@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens ─── */
+@theme {
+  /* Colors – Static palette (Zinc scale) */
+  --color-app: #09090b;
+  --color-panel: #18181b;
+  --color-panelHeader: #27272a;
+  --color-surface: #27272a;
+  --color-tool: #3f3f46;
+  --color-border: #3f3f46;
+  --color-input: #121214;
+  --color-textMain: #f4f4f5;
+  --color-textMuted: #a1a1aa;
+
+  /* Fonts */
+  --font-sans: "Archivo", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Shadows */
+  --shadow-glow: 0 0 0 1px rgb(var(--accent-rgb) / 0.2), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-glow-sm: 0 0 0 1px rgb(var(--accent-rgb) / 0.15);
+  --shadow-3d: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-3d-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-inner-depth: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 20px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.2s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+  --animate-slide-up: slide-up 0.3s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+  --animate-logo-pop: logo-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  --animate-progress: progress 3s linear forwards;
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slide-up {
+  0% { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes logo-pop {
+  0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+  50% { transform: scale(1.3) rotate(15deg); filter: brightness(1.5); }
+  100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+}
+
+@keyframes progress {
+  0% { transform: scaleX(1); }
+  100% { transform: scaleX(0); }
+}
+
+/* ─── Dynamic Accent Colors (runtime CSS vars) ─── */
+:root {
+  --accent-rgb: 0 0 0;
+  --color-accent-hover: 39 39 42;
+  transition: --accent-rgb 0.4s ease, --color-accent-hover 0.4s ease;
+}
+
+/* ─── Accent Utility Classes ─── */
+@utility text-accent {
+  color: rgb(var(--accent-rgb));
+  transition: color 0.4s ease;
+}
+
+@utility bg-accent {
+  background-color: rgb(var(--accent-rgb));
+  transition: background-color 0.4s ease;
+}
+
+@utility border-accent {
+  border-color: rgb(var(--accent-rgb));
+  transition: border-color 0.4s ease;
+}
+
+@utility bg-accentHover {
+  background-color: rgb(var(--color-accent-hover));
+}
+
+/* ─── Base Styles ─── */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+body {
+  background-color: #09090b;
+  color: #f4f4f5;
+  margin: 0;
+  overflow: hidden;
+  font-family: "Archivo", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 13px;
+}
+
+/* ─── Utility Classes ─── */
+@utility superellipse {
+  border-radius: 8px;
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 4px;
+  }
+}
+
+@utility btn-primary {
+  background: rgb(var(--accent-rgb));
+  color: white;
+  transition: background 0.4s ease, transform 0.1s ease;
+}
+
+@utility bg-checkered {
+  background-color: #18181b;
+  background-image:
+    linear-gradient(45deg, #27272a 25%, transparent 25%),
+    linear-gradient(-45deg, #27272a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #27272a 75%),
+    linear-gradient(-45deg, transparent 75%, #27272a 75%);
+  background-size: 20px 20px;
+}
