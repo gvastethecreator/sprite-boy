@@ -70,6 +70,7 @@ function getImageData(img: HTMLImageElement): { width: number, height: number, d
 
 // --- PUBLIC API ---
 
+/** Creates a uniform grid of FrameData from dimensions and GridConfig. */
 export function generateFramesFromGrid(width: number, height: number, grid: GridConfig): FrameData[] {
     const { rows, cols, marginX, marginY, paddingX, paddingY, cellW, cellH } = calculateGeometry(width, height, grid);
     const frames: FrameData[] = [];
@@ -98,16 +99,19 @@ export function generateFramesFromGrid(width: number, height: number, grid: Grid
     return frames;
 }
 
+/** Detects all sprites in an image via flood-fill (runs in Worker). */
 export async function detectSprites(img: HTMLImageElement, threshold: number = 10): Promise<FrameData[]> {
     const { width, height, data } = getImageData(img);
     return runWorkerTask<FrameData[]>('DETECT_SPRITES', { width, height, buffer: data.buffer, threshold });
 }
 
+/** Detects a single sprite at a specific pixel coordinate (runs in Worker). */
 export async function detectSpriteAt(img: HTMLImageElement, startX: number, startY: number, threshold: number = 10) {
     const { width, height, data } = getImageData(img);
     return runWorkerTask<{x:number, y:number, w:number, h:number} | null>('DETECT_ONE', { width, height, buffer: data.buffer, startX, startY, threshold });
 }
 
+/** Removes a target color from an image with tolerance and edge softness (runs in Worker). */
 export async function removeBackground(imgSrc: string, targetHex: string, tolerance: number = 0, softness: number = 20): Promise<Blob | null> {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -146,6 +150,7 @@ export async function removeBackground(imgSrc: string, targetHex: string, tolera
     }
 }
 
+/** Crops a region from an image source and returns a data URI. */
 export async function cropImage(sourceSrc: string, x: number, y: number, w: number, h: number): Promise<string> {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -164,4 +169,5 @@ export async function cropImage(sourceSrc: string, x: number, y: number, w: numb
     });
 }
 
+/** Converts RGB values (0–255) to a hex color string. */
 export const rgbToHex = (r: number, g: number, b: number) => "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);

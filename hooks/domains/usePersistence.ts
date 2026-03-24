@@ -16,6 +16,7 @@ interface PersistenceDeps {
     notify: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
+/** Project save (JSON download) and load (JSON file upload). */
 export function usePersistence(deps: PersistenceDeps) {
     const {
         project, slicerGrid, builderGrid, templateConfig, onionSkin, currentMode,

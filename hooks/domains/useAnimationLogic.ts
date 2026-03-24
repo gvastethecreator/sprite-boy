@@ -5,6 +5,7 @@ import { uiFeedback } from '../../utils/uiFeedback';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+/** Animation CRUD, keyframe management, playback control, and step navigation. */
 export function useAnimationLogic(
     project: ProjectState,
     setProject: (cb: (prev: ProjectState) => ProjectState) => void,

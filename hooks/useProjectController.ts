@@ -47,6 +47,7 @@ const loadUIState = () => {
     };
 };
 
+/** Top-level project orchestrator combining all domain hooks + undo. */
 export function useProjectController() {
     const { state: project, set: setProject, setEphemeral: setProjectEphemeral, undo, redo, canUndo, canRedo } = useUndo<ProjectState>(INITIAL_STATE);
     const ui = useUIController();

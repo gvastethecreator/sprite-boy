@@ -2,9 +2,12 @@
 import { GridConfig, ResizeHandle, SnappingGuide } from '../types';
 import { calculateGeometry } from './renderUtils';
 
+/** Size in pixels of resize handles drawn on frame selection. */
 export const HANDLE_SIZE = 8;
+/** Width in pixels of the ruler area on each canvas edge. */
 export const RULER_SIZE = 24;
 
+/** Returns which resize handle (if any) the mouse is hovering over for a given frame rect. */
 export const getResizeHandle = (mx: number, my: number, x: number, y: number, w: number, h: number, scale: number): ResizeHandle | null => {
     const s = HANDLE_SIZE / scale; 
     const half = s / 2;
@@ -26,6 +29,7 @@ export const getResizeHandle = (mx: number, my: number, x: number, y: number, w:
     return null;
 };
 
+/** Calculates snap offsets so a moving/resizing frame aligns to grid lines or other frames. */
 export const calculateSnapping = (
     x: number, y: number, w: number, h: number, 
     otherObjects: {x:number, y:number, w:number, h:number}[], 
@@ -76,6 +80,7 @@ export const calculateSnapping = (
     return { x: newX, y: newY, guides };
 };
 
+/** Converts a canvas pixel coordinate to a grid cell index (col, row). */
 export const getGridIndexFromPos = (x: number, y: number, canvasW: number, canvasH: number, gridConfig: GridConfig) => {
     const geometry = calculateGeometry(canvasW, canvasH, gridConfig);
     const { rows, cols, marginX, marginY, paddingX, paddingY, cellW, cellH } = geometry;

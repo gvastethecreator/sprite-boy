@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
 import { X, Sparkles, ArrowRight, Layers, Image as ImageIcon, Grid } from 'lucide-react';
-import { BuilderAsset, SlotData } from '../../types';
-import { useProject } from '../../contexts/ProjectContext';
-import { useModalEntrance } from '../../hooks/useGSAPAnimations';
+import { BuilderAsset, SlotData } from '../types';
+import { useProject } from '../contexts/ProjectContext';
+import { useModalEntrance } from '../hooks/useGSAPAnimations';
 
 const GenerationModal: React.FC = () => {
     const { generationModal, setGenerationModal, builderAssets, builderSlots, handleGenerateSlot: onGenerate } = useProject();

@@ -12,6 +12,7 @@ interface RenderLoopDeps {
 }
 
 /** Loads the slicer image into an HTMLImageElement when imageMeta changes. */
+/** Loads an HTMLImageElement from ImageMeta (data URI). */
 export function useImageLoader(imageMeta: ImageMeta | null) {
     const [slicerImgObj, setSlicerImgObj] = useState<HTMLImageElement | null>(null);
 
@@ -30,6 +31,7 @@ export function useImageLoader(imageMeta: ImageMeta | null) {
 }
 
 /** Keeps a cache of loaded HTMLImageElements for builder assets. */
+/** Maintains an HTMLImageElement cache keyed by asset ID. */
 export function useAssetCache(builderAssets: BuilderAsset[] | undefined) {
     const [assetCache, setAssetCache] = useState<Record<string, HTMLImageElement>>({});
 
@@ -48,6 +50,7 @@ export function useAssetCache(builderAssets: BuilderAsset[] | undefined) {
 }
 
 /** Observes the container size and keeps canvasDims in sync. */
+/** Auto-sizes the canvas element to fill its container. */
 export function useCanvasResize(
     canvasRef: React.RefObject<HTMLCanvasElement | null>,
     containerRef: React.RefObject<HTMLDivElement | null>
@@ -85,6 +88,7 @@ export function useCanvasResize(
 }
 
 /** Runs the requestAnimationFrame render loop. */
+/** Drives the requestAnimationFrame render loop via CanvasRenderer. */
 export function useRenderLoop(deps: RenderLoopDeps) {
     const { canvasRef, propsRef, stateRef, slicerImgObj, assetCache } = deps;
     const canvasDims = useCanvasResize(canvasRef, deps.containerRef);
@@ -145,6 +149,7 @@ export function useRenderLoop(deps: RenderLoopDeps) {
 }
 
 /** Auto-resets viewport when image source, mode, or active animation changes. */
+/** Resets viewport (fit-to-view) when image/canvas/mode changes. */
 export function useAutoResetView(
     containerRef: React.RefObject<HTMLDivElement | null>,
     builderCanvas: BuilderCanvasSize | null | undefined,

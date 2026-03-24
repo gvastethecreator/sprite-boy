@@ -16,10 +16,10 @@ interface CanvasToolbarProps {
     onSetAspectRatio?: (ratio: string) => void;
 }
 
-const CanvasToolbar: React.FC<CanvasToolbarProps> = ({ 
-    imageMeta, builderCanvas, currentAspectRatio, onSetAspectRatio 
+const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
+    imageMeta, builderCanvas, currentAspectRatio, onSetAspectRatio
 }) => {
-    
+
     // Only show ratio selector if we have a blank canvas and NO image
     const showRatioSelector = !!builderCanvas && !imageMeta;
 
@@ -31,8 +31,8 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
                 <div className="text-accent">
                     <Maximize2 size={12} />
                 </div>
-                <select 
-                    value={currentAspectRatio || ""} 
+                <select
+                    value={currentAspectRatio || ""}
                     onChange={(e) => onSetAspectRatio?.(e.target.value)}
                     className="bg-transparent border-none text-[10px] font-mono font-bold text-textMain outline-none cursor-pointer hover:text-accent transition-colors"
                 >

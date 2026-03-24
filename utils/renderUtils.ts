@@ -4,6 +4,7 @@ import {
     TemplateConfig, OnionSkinConfig, Keyframe, FrameLabelConfig, SlotAlignment
 } from '../types';
 
+/** Shared state passed to every CanvasRenderer draw method. */
 export interface RenderContext {
     ctx: CanvasRenderingContext2D;
     width: number;
@@ -41,6 +42,7 @@ export interface RenderContext {
  * Calcula las dimensiones exactas de las celdas basadas en la grilla.
  * Aplica márgenes externos y espaciado (gap) interno entre celdas.
  */
+/** Pre-computes derived grid geometry (cell size, total cols/rows) from image dimensions and GridConfig. */
 export function calculateGeometry(width: number, height: number, grid: GridConfig) {
     const { rows, cols, marginX, marginY, paddingX, paddingY } = grid;
     
@@ -65,6 +67,7 @@ export function calculateGeometry(width: number, height: number, grid: GridConfi
 
 let cachedPattern: CanvasPattern | null = null;
 
+/** Stateful renderer that draws the sprite-sheet canvas (checkerboard, grid, frames, overlays, rulers). */
 export class CanvasRenderer {
     public static render(state: RenderContext) {
         const { ctx, width, height, scale, offset, isExport, templateConfig, isPlaying, activeAnimation, isDragOverCanvas, currentMode } = state;

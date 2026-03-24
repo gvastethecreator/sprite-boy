@@ -63,6 +63,7 @@ const TARGET_SVG = `
 </svg>
 `;
 
+/** Built-in sample sprite-sheet assets bundled with the application. */
 export const DEFAULT_ASSETS = [
     {
         id: 'default-hero',

@@ -2,6 +2,7 @@
 import { BuilderAsset } from '../types';
 import { DEFAULT_ASSETS } from './defaultAssets';
 
+/** An asset record persisted in IndexedDB (blob instead of runtime src). */
 export interface StoredAsset extends Omit<BuilderAsset, 'src'> {
     blob: Blob;
 }
@@ -12,6 +13,7 @@ const DB_NAME = 'SpriteSliceDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'assets';
 
+/** Converts a base64 data URI string to a Blob. */
 export function dataURIToBlob(dataURI: string): Blob {
     const splitDataURI = dataURI.split(',');
     const byteString = splitDataURI[0].indexOf('base64') >= 0 ? atob(splitDataURI[1]) : decodeURI(splitDataURI[1]);
@@ -70,6 +72,7 @@ function getDB(): Promise<IDBDatabase> {
     return dbPromise;
 }
 
+/** Retrieves all stored assets from IndexedDB. */
 export async function getAllAssets(): Promise<StoredAsset[]> {
     const db = await getDB();
     return new Promise((resolve, reject) => {
@@ -81,6 +84,7 @@ export async function getAllAssets(): Promise<StoredAsset[]> {
     });
 }
 
+/** Persists a new asset (with its image blob) to IndexedDB. */
 export async function addAsset(asset: Omit<BuilderAsset, 'src' | 'id'>, id: string, blob: Blob): Promise<void> {
     const db = await getDB();
     return new Promise((resolve, reject) => {
@@ -92,6 +96,7 @@ export async function addAsset(asset: Omit<BuilderAsset, 'src' | 'id'>, id: stri
     });
 }
 
+/** Deletes an asset from IndexedDB by id. */
 export async function deleteAsset(id: string): Promise<void> {
     const db = await getDB();
     return new Promise((resolve, reject) => {

@@ -6,6 +6,7 @@ import { uiFeedback } from '../../utils/uiFeedback';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+/** Slicer mode: auto-detect sprites, manage frames, background removal. */
 export function useSlicerLogic(
     project: ProjectState,
     setProject: (cb: (prev: ProjectState) => ProjectState) => void,

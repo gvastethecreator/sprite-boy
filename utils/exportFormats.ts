@@ -15,6 +15,7 @@ interface ExportFrameInfo {
     }>;
 }
 
+/** Generates a generic JSON sprite-sheet descriptor with frame rects, hitboxes and pivot points. */
 export const generateGenericJSON = (
     anim: SpriteAnimation, 
     frames: FrameData[], 
@@ -67,6 +68,7 @@ export const generateGenericJSON = (
     }, null, 2);
 };
 
+/** Generates a Phaser 3–compatible JSON atlas (hash format). */
 export const generatePhaser3 = (
     anim: SpriteAnimation, 
     frames: FrameData[], 
@@ -87,6 +89,7 @@ export const generatePhaser3 = (
 this.anims.create(${JSON.stringify(config, null, 2)});`;
 };
 
+/** Generates a Godot SpriteFrames resource file (.tres) for the given animations. */
 export const generateGodotSpriteFrames = (
     anim: SpriteAnimation,
     frames: FrameData[],

@@ -8,6 +8,7 @@ export interface Modifiers {
 }
 
 /** Tracks keyboard modifier state and Space key for canvas pan mode. */
+/** Tracks space-bar and modifier keys for canvas tool switching. */
 export function useCanvasKeyboard() {
     const [isSpacePressed, setIsSpacePressed] = useState(false);
     const [modifiers, setModifiers] = useState<Modifiers>({ shift: false, ctrl: false, alt: false });
@@ -38,6 +39,7 @@ export function useCanvasKeyboard() {
 }
 
 /** Manages initial canvas creation form state (width/height/ratio). */
+/** Manages width/height/ratio state for the "create new canvas" form. */
 export function useInitCanvasForm() {
     const [initW, setInitW] = useState('1024');
     const [initH, setInitH] = useState('1024');

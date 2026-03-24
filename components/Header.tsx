@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { AppMode } from '../../types';
+import { AppMode } from '../types';
 import { LayoutGrid, Layers, FileImage, Upload, Download, Settings, Undo2, Redo2, ChevronDown, Save, FolderOpen, HelpCircle, Box, FilePlus } from 'lucide-react';
-import { useProject } from '../../contexts/ProjectContext';
-import { useLogoPop } from '../../hooks/useGSAPAnimations';
+import { useProject } from '../contexts/ProjectContext';
+import { useLogoPop } from '../hooks/useGSAPAnimations';
 
 interface HeaderProps {
     onAnalyzeSheet: () => void;

@@ -5,6 +5,7 @@ import { uiFeedback } from '../utils/uiFeedback';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+/** Central UI state: toasts, modals, loading, viewport, generation panel. */
 export function useUIController() {
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [isLoading, setIsLoading] = useState(false);
