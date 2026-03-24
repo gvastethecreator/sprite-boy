@@ -3,18 +3,18 @@ import React, { useRef, useState, useCallback } from 'react';
 import Header from './Header';
 import LeftSidebar from './LeftSidebar';
 import RightSidebar from './RightSidebar';
-import CanvasArea from './CanvasArea';
-import Timeline from './Timeline';
-import ExportModal from './ExportModal';
-import SettingsModal from './SettingsModal';
-import HelpModal from './HelpModal';
-import ToastContainer from './ToastContainer';
-import CommandPalette from './CommandPalette';
-import GenerationModal from './GenerationModal';
-import AnalysisModal from './AnalysisModal';
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import { useProject } from '../contexts/ProjectContext';
-import { AppMode, CanvasHandle } from '../types';
+import CanvasArea from '../canvas/CanvasArea';
+import Timeline from '../common/Timeline';
+import ExportModal from '../overlays/ExportModal';
+import SettingsModal from '../overlays/SettingsModal';
+import HelpModal from '../overlays/HelpModal';
+import ToastContainer from '../overlays/ToastContainer';
+import CommandPalette from '../overlays/CommandPalette';
+import GenerationModal from '../overlays/GenerationModal';
+import AnalysisModal from '../overlays/AnalysisModal';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useProject } from '../../contexts/ProjectContext';
+import { AppMode, CanvasHandle } from '../../types';
 import { GripHorizontal } from 'lucide-react';
 
 const AppLayout: React.FC = () => {
@@ -149,7 +149,7 @@ const AppLayout: React.FC = () => {
             <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} commands={commands} />
             <ExportModal
                 onGenerateCode={handleGenerateCode}
-                onExportPng={async g => { const b = await canvasRef.current?.exportSnapshot(g); if (b) { const u = URL.createObjectURL(b); const l = document.createElement('a'); l.href = u; l.download = 'export.png'; l.click(); } }}
+                onExportPng={async g => { const b = await canvasRef.current?.exportSnapshot(g); if (b) { const u = URL.createObjectURL(b); const l = document.createElement('a'); l.href = u; l.download = 'export.png'; l.click(); URL.revokeObjectURL(u); } }}
                 onExportZip={() => handleExportZip(canvasRef.current)}
                 onExportGif={(aid) => handleExportGif(aid, canvasRef.current)}
                 onCopyCode={c => { navigator.clipboard.writeText(c); showToast('Copied!', 'success'); }}

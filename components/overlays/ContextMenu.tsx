@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
-import { ContextMenuItem } from '../types';
+import { ContextMenuItem } from '../../types';
 
 interface ContextMenuProps {
     x: number;

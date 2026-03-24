@@ -4,8 +4,23 @@ import { calculateGeometry } from './renderUtils';
 
 // --- CLIENT SIDE BRIDGE ---
 
+const WORKER_TIMEOUT_MS = 30_000;
+
 let workerInstance: Worker | null = null;
-const pendingPromises: Record<string, { resolve: Function, reject: Function }> = {};
+const pendingPromises: Record<string, { resolve: Function, reject: Function, timer: ReturnType<typeof setTimeout> }> = {};
+
+function destroyWorker() {
+    if (workerInstance) {
+        workerInstance.terminate();
+        workerInstance = null;
+    }
+    // Reject all pending promises
+    for (const id of Object.keys(pendingPromises)) {
+        pendingPromises[id].reject(new Error('Worker terminated'));
+        clearTimeout(pendingPromises[id].timer);
+        delete pendingPromises[id];
+    }
+}
 
 function getWorker() {
     if (!workerInstance) {
@@ -13,10 +28,15 @@ function getWorker() {
         workerInstance.onmessage = (e) => {
             const { type, id, result, error } = e.data;
             if (pendingPromises[id]) {
+                clearTimeout(pendingPromises[id].timer);
                 if (type === 'SUCCESS') pendingPromises[id].resolve(result);
                 else pendingPromises[id].reject(new Error(error));
                 delete pendingPromises[id];
             }
+        };
+        workerInstance.onerror = (e) => {
+            console.error('Worker crashed:', e.message);
+            destroyWorker(); // Will reject all pending and force re-creation on next call
         };
     }
     return workerInstance;
@@ -25,7 +45,13 @@ function getWorker() {
 function runWorkerTask<T>(type: string, payload: any, transfer: Transferable[] = []): Promise<T> {
     return new Promise((resolve, reject) => {
         const id = Math.random().toString(36).substr(2);
-        pendingPromises[id] = { resolve, reject };
+        const timer = setTimeout(() => {
+            if (pendingPromises[id]) {
+                delete pendingPromises[id];
+                reject(new Error(`Worker task "${type}" timed out after ${WORKER_TIMEOUT_MS}ms`));
+            }
+        }, WORKER_TIMEOUT_MS);
+        pendingPromises[id] = { resolve, reject, timer };
         getWorker().postMessage({ type, id, payload }, transfer);
     });
 }

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { X, Keyboard, Command } from 'lucide-react';
+import { useModalEntrance } from '../../hooks/useGSAPAnimations';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -21,11 +22,12 @@ const ShortcutRow = ({ keys, desc }: { keys: string[], desc: string }) => (
 );
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
+  const modalRef = useModalEntrance();
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-panel border border-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+    <div ref={modalRef} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div data-modal-panel className="bg-panel border border-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
           <h2 className="text-lg font-semibold text-textMain flex items-center gap-2">

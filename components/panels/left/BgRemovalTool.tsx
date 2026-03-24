@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Eraser, Eye, Pipette, X, Zap, AlertTriangle } from 'lucide-react';
-import NumberControl from '../../NumberControl';
+import NumberControl from '../../common/NumberControl';
 import { Checkbox } from '../../common/PanelComponents';
 
 interface BgRemovalToolProps {

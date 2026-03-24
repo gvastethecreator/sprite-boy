@@ -20,7 +20,10 @@
     "lint:log": "node scripts/log-runner.mjs lint \"oxlint .\""
   },
   "dependencies": {
+    "@fontsource/archivo": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@google/genai": "^1.31.0",
+    "@gsap/react": "^2.1.2",
     "gifshot": "^0.4.5",
     "gsap": "^3.12.7",
     "jszip": "^3.10.1",

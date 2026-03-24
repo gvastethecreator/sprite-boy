@@ -1,14 +1,14 @@
 
 import React, { useState } from 'react';
-import { AppMode } from '../types';
+import { AppMode } from '../../types';
 import { Monitor, Image as ImageIcon, Grid3X3, Layout, Camera, PlusSquare, Layers, Film, Box, CheckCircle2, Sparkles, BrainCircuit } from 'lucide-react';
-import SlicerTools from './panels/left/SlicerTools';
-import BgRemovalTool from './panels/left/BgRemovalTool';
-import AnimationList from './panels/left/AnimationList';
-import AssetLibrary from './panels/left/AssetLibrary';
-import GenerationPanel from './panels/right/GenerationPanel';
-import NumberControl from './NumberControl';
-import { useProject } from '../contexts/ProjectContext';
+import SlicerTools from '../panels/left/SlicerTools';
+import BgRemovalTool from '../panels/left/BgRemovalTool';
+import AnimationList from '../panels/left/AnimationList';
+import AssetLibrary from '../panels/left/AssetLibrary';
+import GenerationPanel from '../panels/right/GenerationPanel';
+import NumberControl from '../common/NumberControl';
+import { useProject } from '../../contexts/ProjectContext';
 
 const SectionHeader = ({ title, icon: Icon, colorClass = "text-accent", action }: { title: string, icon?: any, colorClass?: string, action?: React.ReactNode }) => (
     <div className="h-12 bg-white/5 flex items-center justify-between px-4 shrink-0 select-none border-b border-white/5 backdrop-blur-md">

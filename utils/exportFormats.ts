@@ -1,6 +1,19 @@
 
-import { FrameData, SpriteAnimation, GridConfig } from '../types';
+import { FrameData, SpriteAnimation, GridConfig, HitboxData } from '../types';
 import { calculateGeometry } from './renderUtils';
+
+interface ExportFrameInfo {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    pivot: { x: number; y: number };
+    collision?: Array<{
+        label: string;
+        type: HitboxData['type'];
+        rect: { x: number; y: number; w: number; h: number };
+    }>;
+}
 
 export const generateGenericJSON = (
     anim: SpriteAnimation, 
@@ -20,7 +33,7 @@ export const generateGenericJSON = (
         const x = marginX + (c * (cellW + paddingX));
         const y = marginY + (r * (cellH + paddingY));
         
-        const frameInfo: any = {
+        const frameInfo: ExportFrameInfo = {
             x: sourceFrame ? sourceFrame.x : Math.round(x),
             y: sourceFrame ? sourceFrame.y : Math.round(y),
             w: sourceFrame ? sourceFrame.w : Math.round(cellW),

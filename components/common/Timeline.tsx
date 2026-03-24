@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Film, Grid, Play, Pause, SkipBack, SkipForward, ChevronUp, ChevronDown, Clock, Layers, Square, X, PlusCircle, Box, Scissors } from 'lucide-react';
-import { FrameData, ImageMeta, AppMode, SlotData, BuilderAsset, BuilderCanvasSize, SpriteAnimation, Keyframe, DND_KEYFRAME_TYPE, DND_ASSET_TYPE, DND_FRAME_TYPE } from '../types';
-import { useProject } from '../contexts/ProjectContext';
+import { FrameData, ImageMeta, AppMode, SlotData, BuilderAsset, BuilderCanvasSize, SpriteAnimation, Keyframe, DND_KEYFRAME_TYPE, DND_ASSET_TYPE, DND_FRAME_TYPE } from '../../types';
+import { useProject } from '../../contexts/ProjectContext';
 
 const Timeline: React.FC = () => {
   const {

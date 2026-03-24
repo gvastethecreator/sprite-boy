@@ -10,16 +10,16 @@ import {
   AppMode, BuilderCanvasSize, BuilderAsset, SpriteAnimation, Keyframe, 
   TemplateConfig, OnionSkinConfig, GenerationPanelState, 
   SlotData, FrameData, ImageMeta, GridConfig, SlotAlignment, HitboxType 
-} from '../types';
-import NumberControl from './NumberControl';
-import FrameProperties from './panels/right/FrameProperties';
-import AnimationProperties from './panels/right/AnimationProperties';
-import FrameList from './panels/right/FrameList';
-import AssetLibrary from './panels/left/AssetLibrary';
-import { SectionHeader } from './common/PanelComponents';
-import { ASPECT_RATIOS } from './CanvasToolbar';
-import { RATIO_PRESETS, DEFAULT_SLOT_DATA } from '../hooks/domains/useBuilderLogic';
-import { useProject } from '../contexts/ProjectContext';
+} from '../../types';
+import NumberControl from '../common/NumberControl';
+import FrameProperties from '../panels/right/FrameProperties';
+import AnimationProperties from '../panels/right/AnimationProperties';
+import FrameList from '../panels/right/FrameList';
+import AssetLibrary from '../panels/left/AssetLibrary';
+import { SectionHeader } from '../common/PanelComponents';
+import { ASPECT_RATIOS } from '../canvas/CanvasToolbar';
+import { RATIO_PRESETS, DEFAULT_SLOT_DATA } from '../../hooks/domains/useBuilderLogic';
+import { useProject } from '../../contexts/ProjectContext';
 
 const ALIGNMENTS: { id: SlotAlignment, icon: any }[] = [
     { id: 'top-left', icon: AlignStartVertical }, { id: 'top-center', icon: AlignCenterVertical }, { id: 'top-right', icon: AlignEndVertical },

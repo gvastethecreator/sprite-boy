@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Copy, Download, Code, FileImage, Layers, Film, Sparkles, Check, Loader2 } from 'lucide-react';
-import { ExportModalState, SpriteAnimation, CodeFormat } from '../types';
-import { useProject } from '../contexts/ProjectContext';
+import { ExportModalState, SpriteAnimation, CodeFormat } from '../../types';
+import { useProject } from '../../contexts/ProjectContext';
+import { useModalEntrance } from '../../hooks/useGSAPAnimations';
 
 interface ExportModalProps {
   onGenerateCode: (animId: string, scale: number, format: CodeFormat) => string;
@@ -20,6 +21,8 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const onClose = () => setExportModal({ ...exportModal, isOpen: false });
 
   if (!isOpen || !type) return null;
+
+  const modalRef = useModalEntrance();
 
   const [pngGrid, setPngGrid] = useState(false);
   const [selectedAnimId, setSelectedAnimId] = useState<string>(animations[0]?.id || '');
@@ -64,8 +67,8 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const Icon = Icons[type];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-panel border border-border rounded-xl shadow-modal w-full max-w-2xl flex flex-col overflow-hidden max-h-[90vh] animate-scale-in">
+    <div ref={modalRef} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div data-modal-panel className="bg-panel border border-border rounded-xl shadow-modal w-full max-w-2xl flex flex-col overflow-hidden max-h-[90vh]">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">

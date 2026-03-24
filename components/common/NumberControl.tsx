@@ -79,9 +79,24 @@ const NumberControl: React.FC<NumberControlProps> = ({
   const increment = () => {
       if(disabled) return;
       const next = value + step;
-      onChange(next);
-      if(onAfterChange) onAfterChange(next);
+      const clamped = max !== undefined ? Math.min(max, next) : next;
+      onChange(clamped);
+      if(onAfterChange) onAfterChange(clamped);
   }
+
+  const decrement = () => {
+      if(disabled) return;
+      const next = value - step;
+      const clamped = min !== undefined ? Math.max(min, next) : next;
+      onChange(clamped);
+      if(onAfterChange) onAfterChange(clamped);
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (disabled) return;
+      if (e.key === 'ArrowUp') { e.preventDefault(); increment(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); decrement(); }
+  };
 
   const percentage = (min !== undefined && max !== undefined) 
       ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
@@ -116,7 +131,13 @@ const NumberControl: React.FC<NumberControlProps> = ({
                     value={value}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
+                    onKeyDown={handleKeyDown}
                     disabled={disabled}
+                    role="spinbutton"
+                    aria-label={label || 'Numeric value'}
+                    aria-valuenow={value}
+                    aria-valuemin={min}
+                    aria-valuemax={max}
                     className="flex-1 w-0 min-w-0 bg-transparent text-xs text-textMain px-2 outline-none font-mono appearance-none border-none focus:ring-0"
                 />
                 
@@ -124,8 +145,8 @@ const NumberControl: React.FC<NumberControlProps> = ({
 
                 {!disabled && (
                     <div className="flex flex-col border-l border-white/5 w-5 h-full shrink-0 bg-white/5">
-                        <button onClick={increment} tabIndex={-1} className="flex-1 hover:bg-white/10 flex items-center justify-center text-textMuted hover:text-white transition-colors border-none"><ChevronUp size={10}/></button>
-                        <button onClick={() => { onChange(value - step); if(onAfterChange) onAfterChange(value - step); }} tabIndex={-1} className="flex-1 hover:bg-white/10 flex items-center justify-center text-textMuted hover:text-white border-t border-white/5 transition-colors border-none"><ChevronDown size={10}/></button>
+                        <button onClick={increment} tabIndex={-1} aria-label="Increment" className="flex-1 hover:bg-white/10 flex items-center justify-center text-textMuted hover:text-white transition-colors border-none"><ChevronUp size={10}/></button>
+                        <button onClick={decrement} tabIndex={-1} aria-label="Decrement" className="flex-1 hover:bg-white/10 flex items-center justify-center text-textMuted hover:text-white border-t border-white/5 transition-colors border-none"><ChevronDown size={10}/></button>
                     </div>
                 )}
             </div>
@@ -139,6 +160,7 @@ const NumberControl: React.FC<NumberControlProps> = ({
                 value={value}
                 onChange={(e) => onChange(parseFloat(e.target.value))}
                 onMouseUp={() => onAfterChange && onAfterChange(value)}
+                aria-label={label ? `${label} slider` : 'Slider'}
                 className="custom-slider block w-full cursor-pointer accent-accent"
                 style={{ '--slider-progress': `${percentage}%` } as React.CSSProperties}
             />
