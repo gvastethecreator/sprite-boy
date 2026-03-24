@@ -15,8 +15,8 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
-    const filteredCommands = commands.filter(cmd => 
-        cmd.label.toLowerCase().includes(query.toLowerCase()) || 
+    const filteredCommands = commands.filter(cmd =>
+        cmd.label.toLowerCase().includes(query.toLowerCase()) ||
         cmd.category.toLowerCase().includes(query.toLowerCase())
     );
 
@@ -67,13 +67,13 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
 
     return (
         <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/50 backdrop-blur-sm animate-in fade-in duration-100" onClick={onClose}>
-            <div 
+            <div
                 className="w-full max-w-xl bg-panel border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-top-2 duration-150 ring-1 ring-white/10"
                 onClick={e => e.stopPropagation()}
             >
                 <div className="h-12 border-b border-border flex items-center px-4 gap-3 bg-input">
                     <Search className="text-textMuted" size={18} />
-                    <input 
+                    <input
                         ref={inputRef}
                         className="flex-1 bg-transparent border-none outline-none text-textMain text-sm placeholder:text-textMuted/50 h-full"
                         placeholder="Type a command or search..."
@@ -87,7 +87,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
                         </kbd>
                     </div>
                 </div>
-                
+
                 <div ref={listRef} className="max-h-[300px] overflow-y-auto custom-scrollbar p-2 space-y-1 bg-panel">
                     {filteredCommands.length === 0 ? (
                         <div className="py-8 text-center text-textMuted text-sm">No results found.</div>
@@ -121,11 +121,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
                         ))
                     )}
                 </div>
-                
+
                 <div className="bg-panelHeader border-t border-border px-3 py-1.5 flex items-center justify-between text-[10px] text-textMuted">
                     <span>Protip: Use <kbd className="font-sans">Ctrl+K</kbd> to open this</span>
                     <div className="flex items-center gap-2">
-                         <span>Navigate</span> <ArrowRight size={10} /> <span>Select</span>
+                        <span>Navigate</span> <ArrowRight size={10} /> <span>Select</span>
                     </div>
                 </div>
             </div>

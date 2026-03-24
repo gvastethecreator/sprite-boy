@@ -1,7 +1,7 @@
 
 import React, { useRef } from 'react';
 import { X, XCircle, Info, CheckCircle2 } from 'lucide-react';
-import { ToastData } from '../../types';
+import { ToastData } from '../types';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 

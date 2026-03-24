@@ -28,6 +28,7 @@ interface CanvasMouseDeps {
     onSwapSlots: ((a: number, b: number) => void) | undefined;
 }
 
+/** All canvas mouse interaction: drag, pan, zoom, eyedropper, DnD, slot swap. */
 export function useCanvasMouse(deps: CanvasMouseDeps) {
     const {
         containerRef, canvasRef, isEmpty, viewport, setViewport,

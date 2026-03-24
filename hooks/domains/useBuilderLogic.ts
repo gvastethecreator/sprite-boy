@@ -7,6 +7,7 @@ import { addAsset, deleteAsset, dataURIToBlob } from '../../utils/db';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+/** Preset canvas ratios mapping name → pixel dimensions. */
 export const RATIO_PRESETS: Record<string, { w: number, h: number }> = {
     '1:1': { w: 1024, h: 1024 },
     '3:2': { w: 1264, h: 848 },
@@ -20,6 +21,7 @@ export const RATIO_PRESETS: Record<string, { w: number, h: number }> = {
     '2:3': { w: 848, h: 1264 },
 };
 
+/** Creates default slot data for a builder grid cell. */
 export const DEFAULT_SLOT_DATA = (idx: number, assetId: string): SlotData => ({
     gridIndex: idx,
     assetId,
@@ -36,6 +38,7 @@ export const DEFAULT_SLOT_DATA = (idx: number, assetId: string): SlotData => ({
     flipY: false
 });
 
+/** Builder mode: canvas CRUD, slot management, asset library, AI generation. */
 export function useBuilderLogic(
     project: ProjectState,
     setProject: (cb: (prev: ProjectState) => ProjectState) => void,

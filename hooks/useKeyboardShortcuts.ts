@@ -23,6 +23,7 @@ interface ShortcutsConfig {
     activeAnimationId: string | null;
 }
 
+/** Registers global keyboard shortcuts for undo, delete, nudge, copy, mode switch, etc. */
 export const useKeyboardShortcuts = ({
     undo, redo, deleteSelection, nudge, copyHitboxes, pasteHitboxes,
     togglePlay, stepFrame, toggleCommandPalette, resetView, closeModals,

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { X, BrainCircuit } from 'lucide-react';
-import { useModalEntrance } from '../../hooks/useGSAPAnimations';
+import { useModalEntrance } from '../hooks/useGSAPAnimations';
 
 interface AnalysisModalProps {
     isOpen: boolean;

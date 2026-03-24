@@ -9,6 +9,7 @@ interface HistoryState<T> {
 
 const MAX_HISTORY_STEPS = 50; 
 
+/** Generic undo/redo hook with bounded history (max 50 steps). */
 export function useUndo<T>(initialPresent: T) {
   const [state, setState] = useState<HistoryState<T>>({
     past: [],

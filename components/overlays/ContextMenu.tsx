@@ -31,7 +31,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
     }
 
     return (
-        <div 
+        <div
             ref={menuRef}
             className="fixed z-[9999] min-w-[180px] bg-panel/95 backdrop-blur-md border border-border rounded-lg shadow-2xl py-1 flex flex-col animate-in fade-in zoom-in-95 duration-100"
             style={style}

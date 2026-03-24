@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Copy, Download, Code, FileImage, Layers, Film, Sparkles, Check, Loader2 } from 'lucide-react';
-import { ExportModalState, SpriteAnimation, CodeFormat } from '../../types';
-import { useProject } from '../../contexts/ProjectContext';
-import { useModalEntrance } from '../../hooks/useGSAPAnimations';
+import { ExportModalState, SpriteAnimation, CodeFormat } from '../types';
+import { useProject } from '../contexts/ProjectContext';
+import { useModalEntrance } from '../hooks/useGSAPAnimations';
 
 interface ExportModalProps {
     onGenerateCode: (animId: string, scale: number, format: CodeFormat) => string;

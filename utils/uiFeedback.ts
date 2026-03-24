@@ -101,4 +101,5 @@ class SoundManager {
     }
 }
 
+/** Singleton SoundManager for UI audio feedback (click, success, error, etc.). */
 export const uiFeedback = new SoundManager();

@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { X, Palette, Monitor, Save, HelpCircle, Check, Volume2, Moon, Sun, Magnet, Tag } from 'lucide-react';
-import { UserPreferences, FrameLabelPosition } from '../../types';
-import NumberControl from '../common/NumberControl';
-import { useModalEntrance } from '../../hooks/useGSAPAnimations';
+import { UserPreferences, FrameLabelPosition } from '../types';
+import NumberControl from './NumberControl';
+import { useModalEntrance } from '../hooks/useGSAPAnimations';
 
 interface SettingsModalProps {
   isOpen: boolean;

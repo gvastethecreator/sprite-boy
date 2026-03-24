@@ -15,6 +15,7 @@ interface ExportDeps {
     notify: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
+/** Handles ZIP, GIF, and code-generation exports. */
 export function useExportLogic(deps: ExportDeps) {
     const { project, currentMode, activeGrid, builderGrid, setIsLoading, setLoadingMessage, notify } = deps;
 

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { X, Keyboard, Command } from 'lucide-react';
-import { useModalEntrance } from '../../hooks/useGSAPAnimations';
+import { useModalEntrance } from '../hooks/useGSAPAnimations';
 
 interface HelpModalProps {
     isOpen: boolean;
