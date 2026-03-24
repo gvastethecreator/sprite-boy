@@ -198,67 +198,258 @@ export class CanvasRenderer {
         if (!isExport && currentMode !== AppMode.ANIMATION) {
             const { rows, cols, marginX, marginY, paddingX, paddingY, cellW, cellH } = calculateGeometry(width, height, gridConfig);
             if (rows * cols < 5000) {
-                ctx.save(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 1 / scale; ctx.beginPath();
-                for (let r = 0; r < rows; r++) { 
-                    for (let c = 0; c < cols; c++) { 
-                        const x = marginX + (c * (cellW + paddingX)); 
-                        const y = marginY + (r * (cellH + paddingY)); 
-                        ctx.rect(x, y, cellW, cellH); 
-                    } 
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 1 / scale;
+                ctx.beginPath();
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const x = marginX + (c * (cellW + paddingX));
+                        const y = marginY + (r * (cellH + paddingY));
+                        ctx.rect(x, y, cellW, cellH);
+                    }
                 }
-                ctx.stroke(); ctx.restore();
+                ctx.stroke();
+                ctx.restore();
             }
         }
         
         if (selectedFrameIndex !== null && frames[selectedFrameIndex]) {
-            const f = frames[selectedFrameIndex]; if (f.hidden && !isExport) return; 
-            ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2 / scale; ctx.strokeRect(f.x, f.y, f.w, f.h);
+            const f = frames[selectedFrameIndex];
+            if (f.hidden && !isExport) return;
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2 / scale;
+            ctx.strokeRect(f.x, f.y, f.w, f.h);
             this.drawFrameLabel(ctx, f.id, f.x, f.y, f.w, f.h, scale, labelConfig);
         }
     }
 
     private static renderDualView(state: RenderContext, cw: number, ch: number) {
-        const { ctx, activeAnimation, playbackFrameIndex, width, height, scale, offset, slicerImgObj, frames, labelConfig, builderSlots, assetCache } = state;
+        const {
+            ctx, activeAnimation, playbackFrameIndex, width, height,
+            scale, offset, slicerImgObj, frames, labelConfig,
+            builderSlots, assetCache,
+        } = state;
         if (!activeAnimation) return;
-        const midX = Math.floor(cw * 0.6); 
-        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, midX, ch); ctx.clip();
-        ctx.save(); ctx.translate(offset.x, offset.y); ctx.scale(scale, scale);
+
+        // --- Left panel: source frames ---
+        const midX = Math.floor(cw * 0.6);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, midX, ch);
+        ctx.clip();
+
+        ctx.save();
+        ctx.translate(offset.x, offset.y);
+        ctx.scale(scale, scale);
         this.drawCheckerboard(ctx, width, height);
         this.renderBuilderMode({ ...state, isExport: false });
         this.renderSlicerMode({ ...state, isExport: false });
+
         const usedFrameIds = new Set(activeAnimation.keyframes.map(kf => kf.sourceIndex));
         ctx.lineWidth = 2 / scale;
-        frames.forEach(f => { if (!f.hidden && usedFrameIds.has(f.id)) { ctx.strokeStyle = '#fbbf24'; ctx.strokeRect(f.x, f.y, f.w, f.h); } });
-        const currentKf = activeAnimation.keyframes[playbackFrameIndex];
-        if (currentKf) { const f = frames.find(fr => fr.id === currentKf.sourceIndex); if (f && !f.hidden) { ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 3 / scale; ctx.strokeRect(f.x, f.y, f.w, f.h); this.drawFrameLabel(ctx, f.id, f.x, f.y, f.w, f.h, scale, labelConfig); } }
-        ctx.restore(); ctx.restore();
+        frames.forEach(f => {
+            if (!f.hidden && usedFrameIds.has(f.id)) {
+                ctx.strokeStyle = '#fbbf24';
+                ctx.strokeRect(f.x, f.y, f.w, f.h);
+            }
+        });
 
-        ctx.save(); ctx.beginPath(); ctx.rect(midX, 0, cw - midX, ch); ctx.clip();
-        ctx.fillStyle = '#0a0a0c'; ctx.fillRect(midX, 0, cw - midX, ch);
-        ctx.strokeStyle = '#27272a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(midX, 0); ctx.lineTo(midX, ch); ctx.stroke();
+        const currentKf = activeAnimation.keyframes[playbackFrameIndex];
+        if (currentKf) {
+            const f = frames.find(fr => fr.id === currentKf.sourceIndex);
+            if (f && !f.hidden) {
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 3 / scale;
+                ctx.strokeRect(f.x, f.y, f.w, f.h);
+                this.drawFrameLabel(ctx, f.id, f.x, f.y, f.w, f.h, scale, labelConfig);
+            }
+        }
+        ctx.restore();
+        ctx.restore();
+
+        // --- Right panel: animation preview ---
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(midX, 0, cw - midX, ch);
+        ctx.clip();
+
+        ctx.fillStyle = '#0a0a0c';
+        ctx.fillRect(midX, 0, cw - midX, ch);
+        ctx.strokeStyle = '#27272a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(midX, 0);
+        ctx.lineTo(midX, ch);
+        ctx.stroke();
+
         const previewSize = Math.min(cw - midX - 64, ch - 160);
-        const px = midX + (cw - midX - previewSize) / 2, py = (ch - previewSize) / 2 - 20;
-        ctx.save(); ctx.translate(px, py); ctx.save(); this.drawCheckerboard(ctx, previewSize, previewSize); ctx.restore();
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.strokeRect(0, 0, previewSize, previewSize);
+        const px = midX + (cw - midX - previewSize) / 2;
+        const py = (ch - previewSize) / 2 - 20;
+
+        ctx.save();
+        ctx.translate(px, py);
+
+        ctx.save();
+        this.drawCheckerboard(ctx, previewSize, previewSize);
+        ctx.restore();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.strokeRect(0, 0, previewSize, previewSize);
+
         if (currentKf) {
             const frame = frames.find(f => f.id === currentKf.sourceIndex);
             const slot = builderSlots[currentKf.sourceIndex];
             const rotRad = (currentKf.rotation || 0) * Math.PI / 180;
-            const sx = currentKf.scaleX ?? 1, sy = currentKf.scaleY ?? 1, alpha = currentKf.opacity ?? 1;
+            const sx = currentKf.scaleX ?? 1;
+            const sy = currentKf.scaleY ?? 1;
+            const alpha = currentKf.opacity ?? 1;
+
             if (slot && assetCache[slot.assetId]) {
-                const img = assetCache[slot.assetId]; const sBase = Math.min(previewSize / img.width, previewSize / img.height) * 0.8;
-                ctx.save(); ctx.globalAlpha = alpha; ctx.translate(previewSize / 2, previewSize / 2); ctx.rotate(rotRad); ctx.scale(sBase * sx * (slot.flipX ? -1 : 1), sBase * sy * (slot.flipY ? -1 : 1)); ctx.translate(-img.width * currentKf.pivotX, -img.height * currentKf.pivotY); ctx.drawImage(img, 0, 0); this.drawPivotMarker(ctx, img.width, img.height, currentKf.pivotX, currentKf.pivotY, sBase * Math.max(sx, sy)); ctx.restore();
+                const img = assetCache[slot.assetId];
+                const sBase = Math.min(previewSize / img.width, previewSize / img.height) * 0.8;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(previewSize / 2, previewSize / 2);
+                ctx.rotate(rotRad);
+                ctx.scale(sBase * sx * (slot.flipX ? -1 : 1), sBase * sy * (slot.flipY ? -1 : 1));
+                ctx.translate(-img.width * currentKf.pivotX, -img.height * currentKf.pivotY);
+                ctx.drawImage(img, 0, 0);
+                this.drawPivotMarker(ctx, img.width, img.height, currentKf.pivotX, currentKf.pivotY, sBase * Math.max(sx, sy));
+                ctx.restore();
             } else if (frame && slicerImgObj) {
                 const sBase = Math.min(previewSize / frame.w, previewSize / frame.h) * 0.8;
-                ctx.save(); ctx.globalAlpha = alpha; ctx.translate(previewSize / 2, previewSize / 2); ctx.rotate(rotRad); ctx.scale(sBase * sx, sBase * sy); ctx.translate(-frame.w * currentKf.pivotX, -frame.h * currentKf.pivotY); ctx.drawImage(slicerImgObj, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h); this.drawPivotMarker(ctx, frame.w, frame.h, currentKf.pivotX, currentKf.pivotY, sBase * Math.max(sx, sy)); ctx.restore();
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(previewSize / 2, previewSize / 2);
+                ctx.rotate(rotRad);
+                ctx.scale(sBase * sx, sBase * sy);
+                ctx.translate(-frame.w * currentKf.pivotX, -frame.h * currentKf.pivotY);
+                ctx.drawImage(slicerImgObj, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
+                this.drawPivotMarker(ctx, frame.w, frame.h, currentKf.pivotX, currentKf.pivotY, sBase * Math.max(sx, sy));
+                ctx.restore();
             }
         }
-        ctx.fillStyle = 'white'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(`${activeAnimation.name.toUpperCase()}`, previewSize / 2, previewSize + 30);
-        ctx.restore(); ctx.restore();
+
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${activeAnimation.name.toUpperCase()}`, previewSize / 2, previewSize + 30);
+        ctx.restore();
+        ctx.restore();
     }
 
-    private static drawPivotMarker(ctx: CanvasRenderingContext2D, w: number, h: number, px: number, py: number, curScale: number) { ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5 / curScale; ctx.beginPath(); const pl = 8 / curScale; const ax = w * px, ay = h * py; ctx.moveTo(ax - pl, ay); ctx.lineTo(ax + pl, ay); ctx.moveTo(ax, ay - pl); ctx.lineTo(ax, ay + pl); ctx.stroke(); }
-    private static drawCheckerboard(ctx: CanvasRenderingContext2D, w: number, h: number) { if (!cachedPattern) { const pC = document.createElement('canvas'); pC.width = 32; pC.height = 32; const pX = pC.getContext('2d'); if (pX) { pX.fillStyle = '#141418'; pX.fillRect(0, 0, 32, 32); pX.fillStyle = '#1c1c22'; pX.fillRect(0, 0, 16, 16); pX.fillRect(16, 16, 16, 16); cachedPattern = ctx.createPattern(pC, 'repeat'); } } if (cachedPattern) { ctx.fillStyle = cachedPattern; ctx.fillRect(0, 0, w, h); } }
-    private static drawPixelGrid(ctx: CanvasRenderingContext2D, w: number, h: number, sc: number, off: {x: number, y: number}, cw: number, ch: number) { if (sc < 8) return; const startX = Math.max(0, Math.floor(-off.x / sc)), endX = Math.min(w, Math.ceil((cw - off.x) / sc)); const startY = Math.max(0, Math.floor(-off.y / sc)), endY = Math.min(h, Math.ceil((ch - off.y) / sc)); const op = Math.min(0.15, (sc - 12) / 60); ctx.strokeStyle = `rgba(255, 255, 255, ${op})`; ctx.lineWidth = 1 / sc; ctx.beginPath(); for (let x = startX; x <= endX; x++) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); } for (let y = startY; y <= endY; y++) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); } ctx.stroke(); }
-    private static drawFrameLabel(ctx: CanvasRenderingContext2D, id: number | string, x: number, y: number, w: number, h: number, sc: number, config?: FrameLabelConfig) { if (config && !config.visible) return; ctx.save(); const text = `#${id}`, fs = Math.max(8, (config?.fontSize || 12) / sc); ctx.font = `bold ${fs}px sans-serif`; const m = ctx.measureText(text), px = 6/sc, py = 4/sc, bh = fs + py, bw = m.width + px * 2; let bx = x, by = y - bh - (4/sc); ctx.globalAlpha = config?.opacity ?? 1; ctx.fillStyle = config?.color || '#3b82f6'; ctx.beginPath(); if (typeof ctx.roundRect === 'function') { ctx.roundRect(bx, by, bw, bh, 4/sc); } else { const r = 4/sc; ctx.moveTo(bx + r, by); ctx.lineTo(bx + bw - r, by); ctx.arcTo(bx + bw, by, bx + bw, by + r, r); ctx.lineTo(bx + bw, by + bh - r); ctx.arcTo(bx + bw, by + bh, bx + bw - r, by + bh, r); ctx.lineTo(bx + r, by + bh); ctx.arcTo(bx, by + bh, bx, by + bh - r, r); ctx.lineTo(bx, by + r); ctx.arcTo(bx, by, bx + r, by, r); } ctx.fill(); ctx.fillStyle = 'white'; ctx.textBaseline = 'middle'; ctx.fillText(text, bx + px, by + bh/2); ctx.restore(); }
+    private static drawPivotMarker(
+        ctx: CanvasRenderingContext2D,
+        w: number, h: number,
+        px: number, py: number,
+        curScale: number
+    ) {
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 1.5 / curScale;
+        ctx.beginPath();
+        const pl = 8 / curScale;
+        const ax = w * px;
+        const ay = h * py;
+        ctx.moveTo(ax - pl, ay);
+        ctx.lineTo(ax + pl, ay);
+        ctx.moveTo(ax, ay - pl);
+        ctx.lineTo(ax, ay + pl);
+        ctx.stroke();
+    }
+
+    private static drawCheckerboard(ctx: CanvasRenderingContext2D, w: number, h: number) {
+        if (!cachedPattern) {
+            const pC = document.createElement('canvas');
+            pC.width = 32;
+            pC.height = 32;
+            const pX = pC.getContext('2d');
+            if (pX) {
+                pX.fillStyle = '#141418';
+                pX.fillRect(0, 0, 32, 32);
+                pX.fillStyle = '#1c1c22';
+                pX.fillRect(0, 0, 16, 16);
+                pX.fillRect(16, 16, 16, 16);
+                cachedPattern = ctx.createPattern(pC, 'repeat');
+            }
+        }
+        if (cachedPattern) {
+            ctx.fillStyle = cachedPattern;
+            ctx.fillRect(0, 0, w, h);
+        }
+    }
+
+    private static drawPixelGrid(
+        ctx: CanvasRenderingContext2D,
+        w: number, h: number,
+        sc: number,
+        off: { x: number; y: number },
+        cw: number, ch: number
+    ) {
+        if (sc < 8) return;
+        const startX = Math.max(0, Math.floor(-off.x / sc));
+        const endX = Math.min(w, Math.ceil((cw - off.x) / sc));
+        const startY = Math.max(0, Math.floor(-off.y / sc));
+        const endY = Math.min(h, Math.ceil((ch - off.y) / sc));
+        const op = Math.min(0.15, (sc - 12) / 60);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${op})`;
+        ctx.lineWidth = 1 / sc;
+        ctx.beginPath();
+        for (let x = startX; x <= endX; x++) {
+            ctx.moveTo(x, startY);
+            ctx.lineTo(x, endY);
+        }
+        for (let y = startY; y <= endY; y++) {
+            ctx.moveTo(startX, y);
+            ctx.lineTo(endX, y);
+        }
+        ctx.stroke();
+    }
+
+    private static drawFrameLabel(
+        ctx: CanvasRenderingContext2D,
+        id: number | string,
+        x: number, y: number,
+        w: number, h: number,
+        sc: number,
+        config?: FrameLabelConfig
+    ) {
+        if (config && !config.visible) return;
+        ctx.save();
+        const text = `#${id}`;
+        const fs = Math.max(8, (config?.fontSize || 12) / sc);
+        ctx.font = `bold ${fs}px sans-serif`;
+        const m = ctx.measureText(text);
+        const px = 6 / sc;
+        const py = 4 / sc;
+        const bh = fs + py;
+        const bw = m.width + px * 2;
+        const bx = x;
+        const by = y - bh - 4 / sc;
+
+        ctx.globalAlpha = config?.opacity ?? 1;
+        ctx.fillStyle = config?.color || '#3b82f6';
+        ctx.beginPath();
+
+        if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(bx, by, bw, bh, 4 / sc);
+        } else {
+            const r = 4 / sc;
+            ctx.moveTo(bx + r, by);
+            ctx.lineTo(bx + bw - r, by);
+            ctx.arcTo(bx + bw, by, bx + bw, by + r, r);
+            ctx.lineTo(bx + bw, by + bh - r);
+            ctx.arcTo(bx + bw, by + bh, bx + bw - r, by + bh, r);
+            ctx.lineTo(bx + r, by + bh);
+            ctx.arcTo(bx, by + bh, bx, by + bh - r, r);
+            ctx.lineTo(bx, by + r);
+            ctx.arcTo(bx, by, bx + r, by, r);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = 'white';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, bx + px, by + bh / 2);
+        ctx.restore();
+    }
 }

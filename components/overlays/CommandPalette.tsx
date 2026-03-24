@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Command, ArrowRight } from 'lucide-react';
-import { CommandPaletteItem } from '../types';
+import { CommandPaletteItem } from '../../types';
 
 interface CommandPaletteProps {
     isOpen: boolean;

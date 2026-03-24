@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { X, Palette, Monitor, Save, HelpCircle, Check, Volume2, Moon, Sun, Magnet, Tag } from 'lucide-react';
-import { UserPreferences, FrameLabelPosition } from '../types';
-import NumberControl from './NumberControl';
+import { UserPreferences, FrameLabelPosition } from '../../types';
+import NumberControl from '../common/NumberControl';
+import { useModalEntrance } from '../../hooks/useGSAPAnimations';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ const POSITIONS: {value: FrameLabelPosition, label: string}[] = [
 ];
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferences, onUpdatePreferences }) => {
+  const modalRef = useModalEntrance();
   if (!isOpen) return null;
 
   const updateLabel = (key: keyof typeof preferences.frameLabel, val: any) => {
@@ -48,8 +50,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, preferen
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-panel border border-border rounded-xl shadow-modal w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-scale-in" onClick={e => e.stopPropagation()}>
+    <div ref={modalRef} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      <div data-modal-panel className="bg-panel border border-border rounded-xl shadow-modal w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
         
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
           <h2 className="text-base font-bold text-textMain">Settings</h2>

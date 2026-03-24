@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ZoomIn, ZoomOut, Focus, MousePointer2, Hand, Move, RefreshCcw } from 'lucide-react';
-import { DragMode, ViewportState } from '../types';
+import { DragMode, ViewportState } from '../../types';
 
 interface CanvasStatusBarProps {
     dragMode: DragMode;

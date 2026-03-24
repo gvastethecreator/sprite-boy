@@ -2,7 +2,7 @@
 import React from 'react';
 import { Film, Layers, Crosshair, Copy, Trash2, MoveDiagonal, RotateCw, Ghost, Maximize } from 'lucide-react';
 import { SpriteAnimation, Keyframe, OnionSkinConfig } from '../../../types';
-import NumberControl from '../../NumberControl';
+import NumberControl from '../../common/NumberControl';
 import { SectionHeader, Section, PropRow, TextInput, Checkbox } from '../../common/PanelComponents';
 
 interface AnimationPropertiesProps {

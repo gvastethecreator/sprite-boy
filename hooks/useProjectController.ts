@@ -4,20 +4,17 @@ import { useUndo } from './useUndo';
 import { useUIController } from './useUIController';
 import { 
     AppMode, ProjectState, GridConfig, TemplateConfig, UserPreferences, DEFAULT_PREFERENCES, 
-    OnionSkinConfig, SlotData, BuilderAsset, BuilderCanvasSize, DND_ASSET_TYPE, FrameData, CommandPaletteItem,
-    CodeFormat
+    OnionSkinConfig, SlotData, BuilderAsset, BuilderCanvasSize, DND_ASSET_TYPE, FrameData, CommandPaletteItem
 } from '../types';
 import { generateFramesFromGrid } from '../utils/algorithms';
 import { useAnimationLogic } from './domains/useAnimationLogic';
 import { useSlicerLogic } from './domains/useSlicerLogic';
 import { useBuilderLogic, DEFAULT_SLOT_DATA, RATIO_PRESETS } from './domains/useBuilderLogic';
+import { useExportLogic } from './domains/useExportLogic';
+import { usePersistence } from './domains/usePersistence';
 import { getAllAssets } from '../utils/db';
 import { analyzeImage } from '../utils/aiService';
-import { generateGenericJSON, generatePhaser3, generateGodotSpriteFrames } from '../utils/exportFormats';
-import { calculateGeometry } from '../utils/renderUtils';
 import { Save, FolderOpen, FilePlus, Undo2, Redo2, Download, Settings, HelpCircle, BrainCircuit, Wand2, Scissors, Box, Layers } from 'lucide-react';
-import JSZip from 'jszip';
-import gifshot from 'gifshot';
 
 const INITIAL_STATE: ProjectState = {
     imageMeta: null,
@@ -81,6 +78,16 @@ export function useProjectController() {
     const animLogic = useAnimationLogic(project, setProject, preferences);
     const slicerLogic = useSlicerLogic(project, setProject, setProjectEphemeral, preferences, notify, ui.setIsLoading, ui.setLoadingMessage);
     const builderLogic = useBuilderLogic(project, setProject, setProjectEphemeral, preferences, notify, ui.setIsLoading, ui.setLoadingMessage);
+
+    const exportLogic = useExportLogic({
+        project, currentMode, activeGrid, builderGrid,
+        setIsLoading: ui.setIsLoading, setLoadingMessage: ui.setLoadingMessage, notify,
+    });
+
+    const persistence = usePersistence({
+        project, slicerGrid, builderGrid, templateConfig, onionSkin, currentMode,
+        setProject, setSlicerGrid, setBuilderGrid, setTemplateConfig, setCurrentMode, notify,
+    });
     
     // Asynchronous asset loading from IndexedDB
     useEffect(() => {
@@ -194,40 +201,6 @@ export function useProjectController() {
         setProject(prev => ({ ...prev, frames: newFrames }));
     };
 
-    const handleSaveProject = () => {
-        const data = JSON.stringify({
-            project,
-            ui: { slicerGrid, builderGrid, templateConfig, onionSkin, currentMode }
-        });
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `project_${project.imageMeta?.name || 'studio'}_${Date.now()}.json`;
-        link.click();
-        notify("Project saved", "success");
-    };
-
-    const handleLoadProject = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target?.result as string);
-                if (data.project) setProject(data.project);
-                if (data.ui) {
-                    if (data.ui.slicerGrid) setSlicerGrid(data.ui.slicerGrid);
-                    if (data.ui.builderGrid) setBuilderGrid(data.ui.builderGrid);
-                    if (data.ui.templateConfig) setTemplateConfig(data.ui.templateConfig);
-                    if (data.ui.currentMode) setCurrentMode(data.ui.currentMode);
-                }
-                notify("Project loaded", "success");
-            } catch (err) {
-                notify("Invalid file", "error");
-            }
-        };
-        reader.readAsText(file);
-    };
-
     const handleNewProject = () => { 
         setProject({ ...INITIAL_STATE, builderAssets: project.builderAssets }); 
         setSelectedIndex(null); 
@@ -276,73 +249,6 @@ export function useProjectController() {
             reader.readAsDataURL(blob);
         } catch (e) {
             notify("Analysis failed", "error");
-        } finally {
-            ui.setIsLoading(false);
-        }
-    };
-
-    const handleExportZip = async (canvasHandle: any) => {
-        if (!canvasHandle) return;
-        ui.setIsLoading(true);
-        ui.setLoadingMessage('Packaging...');
-        try {
-            const zip = new JSZip();
-            const folder = zip.folder("sprites");
-            for (const frame of project.frames) {
-                if (frame.hidden) continue;
-                const dataUrl = await canvasHandle.exportFrame(frame.id);
-                if (dataUrl) {
-                    const base64Data = dataUrl.split(',')[1];
-                    folder?.file(`frame_${frame.id}.png`, base64Data, { base64: true });
-                }
-            }
-            const content = await zip.generateAsync({ type: "blob" });
-            const url = URL.createObjectURL(content);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `package_${Date.now()}.zip`;
-            link.click();
-            notify("ZIP downloaded", "success");
-        } catch (e) {
-            notify("Failed to create ZIP", "error");
-        } finally {
-            ui.setIsLoading(false);
-        }
-    };
-
-    const handleExportGif = async (animId: string, canvasHandle: any) => {
-        const anim = project.animations.find(a => a.id === animId);
-        if (!anim || anim.keyframes.length === 0 || !canvasHandle) return;
-        ui.setIsLoading(true);
-        ui.setLoadingMessage('Encoding GIF...');
-        try {
-            const frameImages: string[] = [];
-            for (const kf of anim.keyframes) {
-                const dataUrl = await canvasHandle.exportFrame(kf.sourceIndex);
-                if (dataUrl) frameImages.push(dataUrl);
-            }
-            return new Promise<void>((resolve, reject) => {
-                gifshot.createGIF({
-                    images: frameImages,
-                    interval: 1 / anim.fps,
-                    gifWidth: anim.keyframes[0] ? project.frames.find(f => f.id === anim.keyframes[0].sourceIndex)?.w || 100 : 100,
-                    gifHeight: anim.keyframes[0] ? project.frames.find(f => f.id === anim.keyframes[0].sourceIndex)?.h || 100 : 100,
-                }, (obj: any) => {
-                    if (!obj.error) {
-                        const link = document.createElement('a');
-                        link.href = obj.image;
-                        link.download = `${anim.name}.gif`;
-                        link.click();
-                        notify("GIF Exported", "success");
-                        resolve();
-                    } else {
-                        notify("GIF Encoding failed", "error");
-                        reject(obj.error);
-                    }
-                });
-            });
-        } catch (e) {
-            notify("GIF Generation Error", "error");
         } finally {
             ui.setIsLoading(false);
         }
@@ -420,23 +326,6 @@ export function useProjectController() {
         }
     };
 
-    const handleGenerateCode = (animId: string, scale: number, format: CodeFormat): string => {
-        const anim = project.animations.find(a => a.id === animId);
-        if (!anim) return '// Animation not found';
-        const grid = currentMode === AppMode.BUILDER ? builderGrid : activeGrid;
-        const w = project.imageMeta?.width || project.builderCanvas?.width || 512;
-        const h = project.imageMeta?.height || project.builderCanvas?.height || 512;
-        const geo = calculateGeometry(w, h, grid);
-        switch (format) {
-            case 'phaser': return generatePhaser3(anim, project.frames, geo);
-            case 'godot': return generateGodotSpriteFrames(anim, project.frames, geo, w, h);
-            case 'unity_json':
-            case 'json_generic':
-            default:
-                return generateGenericJSON(anim, project.frames, geo, scale);
-        }
-    };
-
     const handleGenerateSlot = (slotIndex: number, prompt: string, _contextType: string, contextAssetId?: string) => {
         const contextImages: string[] = [];
         if (contextAssetId) {
@@ -450,7 +339,7 @@ export function useProjectController() {
     const commands = useMemo<CommandPaletteItem[]>(() => [
         { id: 'new-proj', label: 'New Project', icon: FilePlus, category: 'General', action: handleNewProject, shortcut: ['Ctrl', 'N'] },
         { id: 'open-proj', label: 'Open Project', icon: FolderOpen, category: 'General', action: () => { /* Trigger via ref or internal */ }, shortcut: ['Ctrl', 'O'] },
-        { id: 'save-proj', label: 'Save Project', icon: Save, category: 'General', action: handleSaveProject, shortcut: ['Ctrl', 'S'] },
+        { id: 'save-proj', label: 'Save Project', icon: Save, category: 'General', action: persistence.handleSaveProject, shortcut: ['Ctrl', 'S'] },
         { id: 'undo', label: 'Undo Action', icon: Undo2, category: 'Edit', action: undo, shortcut: ['Ctrl', 'Z'] },
         { id: 'redo', label: 'Redo Action', icon: Redo2, category: 'Edit', action: redo, shortcut: ['Ctrl', 'Y'] },
         { id: 'export-png', label: 'Export as PNG', icon: Download, category: 'General', action: () => ui.setExportModal({ isOpen: true, type: 'png' }) },
@@ -460,7 +349,7 @@ export function useProjectController() {
         { id: 'ai-analyze', label: 'Analyze with Gemini', icon: BrainCircuit, category: 'AI', action: () => { /* Trigger analysis */ } },
         { id: 'settings', label: 'Preferences', icon: Settings, category: 'General', action: () => ui.setIsSettingsOpen(true), shortcut: [','] },
         { id: 'help', label: 'Help & Shortcuts', icon: HelpCircle, category: 'General', action: () => ui.setIsHelpOpen(true), shortcut: ['?'] },
-    ], [undo, redo, handleNewProject, handleSaveProject, handleSetMode, ui, slicerLogic.handleAutoSlice]);
+    ], [undo, redo, handleNewProject, persistence.handleSaveProject, handleSetMode, ui, slicerLogic.handleAutoSlice]);
 
     return {
         ...ui, preferences, setPreferences, currentMode, handleSetMode,
@@ -472,7 +361,7 @@ export function useProjectController() {
         templateConfig, setTemplateConfig, selectedIndex, setSelectedIndex,
         undo, redo, canUndo, canRedo,
         handleSetGridConfig, handleUpload, handleCreateCanvas,
-        handleSyncGrid, handleSaveProject, handleLoadProject, handleNewProject,
+        handleSyncGrid, handleSaveProject: persistence.handleSaveProject, handleLoadProject: persistence.handleLoadProject, handleNewProject,
         onionSkin, setOnionSkin,
         handleToggleFrameVisibility: (id: number) => { setProject(prev => ({ ...prev, frames: prev.frames.map(f => f.id === id ? { ...f, hidden: !f.hidden } : f) })); },
         handleAddKeyframeFromAsset: (id: string) => { 
@@ -487,8 +376,8 @@ export function useProjectController() {
         handlePreviewBackground,
         handleCancelPreview,
         handleAnalyzeSheet,
-        handleExportZip,
-        handleExportGif,
+        handleExportZip: exportLogic.handleExportZip,
+        handleExportGif: exportLogic.handleExportGif,
         handleDeleteFrame,
         handleDuplicateFrame: (id: number) => slicerLogic.handleDuplicateFrame(id, setSelectedIndex),
         currentAspectRatio: project.aspectRatio,
@@ -505,7 +394,7 @@ export function useProjectController() {
         handleClearAIContext,
         setBuilderCanvas,
         handleDeleteSelection,
-        handleGenerateCode,
+        handleGenerateCode: exportLogic.handleGenerateCode,
         handleGenerateSlot,
         commands
     };

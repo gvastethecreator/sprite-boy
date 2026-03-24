@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Maximize2 } from 'lucide-react';
-import { ImageMeta, BuilderCanvasSize } from '../types';
+import { ImageMeta, BuilderCanvasSize } from '../../types';
 
 export const ASPECT_RATIOS = [
     { label: 'Standard', items: ['1:1', '4:3', '3:2', '21:9', '16:9'] },

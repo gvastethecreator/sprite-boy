@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { AppMode, GridConfig, FrameData } from '../../../types';
 import { Grid3X3, Scissors, Wand2, Sparkles, ChevronRight, ChevronDown, Monitor } from 'lucide-react';
-import NumberControl from '../../NumberControl';
+import NumberControl from '../../common/NumberControl';
 
 interface SlicerToolsProps {
     currentMode: AppMode;

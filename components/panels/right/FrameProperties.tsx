@@ -2,7 +2,7 @@
 import React from 'react';
 import { FrameData } from '../../../types';
 import { Grid, Scissors, Copy } from 'lucide-react';
-import NumberControl from '../../NumberControl';
+import NumberControl from '../../common/NumberControl';
 import { SectionHeader, Section } from '../../common/PanelComponents';
 
 interface FramePropertiesProps {

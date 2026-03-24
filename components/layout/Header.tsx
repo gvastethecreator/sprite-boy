@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { AppMode } from '../types';
+import { AppMode } from '../../types';
 import { LayoutGrid, Layers, FileImage, Upload, Download, Settings, Undo2, Redo2, ChevronDown, Save, FolderOpen, HelpCircle, Box, FilePlus } from 'lucide-react';
-import { useProject } from '../contexts/ProjectContext';
+import { useProject } from '../../contexts/ProjectContext';
+import { useLogoPop } from '../../hooks/useGSAPAnimations';
 
 interface HeaderProps {
   onAnalyzeSheet: () => void;
@@ -36,20 +37,13 @@ const Header: React.FC<HeaderProps> = ({ onAnalyzeSheet }) => {
   const projectInputRef = useRef<HTMLInputElement>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showFileMenu, setShowFileMenu] = useState(false);
-  const [isLogoAnimating, setIsLogoAnimating] = useState(false);
+  const { triggerRef: logoRef, play: playLogoPop } = useLogoPop();
 
   const handleLogoClick = () => {
-      if (isLogoAnimating) return;
-      
-      setIsLogoAnimating(true);
       const currentIndex = ACCENT_CYCLE.indexOf(preferences.accentColor);
       const nextIndex = (currentIndex + 1) % ACCENT_CYCLE.length;
-      
-      // Actualizamos color de acento
       onUpdatePreferences({ ...preferences, accentColor: ACCENT_CYCLE[nextIndex] });
-      
-      // Terminamos animación tras el tiempo de la animación CSS
-      setTimeout(() => setIsLogoAnimating(false), 500);
+      playLogoPop();
   };
 
   const isBlackAccent = preferences.accentColor === '0 0 0';
@@ -81,8 +75,9 @@ const Header: React.FC<HeaderProps> = ({ onAnalyzeSheet }) => {
       {/* Left: Brand & File */}
       <div className="flex items-center gap-4">
         <div 
+            ref={logoRef}
             onClick={handleLogoClick}
-            className={`flex items-center gap-2.5 cursor-pointer group select-none ${isLogoAnimating ? 'animate-logo-pop' : ''}`}
+            className="flex items-center gap-2.5 cursor-pointer group select-none"
         >
           <div className={`w-8 h-8 bg-surface rounded-lg flex items-center justify-center border border-white/10 group-hover:border-accent/50 transition-colors ${isBlackAccent ? 'group-hover:border-zinc-500' : ''}`}>
             <LayoutGrid size={18} className={isBlackAccent ? 'text-zinc-400' : 'text-accent'} />

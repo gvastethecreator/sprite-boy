@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
 import { X, Sparkles, ArrowRight, Layers, Image as ImageIcon, Grid } from 'lucide-react';
-import { BuilderAsset, SlotData } from '../types';
-import { useProject } from '../contexts/ProjectContext';
+import { BuilderAsset, SlotData } from '../../types';
+import { useProject } from '../../contexts/ProjectContext';
+import { useModalEntrance } from '../../hooks/useGSAPAnimations';
 
 const GenerationModal: React.FC = () => {
     const { generationModal, setGenerationModal, builderAssets, builderSlots, handleGenerateSlot: onGenerate } = useProject();
     const { isOpen, targetSlotIndex } = generationModal;
     const onClose = () => setGenerationModal({ ...generationModal, isOpen: false });
 
+    const modalRef = useModalEntrance();
     if (!isOpen || targetSlotIndex === null) return null;
 
     const [prompt, setPrompt] = useState('');
@@ -26,8 +28,8 @@ const GenerationModal: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-panel border border-border rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div ref={modalRef} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div data-modal-panel className="bg-panel border border-border rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
                     <h2 className="text-lg font-semibold text-textMain flex items-center gap-2">
                         <Sparkles size={18} className="text-purple-400" /> Generate Frame
