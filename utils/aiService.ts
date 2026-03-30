@@ -1,5 +1,29 @@
-import { GoogleGenAI } from "@google/genai";
-import { AIGenerationMode, AIModelId } from "../types";
+import { GoogleGenAI } from '@google/genai';
+import { AIGenerationMode, AIModelId } from '../types';
+
+const GEMINI_API_KEY_STORAGE_KEY = 'sprite-boy-gemini-api-key';
+
+function resolveGeminiApiKey(): string {
+    if (typeof window === 'undefined') {
+        throw new Error('Gemini AI is only available in the browser.');
+    }
+
+    const storedKey = window.sessionStorage.getItem(GEMINI_API_KEY_STORAGE_KEY)?.trim();
+    if (storedKey) {
+        return storedKey;
+    }
+
+    const promptedKey = window.prompt(
+        'Enter your Gemini API key for this session. It will stay only in sessionStorage and will not be bundled into the app.',
+    )?.trim();
+
+    if (!promptedKey) {
+        throw new Error('A Gemini API key is required to use AI features in Sprite Boy.');
+    }
+
+    window.sessionStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, promptedKey);
+    return promptedKey;
+}
 
 /**
  * Helper to downscale image if too large (Max 1024px dimension for context)
@@ -46,16 +70,17 @@ async function optimizeImageForAI(base64Str: string): Promise<string> {
  * Generates a sprite based on input images, prompt, model, and mode.
  */
 export async function generateSprite(
-    contextImages: string[], 
+    contextImages: string[],
     prompt: string,
     model: AIModelId,
     mode: AIGenerationMode
 ): Promise<string> {
     // Create a new instance right before call as per guidelines
-    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const genAI = new GoogleGenAI({ apiKey: resolveGeminiApiKey() });
 
-    let systemInstruction = "You are a professional pixel artist. You generate high-quality game assets. Output strictly one image part.";
-    let finalPrompt = prompt || "A professional game sprite";
+    let systemInstruction =
+        'You are a professional pixel artist. You generate high-quality game assets. Output strictly one image part.';
+    const finalPrompt = prompt || 'A professional game sprite';
 
     switch (mode) {
         case 'new_image':
@@ -89,10 +114,12 @@ export async function generateSprite(
             });
 
             const base64Data = response.generatedImages?.[0]?.image?.imageBytes;
-            if (!base64Data) throw new Error("Imagen 4 returned no image data.");
+            if (!base64Data) {
+                throw new Error('Imagen 4 returned no image data.');
+            }
             return `data:image/jpeg;base64,${base64Data}`;
         }
-        
+
         // --- GEMINI IMAGE PATH (Flash/Pro) ---
         else {
             const parts: any[] = [];
@@ -103,8 +130,8 @@ export async function generateSprite(
                 parts.push({
                     inlineData: {
                         mimeType: 'image/png',
-                        data: optimizedData
-                    }
+                        data: optimizedData,
+                    },
                 });
             }
 
@@ -117,18 +144,20 @@ export async function generateSprite(
                 config: {
                     systemInstruction: systemInstruction,
                     // Use imageConfig if it's gemini-3-pro-image-preview
-                    ...(model === 'gemini-3-pro-image-preview' ? {
-                        imageConfig: {
-                            aspectRatio: "1:1",
-                            imageSize: "1K"
-                        }
-                    } : {})
-                }
+                    ...(model === 'gemini-3-pro-image-preview'
+                        ? {
+                              imageConfig: {
+                                  aspectRatio: '1:1',
+                                  imageSize: '1K',
+                              },
+                          }
+                        : {}),
+                },
             });
 
             const candidates = response.candidates;
             if (!candidates?.[0]?.content?.parts) {
-                throw new Error("The model did not return any content parts.");
+                throw new Error('The model did not return any content parts.');
             }
 
             // Find the image part in response
@@ -138,12 +167,11 @@ export async function generateSprite(
                 }
             }
             
-            throw new Error("No image was generated. Please try a different prompt.");
+            throw new Error('No image was generated. Please try a different prompt.');
         }
-
     } catch (error: any) {
-        console.error("AI Generation Error:", error);
-        throw new Error(error.message || "Failed to generate asset.");
+        console.error('AI Generation Error:', error);
+        throw new Error(error.message || 'Failed to generate asset.');
     }
 }
 
@@ -151,7 +179,7 @@ export async function generateSprite(
  * Analyzes a sprite sheet using Gemini.
  */
 export async function analyzeImage(base64Image: string): Promise<string> {
-    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const genAI = new GoogleGenAI({ apiKey: resolveGeminiApiKey() });
     try {
         const optimizedData = await optimizeImageForAI(base64Image);
         const response = await genAI.models.generateContent({
@@ -159,12 +187,14 @@ export async function analyzeImage(base64Image: string): Promise<string> {
             contents: {
                 parts: [
                     { inlineData: { mimeType: 'image/png', data: optimizedData } },
-                    { text: "Analyze this sprite sheet as a Technical Game Artist. Provide feedback on consistency, palette, and layout in Markdown." }
-                ]
-            }
+                    {
+                        text: 'Analyze this sprite sheet as a Technical Game Artist. Provide feedback on consistency, palette, and layout in Markdown.',
+                    },
+                ],
+            },
         });
 
-        return response.text || "No analysis available.";
+        return response.text || 'No analysis available.';
     } catch (error: any) {
         return `Analysis failed: ${error.message}`;
     }
