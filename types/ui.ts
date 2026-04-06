@@ -1,7 +1,6 @@
-
-import { AppMode } from './enums';
-import { ImageMeta, FrameData, BuilderAsset, SpriteAnimation, SlotData } from './core';
-import { GridConfig, TemplateConfig, OnionSkinConfig } from './config';
+import { AppMode } from "./enums";
+import { ImageMeta, FrameData, BuilderAsset, SpriteAnimation, SlotData } from "./core";
+import { GridConfig, TemplateConfig, OnionSkinConfig } from "./config";
 
 export interface ViewportState {
   scale: number;
@@ -20,7 +19,7 @@ export interface SidebarProps {
   onUpdateFrame?: (id: number, data: Partial<FrameData>) => void;
   onDeleteFrame?: (index: number) => void;
   onDuplicateFrame?: (id: number) => void;
-  onToggleFrameVisibility?: (id: number) => void; 
+  onToggleFrameVisibility?: (id: number) => void;
   builderAssets?: BuilderAsset[];
   onAddAsset?: (file: File) => void;
   onDeleteAsset?: (id: string) => void;
@@ -36,8 +35,8 @@ export interface SidebarProps {
   setTemplateConfig?: (config: TemplateConfig) => void;
   onDownloadSnapshot?: () => void;
   onAutoSlice?: () => void;
-  onRemoveBackground?: (color: string, tolerance: number, softness: number) => void; 
-  onPreviewBackground?: (color: string, tolerance: number, softness: number) => void; 
+  onRemoveBackground?: (color: string, tolerance: number, softness: number) => void;
+  onPreviewBackground?: (color: string, tolerance: number, softness: number) => void;
   onCancelPreview?: () => void;
   isEyedropperActive?: boolean;
   setIsEyedropperActive?: (active: boolean) => void;
@@ -47,7 +46,7 @@ export interface SidebarProps {
   isLoading?: boolean;
   onFrameToAsset?: (frameId: number) => void;
   onSyncGridConfig?: () => void;
-  
+
   builderSlots?: Record<number, SlotData>;
   builderLayoutMode?: string;
   onSetBuilderLayoutMode?: (mode: any) => void;
@@ -63,8 +62,8 @@ export interface RightSidebarProps {
   onUpdateFrame?: (id: number, data: Partial<FrameData>) => void;
   onUpdateFrameEphemeral?: (id: number, data: Partial<FrameData>) => void;
   onDeleteFrame?: (index: number) => void;
-  onDuplicateFrame?: (id: number) => void; 
-  onToggleFrameVisibility?: (id: number) => void; 
+  onDuplicateFrame?: (id: number) => void;
+  onToggleFrameVisibility?: (id: number) => void;
   onFrameToAsset?: (id: number) => void;
   builderCanvas?: BuilderCanvasSize | null;
   onCreateCanvas?: (w: number, h: number) => void;
@@ -97,8 +96,8 @@ export interface BuilderCanvasSize {
   height: number;
 }
 
-export type ExportType = 'png' | 'code' | 'zip' | 'gif' | null;
-export type CodeFormat = 'json_generic' | 'phaser' | 'godot' | 'unity_json';
+export type ExportType = "png" | "code" | "zip" | "gif" | null;
+export type CodeFormat = "json_generic" | "phaser" | "godot" | "unity_json";
 
 export interface ExportModalState {
   isOpen: boolean;
@@ -114,25 +113,33 @@ export interface GenerationModalState {
 
 export interface GenerationContextSlot {
   id: number;
-  type: 'asset' | 'keyframe' | 'slot' | 'frame';
+  type: "asset" | "keyframe" | "slot" | "frame";
   dataId: string;
   previewSrc: string;
 }
 
-export type AIModelId = 'gemini-3-pro-image-preview' | 'gemini-2.5-flash-image' | 'imagen-4.0-generate-001';
-export type AIGenerationMode = 'new_image' | 'variation' | 'inbetween' | 'edit_context' | 'full_sheet';
+export type AIModelId =
+  | "gemini-3-pro-image-preview"
+  | "gemini-2.5-flash-image"
+  | "imagen-4.0-generate-001";
+export type AIGenerationMode =
+  | "new_image"
+  | "variation"
+  | "inbetween"
+  | "edit_context"
+  | "full_sheet";
 
 export interface GenerationPanelState {
-    model: AIModelId;
-    prompt: string;
-    mode: AIGenerationMode;
-    contextSlots: (GenerationContextSlot | null)[];
+  model: AIModelId;
+  prompt: string;
+  mode: AIGenerationMode;
+  contextSlots: (GenerationContextSlot | null)[];
 }
 
 export interface ToastData {
-    id: string;
-    msg: string;
-    type: 'success' | 'error' | 'info';
+  id: string;
+  msg: string;
+  type: "success" | "error" | "info";
 }
 
 export interface CanvasHandle {
@@ -141,35 +148,35 @@ export interface CanvasHandle {
   resetView: () => void;
 }
 
-export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 export interface SnappingGuide {
-    type: 'vertical' | 'horizontal';
-    position: number;
-    start: number;
-    end: number;
+  type: "vertical" | "horizontal";
+  position: number;
+  start: number;
+  end: number;
 }
 
 export interface CommandPaletteItem {
-    id: string;
-    label: string;
-    icon?: any;
-    shortcut?: string[];
-    action: () => void;
-    category: 'General' | 'Edit' | 'View' | 'Tools' | 'AI';
+  id: string;
+  label: string;
+  icon?: any;
+  shortcut?: string[];
+  action: () => void;
+  category: "General" | "Edit" | "View" | "Tools" | "AI";
 }
 
 export interface ContextMenuItem {
-    label: string;
-    icon?: any;
-    action: () => void;
-    danger?: boolean;
-    shortcut?: string;
+  label: string;
+  icon?: any;
+  action: () => void;
+  danger?: boolean;
+  shortcut?: string;
 }
 
 export interface ContextMenuState {
-    isOpen: boolean;
-    x: number;
-    y: number;
-    items: ContextMenuItem[];
+  isOpen: boolean;
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
 }

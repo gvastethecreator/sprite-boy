@@ -1,7 +1,6 @@
-
 # Prompt para Replicar SpriteSlice Studio
 
-*Este documento contiene un prompt diseñado para ser introducido en un LLM (como Gemini, GPT-4 o Claude 3.5 Sonnet) para recrear la estructura y lógica fundamental de SpriteSlice Studio.*
+_Este documento contiene un prompt diseñado para ser introducido en un LLM (como Gemini, GPT-4 o Claude 3.5 Sonnet) para recrear la estructura y lógica fundamental de SpriteSlice Studio._
 
 ---
 
@@ -13,11 +12,12 @@ Actúa como un Arquitecto de Software experto en React y Gráficos Web. Tu tarea
 Una herramienta "Local-First" para desarrolladores de juegos que permite manipular spritesheets. La aplicación no usa backend, todo ocurre en el navegador.
 
 **Stack Tecnológico:**
-*   React 19 (Functional Components, Hooks).
-*   TypeScript (Tipado estricto).
-*   Tailwind CSS (Estilizado).
-*   HTML5 Canvas API (Para el renderizado del área de trabajo).
-*   Lucide React (Iconos).
+
+- React 19 (Functional Components, Hooks).
+- TypeScript (Tipado estricto).
+- Tailwind CSS (Estilizado).
+- HTML5 Canvas API (Para el renderizado del área de trabajo).
+- Lucide React (Iconos).
 
 **Requisitos Arquitectónicos Clave:**
 
@@ -25,10 +25,10 @@ Una herramienta "Local-First" para desarrolladores de juegos que permite manipul
 2.  **Gestión de Estado Centralizada:** Crea un hook `useProjectController` que maneje toda la lógica de negocio (CRUD de frames, animaciones, assets).
 3.  **Historial:** Implementa un hook `useUndo` que maneje el historial (past, present, future) para permitir Ctrl+Z/Ctrl+Y.
 4.  **Modelo de Datos:**
-    *   `AppMode`: ENUM ('SLICER', 'BUILDER', 'ANIMATION', 'COLLISION').
-    *   `FrameData`: { x, y, w, h, hitboxes: [] }.
-    *   `SpriteAnimation`: { id, name, fps, keyframes: [] }.
-    *   `HitboxData`: { x, y, w, h, type: 'HIT'|'HURT'|'COLLISION' }.
+    - `AppMode`: ENUM ('SLICER', 'BUILDER', 'ANIMATION', 'COLLISION').
+    - `FrameData`: { x, y, w, h, hitboxes: [] }.
+    - `SpriteAnimation`: { id, name, fps, keyframes: [] }.
+    - `HitboxData`: { x, y, w, h, type: 'HIT'|'HURT'|'COLLISION' }.
 
 **Funcionalidades a Implementar:**
 
@@ -39,11 +39,12 @@ Una herramienta "Local-First" para desarrolladores de juegos que permite manipul
 5.  **Exportación:** Generar un JSON genérico con la estructura de la animación y los frames.
 
 **Estructura de Archivos Sugerida:**
-*   `types.ts`: Interfaces.
-*   `utils/renderUtils.ts`: La clase `CanvasRenderer`.
-*   `hooks/useProjectController.ts`: Lógica de estado.
-*   `components/CanvasArea.tsx`: Wrapper del canvas.
-*   `components/Timeline.tsx`: UI de la línea de tiempo.
-*   `App.tsx`: Layout principal.
+
+- `types.ts`: Interfaces.
+- `utils/renderUtils.ts`: La clase `CanvasRenderer`.
+- `hooks/useProjectController.ts`: Lógica de estado.
+- `components/CanvasArea.tsx`: Wrapper del canvas.
+- `components/Timeline.tsx`: UI de la línea de tiempo.
+- `App.tsx`: Layout principal.
 
 Por favor, genera el código esencial para `types.ts`, `renderUtils.ts` y `useProjectController.ts` enfocándote en la lógica de renderizado performante y la estructura de datos.

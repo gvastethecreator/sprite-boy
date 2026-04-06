@@ -1,4 +1,3 @@
-
 /**
  * Default SVG assets as Data URIs for the application skeleton.
  * Includes placeholders for UI, logic debugging and VFX.
@@ -65,53 +64,53 @@ const TARGET_SVG = `
 
 /** Built-in sample sprite-sheet assets bundled with the application. */
 export const DEFAULT_ASSETS = [
-    {
-        id: 'default-hero',
-        src: `data:image/svg+xml;base64,${btoa(HERO_SVG.trim())}`,
-        name: 'hero_placeholder.svg',
-        width: 64,
-        height: 64
-    },
-    {
-        id: 'default-crate',
-        src: `data:image/svg+xml;base64,${btoa(CRATE_SVG.trim())}`,
-        name: 'crate_placeholder.svg',
-        width: 64,
-        height: 64
-    },
-    {
-        id: 'num-1',
-        src: `data:image/svg+xml;base64,${btoa(NUM_1_SVG.trim())}`,
-        name: 'debug_1.svg',
-        width: 64,
-        height: 64
-    },
-    {
-        id: 'num-2',
-        src: `data:image/svg+xml;base64,${btoa(NUM_2_SVG.trim())}`,
-        name: 'debug_2.svg',
-        width: 64,
-        height: 64
-    },
-    {
-        id: 'num-3',
-        src: `data:image/svg+xml;base64,${btoa(NUM_3_SVG.trim())}`,
-        name: 'debug_3.svg',
-        width: 64,
-        height: 64
-    },
-    {
-        id: 'vfx-flash',
-        src: `data:image/svg+xml;base64,${btoa(VFX_FLASH_SVG.trim())}`,
-        name: 'vfx_flash.svg',
-        width: 64,
-        height: 64
-    },
-    {
-        id: 'target-crosshair',
-        src: `data:image/svg+xml;base64,${btoa(TARGET_SVG.trim())}`,
-        name: 'target.svg',
-        width: 64,
-        height: 64
-    }
+  {
+    id: "default-hero",
+    src: `data:image/svg+xml;base64,${btoa(HERO_SVG.trim())}`,
+    name: "hero_placeholder.svg",
+    width: 64,
+    height: 64,
+  },
+  {
+    id: "default-crate",
+    src: `data:image/svg+xml;base64,${btoa(CRATE_SVG.trim())}`,
+    name: "crate_placeholder.svg",
+    width: 64,
+    height: 64,
+  },
+  {
+    id: "num-1",
+    src: `data:image/svg+xml;base64,${btoa(NUM_1_SVG.trim())}`,
+    name: "debug_1.svg",
+    width: 64,
+    height: 64,
+  },
+  {
+    id: "num-2",
+    src: `data:image/svg+xml;base64,${btoa(NUM_2_SVG.trim())}`,
+    name: "debug_2.svg",
+    width: 64,
+    height: 64,
+  },
+  {
+    id: "num-3",
+    src: `data:image/svg+xml;base64,${btoa(NUM_3_SVG.trim())}`,
+    name: "debug_3.svg",
+    width: 64,
+    height: 64,
+  },
+  {
+    id: "vfx-flash",
+    src: `data:image/svg+xml;base64,${btoa(VFX_FLASH_SVG.trim())}`,
+    name: "vfx_flash.svg",
+    width: 64,
+    height: 64,
+  },
+  {
+    id: "target-crosshair",
+    src: `data:image/svg+xml;base64,${btoa(TARGET_SVG.trim())}`,
+    name: "target.svg",
+    width: 64,
+    height: 64,
+  },
 ];

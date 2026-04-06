@@ -19,10 +19,7 @@ declare module "gifshot" {
   }
 
   const gifshot: {
-    createGIF(
-      options: GifshotOptions,
-      callback: (result: GifshotResult) => void,
-    ): void;
+    createGIF(options: GifshotOptions, callback: (result: GifshotResult) => void): void;
   };
 
   export default gifshot;

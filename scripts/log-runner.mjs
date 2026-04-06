@@ -9,7 +9,7 @@ import { join } from "node:path";
 const [, , name, command] = process.argv;
 
 if (!name || !command) {
-  console.error("Usage: node scripts/log-runner.mjs <name> \"<command>\"");
+  console.error('Usage: node scripts/log-runner.mjs <name> "<command>"');
   process.exit(1);
 }
 

@@ -1,4 +1,3 @@
-
 export interface GridConfig {
   rows: number;
   cols: number;
@@ -8,7 +7,13 @@ export interface GridConfig {
   paddingY: number;
 }
 
-export type FrameLabelPosition = 'outside-top' | 'inside-top-left' | 'inside-top-right' | 'inside-bottom-left' | 'inside-bottom-right' | 'center';
+export type FrameLabelPosition =
+  | "outside-top"
+  | "inside-top-left"
+  | "inside-top-right"
+  | "inside-bottom-left"
+  | "inside-bottom-right"
+  | "center";
 
 export interface FrameLabelConfig {
   visible: boolean;
@@ -19,9 +24,9 @@ export interface FrameLabelConfig {
 }
 
 export interface UserPreferences {
-  theme: 'dark' | 'light';
+  theme: "dark" | "light";
   accentColor: string;
-  uiDensity: 'compact' | 'comfortable';
+  uiDensity: "compact" | "comfortable";
   autoSaveGrid: boolean;
   showTooltips: boolean;
   defaultFps: number;
@@ -32,9 +37,9 @@ export interface UserPreferences {
 }
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
-  theme: 'dark',
-  accentColor: '0 0 0',
-  uiDensity: 'comfortable',
+  theme: "dark",
+  accentColor: "0 0 0",
+  uiDensity: "comfortable",
   autoSaveGrid: true,
   showTooltips: true,
   defaultFps: 12,
@@ -44,14 +49,14 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   frameLabel: {
     visible: true,
     fontSize: 12,
-    position: 'outside-top',
-    color: '#3b82f6',
-    opacity: 1.0
-  }
+    position: "outside-top",
+    color: "#3b82f6",
+    opacity: 1.0,
+  },
 };
 
 export interface TemplateConfig {
-  viewType: 'full' | 'grid_only' | 'numbered';
+  viewType: "full" | "grid_only" | "numbered";
   showIndices: boolean;
   gridColor: string;
   gridWidth: number;

@@ -14,15 +14,15 @@ A web-based sprite sheet editor, animation sequencer, and sprite composition too
 
 ## Tech Stack
 
-| Layer | Tool |
-|---|---|
-| Runtime | React 19 + TypeScript 5.8 |
-| Bundler | Vite 8 (Rolldown) |
-| Styling | Tailwind CSS 4 (design-token based) |
-| Animation | GSAP 3, CSS keyframes |
-| Testing | Vitest 4 + Testing Library |
-| Linting | OXC (oxlint) |
-| Package Manager | Bun |
+| Layer           | Tool                                |
+| --------------- | ----------------------------------- |
+| Runtime         | React 19 + TypeScript 5.8           |
+| Bundler         | Vite 8 (Rolldown)                   |
+| Styling         | Tailwind CSS 4 (design-token based) |
+| Animation       | GSAP 3, CSS keyframes               |
+| Testing         | Vitest 4 + Testing Library          |
+| Linting         | OXC (oxlint)                        |
+| Package Manager | Bun                                 |
 
 ## Getting Started
 
@@ -130,8 +130,8 @@ bun run lint:log    # → logs/lint.log
 
 ## Environment Variables
 
-| Variable | Description |
-|---|---|
+| Variable         | Description                                      |
+| ---------------- | ------------------------------------------------ |
 | `GEMINI_API_KEY` | Google AI Studio API key for generation features |
 
 Create a `.env` file at the project root:
@@ -144,17 +144,17 @@ GEMINI_API_KEY=your_api_key_here
 
 Open the Command Palette (`Ctrl+Shift+P`) → **Tasks: Run Task** to access:
 
-| Task | Description |
-|---|---|
-| 🚀 Dev Server | Start Vite dev server |
-| 📦 Build | Production build with log |
-| 🔍 Lint | Run oxlint with log |
-| 🧪 Test | Run vitest with log |
-| 📊 Test Coverage | Coverage report |
-| ✅ Typecheck | TypeScript check |
-| 🔎 Full Check | Typecheck + lint |
-| 👁️ Preview | Preview production build |
-| 🧹 Clean | Remove dist & logs |
+| Task             | Description               |
+| ---------------- | ------------------------- |
+| 🚀 Dev Server    | Start Vite dev server     |
+| 📦 Build         | Production build with log |
+| 🔍 Lint          | Run oxlint with log       |
+| 🧪 Test          | Run vitest with log       |
+| 📊 Test Coverage | Coverage report           |
+| ✅ Typecheck     | TypeScript check          |
+| 🔎 Full Check    | Typecheck + lint          |
+| 👁️ Preview       | Preview production build  |
+| 🧹 Clean         | Remove dist & logs        |
 
 ## License
 

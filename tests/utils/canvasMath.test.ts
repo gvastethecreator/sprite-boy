@@ -38,7 +38,10 @@ describe("getResizeHandle", () => {
 describe("calculateSnapping", () => {
   it("snaps to canvas left edge", () => {
     const result = calculateSnapping(
-      3, 50, 40, 40, // x near 0
+      3,
+      50,
+      40,
+      40, // x near 0
       [],
       200,
       200,
@@ -59,7 +62,10 @@ describe("calculateSnapping", () => {
 
   it("snaps to canvas center", () => {
     const result = calculateSnapping(
-      78, 50, 40, 40, // center-x = 98 → near 100 (canvas center)
+      78,
+      50,
+      40,
+      40, // center-x = 98 → near 100 (canvas center)
       [],
       200,
       200,
@@ -73,7 +79,10 @@ describe("calculateSnapping", () => {
   it("snaps to other object edges", () => {
     const others = [{ x: 100, y: 0, w: 50, h: 50 }];
     const result = calculateSnapping(
-      97, 60, 30, 30, // left edge at 97, other obj left at 100
+      97,
+      60,
+      30,
+      30, // left edge at 97, other obj left at 100
       others,
       500,
       500,

@@ -94,11 +94,11 @@ Todos los imports actualizados. `tsc --noEmit` limpio.
 
 ## 📊 Métricas actuales
 
-| Métrica | Valor |
-| --- | --- |
-| Tests unitarios | ~56 |
-| Archivos typescript | ~45 |
-| Coverage estimado | ~35% (utils + hooks) |
-| Componentes | 18 principales + 9 paneles |
-| Hooks | 7 (4 core + 3 domain) |
-| LOC total estimado | ~8000 |
+| Métrica             | Valor                      |
+| ------------------- | -------------------------- |
+| Tests unitarios     | ~56                        |
+| Archivos typescript | ~45                        |
+| Coverage estimado   | ~35% (utils + hooks)       |
+| Componentes         | 18 principales + 9 paneles |
+| Hooks               | 7 (4 core + 3 domain)      |
+| LOC total estimado  | ~8000                      |
