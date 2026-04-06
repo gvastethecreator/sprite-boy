@@ -1,5 +1,4 @@
-
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 
 interface HistoryState<T> {
   past: T[];
@@ -7,7 +6,7 @@ interface HistoryState<T> {
   future: T[];
 }
 
-const MAX_HISTORY_STEPS = 50; 
+const MAX_HISTORY_STEPS = 50;
 
 /** Generic undo/redo hook with bounded history (max 50 steps). */
 export function useUndo<T>(initialPresent: T) {
@@ -53,13 +52,13 @@ export function useUndo<T>(initialPresent: T) {
   const set = useCallback((newPresent: T | ((curr: T) => T)) => {
     setState((currentState) => {
       const value = newPresent instanceof Function ? newPresent(currentState.present) : newPresent;
-      
+
       // DEEP EQUALITY CHECK (Simplified for project state objects)
       if (JSON.stringify(value) === JSON.stringify(currentState.present)) return currentState;
 
       const newPast = [...currentState.past, currentState.present];
       if (newPast.length > MAX_HISTORY_STEPS) {
-          newPast.shift(); 
+        newPast.shift();
       }
 
       return {
@@ -69,15 +68,15 @@ export function useUndo<T>(initialPresent: T) {
       };
     });
   }, []);
-  
+
   const setEphemeral = useCallback((newPresent: T | ((curr: T) => T)) => {
-      setState((currentState) => {
-          const value = newPresent instanceof Function ? newPresent(currentState.present) : newPresent;
-          return {
-              ...currentState,
-              present: value
-          };
-      });
+    setState((currentState) => {
+      const value = newPresent instanceof Function ? newPresent(currentState.present) : newPresent;
+      return {
+        ...currentState,
+        present: value,
+      };
+    });
   }, []);
 
   return {
@@ -88,6 +87,6 @@ export function useUndo<T>(initialPresent: T) {
     redo,
     canUndo,
     canRedo,
-    history: state 
+    history: state,
   };
 }

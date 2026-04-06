@@ -31,20 +31,32 @@
 }
 
 @keyframes fade-in {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 @keyframes slide-up {
-  0% { transform: translateY(10px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* ─── Dynamic Accent Colors (runtime CSS vars) ─── */
 :root {
   --accent-rgb: 0 0 0;
   --color-accent-hover: 39 39 42;
-  transition: --accent-rgb 0.4s ease, --color-accent-hover 0.4s ease;
+  transition:
+    --accent-rgb 0.4s ease,
+    --color-accent-hover 0.4s ease;
 }
 
 /* ─── Accent Utility Classes ─── */
@@ -109,7 +121,9 @@ body {
 @utility btn-primary {
   background: rgb(var(--accent-rgb));
   color: white;
-  transition: background 0.4s ease, transform 0.1s ease;
+  transition:
+    background 0.4s ease,
+    transform 0.1s ease;
 }
 
 @utility bg-checkered {

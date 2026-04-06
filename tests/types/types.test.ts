@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { GridConfig } from "../../types/config";
-import type {
-  FrameData,
-  SpriteAnimation,
-  Keyframe,
-  ProjectState,
-} from "../../types/core";
+import type { FrameData, SpriteAnimation, Keyframe, ProjectState } from "../../types/core";
 import { AppMode, HitboxType } from "../../types/enums";
 
 describe("Type definitions", () => {
@@ -32,9 +27,7 @@ describe("Type definitions", () => {
       y: 0,
       w: 64,
       h: 64,
-      hitboxes: [
-        { id: "hb1", x: 5, y: 5, w: 54, h: 54, type: HitboxType.HURTBOX, tag: "body" },
-      ],
+      hitboxes: [{ id: "hb1", x: 5, y: 5, w: 54, h: 54, type: HitboxType.HURTBOX, tag: "body" }],
     };
     expect(frameWithHitbox.hitboxes).toHaveLength(1);
   });

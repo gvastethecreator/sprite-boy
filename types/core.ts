@@ -1,8 +1,16 @@
+import { BuilderCanvasSize } from "./ui";
+import { HitboxType } from "./enums";
 
-import { BuilderCanvasSize } from './ui';
-import { HitboxType } from './enums';
-
-export type SlotAlignment = 'top-left' | 'top-center' | 'top-right' | 'middle-left' | 'center' | 'middle-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+export type SlotAlignment =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "middle-left"
+  | "center"
+  | "middle-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
 // Hitbox data structure for collision regions
 export interface HitboxData {
@@ -29,7 +37,7 @@ export interface FrameData {
   y: number;
   w: number;
   h: number;
-  hidden?: boolean; 
+  hidden?: boolean;
   // List of collision boxes associated with this frame
   hitboxes?: HitboxData[];
 }
@@ -43,9 +51,9 @@ export interface BuilderAsset {
 }
 
 export interface SlotData {
-  gridIndex: number; 
+  gridIndex: number;
   assetId: string;
-  fitMode: 'fit' | 'fill' | 'original' | 'stretch';
+  fitMode: "fit" | "fill" | "original" | "stretch";
   alignment: SlotAlignment;
   scaleX: number;
   scaleY: number;
@@ -77,10 +85,10 @@ export interface Keyframe {
   sourceIndex: number;
   pivotX: number;
   pivotY: number;
-  rotation?: number;    
-  scaleX?: number;      
-  scaleY?: number;      
-  opacity?: number;    
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+  opacity?: number;
 }
 
 export interface SpriteAnimation {
@@ -99,5 +107,5 @@ export interface ProjectState {
   builderFreeObjects: BuilderFreeObject[];
   animations: SpriteAnimation[];
   builderAssets: BuilderAsset[];
-  aspectRatio?: string; 
+  aspectRatio?: string;
 }

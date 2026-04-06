@@ -97,13 +97,7 @@ describe("generatePhaser3", () => {
 
 describe("generateGodotSpriteFrames", () => {
   it("produces valid Godot JSON with SpriteFrames resource type", () => {
-    const json = generateGodotSpriteFrames(
-      mockAnim,
-      mockFrames,
-      mockGeometry,
-      256,
-      256,
-    );
+    const json = generateGodotSpriteFrames(mockAnim, mockFrames, mockGeometry, 256, 256);
     const parsed = JSON.parse(json);
 
     expect(parsed.resource_type).toBe("SpriteFrames");
@@ -114,13 +108,7 @@ describe("generateGodotSpriteFrames", () => {
   });
 
   it("calculates correct offsets from pivot", () => {
-    const json = generateGodotSpriteFrames(
-      mockAnim,
-      mockFrames,
-      mockGeometry,
-      256,
-      256,
-    );
+    const json = generateGodotSpriteFrames(mockAnim, mockFrames, mockGeometry, 256, 256);
     const parsed = JSON.parse(json);
     // pivot(0.5, 1.0) → offset = (64*(0.5-0.5), 64*(1.0-0.5)) = (0, 32)
     expect(parsed.frames[0].offset.x).toBe(0);
