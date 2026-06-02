@@ -1,75 +1,78 @@
-# Guía de Componentes - SpriteSlice Studio
+# Components Guide - SpriteBoy Studio
 
-Este documento desglosa la estructura de la interfaz de usuario y la responsabilidad de cada componente.
+This document breaks down the user interface structure and the responsibility of each component.
 
-## Jerarquía Principal
+## Main Hierarchy
 
 ```
 App
-└── AppLayout (Layout principal, Grid CSS/Flex)
-    ├── Header (Barra superior)
-    ├── LeftSidebar (Herramientas, Librería, Animaciones)
-    ├── CanvasArea (Viewport central, <canvas>)
-    ├── Timeline (Secuenciador inferior)
-    ├── RightSidebar (Propiedades, Inspector)
-    └── Modals (Export, Settings, Help)
+└── AppLayout (Main layout, CSS Grid/Flex)
+    ├── Header (Top bar)
+    ├── LeftSidebar (Tools, Library, Animations)
+    ├── CanvasArea (Central viewport, <canvas>)
+    ├── Timeline (Lower sequencer)
+    ├── RightSidebar (Properties, Inspector)
+    └── Modals (Export, Settings, Help, Generation, Analysis, Command Palette)
 ```
 
-## Descripción de Componentes
+## Component Descriptions
 
 ### 1. `AppLayout.tsx`
 
-- **Responsabilidad:** Orquestador principal. Recibe el `controller` y distribuye el estado y las funciones a los hijos.
-- **Layout:** Gestiona la disposición responsiva de los paneles y los diálogos modales.
+- **Responsibility:** Main orchestrator. Receives the `controller` and distributes state and functions to children.
+- **Layout:** Manages responsive panel layout and modal dialogs.
 
 ### 2. `CanvasArea.tsx`
 
-- **Responsabilidad:** Manejo de la interacción directa con el espacio de trabajo.
+- **Responsibility:** Handles direct interaction with the workspace.
 - **Features:**
-  - Contiene el elemento `<canvas>`.
-  - Captura eventos de ratón (Drag, Drop, Click) y teclado.
-  - Implementa la lógica de "Cámara" (Zoom, Pan).
-  - Traduce coordenadas de pantalla a coordenadas de mundo (World Space).
-  - Llama a `CanvasRenderer` para dibujar.
+  - Contains the `<canvas>` element.
+  - Captures mouse (Drag, Drop, Click) and keyboard events.
+  - Implements "Camera" logic (Zoom, Pan).
+  - Translates screen coordinates to world coordinates (World Space).
+  - Calls `CanvasRenderer` to draw.
 
 ### 3. `LeftSidebar.tsx`
 
-Cambia su contenido dinámicamente según el `AppMode` actual.
+Changes its content dynamically based on the current `AppMode`.
 
-- **`ToolsPanel`**: Configuración de Grilla, Auto-slice, Varita mágica (Chroma Key).
-- **`AnimationPanel`**: Lista de animaciones creadas.
-- **`LibraryPanel`** (Solo Builder): Grid de assets importados disponibles para arrastrar.
-- **`TemplatePanel`** (Solo Template): Opciones de visualización para exportación.
+- **Builder tab (default):** Tools panel (Grid config, Auto-slice, Magic wand) + AI Creator panel.
+- **Animation tab:** Sequence panel with the list of animations.
+- **Template/View tab:** Presentation panel with export options (Consolidated sheet, Reference grid, Indexed view), aesthetics (background, grid color), and master exports (PNG zip, GIF).
 
 ### 4. `RightSidebar.tsx`
 
-Actúa como un "Inspector de Propiedades". Muestra información contextual basada en la selección actual.
+Acts as a "Properties Inspector". Shows contextual information based on the current selection.
 
-- **Si hay Frame seleccionado:** Muestra X, Y, W, H.
-- **Si hay Hitbox seleccionada:** Muestra Tag, Tipo, Dimensiones.
-- **Si hay Animación activa:** Muestra nombre, FPS, Loop, y propiedades del Keyframe actual (Pivote).
-- **Si hay Builder Slot seleccionado:** Muestra ajustes de imagen (Fit/Fill, Flip, Offset).
+- **If a Frame is selected:** Shows X, Y, W, H and frame tools.
+- **If a Hitbox is selected:** Shows Tag, Type, Dimensions.
+- **If an Animation is active:** Shows name, FPS, Loop, and current Keyframe properties (Pivot, rotation, scale, opacity).
+- **If a Builder Slot is selected:** Shows image adjustments (Fit/Fill, Flip, Offset, rotation).
 
 ### 5. `Timeline.tsx`
 
-- **Responsabilidad:** Visualización y manipulación de la secuencia de animación.
+- **Responsibility:** Visualization and manipulation of the animation sequence.
 - **Features:**
-  - Lista horizontal de frames.
-  - Drag & Drop para reordenar (usando API nativa de HTML5 DnD).
-  - Controles de reproducción (Play, Pause, Step).
-  - "Tray" (Bandeja) desplegable para añadir nuevos frames desde la fuente disponible.
+  - Horizontal list of frames.
+  - Drag & drop to reorder (using the native HTML5 DnD API).
+  - Playback controls (Play, Pause, Step).
+  - "Tray" (drawer) deployable to add new frames from the available source.
 
 ### 6. `Header.tsx`
 
-- **Responsabilidad:** Navegación global y acciones a nivel de archivo.
-- **Controles:** Selector de Modo (Slice, Hitbox, Build, Export), Undo/Redo, Abrir/Guardar Proyecto, Ajustes.
+- **Responsibility:** Global navigation and file-level actions.
+- **Controls:** Mode selector (Build, Animate, View), Undo/Redo, Open/Save Project, Settings, Help, Export.
 
-### 7. Modales
+### 7. Modals
 
-- **`ExportModal.tsx`**: Generador de código y descarga de PNG. Muestra una vista previa del código generado en tiempo real.
-- **`SettingsModal.tsx`**: Preferencias de usuario (Tema, Color de acento, Densidad UI).
-- **`HelpModal.tsx`**: Tabla de atajos de teclado.
+- **`ExportModal.tsx`**: Code generator and PNG download. Shows a real-time preview of the generated code.
+- **`SettingsModal.tsx`**: User preferences (Theme, Accent color, UI density).
+- **`HelpModal.tsx`**: Keyboard shortcut reference.
+- **`GenerationModal.tsx`**: AI generation flow.
+- **`AnalysisModal.tsx`**: AI-powered sprite-sheet analysis report.
+- **`CommandPalette.tsx`**: Quick command launcher.
 
-## Componentes UI Reutilizables
+## Reusable UI Components
 
-- **`NumberControl.tsx`**: Input numérico avanzado. Permite arrastrar el label para cambiar el valor (scrubbing), usar flechas, o escribir directamente. Soporta sliders opcionales.
+- **`NumberControl.tsx`**: Advanced numeric input. Allows dragging the label to scrub the value, arrow keys, or typing directly. Supports optional sliders.
+- **`PanelComponents.tsx`**: Small primitives used by the side panels (`Section`, `SectionHeader`, `PropRow`, `TextInput`, `Checkbox`).

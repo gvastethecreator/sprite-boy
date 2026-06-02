@@ -1,68 +1,68 @@
-# Documento de Requisitos del Producto (PRD) - SpriteSlice Studio
+# Product Requirements Document (PRD) - SpriteBoy Studio
 
-## 1. Introducción y Visión
+## 1. Introduction and Vision
 
-**SpriteSlice Studio** es una aplicación web ("Single Page Application") diseñada para desarrolladores de videojuegos indie y artistas de píxeles. Su objetivo es proporcionar un flujo de trabajo unificado y sin servidor (local-first) para preparar _assets_ gráficos antes de importarlos a motores de juego como Unity, Godot o Phaser.
+**SpriteBoy Studio** is a web application ("Single Page Application") designed for indie game developers and pixel artists. Its goal is to provide a unified, serverless workflow (local-first) for preparing graphical assets before importing them into game engines like Unity, Godot, or Phaser.
 
-La visión es eliminar la necesidad de herramientas de escritorio pesadas o scripts de Python complejos para tareas comunes como cortar spritesheets, crear animaciones básicas y definir cajas de colisión.
+The vision is to eliminate the need for heavy desktop tools or complex Python scripts for common tasks such as slicing sprite sheets, creating basic animations, and defining collision boxes.
 
-## 2. Perfil de Usuario
+## 2. User Profile
 
-- **Game Developer Indie:** Necesita iterar rápido, cortar hojas de sprites descargadas de internet y generar metadatos (JSON) compatibles con su motor.
-- **Pixel Artist:** Necesita previsualizar animaciones y limpiar fondos de sus creaciones sin salir del navegador.
+- **Indie Game Developer:** Needs to iterate quickly, slice sprite sheets downloaded from the internet, and generate metadata (JSON) compatible with their engine.
+- **Pixel Artist:** Needs to preview animations and clean up backgrounds of their creations without leaving the browser.
 
-## 3. Modos de la Aplicación (Funcionalidades Core)
+## 3. Application Modes (Core Features)
 
-La aplicación se estructura en 4 modos distintos que operan sobre un estado de proyecto compartido.
+The application is structured around 4 distinct modes that operate over a shared project state.
 
-### 3.1. Modo SLICER (Cortador)
+### 3.1. BUILDER Mode (Composer)
 
-- **Objetivo:** Importar una imagen fuente y definir regiones (frames) individuales.
-- **Requisitos:**
-  - Importación de imágenes (PNG, JPG, WEBP).
-  - **Auto-Slice:** Algoritmo para detectar "islas" de píxeles no transparentes automáticamente.
-  - **Grid Slice:** Configuración manual de filas, columnas, márgenes y padding.
-  - **Background Removal:** Herramienta de "varita mágica" (Chroma Key/Luma Key) para eliminar fondos de color sólido con tolerancia ajustable.
-  - Manipulación manual de frames (mover, redimensionar, crear, borrar).
+- **Goal:** Create a new sprite sheet by combining multiple individual assets (manual packing).
+- **Requirements:**
+  - Output canvas size definition (e.g. 1024x1024).
+  - **Asset Library:** Drag-and-drop area for external images or frames extracted from the Slicer.
+  - **Grid System:** Slot system where assets can be placed.
+  - Per-slot properties: Fit/Fill/Stretch, Flip X/Y, Offset, Rotation, Opacity.
 
-### 3.2. Modo BUILDER (Compositor)
+### 3.2. SLICER (Auto-Slice inside the Builder workspace)
 
-- **Objetivo:** Crear un nuevo spritesheet combinando múltiples assets individuales (packing manual).
-- **Requisitos:**
-  - Definición del tamaño del canvas de salida (ej. 1024x1024).
-  - **Biblioteca de Assets:** Área para arrastrar y soltar imágenes externas o frames extraídos del Slicer.
-  - **Grid System:** Sistema de slots donde se pueden colocar assets.
-  - Propiedades por Slot: Ajuste (Fit/Fill/Stretch), Flip X/Y, Offset.
+- **Goal:** Import a source image and define individual regions (frames).
+- **Requirements:**
+  - Image import (PNG, JPG, WEBP).
+  - **Auto-Slice:** Algorithm to detect "islands" of non-transparent pixels automatically.
+  - **Grid Slice:** Manual configuration of rows, columns, margins, and padding.
+  - **Background Removal:** "Magic wand" tool (Chroma Key / Luma Key) to remove solid color backgrounds with adjustable tolerance.
+  - Manual manipulation of frames (move, resize, create, delete).
 
-### 3.3. Modo ANIMATION (Animación)
+### 3.3. ANIMATION Mode
 
-- **Objetivo:** Crear secuencias de animación utilizando los frames definidos en Slicer o Builder.
-- **Requisitos:**
-  - Gestión de múltiples animaciones (Crear, Renombrar, Duplicar, Borrar).
-  - **Línea de Tiempo:** Drag & drop para reordenar keyframes.
-  - **Reproducción:** Play/Pause, FPS ajustable, Loop.
-  - **Onion Skinning:** Visualización semitransparente del frame anterior.
-  - **Pivotes:** Definición del punto de anclaje (Pivot X/Y) por frame.
+- **Goal:** Create animation sequences using the frames defined in Slicer or Builder.
+- **Requirements:**
+  - Multi-animation management (Create, Rename, Duplicate, Delete).
+  - **Timeline:** Drag & drop to reorder keyframes.
+  - **Playback:** Play/Pause, adjustable FPS, Loop.
+  - **Onion Skinning:** Semi-transparent rendering of the previous frame.
+  - **Pivots:** Anchor point (Pivot X/Y) definition per frame.
 
-### 3.4. Modo COLLISION (Colisiones)
+### 3.4. COLLISION Mode
 
-- **Objetivo:** Definir metadatos de física y combate.
-- **Requisitos:**
-  - Creación de múltiples cajas (Hitboxes) por frame.
-  - Tipos de caja: Hitbox (Ataque), Hurtbox (Daño), Collision (Física).
-  - Etiquetado (Tags) para lógica de juego (ej. "head", "body").
-  - Herramientas de productividad: Copiar/Pegar hitboxes entre frames, Flip horizontal.
+- **Goal:** Define physics and combat metadata.
+- **Requirements:**
+  - Creation of multiple boxes (Hitboxes) per frame.
+  - Box types: Hitbox (Attack), Hurtbox (Damage), Collision (Physics), Trigger.
+  - Tagging for game logic (e.g. "head", "body").
+  - Productivity tools: Copy/Paste hitboxes between frames, horizontal flip.
 
-## 4. Requisitos No Funcionales
+## 4. Non-Functional Requirements
 
-- **Rendimiento:** Debe mantener 60 FPS durante la manipulación del canvas. El renderizado pesado no debe bloquear la UI de React.
-- **Privacidad:** Todo el procesamiento ocurre en el navegador del cliente (`<canvas>`). Ninguna imagen se sube a un servidor.
-- **Persistencia:** Guardado y carga de proyectos en formato `.json` (incluyendo imágenes en Base64 para portabilidad).
-- **Exportación:**
-  - Imagen: PNG optimizado.
-  - Datos: JSON Genérico, Formato Phaser 3, Formato Godot (Resource).
+- **Performance:** Must maintain 60 FPS during canvas manipulation. Heavy rendering must not block the React UI.
+- **Privacy:** All processing happens in the client's browser (`<canvas>`). No image is uploaded to a server.
+- **Persistence:** Save and load projects in `.json` format (including Base64 images for portability).
+- **Export:**
+  - Image: Optimized PNG.
+  - Data: Generic JSON, Phaser 3 format, Godot (Resource) format, ZIP of individual PNGs, GIF of animation sequences.
 
-## 5. Interfaz de Usuario (UI/UX)
+## 5. User Interface (UI/UX)
 
-- **Tema:** Oscuro por defecto (Dark Mode) para reducir fatiga visual, con acento configurable.
-- **Layout:** Estilo "IDE": Sidebar Izquierdo (Herramientas), Centro (Canvas), Sidebar Derecho (Propiedades), Abajo (Línea de tiempo).
+- **Theme:** Dark by default (Dark Mode) to reduce visual fatigue, with configurable accent.
+- **Layout:** "IDE" style: Left Sidebar (Tools), Center (Canvas), Right Sidebar (Properties), Bottom (Timeline).

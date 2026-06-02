@@ -1,104 +1,104 @@
-# ✅ Deuda Técnica – SpriteBoy Studio
+# Technical Debt - SpriteBoy Studio
 
-Documento de seguimiento de mejoras. **Todos los ítems han sido resueltos.**
-
----
-
-## 🔴 Prioridad Alta
-
-### 1. ✅ `CanvasArea.tsx` – Componente monolítico
-
-**Resuelto:** Extraídos 3 hooks composables:
-
-- `hooks/canvas/useCanvasMouse.ts` – eventos de ratón (drag, zoom, pan)
-- `hooks/canvas/useCanvasKeyboard.ts` – atajos de teclado del canvas
-- `hooks/canvas/useCanvasRenderLoop.ts` – requestAnimationFrame loop + carga de imágenes + resize
-
-CanvasArea reducido de ~600 a ~160 líneas.
-
-### 2. ✅ `useProjectController.ts` – Controller centralizado
-
-**Resuelto:** Extraídos 2 hooks adicionales:
-
-- `hooks/domains/useExportLogic.ts` – lógica de exportación (PNG, JSON, Phaser, Godot)
-- `hooks/domains/usePersistence.ts` – persistencia IndexedDB (guardar/cargar/borrar)
-
-Controller reducido ~200 líneas.
-
-### 3. ✅ Cobertura de Tests insuficiente
-
-**Resuelto:** 25 nuevos tests de hooks implementados:
-
-- `useUndo.test.ts` – historial, ephemeral updates, límites
-- `useAnimationLogic.test.ts` – CRUD animaciones, playback
-- `useSlicerLogic.test.ts` – grid config, detección de sprites
-
-~56 tests totales pasando.
+Tracking document for improvements. **All items have been resolved.**
 
 ---
 
-## 🟡 Prioridad Media
+## High Priority
 
-### 4. ✅ Web Worker sin gestión de errores robusta
+### 1. `CanvasArea.tsx` - Monolithic component
 
-**Resuelto:** Añadido timeout de 30s a promesas del Worker, handler `onerror` global, y recreación automática de la instancia Worker en caso de crash.
+**Resolved:** Extracted 3 composable hooks:
 
-### 5. ✅ Blob URL memory leaks potenciales
+- `hooks/canvas/useCanvasMouse.ts` - mouse events (drag, zoom, pan)
+- `hooks/canvas/useCanvasKeyboard.ts` - canvas keyboard shortcuts
+- `hooks/canvas/useCanvasRenderLoop.ts` - requestAnimationFrame loop + image loading + resize
 
-**Resuelto:** Auditados todos los flujos de carga de imagen. Añadido `URL.revokeObjectURL()` en cleanup de `AppLayout.tsx` al cambiar de imagen.
+CanvasArea reduced from ~600 to ~160 lines.
 
-### 6. ✅ `renderUtils.ts` – Clase estática con código minificado
+### 2. `useProjectController.ts` - Centralized controller
 
-**Resuelto:** Expandidos 4 métodos ultra-comprimidos (`drawPivotMarker`, `drawCheckerboard`, `drawPixelGrid`, `drawFrameLabel`) + `renderDualView` + sección slicer tail + grid-stroke block a formato legible multi-línea.
+**Resolved:** Extracted 2 additional hooks:
 
-### 7. ✅ Tipado débil en `exportFormats.ts`
+- `hooks/domains/useExportLogic.ts` - export logic (PNG, JSON, Phaser, Godot)
+- `hooks/domains/usePersistence.ts` - IndexedDB persistence (save/load/delete)
 
-**Resuelto:** Creadas interfaces `ExportFrameInfo` y `CollisionInfo`. Eliminado el único `any` del archivo. Corregido import `HitboxData`.
+Controller reduced ~200 lines.
 
-### 8. ✅ Google Fonts via CDN
+### 3. Insufficient test coverage
 
-**Resuelto:** Instalados `@fontsource/archivo` y `@fontsource/jetbrains-mono`. Eliminados `<link>` CDN de `index.html`. Fuentes importadas en `index.tsx`.
+**Resolved:** 25 new hook tests implemented:
+
+- `useUndo.test.ts` - history, ephemeral updates, limits
+- `useAnimationLogic.test.ts` - animation CRUD, playback
+- `useSlicerLogic.test.ts` - grid config, sprite detection
+
+~56 tests passing.
 
 ---
 
-## 🟢 Prioridad Baja
+## Medium Priority
 
-### 9. ✅ Migrar animaciones CSS a GSAP
+### 4. Web Worker without robust error handling
 
-**Resuelto:** Creado `hooks/useGSAPAnimations.ts` con hooks `useModalEntrance()` y `useLogoPop()`. Aplicado a 5 modales, Header logo, y ToastContainer. Eliminados keyframes CSS obsoletos (`logo-pop`, `progress`).
+**Resolved:** Added 30s timeout to Worker promises, global `onerror` handler, and automatic Worker instance recreation in case of crash.
 
-### 10. ✅ Componente `NumberControl` – Accesibilidad
+### 5. Potential Blob URL memory leaks
 
-**Resuelto:** Añadidos `role="spinbutton"`, `aria-valuemin/max/now`, `aria-label` en input/botones/slider. Añadida navegación por teclado (ArrowUp/Down) y función `decrement()`.
+**Resolved:** Audited all image loading flows. Added `URL.revokeObjectURL()` in cleanup of `AppLayout.tsx` when changing images.
 
-### 11. ✅ Estructura de carpetas `components/`
+### 6. `renderUtils.ts` - Static class with minified code
 
-**Resuelto:** Reorganizados 17 archivos en subdirectorios:
+**Resolved:** Expanded 4 ultra-compressed methods (`drawPivotMarker`, `drawCheckerboard`, `drawPixelGrid`, `drawFrameLabel`) + `renderDualView` + slicer tail section + grid-stroke block into a readable multi-line format.
+
+### 7. Weak typing in `exportFormats.ts`
+
+**Resolved:** Created `ExportFrameInfo` and `CollisionInfo` interfaces. Removed the only `any` from the file. Fixed `HitboxData` import.
+
+### 8. Google Fonts via CDN
+
+**Resolved:** Installed `@fontsource/archivo` and `@fontsource/jetbrains-mono`. Removed `<link>` CDN from `index.html`. Fonts imported in `index.tsx`.
+
+---
+
+## Low Priority
+
+### 9. Migrate CSS animations to GSAP
+
+**Resolved:** Created `hooks/useGSAPAnimations.ts` with `useModalEntrance()` and `useLogoPop()` hooks. Applied to 5 modals, Header logo, and ToastContainer. Removed obsolete CSS keyframes (`logo-pop`, `progress`).
+
+### 10. `NumberControl` component - Accessibility
+
+**Resolved:** Added `role="spinbutton"`, `aria-valuemin/max/now`, `aria-label` on input/buttons/slider. Added keyboard navigation (ArrowUp/Down) and `decrement()` function.
+
+### 11. `components/` folder structure
+
+**Resolved:** Reorganized 17 files into subdirectories:
 
 ```text
 components/
 ├── layout/      # AppLayout, Header, LeftSidebar, RightSidebar
 ├── canvas/      # CanvasArea, CanvasToolbar, CanvasStatusBar
-├── overlays/    # ExportModal, SettingsModal, HelpModal, AnalysisModal, GenerationModal, CommandPalette, ContextMenu, ToastContainer
-├── panels/      # left/ + right/ (sin cambios)
+├── overlays/    # ExportModal, SettingsModal, HelpModal, AnalysisModal, GenerationModal, CommandPalette, ToastContainer
+├── panels/      # left/ + right/ (no changes)
 └── common/      # NumberControl, Timeline, PanelComponents
 ```
 
-Todos los imports actualizados. `tsc --noEmit` limpio.
+All imports updated. `tsc --noEmit` clean.
 
-### 12. ✅ Documentación inline
+### 12. Inline documentation
 
-**Resuelto:** JSDoc añadido a la API pública de ~20 hooks y ~25 exports de utilidades (`algorithms`, `canvasMath`, `db`, `exportFormats`, `renderUtils`, `uiFeedback`, `defaultAssets`).
+**Resolved:** JSDoc added to the public API of ~20 hooks and ~25 utility exports (`algorithms`, `canvasMath`, `db`, `exportFormats`, `renderUtils`, `uiFeedback`, `defaultAssets`).
 
 ---
 
-## 📊 Métricas actuales
+## Current Metrics
 
-| Métrica             | Valor                      |
-| ------------------- | -------------------------- |
-| Tests unitarios     | ~56                        |
-| Archivos typescript | ~45                        |
-| Coverage estimado   | ~35% (utils + hooks)       |
-| Componentes         | 18 principales + 9 paneles |
-| Hooks               | 7 (4 core + 3 domain)      |
-| LOC total estimado  | ~8000                      |
+| Metric             | Value                      |
+| ------------------ | -------------------------- |
+| Unit tests         | ~57                        |
+| TypeScript files   | ~45                        |
+| Estimated coverage | ~35% (utils + hooks)       |
+| Components         | 18 main + 9 panels         |
+| Hooks              | 7 (4 core + 3 domain)      |
+| Total estimated LOC| ~8000                      |

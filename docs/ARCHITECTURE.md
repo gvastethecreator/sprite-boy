@@ -1,86 +1,86 @@
-# Arquitectura Técnica - SpriteBoy Studio
+# Technical Architecture - SpriteBoy Studio
 
-Este documento describe las decisiones de ingeniería, patrones de diseño y flujo de datos de la aplicación.
+This document describes the engineering decisions, design patterns, and data flow of the application.
 
-## 1. Visión General del Stack
+## 1. Stack Overview
 
-| Capa            | Herramienta                   | Versión |
-| --------------- | ----------------------------- | ------- |
-| Framework UI    | React                         | 19.2    |
-| Lenguaje        | TypeScript                    | 5.8     |
-| Bundler         | Vite (Rolldown)               | 8.x     |
-| Estilos         | Tailwind CSS                  | 4.x     |
-| Animación       | GSAP + CSS keyframes          | 3.12    |
-| Testing         | Vitest + Testing Library      | 4.x     |
-| Linting         | OXC (oxlint)                  | 1.x     |
-| Package Manager | Bun                           | 1.x     |
-| Renderizado     | HTML5 Canvas API (Imperativo) | -       |
-| Persistencia    | IndexedDB                     | -       |
-| IA              | Google GenAI (Gemini/Imagen)  | -       |
+| Layer            | Tool                          | Version |
+| ---------------- | ----------------------------- | ------- |
+| UI Framework     | React                         | 19.2    |
+| Language         | TypeScript                    | 5.8     |
+| Bundler          | Vite (Rolldown)               | 8.x     |
+| Styling          | Tailwind CSS                  | 4.x     |
+| Animation        | GSAP + CSS keyframes          | 3.12    |
+| Testing          | Vitest + Testing Library      | 4.x     |
+| Linting          | OXC (oxlint)                  | 1.x     |
+| Package Manager  | Bun                           | 1.x     |
+| Rendering        | HTML5 Canvas API (Imperative) | -       |
+| Persistence      | IndexedDB                     | -       |
+| AI               | Google GenAI (Gemini/Imagen)  | -       |
 
-## 2. Patrón de Diseño: React UI + Canvas Engine
+## 2. Design Pattern: React UI + Canvas Engine
 
-Para lograr un alto rendimiento, la aplicación desacopla el ciclo de renderizado de React del ciclo de renderizado del Canvas gráfico.
+To achieve high performance, the application decouples the React render cycle from the Canvas render cycle.
 
-### 2.1. El Problema
+### 2.1. The Problem
 
-Renderizar imágenes pesadas, guías, hitboxes y animaciones a 60 FPS mediante componentes React (DOM) es ineficiente y causa "jank".
+Rendering heavy images, guides, hitboxes, and animations at 60 FPS through React components (DOM) is inefficient and causes jank.
 
-### 2.2. La Solución: `CanvasRenderer` (Clase Estática)
+### 2.2. The Solution: `CanvasRenderer` (Static Class)
 
-Se utiliza una clase utilitaria (`utils/renderUtils.ts`) que actúa como un motor de renderizado "stateless".
+A utility class (`utils/renderUtils.ts`) acts as a "stateless" rendering engine.
 
-- **Render Loop:** `useProjectController` mantiene un bucle `requestAnimationFrame`.
-- **Render Context:** En cada frame, se pasa un objeto `RenderContext` completo (que contiene todo el estado relevante: frames, imágenes, configuración, ratón) al método estático `CanvasRenderer.render()`.
-- **Ventaja:** React solo gestiona los inputs y la estructura del layout. El canvas se redibuja de forma imperativa, permitiendo operaciones complejas (zoom, pan, pixel-grid, onion skin) sin reconciliación del Virtual DOM.
+- **Render Loop:** `useProjectController` runs a `requestAnimationFrame` loop.
+- **Render Context:** On every frame, a complete `RenderContext` object (containing all relevant state: frames, images, configuration, mouse) is passed to the static `CanvasRenderer.render()` method.
+- **Advantage:** React only manages inputs and layout structure. The canvas redraws imperatively, allowing complex operations (zoom, pan, pixel grid, onion skin) without virtual DOM reconciliation.
 
-## 3. Gestión de Estado
+## 3. State Management
 
 ### 3.1. `useProjectController`
 
-Es el "cerebro" de la aplicación.
+The "brain" of the application.
 
-- Centraliza toda la lógica de negocio.
-- Expone métodos para modificar el estado (acciones).
-- Gestiona los efectos secundarios (timers, carga de imágenes).
-- Sirve como puente entre los componentes de UI y el estado global.
+- Centralizes all business logic.
+- Exposes methods to modify state (actions).
+- Manages side effects (timers, image loading).
+- Bridges UI components and global state.
 
 ### 3.2. `useUndo`
 
-Un hook genérico que envuelve el estado del proyecto (`ProjectState`).
+A generic hook that wraps the project state (`ProjectState`).
 
-- Implementa un patrón _Memento_ simple (Past, Present, Future).
-- Permite actualizaciones "efímeras" (`setEphemeral`) para acciones de alta frecuencia (como arrastrar un frame) que no deben generar historial de deshacer hasta que la acción termina (`onMouseUp`).
+- Implements a simple _Memento_ pattern (Past, Present, Future).
+- Supports "ephemeral" updates (`setEphemeral`) for high-frequency actions (such as dragging a frame) that should not generate undo history until the action ends (`onMouseUp`).
 
-## 4. Estructura de Datos (`types.ts`)
+## 4. Data Model (`types/`)
 
-El modelo de datos está diseñado para ser serializable a JSON.
+The data model is designed to be JSON-serializable.
 
-- **`ImageMeta`**: Referencia a la imagen fuente. Usa `Blob URL` (`blob:http://...`) para mantener las imágenes en memoria del navegador sin duplicar datos en Base64 hasta el momento de guardar.
-- **`FrameData`**: Coordenadas `{x, y, w, h}` relativas a la imagen fuente. Contiene un array de `HitboxData`.
-- **`SpriteAnimation`**: Lista de `Keyframe`. Un `Keyframe` referencia a un `FrameData` por índice y añade metadatos de animación (pivote).
-- **`BuilderSlots`**: Un mapa hash para el modo Builder, vinculando celdas de una grilla lógica con `Assets` de la librería.
+- **`ImageMeta`**: Reference to the source image. Uses a `Blob URL` (`blob:http://...`) to keep images in browser memory without duplicating data in Base64 until save time.
+- **`FrameData`**: Coordinates `{x, y, w, h}` relative to the source image. Contains an array of `HitboxData`.
+- **`SpriteAnimation`**: List of `Keyframe`. A `Keyframe` references a `FrameData` by index and adds animation metadata (pivot).
+- **`BuilderSlots`**: A hash map for Builder mode, linking logical grid cells with `Assets` from the library.
 
-## 5. Algoritmos Clave
+## 5. Key Algorithms
 
-### 5.1. Detección de Sprites (`detectSprites` en `algorithms.ts`)
+### 5.1. Sprite Detection (`detectSprites` in `algorithms.ts`)
 
-- Usa un algoritmo de **Búsqueda en Anchura (BFS)** o "Flood Fill".
-- Analiza el `ImageData` del canvas para encontrar islas de píxeles no transparentes.
-- Optimización: "Cede" el control al hilo principal (Yield to main thread) cada ciertas filas para no congelar la UI durante el procesamiento de imágenes grandes.
+- Uses a **Breadth-First Search (BFS)** or "Flood Fill" algorithm.
+- Analyzes the `ImageData` of the canvas to find islands of non-transparent pixels.
+- Optimization: "Yields" control to the main thread every few rows to avoid freezing the UI when processing large images.
 
-### 5.2. Eliminación de Fondo (`removeBackground`)
+### 5.2. Background Removal (`removeBackground`)
 
-- Implementa lógica de **Chroma Key** en el espacio de color HSL.
-- Calcula la distancia de color entre el píxel y el color objetivo.
-- Aplica suavizado (Feathering) en los bordes para evitar bordes duros (aliasing).
-- Detecta automáticamente si debe usar Luma Key (para grises) o Chroma Key (para colores).
+- Implements **Chroma Key** logic in the HSL color space.
+- Calculates color distance between the pixel and the target color.
+- Applies feathering on edges to avoid hard (aliased) borders.
+- Automatically detects whether to use Luma Key (for grays) or Chroma Key (for colors).
 
-## 6. Flujo de Datos
+## 6. Data Flow
 
-1. **Input:** Usuario interactúa (Click, Teclado, Drag).
-2. **Controller:** `useProjectController` recibe el evento.
-3. **Lógica:** Se actualiza el estado (ej. mover un frame).
-4. **React Render:** React detecta cambio de estado y actualiza el DOM (inputs numéricos, lista de capas).
-5. **Canvas Render:** Un `useEffect` en `CanvasArea` o el loop de animación detecta el cambio y llama a `CanvasRenderer.render()`.
-6. **Paint:** El canvas HTML5 se actualiza visualmente.
+1. **Input:** User interacts (Click, Keyboard, Drag).
+2. **Controller:** `useProjectController` receives the event.
+3. **Logic:** State is updated (e.g. move a frame).
+4. **React Render:** React detects state change and updates the DOM (numeric inputs, layer list).
+5. **Canvas Render:** A `useEffect` in `CanvasArea` or the animation loop detects the change and calls `CanvasRenderer.render()`.
+6. **Paint:** The HTML5 canvas updates visually.
