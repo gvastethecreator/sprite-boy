@@ -4,12 +4,14 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
+*.tsbuildinfo
 
 # Logs
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
 pnpm-debug.log*
 bun-debug.log*
 
@@ -36,6 +38,10 @@ coverage/
 
 # Bun
 bun.lock
+
+# Vite
+.vite/
+.vite-temp/
 
 # OS
 desktop.ini

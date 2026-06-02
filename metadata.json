@@ -1,5 +1,5 @@
 {
-  "name": "👹 SPRITER STUDIO",
-  "description": "A web-based sprite sheet editor and slicer tool.",
+  "name": "👹 SpriteBoy Studio",
+  "description": "A web-based sprite sheet editor, animation sequencer, and sprite composition tool.",
   "requestFramePermissions": []
 }

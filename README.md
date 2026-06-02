@@ -158,4 +158,4 @@ Open the Command Palette (`Ctrl+Shift+P`) → **Tasks: Run Task** to access:
 
 ## License
 
-Private – All rights reserved.
+Released under the [MIT License](./LICENSE). See the file for the full text.
