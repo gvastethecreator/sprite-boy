@@ -4,13 +4,17 @@ import type {
   SceneDrawOperation,
 } from "./sceneCompositor";
 
+export type SceneCanvas2DContext =
+  | CanvasRenderingContext2D
+  | OffscreenCanvasRenderingContext2D;
+
 /**
  * Canvas2D executor for a compiled scene plan. DPR/viewport base transforms are
  * intentionally deferred to the F5-06 adapter; this target renders logical
  * scene pixels into the supplied context.
  */
 export function createCanvas2DSceneTarget(
-  context: CanvasRenderingContext2D,
+  context: SceneCanvas2DContext,
 ): SceneCompositorTarget<CanvasImageSource> {
   let activeFrame: SceneCompositorFrame | null = null;
 
