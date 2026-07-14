@@ -1,0 +1,48 @@
+{
+  "slice": "F2-04",
+  "date": "2026-07-14",
+  "runtime": "Chromium via Playwright",
+  "origin": "http://127.0.0.1:4173/",
+  "sharedLease": {
+    "sameUrlForTwoOwners": true,
+    "createCount": 1,
+    "beforeRelease": {
+      "fetchable": true,
+      "text": "runtime-bytes"
+    },
+    "afterFirstRelease": {
+      "fetchable": true,
+      "text": "runtime-bytes"
+    },
+    "afterLastRelease": {
+      "fetchable": false,
+      "errorName": "TypeError"
+    },
+    "finalLeaseCount": 0
+  },
+  "nonCooperativeLoader": {
+    "internalSignalAborted": true,
+    "publicResult": {
+      "status": "error",
+      "code": "ASSET_LEASE_CONFLICT",
+      "operation": "create-url"
+    },
+    "lateCreatedUrlWasRevoked": true
+  },
+  "dispose": {
+    "fetchableBefore": true,
+    "fetchableAfter": false,
+    "afterErrorName": "TypeError"
+  },
+  "hostTotals": {
+    "created": 3,
+    "revoked": 3,
+    "balanced": true
+  },
+  "pageErrors": [],
+  "expectedConsoleErrors": [
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND",
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND"
+  ],
+  "expectedConsoleErrorReason": "Intentional fetch probes after revoke and dispose"
+}
