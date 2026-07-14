@@ -5,3 +5,6 @@ export * from "./canvas2dSceneTarget";
 export * from "./renderScheduler";
 export * from "./sceneThumbnail";
 export * from "./browserSceneThumbnailSurface";
+export * from "./sceneEncoding";
+export * from "./sceneExport";
+export * from "./browserSceneExportSurface";
