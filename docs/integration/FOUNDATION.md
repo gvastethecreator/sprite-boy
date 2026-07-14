@@ -172,6 +172,10 @@ interface AssetRepository {
   blobs v1 dentro del siguiente put atómico; nunca confía sólo en tamaño.
 - IndexedDB contiene blobs y metadata indexada por project/content hash.
 - El runtime URL manager usa reference counting y revoca al desmontar/reemplazar/cerrar proyecto.
+- Cada par owner/asset posee como máximo una lease; owners concurrentes
+  comparten carga y URL. Release del último owner, replace, remove o dispose
+  revocan exactamente una vez; cargas tardías nunca pueden revocar la URL de
+  una generación viva.
 - Borrado sólo ocurre cuando no hay referencias o después de una cascada confirmada.
 - Importación valida MIME real, dimensiones, límites y decode; filename no basta.
 - Una cuota insuficiente produce error recuperable y ofrece exportar/limpiar/reintentar.

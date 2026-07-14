@@ -227,6 +227,26 @@ los lotes que sí modifican producto.
   known vector, 2 metadata/1 blob, MIME wrapper, colisión con rollback, upgrade
   v1→v2, provider bloqueado abortado antes de abrir DB y cleanup sin errores.
 
+## F2-04 — Runtime Object URL leases
+
+- **Estado:** `accept` tras una ronda `repair` independiente y reproducción de
+  sus dos carreras.
+- **Ownership:** una lease idempotente por owner/asset; todos los owners de un
+  asset comparten carga y URL. `releaseOwner`, `releaseAsset` y `dispose`
+  limpian en forma determinista sin tocar el documento durable.
+- **Lifecycle:** el último release aborta la carga interna y hace settle del
+  acquire público aunque el loader no coopere. Una URL creada tarde se revoca;
+  una generación stale nunca revoca la URL registrada por la generación viva.
+- **Errores:** host ausente falla antes del loader. Loader/blob/create errors se
+  tipan como create-url; revoke/observer failures no interrumpen cleanup y
+  producen diagnostic release-url cuando existe observer.
+- **Evidencia:** 12/12 tests focales; checkpoint 21 suites/202 tests, build,
+  typecheck y lint. Chromium real en
+  `../../artifacts/quality/F2/2026-07-14/runtime-url-browser.json` verificó URL
+  fetchable con un owner, revocada al último release/dispose, carga tardía y
+  balance final 3 creadas/3 revocadas. Los dos ERR_FILE_NOT_FOUND son probes
+  intencionales después de revoke; cero page errors.
+
 ## Frontier pendiente de review
 
-- F2-04: runtime Object URL lease/revoke registry.
+- F2-05: import/replace/remove service y rollback boundary.
