@@ -1,0 +1,65 @@
+{
+  "slice": "F2-07",
+  "date": "2026-07-14",
+  "runtime": "Chromium via Playwright",
+  "origin": "http://127.0.0.1:4173/",
+  "journeyModule": "tests/browser/assetRepositoryReloadJourney.ts",
+  "beforeReload": {
+    "assetId": "asset-reload",
+    "contentHash": "e6e0e45161db7ea3bed91db41ca78c2b6bf24f2a7420967677bc7b1ff2aa1017",
+    "oldUrlFetchableBeforeReload": true,
+    "countsBeforeReload": {
+      "created": 1,
+      "revoked": 0
+    }
+  },
+  "afterReload": {
+    "pagehideDisposed": true,
+    "oldUrlFetchableAfterReload": false,
+    "metadata": {
+      "id": "asset-reload",
+      "hashMatches": true,
+      "containsRuntimeUrl": false
+    },
+    "blobText": "persist-across-reload",
+    "integrity": [
+      {
+        "assetId": "asset-reload",
+        "status": "ok"
+      }
+    ],
+    "sharedLease": {
+      "sameUrl": true,
+      "fetchableAfterFirstRelease": true,
+      "fetchableAfterLastRelease": false
+    },
+    "dispose": {
+      "finalUrlWasCreated": true,
+      "finalUrlFetchableAfterDispose": false,
+      "laterOperationCode": "ASSET_STORAGE_UNAVAILABLE"
+    },
+    "urlBalance": {
+      "created": 3,
+      "revoked": 3,
+      "balanced": true,
+      "exactIdentityBalance": true
+    },
+    "cleanup": {
+      "result": "deleted",
+      "databaseStillListed": false
+    }
+  },
+  "pageErrors": [],
+  "consoleErrors": [
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND",
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND",
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND"
+  ],
+  "expectedConsoleErrors": [
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND",
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND",
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND"
+  ],
+  "unexpectedConsoleErrors": [],
+  "expectedConsoleErrorReason": "Intentional fetch probes of the pagehide, last-owner and dispose-revoked Object URLs"
+}
