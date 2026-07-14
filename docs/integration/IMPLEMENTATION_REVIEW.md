@@ -673,8 +673,35 @@ los lotes que sí modifican producto.
   41/41 archivos y 403/403 tests; typecheck, lint focal `--deny-warnings`, build
   y diff-check verdes. Revisión final: `accept`; warning >500 kB es baseline.
 
+## F5-05 — Full-resolution scene export adapter
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Contrato:** raster de una escena a resolución lógica exacta, PNG default o
+  WebP con quality normalizada, sin crop/resize/padding. Rechaza más de 16384 por
+  eje o 64M pixels antes de allocation; empty scene no toca ports. Resultado
+  frozen publica project/revision/workspace, canvas, sampling, extensión, draw
+  count, byte size y Blob con MIME exacto.
+- **Pipeline:** export y thumbnail capturan un único `SceneDrawPlan` y lo
+  ejecutan por el compositor compartido. Browser surface usa OffscreenCanvas o
+  HTMLCanvas fallback, Canvas2D target común y cleanup 0x0 aun cuando una
+  allocation no entrega contexto.
+- **Artifact proof:** los cinco roots producen PNG con signature, chunks, CRC e
+  inflate de scanlines válidos; pixels decodificados coinciden con los goldens
+  del compositor. WebP prueba MIME/quality/metadata sin convertir F5-05 en codec
+  de secuencia o download manager.
+- **Repair de review:** validar el plan antes de `surfaceFactory.create` pero
+  recompilar `request.projection` después permitía que una factory reentrante
+  desacoplara límites, metadata y pixels. `compositeSceneDrawPlan` copia el plan
+  defensivamente antes de awaits; regresiones mutan la proyección durante create
+  en export y thumbnail y confirman que ambos conservan el snapshot inicial.
+- **Evidencia:** 47/47 compositor+thumbnail+export; suite acumulada 42/42 archivos
+  y 416/416 tests; typecheck, lint focal `--deny-warnings`, build y diff-check
+  verdes. Ledger: 198/198 IDs únicos. Revisión final: `accept`; warning chunk
+  >500 kB permanece como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F5-05: activo; debe consumir el mismo draw plan/compositor sin bifurcar pixels.
+- F5-06: activo; debe cerrar DPR, resize, context loss y cleanup del runtime de
+  render antes de habilitar el registry de workspaces F6.

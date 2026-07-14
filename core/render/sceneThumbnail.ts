@@ -1,16 +1,21 @@
 import type { EntityId, ProjectRevision, WorkspaceId } from "../project";
 import {
-  compositeScene,
+  compositeSceneDrawPlan,
   createSceneDrawPlan,
   type SceneAssetImageResolver,
   type SceneCompositorTarget,
   type SceneSampling,
 } from "./sceneCompositor";
 import type { SceneCanvas, SceneProjection } from "./sceneProjection";
+import {
+  isPlatformBlob,
+  type SceneRasterEncodeOptions,
+  type SceneRasterMimeType,
+} from "./sceneEncoding";
 
 export const MAX_SCENE_THUMBNAIL_EDGE = 2048;
 
-export type SceneThumbnailMimeType = "image/png" | "image/webp";
+export type SceneThumbnailMimeType = SceneRasterMimeType;
 
 export interface SceneThumbnailOptions {
   readonly maxWidth: number;
@@ -30,10 +35,7 @@ export interface SceneThumbnailLayout {
   readonly scaleY: number;
 }
 
-export interface SceneThumbnailEncodeOptions {
-  readonly mimeType: SceneThumbnailMimeType;
-  readonly quality?: number;
-}
+export interface SceneThumbnailEncodeOptions extends SceneRasterEncodeOptions {}
 
 export interface SceneThumbnailSurface<TImage> {
   readonly target: SceneCompositorTarget<TImage>;
@@ -208,17 +210,6 @@ function assertSurface<TImage>(surface: SceneThumbnailSurface<TImage>): void {
   }
 }
 
-function isPlatformBlob(value: unknown): value is Blob {
-  if (value === null || typeof value !== "object") return false;
-  try {
-    Reflect.apply(Blob.prototype.slice, value, [0, 0]);
-    return typeof (value as Blob).size === "number" &&
-      typeof (value as Blob).type === "string";
-  } catch {
-    return false;
-  }
-}
-
 export async function renderSceneThumbnail<TImage>(
   request: RenderSceneThumbnailRequest<TImage>,
 ): Promise<SceneThumbnailResult | null> {
@@ -258,8 +249,8 @@ export async function renderSceneThumbnail<TImage>(
   let primaryError: unknown;
   let result: SceneThumbnailResult | undefined;
   try {
-    const composite = await compositeScene({
-      projection: request.projection,
+    const composite = await compositeSceneDrawPlan({
+      plan,
       resolver: request.resolver,
       target: surface.target,
       sampling: options.sampling,

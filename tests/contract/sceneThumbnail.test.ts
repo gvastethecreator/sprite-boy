@@ -45,6 +45,9 @@ const PIXEL_SYMBOLS = new Map([
 ]);
 
 type GoldenRoot = keyof typeof sceneCompositorPixelGoldens;
+type MutableSceneProjection = {
+  -readonly [Key in keyof SceneProjection]: SceneProjection[Key];
+};
 
 function projectionFor(root: GoldenRoot): SceneProjection {
   const project: StudioProjectV1 = structuredClone(sceneCompositorProjectFixture);
@@ -328,6 +331,34 @@ describe("shared-compositor thumbnail adapter", () => {
       height: 1,
       scaleX: 0.5,
       scaleY: 0.5,
+    });
+    expect(factory.surface?.disposeCount).toBe(1);
+  });
+
+  it("renders the same layout snapshot when surface creation mutates the source projection", async () => {
+    const projection = structuredClone(projectionFor("asset")) as MutableSceneProjection;
+    const factory = new SoftwareThumbnailFactory();
+    factory.configure = () => {
+      projection.canvas = {
+        width: 20_000,
+        height: 20_000,
+        background: projection.root!.background,
+      };
+      projection.root = {
+        ...projection.root!,
+        width: 20_000,
+        height: 20_000,
+      };
+    };
+
+    const result = await renderWithSoftware(projection, factory, { maxWidth: 2, maxHeight: 2 });
+
+    expect(result).toMatchObject({
+      sourceWidth: 4,
+      sourceHeight: 2,
+      width: 2,
+      height: 1,
+      revision: 14,
     });
     expect(factory.surface?.disposeCount).toBe(1);
   });

@@ -60,8 +60,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F5-02 | J | F5-01 | Compositor asset/region/layer/variant/cel sin UI state | VIS fixture goldens | done |
 | F5-03 | J | F5-02 | Invalidation scheduler; rAF sólo durante drag/playback | PERF 0 rAF idle | done |
 | F5-04 | E | F5-02 | Thumbnail adapter sobre el compositor compartido | VIS parity + REV | done |
-| F5-05 | E | F5-02 | Export render adapter sobre el compositor compartido | ART/VIS parity + REV | active |
-| F5-06 | J | F5-03,F5-04,F5-05 | DPR/resize/context-loss/cleanup render gate | BR + PERF + REV | todo |
+| F5-05 | E | F5-02 | Export render adapter sobre el compositor compartido | ART/VIS parity + REV | done |
+| F5-06 | J | F5-03,F5-04,F5-05 | DPR/resize/context-loss/cleanup render gate | BR + PERF + REV | active |
 | F6-01 | J | F4-06,F5-06 | Workspace registry Slice/Compose/Animate/Collision/Export | CT exhaustive registry | todo |
 | F6-02 | J | F6-01 | Command registry tipado, enablement y shortcut conflicts | UT no placeholder handler | todo |
 | F6-03 | E | F6-01 | Shell layout/header/nav usando registry | BR navigation + REV | todo |

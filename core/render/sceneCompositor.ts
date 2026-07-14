@@ -68,6 +68,13 @@ export interface CompositeSceneRequest<TImage> {
   readonly sampling?: SceneSampling;
 }
 
+export interface CompositeSceneDrawPlanRequest<TImage> {
+  readonly plan: SceneDrawPlan;
+  readonly resolver: SceneAssetImageResolver<TImage>;
+  readonly target: SceneCompositorTarget<TImage>;
+  readonly sampling?: SceneSampling;
+}
+
 export interface SceneCompositeResult {
   readonly canvas: SceneCanvas | null;
   readonly drawCount: number;
@@ -287,6 +294,37 @@ export function createSceneDrawPlan(projection: SceneProjection): SceneDrawPlan 
   });
 }
 
+function copyMatrix(matrix: SceneAffineMatrix): SceneAffineMatrix {
+  return Object.freeze({
+    a: matrix.a,
+    b: matrix.b,
+    c: matrix.c,
+    d: matrix.d,
+    e: matrix.e,
+    f: matrix.f,
+  });
+}
+
+function copyDrawOperation(operation: SceneDrawOperation): SceneDrawOperation {
+  return Object.freeze({
+    origin: Object.freeze({ kind: operation.origin.kind, id: operation.origin.id }),
+    asset: copyAsset(operation.asset),
+    sourceRect: copyRect(operation.sourceRect),
+    matrix: copyMatrix(operation.matrix),
+    opacity: operation.opacity,
+  });
+}
+
+function copyDrawPlan(plan: SceneDrawPlan): SceneDrawPlan {
+  return Object.freeze({
+    projectId: plan.projectId,
+    revision: plan.revision,
+    workspaceId: plan.workspaceId,
+    canvas: plan.canvas === null ? null : copyCanvas(plan.canvas),
+    operations: Object.freeze(plan.operations.map(copyDrawOperation)),
+  });
+}
+
 function targetError(error: unknown, assetId?: EntityId): SceneCompositorError {
   return new SceneCompositorError(
     "SCENE_TARGET_FAILED",
@@ -303,10 +341,14 @@ async function suppressAbort<TImage>(target: SceneCompositorTarget<TImage>): Pro
   }
 }
 
-export async function compositeScene<TImage>(
-  request: CompositeSceneRequest<TImage>,
+/**
+ * Executes one defensive snapshot. Callers that allocate asynchronously from a
+ * plan can keep metadata, bounds and rendered pixels on the same revision.
+ */
+export async function compositeSceneDrawPlan<TImage>(
+  request: CompositeSceneDrawPlanRequest<TImage>,
 ): Promise<SceneCompositeResult> {
-  const plan = createSceneDrawPlan(request.projection);
+  const plan = copyDrawPlan(request.plan);
   if (plan.canvas === null) return Object.freeze({ canvas: null, drawCount: 0 });
 
   const resolved = new Map<EntityId, TImage>();
@@ -367,4 +409,15 @@ export async function compositeScene<TImage>(
     throw targetError(error);
   }
   return Object.freeze({ canvas: copyCanvas(plan.canvas), drawCount: plan.operations.length });
+}
+
+export async function compositeScene<TImage>(
+  request: CompositeSceneRequest<TImage>,
+): Promise<SceneCompositeResult> {
+  return compositeSceneDrawPlan({
+    plan: createSceneDrawPlan(request.projection),
+    resolver: request.resolver,
+    target: request.target,
+    ...(request.sampling === undefined ? {} : { sampling: request.sampling }),
+  });
 }

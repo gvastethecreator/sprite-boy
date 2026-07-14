@@ -15,8 +15,9 @@ luego reducir también permitiría allocations enormes por cada card.
 
 ## Decisión
 
-- Toda miniatura recibe una `SceneProjection` y se renderiza mediante
-  `compositeScene`; no reinterpreta layers ni sources legacy.
+- Toda miniatura recibe una `SceneProjection`, captura un `SceneDrawPlan` y lo
+  ejecuta mediante `compositeSceneDrawPlan`; no reinterpreta layers ni sources
+  legacy ni relee la proyección después de crear la surface.
 - La salida conserva aspect ratio dentro de `maxWidth`/`maxHeight`, sin crop ni
   padding. No hace upscale salvo opción explícita; el card consumer decide su
   checker, padding y escalado CSS.

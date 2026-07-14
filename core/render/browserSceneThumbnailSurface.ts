@@ -1,8 +1,9 @@
 import { multiplySceneMatrices, sceneScale } from "./affine";
+import { createCanvas2DSceneTarget } from "./canvas2dSceneTarget";
 import {
-  createCanvas2DSceneTarget,
-  type SceneCanvas2DContext,
-} from "./canvas2dSceneTarget";
+  createBrowserEncodedSceneCanvas,
+  type BrowserSceneCanvasScope,
+} from "./browserEncodedSceneCanvas";
 import type {
   SceneCompositorFrame,
   SceneCompositorTarget,
@@ -11,17 +12,13 @@ import type {
 import {
   renderSceneThumbnail,
   type RenderSceneThumbnailRequest,
-  type SceneThumbnailEncodeOptions,
   type SceneThumbnailLayout,
   type SceneThumbnailResult,
   type SceneThumbnailSurface,
   type SceneThumbnailSurfaceFactory,
 } from "./sceneThumbnail";
 
-export interface BrowserSceneThumbnailScope {
-  readonly OffscreenCanvas?: new (width: number, height: number) => OffscreenCanvas;
-  readonly document?: Pick<Document, "createElement">;
-}
+export type BrowserSceneThumbnailScope = BrowserSceneCanvasScope;
 
 export interface RenderBrowserSceneThumbnailRequest extends Omit<
   RenderSceneThumbnailRequest<CanvasImageSource>,
@@ -67,91 +64,17 @@ function scaledTarget(
   });
 }
 
-function offscreenSurface(
-  constructor: new (width: number, height: number) => OffscreenCanvas,
-  layout: SceneThumbnailLayout,
-): SceneThumbnailSurface<CanvasImageSource> | null {
-  const canvas = new constructor(layout.width, layout.height);
-  const context = canvas.getContext("2d");
-  if (context === null) return null;
-  let disposed = false;
-  let encoded = false;
-  return Object.freeze({
-    target: scaledTarget(
-      createCanvas2DSceneTarget(context as SceneCanvas2DContext),
-      layout,
-    ),
-    encode(options: SceneThumbnailEncodeOptions): Promise<Blob> {
-      if (disposed || encoded) throw new Error("Scene thumbnail surface is unavailable.");
-      encoded = true;
-      return canvas.convertToBlob({
-        type: options.mimeType,
-        ...(options.quality === undefined ? {} : { quality: options.quality }),
-      });
-    },
-    dispose(): void {
-      if (disposed) return;
-      disposed = true;
-      canvas.width = 0;
-      canvas.height = 0;
-    },
-  });
-}
-
-function htmlCanvasSurface(
-  document: Pick<Document, "createElement">,
-  layout: SceneThumbnailLayout,
-): SceneThumbnailSurface<CanvasImageSource> | null {
-  const canvas = document.createElement("canvas");
-  canvas.width = layout.width;
-  canvas.height = layout.height;
-  const context = canvas.getContext("2d");
-  if (context === null) return null;
-  let disposed = false;
-  let encoded = false;
-  return Object.freeze({
-    target: scaledTarget(createCanvas2DSceneTarget(context), layout),
-    encode(options: SceneThumbnailEncodeOptions): Promise<Blob> {
-      if (disposed || encoded) throw new Error("Scene thumbnail surface is unavailable.");
-      encoded = true;
-      return new Promise((resolve, reject) => {
-        try {
-          canvas.toBlob(
-            (blob) => {
-              if (blob === null) reject(new Error("Canvas returned no thumbnail Blob."));
-              else resolve(blob);
-            },
-            options.mimeType,
-            options.quality,
-          );
-        } catch (error) {
-          reject(error);
-        }
-      });
-    },
-    dispose(): void {
-      if (disposed) return;
-      disposed = true;
-      canvas.width = 0;
-      canvas.height = 0;
-    },
-  });
-}
-
 export function createBrowserSceneThumbnailSurfaceFactory(
   scope: BrowserSceneThumbnailScope = globalThis,
 ): SceneThumbnailSurfaceFactory<CanvasImageSource> {
   return Object.freeze({
     create(layout: SceneThumbnailLayout): SceneThumbnailSurface<CanvasImageSource> {
-      if (typeof scope.OffscreenCanvas === "function") {
-        const surface = offscreenSurface(scope.OffscreenCanvas, layout);
-        if (surface !== null) return surface;
-      }
-      if (scope.document !== undefined) {
-        const surface = htmlCanvasSurface(scope.document, layout);
-        if (surface !== null) return surface;
-      }
-      throw new Error("Browser Canvas2D thumbnail surfaces are unavailable.");
+      const surface = createBrowserEncodedSceneCanvas(layout.width, layout.height, scope);
+      return Object.freeze({
+        target: scaledTarget(createCanvas2DSceneTarget(surface.context), layout),
+        encode: surface.encode,
+        dispose: surface.dispose,
+      });
     },
   });
 }
