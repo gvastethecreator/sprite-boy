@@ -2,15 +2,27 @@ import type { AssetRecord, EntityId } from "../project/schema";
 import { isEntityId } from "../project/primitives";
 import {
   AssetRepositoryError,
+  awaitAbortableAssetOperation,
+  isAssetRepositoryError,
   normalizeAssetRepositoryError,
 } from "./contracts";
 import type {
   AssetOperationOptions,
   AssetRepositoryOperation,
 } from "./contracts";
+import {
+  assertAssetRecordContentIdentity,
+  assertNoAssetContentCollision,
+  computeAssetContentIdentity,
+  validateAssetContentIdentity,
+} from "./contentIdentity";
+import type {
+  AssetContentIdentity,
+  AssetContentIdentityProvider,
+} from "./contentIdentity";
 
 export const ASSET_DATABASE_NAME = "sprite-boy-studio-assets";
-export const ASSET_DATABASE_VERSION = 1;
+export const ASSET_DATABASE_VERSION = 2;
 export const ASSET_METADATA_STORE = "asset-metadata";
 export const ASSET_BLOB_STORE = "asset-blobs";
 export const ASSET_PROJECT_INDEX = "by-project";
@@ -27,12 +39,17 @@ export interface StoredAssetMetadataEntry {
 
 export interface StoredAssetBlobEntry {
   blobKey: string;
+  /** Added in database v2; absent entries are verified and backfilled on put. */
+  contentHash?: string;
+  verificationHash?: string;
+  byteSize?: number;
   blob: Blob;
 }
 
 export interface IndexedDbAssetStorageOptions {
   databaseName?: string;
   factory?: IDBFactory | null;
+  identityProvider?: AssetContentIdentityProvider;
 }
 
 export interface AssetStorageListOptions extends AssetOperationOptions {
@@ -193,6 +210,35 @@ function metadataKey(projectId: EntityId, assetId: EntityId): [EntityId, EntityI
   return [projectId, assetId];
 }
 
+function storedContentIdentity(
+  stored: StoredAssetBlobEntry,
+  assetId: EntityId,
+): AssetContentIdentity | undefined {
+  const fields = [stored.contentHash, stored.verificationHash, stored.byteSize];
+  if (fields.every((value) => value === undefined)) return undefined;
+  if (fields.some((value) => value === undefined)) {
+    throw new AssetRepositoryError(
+      "ASSET_INTEGRITY_MISMATCH",
+      "Stored asset identity is incomplete; existing bytes were preserved.",
+      { operation: "put", assetId },
+    );
+  }
+  try {
+    return validateAssetContentIdentity({
+      blobKey: stored.blobKey,
+      contentHash: stored.contentHash,
+      verificationHash: stored.verificationHash,
+      byteSize: stored.byteSize,
+    }, { operation: "put", assetId });
+  } catch (cause) {
+    throw new AssetRepositoryError(
+      "ASSET_INTEGRITY_MISMATCH",
+      "Stored asset identity is invalid; existing bytes were preserved.",
+      { operation: "put", assetId, cause },
+    );
+  }
+}
+
 /**
  * Project-scoped IndexedDB storage primitive. It persists metadata and blobs in
  * one transaction, while keeping blobs keyed independently for later hash
@@ -202,6 +248,7 @@ export class IndexedDbAssetStorage {
   readonly projectId: EntityId;
   readonly databaseName: string;
   private readonly factory: IDBFactory | null;
+  private readonly identityProvider: AssetContentIdentityProvider;
   private databasePromise?: Promise<IDBDatabase>;
   private database?: IDBDatabase;
   private openGeneration = 0;
@@ -213,6 +260,7 @@ export class IndexedDbAssetStorage {
     this.factory = options.factory === undefined
       ? (typeof indexedDB === "undefined" ? null : indexedDB)
       : options.factory;
+    this.identityProvider = options.identityProvider ?? computeAssetContentIdentity;
   }
 
   private getDatabase(): Promise<IDBDatabase> {
@@ -300,6 +348,69 @@ export class IndexedDbAssetStorage {
     return tracked;
   }
 
+  private async getBlobEntryForPut(
+    database: IDBDatabase,
+    blobKey: string,
+    assetId: EntityId,
+    options?: AssetOperationOptions,
+  ): Promise<StoredAssetBlobEntry | undefined> {
+    const transaction = createTransaction(database, ASSET_BLOB_STORE, "readonly", "put", assetId);
+    const monitor = monitorTransaction<StoredAssetBlobEntry | undefined>(
+      transaction,
+      "put",
+      assetId,
+      options,
+      undefined,
+    );
+    let request: IDBRequest<unknown>;
+    try {
+      request = transaction.objectStore(ASSET_BLOB_STORE).get(blobKey);
+    } catch (error) {
+      monitor.fail(structuralStorageError("put", error, assetId));
+      return monitor.promise;
+    }
+    request.onsuccess = () => {
+      if (request.result !== undefined) {
+        monitor.setResult(request.result as StoredAssetBlobEntry);
+      }
+    };
+    return monitor.promise;
+  }
+
+  private async prepareLegacyBlobIdentity(
+    database: IDBDatabase,
+    incoming: AssetContentIdentity,
+    assetId: EntityId,
+    options?: AssetOperationOptions,
+  ): Promise<AssetContentIdentity | undefined> {
+    const stored = await this.getBlobEntryForPut(database, incoming.blobKey, assetId, options);
+    if (!stored) return undefined;
+    const currentIdentity = storedContentIdentity(stored, assetId);
+    if (currentIdentity) return undefined;
+    if (!(stored.blob instanceof Blob)) {
+      throw new AssetRepositoryError(
+        "ASSET_INTEGRITY_MISMATCH",
+        "Legacy stored asset has no readable Blob; existing data was preserved.",
+        { operation: "put", assetId },
+      );
+    }
+    let legacyIdentity: AssetContentIdentity;
+    try {
+      legacyIdentity = await computeAssetContentIdentity(stored.blob, options);
+    } catch (cause) {
+      if (isAssetRepositoryError(cause) && cause.code === "ASSET_TRANSACTION_ABORTED") {
+        throw abortedError("put", assetId, cause);
+      }
+      throw new AssetRepositoryError(
+        "ASSET_INTEGRITY_MISMATCH",
+        "Legacy stored asset could not be verified; existing data was preserved.",
+        { operation: "put", assetId, cause },
+      );
+    }
+    assertNoAssetContentCollision(legacyIdentity, incoming, assetId);
+    return legacyIdentity;
+  }
+
   async put(
     record: AssetRecord,
     blob: Blob,
@@ -307,7 +418,41 @@ export class IndexedDbAssetStorage {
   ): Promise<void> {
     throwIfAborted(options, "put", record?.id);
     validatePutInput(this.projectId, record, blob);
+    let identity: AssetContentIdentity;
+    try {
+      identity = validateAssetContentIdentity(
+        await awaitAbortableAssetOperation(
+          Promise.resolve().then(() => this.identityProvider(blob, options)),
+          options,
+          "put",
+          record.id,
+        ),
+        { operation: "put", assetId: record.id },
+      );
+      assertAssetRecordContentIdentity(record, blob, identity);
+    } catch (error) {
+      if (options?.signal?.aborted) {
+        throw abortedError("put", record.id, options.signal.reason);
+      }
+      if (isAssetRepositoryError(error)) {
+        throw new AssetRepositoryError(error.code, error.message, {
+          operation: "put",
+          assetId: record.id,
+          recoverable: error.recoverable,
+          recoveryActions: error.recoveryActions,
+          cause: error,
+        });
+      }
+      throw normalizeAssetRepositoryError(error, { operation: "put", assetId: record.id });
+    }
     const database = await this.getDatabase();
+    throwIfAborted(options, "put", record.id);
+    const legacyIdentity = await this.prepareLegacyBlobIdentity(
+      database,
+      identity,
+      record.id,
+      options,
+    );
     throwIfAborted(options, "put", record.id);
     const transaction = createTransaction(database,
       [ASSET_METADATA_STORE, ASSET_BLOB_STORE],
@@ -331,7 +476,34 @@ export class IndexedDbAssetStorage {
     blobRequest.onsuccess = () => {
       try {
         if (blobRequest.result === undefined) {
-          blobStore.add({ blobKey: record.blobKey, blob } satisfies StoredAssetBlobEntry);
+          blobStore.add({
+            blobKey: identity.blobKey,
+            contentHash: identity.contentHash,
+            verificationHash: identity.verificationHash,
+            byteSize: identity.byteSize,
+            blob,
+          } satisfies StoredAssetBlobEntry);
+        } else {
+          const stored = blobRequest.result as StoredAssetBlobEntry;
+          const existingIdentity = storedContentIdentity(stored, record.id);
+          if (existingIdentity) {
+            assertNoAssetContentCollision(existingIdentity, identity, record.id);
+          } else {
+            if (!legacyIdentity) {
+              throw new AssetRepositoryError(
+                "ASSET_INTEGRITY_MISMATCH",
+                "Legacy asset changed before verification; existing bytes were preserved.",
+                { operation: "put", assetId: record.id },
+              );
+            }
+            assertNoAssetContentCollision(legacyIdentity, identity, record.id);
+            blobStore.put({
+              ...stored,
+              contentHash: legacyIdentity.contentHash,
+              verificationHash: legacyIdentity.verificationHash,
+              byteSize: legacyIdentity.byteSize,
+            } satisfies StoredAssetBlobEntry);
+          }
         }
         metadataStore.put({
           projectId: this.projectId,
@@ -458,7 +630,11 @@ export class IndexedDbAssetStorage {
           ));
           return;
         }
-        monitor.setResult(stored.blob);
+        monitor.setResult(
+          stored.blob.type === entry.record.mimeType
+            ? stored.blob
+            : stored.blob.slice(0, stored.blob.size, entry.record.mimeType),
+        );
       };
     };
     const result = await monitor.promise;

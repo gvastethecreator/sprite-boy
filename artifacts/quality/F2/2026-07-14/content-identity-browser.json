@@ -1,0 +1,62 @@
+{
+  "slice": "F2-03",
+  "date": "2026-07-14",
+  "runtime": "Chromium via Playwright",
+  "origin": "http://127.0.0.1:4173/",
+  "databaseVersion": 2,
+  "knownVector": {
+    "input": "abc",
+    "contentHash": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    "blobKey": "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    "verificationHash": "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+    "byteSize": 3
+  },
+  "exactDedup": {
+    "listedIds": ["asset-a", "asset-b"],
+    "metadataCount": 2,
+    "blobCount": 1,
+    "returnedMimeType": "application/octet-stream",
+    "returnedText": "abc",
+    "storedVerificationHashLength": 128
+  },
+  "legacyUpgrade": {
+    "fromDatabaseVersion": 1,
+    "toDatabaseVersion": 2,
+    "metadataCount": 1,
+    "blobCount": 1,
+    "contentHash": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    "verificationHashLength": 128,
+    "byteSize": 3
+  },
+  "forcedCollision": {
+    "error": {
+      "code": "ASSET_INTEGRITY_MISMATCH",
+      "operation": "put",
+      "assetId": "collision-rejected",
+      "recoverable": true
+    },
+    "listedIds": ["collision-original"],
+    "preservedText": "AAAA",
+    "rejectedMetadata": {
+      "code": "ASSET_NOT_FOUND",
+      "operation": "get-metadata",
+      "assetId": "collision-rejected"
+    },
+    "metadataCount": 1,
+    "blobCount": 1
+  },
+  "stuckProviderAbort": {
+    "providerCalls": 1,
+    "error": {
+      "code": "ASSET_TRANSACTION_ABORTED",
+      "operation": "put",
+      "assetId": "stuck"
+    },
+    "databaseOpenedBeforeAbort": false
+  },
+  "cleanup": {
+    "remainingDatabases": []
+  },
+  "pageErrors": [],
+  "consoleErrors": []
+}
