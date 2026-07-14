@@ -299,6 +299,31 @@ los lotes que sí modifican producto.
   recolectable, reporte repetible, conteos 4→4, pre-abort, boundary hostil,
   cleanup y cero page/console errors. Veredicto independiente final: `accept`.
 
+## F2-07 — Real reload and cleanup browser journey
+
+- **Estado:** `accept` después de una revisión independiente `repair` de dos
+  posibles falsos positivos del harness. F2 queda cerrado.
+- **Journey reproducible:** `tests/browser/assetRepositoryReloadJourney.ts`
+  persiste un blob, crea una lease y registra `pagehide → dispose`; Playwright
+  recarga el documento real y ejecuta la segunda etapa sobre la misma base.
+- **Persistencia:** tras reload, metadata/hash y texto exacto reaparecen,
+  `AssetIntegrity` es `ok` y el record durable no contiene `blob:`. La URL del
+  documento anterior ya no es fetchable.
+- **Cleanup:** dos owners comparten URL; sigue fetchable tras el primer release
+  y deja de serlo tras el último. Una URL final deja de ser fetchable después
+  de `dispose`, operaciones posteriores fallan tipadas y deleteDatabase termina
+  `deleted`, no `blocked`, sin base listada.
+- **Reparación de review:** contar 3 create/3 revoke podía ocultar revocaciones
+  sobre URLs equivocadas y el artefacto no capturaba la consola observada. El
+  harness ahora registra identidades después de cada llamada nativa, compara
+  los multiconjuntos exactos y prueba ambos URLs revocados. El artefacto
+  reconcilia tres `ERR_FILE_NOT_FOUND` intencionales y cero errores inesperados.
+- **Evidencia:** typecheck y lint focal verdes; checkpoint producto permanece en
+  23 suites/223 tests, build y lint exit 0. Chromium en
+  `../../artifacts/quality/F2/2026-07-14/repository-reload-cleanup-browser.json`
+  prueba reload, integridad, balance exacto 3/3, cleanup y cero page errors.
+  Veredicto independiente final: `accept`.
+
 ## Frontier pendiente de review
 
-- F2-07: reload/cleanup browser journey del repository sin leaked URLs.
+- F3-01: `ProjectCodec` encode/decode con version dispatch y round-trip V1.

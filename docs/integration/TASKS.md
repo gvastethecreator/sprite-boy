@@ -37,8 +37,8 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0 y F1/F2-01/F2-02/F2-03/F2-04/F2-05/F2-06 están aceptados. El frontier
-activo es `F2-07` (journey browser de reload/cleanup del repository sin leaks).
+F0, B0, F1 y F2 completo (F2-01/F2-07) están aceptados. El frontier activo es
+`F3-01` (`ProjectCodec` encode/decode con dispatch explícito de versión).
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 

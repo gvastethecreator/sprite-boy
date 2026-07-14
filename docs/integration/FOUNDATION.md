@@ -192,6 +192,10 @@ interface AssetRepository {
 - Los envelopes del inventario se leen como data properties propias. Hashes no
   se coercionan y los Blob se brand-checkean/normalizan con métodos nativos
   antes del provider, evitando getters o traps hostiles en el scan.
+- El host registra `pagehide → repository.dispose()` antes de una recarga real.
+  Reload reabre bytes/metadata durables, nunca reutiliza una Blob URL anterior
+  y el cleanup debe demostrar igualdad exacta entre las identidades de URLs
+  creadas/revocadas, no sólo igualdad de contadores.
 - Borrado sólo ocurre cuando no hay referencias o después de una cascada confirmada.
 - Importación valida MIME real, dimensiones, límites y decode; filename no basta.
 - Una cuota insuficiente produce error recuperable y ofrece exportar/limpiar/reintentar.
