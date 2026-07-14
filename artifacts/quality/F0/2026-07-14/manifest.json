@@ -1,0 +1,73 @@
+{
+  "slice": "F0",
+  "baselineCommit": "4e16041",
+  "environment": "Windows / Bun 1.3.14 / Node 25.5.0 / Vitest 4.1.10",
+  "behaviorIds": [],
+  "checks": [
+    {
+      "name": "legacy-fixture-contract",
+      "result": "pass",
+      "artifact": "tests/contract/legacyProjectV0.test.ts",
+      "details": "3 tests"
+    },
+    {
+      "name": "canonical-project-contract",
+      "result": "pass",
+      "artifact": "tests/contract/projectValidation.test.ts",
+      "details": "32 tests; raw run metadata and source hashes in checks.json"
+    },
+    {
+      "name": "typecheck",
+      "result": "pass",
+      "artifact": "bunx tsc --noEmit --pretty false"
+    },
+    {
+      "name": "focused-lint",
+      "result": "pass",
+      "artifact": "bunx oxlint core/project tests/contract",
+      "details": "0 warnings"
+    },
+    {
+      "name": "diff-check",
+      "result": "pass",
+      "artifact": "artifacts/quality/F0/2026-07-14/checks.json",
+      "details": "explicit whitespace scan includes untracked F0 files"
+    },
+    {
+      "name": "accumulated-regression",
+      "result": "pass",
+      "artifact": "bun run test",
+      "details": "9 suites / 92 tests"
+    },
+    {
+      "name": "repository-lint",
+      "result": "pass",
+      "artifact": "bun run lint",
+      "details": "exit 0; pre-existing legacy warnings remain, F0 focused lint has 0 warnings"
+    },
+    {
+      "name": "production-build",
+      "result": "pass",
+      "artifact": "bun run build",
+      "details": "exit 0; pre-existing main chunk size warning remains"
+    }
+  ],
+  "hostilePaths": [
+    { "scenario": "non-object and future schema", "result": "pass" },
+    { "scenario": "Blob/Data URL and non-JSON runtime values", "result": "pass" },
+    { "scenario": "missing references, duplicate ownership and owner mismatch", "result": "pass" },
+    { "scenario": "malformed and sparse arrays", "result": "pass" },
+    { "scenario": "invalid dimensions, opacity and calendar timestamps", "result": "pass" },
+    {
+      "scenario": "ambiguous legacy frame/slot source",
+      "result": "not-run",
+      "details": "F0 provides the fixture only; detector and migration report are gated by F3"
+    }
+  ],
+  "review": {
+    "model": "gpt-5.6-sol",
+    "effort": "xhigh",
+    "verdict": "accept",
+    "details": "35/35 contract, 92/92 full, 10/10 source hashes matched; no residual P1/P2"
+  }
+}

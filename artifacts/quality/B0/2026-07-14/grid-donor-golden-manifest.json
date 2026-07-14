@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-14",
+  "donor": {
+    "repository": "D:/DEV/grid-splitter",
+    "commit": "5322f8233f47cc3ba58d579cc06d5bcf88905005",
+    "fixtureAndRegressionPathsClean": true,
+    "fixtureReadme": "src/test/fixtures/README.md",
+    "regressionTest": "src/test/regression/visual.test.ts"
+  },
+  "fixtures": [
+    {
+      "name": "grid_2x4_transparent.png",
+      "sourcePath": "src/test/fixtures/grid_2x4_transparent.png",
+      "width": 64,
+      "height": 128,
+      "bytes": 32964,
+      "sha256": "066cf7001446d8501bb2708d671653d609e44c5cf019dc40caa0256219fa0842",
+      "expectedManualCells": 8
+    },
+    {
+      "name": "grid_3x3_green_bg.png",
+      "sourcePath": "src/test/fixtures/grid_3x3_green_bg.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 37028,
+      "sha256": "76fa2fc3f35103a0bb791d8c0c54d13acf8352fc9c5b3f252f358788b29d435a",
+      "expectedManualCells": 9
+    },
+    {
+      "name": "pixel_art_16x16.png",
+      "sourcePath": "src/test/fixtures/pixel_art_16x16.png",
+      "width": 16,
+      "height": 16,
+      "bytes": 1108,
+      "sha256": "9a1c98b9a7621ec28eaa7b49a608e4f26ac84b450779b9143922b0331248e393"
+    },
+    {
+      "name": "single_asset.png",
+      "sourcePath": "src/test/fixtures/single_asset.png",
+      "width": 32,
+      "height": 32,
+      "bytes": 4196,
+      "sha256": "6580b1fc8aacb593da72459340ee7ac648a952a59048ea4e97bdd6111417b6e5",
+      "expectedManualCells": 1
+    }
+  ],
+  "limitations": [
+    "The donor regression suite validates PNG acceptance, manual-grid geometry and stable filenames; it does not freeze processed output pixels yet.",
+    "Host copies and full worker golden outputs remain owned by G1/G2 and are explicitly missing in the B0 fixture inventory."
+  ],
+  "review": "accept-as-wave-0-source-golden-manifest"
+}
