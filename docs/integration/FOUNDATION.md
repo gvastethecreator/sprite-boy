@@ -155,6 +155,14 @@ notifican. Dispatch reentrante se rechaza; cada listener observa como máximo el
 commit actual y sus fallos se aíslan mediante un diagnostic genérico sin causa.
 El overflow de revision se decide antes de invocar reloj o IdFactory.
 
+Workspace/Interaction/Job/Playback usan factories concretos sobre una runtime
+privada: snapshots data-only frozen, subscription aislada y dispatch sin
+serialize/hydrate/history. Acciones se clonan desde descriptors, rechazan
+accessors, ciclos, sparse arrays, prototypes runtime y contaminación project/
+revision. No-op conserva identidad y no notifica. Playback no puede seek sin
+sequence ni advance sin `playing`; errores externos se redactan antes de cruzar
+la frontera. Job entries quedan extensibles sólo con data plain para F7.
+
 ## AssetRepository
 
 Contrato requerido:

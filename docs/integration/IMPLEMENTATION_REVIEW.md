@@ -505,8 +505,27 @@ los lotes que sí modifican producto.
   reentrancia, listener failure, metadata/accessors y providers en overflow
   incluidas. Veredicto independiente final: `repair+accept`.
 
+## F4-03 — Isolated local stores
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Stores:** Workspace parcial y Interaction/Job/Playback efímeros comparten
+  sólo una runtime privada de snapshot/subscription. Las factories públicas
+  siguen concretas, frozen y sin APIs serialize/hydrate/history.
+- **Aislamiento:** actions/snapshots son data-only; records aceptan IDs hostiles
+  como `__proto__` sin pollution. Jobs rechazan project/revision y conservan
+  extensiones lifecycle plain-data para F7. Un store nunca notifica a otro.
+- **Reparaciones de review:** playback inicialmente permitía seek/advance sin
+  sequence/playing; resets y reemplazos equivalentes cambiaban identity; un
+  Proxy filtraba su mensaje privado. Se añadieron invariantes, igualdad
+  estructural data-only y redacción de traps externos con estado estable.
+- **Evidencia:** 9/9 tests focales locales y 2/2 de contracts; typecheck, lint
+  focal `--deny-warnings` y diff-check verdes. Fixtures cubren no-op/reset,
+  freeze, accessors, Proxy, ciclos, sparse arrays, prototypes runtime,
+  reentrancia/observer failure, job order/pollution y playback inválido.
+  Veredicto independiente final: `repair+accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F4-03/F4-04: autorizados desde F4-01/F4-02 aceptados.
+- F4-04/F4-05: autorizados desde F4-02/F4-03 aceptados.
