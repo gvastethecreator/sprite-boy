@@ -229,6 +229,15 @@ animaciones/cels, pivots/timing y grid recipe; después ejecuta el validator V1.
 Assets con el mismo content hash se deduplican y cualquier constraint/UI/ratio
 sin representación durable aparece como `loss`, nunca como éxito silencioso.
 
+El package portable `.spriteboy` es un ZIP determinista con fecha fija y tres
+clases de entrada: `manifest.json`, `project.json` y blobs deduplicados en
+`assets/<sha256>.<ext>`. El manifest vincula cada asset con hash, MIME,
+dimensiones y tamaño; import valida primero el directorio central físico
+(duplicados, paths, ZIP64, cifrado, método de compresión y límites), después
+verifica documento y blobs por tamaño/hash y recién entonces entrega un batch
+para persistir. Una importación incompleta o abortada no modifica storage ni el
+proyecto activo.
+
 Formato de trabajo:
 
 - Autosave: documento JSON versionado + blobs deduplicados en IndexedDB.

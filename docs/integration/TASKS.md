@@ -37,8 +37,9 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1, F2 y F3-01..F3-03 están aceptados. El frontier activo es `F3-04`
-(package portable `.spriteboy` con documento, blobs y verificación de hashes).
+F0, B0, F1, F2 y F3-01..F3-04 están aceptados. El frontier activo es `F3-05`
+(autosave journal, checkpoint atómico y recovery candidate ante crash o
+escritura parcial).
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 

@@ -396,6 +396,30 @@ los lotes que sí modifican producto.
   validator V1; checkpoint 26 suites/260 tests, typecheck, build y lint exit 0
   con deuda legacy/bundle sin cambios. Veredicto final: `repair+accept`.
 
+## F3-04 — Portable `.spriteboy` package
+
+- **Estado:** `accept` después de revisión independiente `repair+accept` y
+  regresiones para cada límite reparado.
+- **Formato:** ZIP determinista con `manifest.json`, `project.json` y blobs
+  deduplicados en `assets/<sha256>.<ext>`. El manifest conserva hash, MIME,
+  bytes, dimensiones y los asset IDs consumidores; el proyecto pasa por
+  `ProjectCodec` antes de exportar y después de importar.
+- **Integridad:** export confirma la identidad binaria de cada blob. Import
+  valida tamaño/hash del package, documento y assets, entradas requeridas y
+  extra, paths seguros, versiones y coherencia de metadata antes de devolver un
+  batch. No existe persistencia parcial dentro de esta frontera.
+- **Reparaciones de review:** JSZip ocultaba duplicados físicos al sobrescribir
+  nombres; ahora un preflight del directorio central rechaza duplicados,
+  directorios, ZIP64/multidisk, cifrado, métodos no soportados e inconsistencias
+  local/central antes de inflar. Señales, options y asset sources se normalizan
+  por descriptors; abort compite con trabajo no cooperativo y limpia listeners.
+  Assets que comparten hash también deben compartir dimensiones.
+- **Evidencia:** 9/9 tests focales; checkpoint 27 suites/269 tests, typecheck,
+  build y lint exit 0 con las mismas warnings legacy y warning de bundle. Lint
+  focal `--deny-warnings` y `git diff --check` verdes. Veredicto independiente:
+  `repair+accept`.
+
 ## Frontier pendiente de review
 
-- F3-04: package `.spriteboy` document+blobs con hashes verificados.
+- F3-05: autosave journal, checkpoint atómico y recovery candidate ante crash
+  o escritura parcial.
