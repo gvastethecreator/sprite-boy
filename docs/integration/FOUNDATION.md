@@ -148,6 +148,13 @@ ningún store ofrece `setState`, serialize/hydrate o history ad hoc. Los stores
 efímeros nunca contienen documento/revision y la persistencia parcial de
 WorkspaceStore pertenece a adapters externos, no a su API runtime.
 
+ProjectStore valida el documento inicial, normaliza options/context y envelopes
+desde data properties propias y sólo incrementa revision cuando el reducer
+canónico entrega un proyecto nuevo. Failed/no-op conservan snapshot y no
+notifican. Dispatch reentrante se rechaza; cada listener observa como máximo el
+commit actual y sus fallos se aíslan mediante un diagnostic genérico sin causa.
+El overflow de revision se decide antes de invocar reloj o IdFactory.
+
 ## AssetRepository
 
 Contrato requerido:

@@ -485,8 +485,28 @@ los lotes que sí modifican producto.
   exacta; typecheck, lint focal `--deny-warnings` y diff-check verdes.
   Veredicto independiente final: `repair+accept`.
 
+## F4-02 — Canonical ProjectStore dispatch and revision
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Dispatch:** el constructor valida V1 y revision. Cada envelope exacto y su
+  metadata data-only se normalizan antes del reducer. Failed/no-op conservan
+  snapshot/revision; un cambio crea un snapshot nuevo, incrementa una vez y
+  notifica sólo después del commit.
+- **Suscripción:** unsubscribe es idempotente; dispatch desde un listener se
+  rechaza como precondition y no altera la revision. Un listener que lanza no
+  impide los siguientes ni convierte un commit exitoso en excepción; el canal
+  opcional recibe sólo un diagnostic frozen genérico.
+- **Reparaciones de review:** la primera versión devolvía revision incorrecta
+  con reentrancia, duplicaba observers, filtraba errores privados y aceptaba
+  `metadata: null`. Options/context y metadata ahora son descriptor-safe y el
+  overflow se decide antes de consumir reloj/IdFactory.
+- **Evidencia:** 9/9 tests focales de ProjectStore y 2/2 de contracts; typecheck,
+  lint focal `--deny-warnings` y diff-check verdes. Reproducciones de
+  reentrancia, listener failure, metadata/accessors y providers en overflow
+  incluidas. Veredicto independiente final: `repair+accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F4-02/F4-03: autorizados desde el contrato F4-01 aceptado.
+- F4-03/F4-04: autorizados desde F4-01/F4-02 aceptados.
