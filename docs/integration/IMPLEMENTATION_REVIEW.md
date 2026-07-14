@@ -467,7 +467,26 @@ los lotes que sí modifican producto.
   thenables anidados, abort/listener balance, frozen graph y causa privada
   cubiertos. Veredicto independiente final: `repair+accept`.
 
-## Frontier pendiente de review
+## F4-01 — Store boundary contracts
 
-- F3-07: journey browser save-close-reload y export/import portable en storage
-  limpio.
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Fronteras:** ProjectStore contiene el documento/revision y es el único con
+  history por commands. WorkspaceStore conserva layout/viewport/preferencias
+  parcialmente persistibles sin duplicar `project.workspace`. Interaction,
+  Job y Playback son efímeros y sin history.
+- **API:** cinco aliases concretos ligan kind, state, action y policy. Sólo
+  exponen snapshot, subscribe y dispatch; la base genérica no es pública.
+  Snapshots y resultados del proyecto son deep-readonly.
+- **Reparaciones de review:** se incorporó WorkspaceStore, se cerró el bypass
+  mutable de ProjectSnapshot/result, se eliminaron genéricos públicos capaces
+  de mezclar estado/acción y jobs ausentes quedaron tipados como `undefined`.
+  Registry y policies están congelados y ligados por tipo.
+- **Evidencia:** 2/2 tests focales con checks negativos de compilación y API
+  exacta; typecheck, lint focal `--deny-warnings` y diff-check verdes.
+  Veredicto independiente final: `repair+accept`.
+
+## Frontiers abiertos
+
+- F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
+  save-close-reload y export/import portable en storage limpio.
+- F4-02/F4-03: autorizados desde el contrato F4-01 aceptado.

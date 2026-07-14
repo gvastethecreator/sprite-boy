@@ -37,8 +37,9 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1, F2 y F3-01..F3-06 están aceptados. El frontier activo es `F3-07`
-(journey browser save-close-reload y export/import portable en storage limpio).
+F0, B0, F1, F2, F3-01..F3-06 y F4-01 están aceptados. `F3-07` sigue pendiente
+del journey browser save-close-reload/export-import; `F4-02` y `F4-03` quedan
+autorizados en paralelo por depender sólo del contrato F4-01 aceptado.
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 

@@ -4,9 +4,13 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2 y F3-01..F3-06 aceptados. Frontier autorizado: F3-07.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06 y F4-01 aceptados. Frontiers: F3-07 pendiente de browser; F4-02/F4-03 autorizados.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
+
+F4 avanza en paralelo porque F4-01 depende de F1-08, ya aceptado. Esto no
+degrada F3-07: su harness queda `ready-for-browser`, pero el gate continúa
+abierto hasta ejecutar J1/J8 en el perfil Chrome real y revisar el artefacto.
 
 ## Reglas de ejecución
 

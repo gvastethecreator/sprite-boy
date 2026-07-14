@@ -136,13 +136,17 @@ Operaciones destructivas con referencias:
 
 | Store | Contenido | Persistencia | History |
 |---|---|---|---|
-| `ProjectStore` | Documento normalizado y revision | Sí | Sí |
-| `WorkspaceStore` | workspace activo, panel sizes, selección, viewport, preferencias | Parcial por proyecto/usuario | Sólo selección durable si aporta valor |
+| `ProjectStore` | Documento normalizado, revision y `project.workspace` durable | Sí | Sí |
+| `WorkspaceStore` | panel sizes, viewport y preferencias; workspace/selección se proyectan desde ProjectStore | Parcial por proyecto/usuario | No; selección durable usa command canónico |
 | `InteractionStore` | hover, drag, guides, marquee, modal, context menu | No | No |
 | `PlaybackStore` | playing, cursor, accumulator, dropped frames | No | No |
 | `JobStore` | worker/AI/export jobs, progress, cancel, logs | Sólo resumen/provenance final | No |
 
 Los componentes se suscriben a selectores mínimos con igualdad estable. `AppLayout` sólo orquesta regiones del shell; no recibe ni redistribuye el controller completo.
+Los cinco contratos exponen snapshots deep-readonly y un único `dispatch` tipado;
+ningún store ofrece `setState`, serialize/hydrate o history ad hoc. Los stores
+efímeros nunca contienen documento/revision y la persistencia parcial de
+WorkspaceStore pertenece a adapters externos, no a su API runtime.
 
 ## AssetRepository
 
