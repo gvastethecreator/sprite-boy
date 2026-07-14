@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06 y F5-01..F5-02 aceptados. Frontiers: F3-07 pendiente de browser; F5-03/F5-04/F5-05 autorizados.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06 y F5-01..F5-03 aceptados. Frontiers: F3-07 pendiente de browser; F5-04/F5-05 autorizados.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -27,6 +27,12 @@ resuelve cada asset una vez antes de abrir el frame y ejecuta por un target con
 rollback obligatorio. Asset, region, composition/layer, variant y cel comparten
 los mismos pixels; Canvas2D preserva estado externo y nearest es el default.
 Scheduler, thumbnail y export adapters pueden avanzar sobre esta única salida.
+F5-03 cerró el scheduler por invalidación: coalesce reasons/revision/changed IDs,
+serializa renders async y sólo mantiene continuidad mediante leases de drag o
+playback. El host queda en cero callbacks al entrar en idle; dispose y fallos no
+reactivan trabajo tardío. Los boundaries reentrantes del host están probados,
+incluidos throw + observer que reinvalida y release/dispose antes de recibir el
+handle solicitado.
 
 ## Reglas de ejecución
 

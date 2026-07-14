@@ -633,9 +633,29 @@ los lotes que sí modifican producto.
   archivos y 373/373 tests; typecheck, lint focal `--deny-warnings`, build y
   diff-check verdes. Warning chunk >500 kB permanece como baseline.
 
+## F5-03 — Invalidation-driven render scheduler
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Contrato:** scene/asset/viewport/overlay/resize coalescen en un frame
+  determinista; revision máxima y changed IDs ordenados viajan con el snapshot.
+  Drag/playback usan leases tokenizados y el último release cancela la cola
+  vacía, dejando cero callbacks host en idle.
+- **Concurrencia:** existe como máximo un request y un render async en vuelo.
+  Invalidaciones durante render forman el frame siguiente. Un fallo restaura el
+  dirty snapshot y corta la continuidad hasta una actividad externa posterior;
+  dispose ignora completions tardías.
+- **Repairs de review:** el primer request guard permitía recursión síncrona si
+  `requestFrame` arrojaba y `onError` reinvalidaba. Además, release/dispose antes
+  de que el host devolviera handle dejaba un callback huérfano. `requestingFrame`
+  bloquea el reingreso; callback consumido y token cancelado se distinguen para
+  cancelar el handle tardío sin tocar callbacks síncronos ya ejecutados.
+- **Evidencia:** 14/14 focales; suite acumulada 40/40 archivos y 387/387 tests;
+  typecheck, lint focal `--deny-warnings`, build y diff-check verdes. Revisión
+  final independiente: `accept`. Warning chunk >500 kB permanece como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F5-03/F5-04/F5-05: autorizados por F5-02; scheduler y adapters deben consumir
-  el mismo draw plan/compositor sin bifurcar pixels.
+- F5-04/F5-05: autorizados y deben consumir el mismo draw plan/compositor sin
+  bifurcar pixels.
