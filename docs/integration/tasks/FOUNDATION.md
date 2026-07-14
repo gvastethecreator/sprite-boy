@@ -56,7 +56,7 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 
 | ID | Tipo | Dep. | Resultado individual | Prueba de cierre | Estado |
 |---|---|---|---|---|---|
-| F5-01 | J | F1-08,F4-06 | `SceneProjection` canónica desde project+workspace | UT deterministic projection | todo |
+| F5-01 | J | F1-08,F4-06 | `SceneProjection` canónica desde project+workspace | UT deterministic projection | done |
 | F5-02 | J | F5-01 | Compositor asset/region/layer/variant/cel sin UI state | VIS fixture goldens | todo |
 | F5-03 | J | F5-02 | Invalidation scheduler; rAF sólo durante drag/playback | PERF 0 rAF idle | todo |
 | F5-04 | E | F5-02 | Thumbnail adapter sobre el compositor compartido | VIS parity + REV | todo |

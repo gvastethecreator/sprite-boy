@@ -592,8 +592,28 @@ los lotes que sí modifican producto.
 - **Alcance del gate:** F4 y el store gate de W1 quedan aceptados. W1 global no
   se declara cerrado mientras F3-07 no ejecute J1/J8 en Chrome real.
 
+## F5-01 — Canonical scene projection
+
+- **Estado:** `accept` después de revisión independiente sin findings P0-P3.
+- **Contrato:** `createSceneProjection` transforma revision de proyecto más
+  viewport del workspace activo en un árbol data-only, copiado y deep-frozen.
+  Panel sizes, preferences, interaction, playback, Canvas, object URLs y caches
+  quedan fuera de la frontera.
+- **Resolución:** Assets/Slice priorizan su selección pertinente; Compose usa
+  composition/layer/variant y orden raíz; Animate/Collision/Export usan cel y
+  orden de sequence antes del fallback visual. Un proyecto vacío produce root y
+  canvas nulos con viewport determinista.
+- **Árbol:** asset, region, composition, variant y cel normalizan descriptores
+  binarios, source rects, transforms completos, dimensions/background y layers
+  en orden canónico, conservando `visible`/`locked` para que F5-02 decida draw.
+- **Evidencia:** gate focal 12/12; suite acumulada 38/38 archivos y 355/355
+  tests; typecheck, lint focal `--deny-warnings`, build y diff-check verdes. La
+  primera suite completa pasó 335 tests pero dos forks no iniciaron por timeout;
+  ambos archivos pasaron 20/20 con un worker y la repetición unificada con tres
+  workers cerró verde. El warning de chunk >500 kB continúa como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F5-01: autorizado por F1-08/F4-06 para iniciar `SceneProjection` canónica.
+- F5-02: autorizado por F5-01 para implementar el compositor compartido.

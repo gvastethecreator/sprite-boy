@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06 y F4-01..F4-06 aceptados. Frontiers: F3-07 pendiente de browser; F5-01 autorizado.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06 y F5-01 aceptados. Frontiers: F3-07 pendiente de browser; F5-02 autorizado.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -17,6 +17,11 @@ desde `AppLayout` a un leaf consumer. `ProjectContext` y el documento legacy
 quedaron fuera. F4-06 cerró batch undo/redo, frontera data-only contra mutación
 o código externo, retención configurable (100 por defecto) y el gate conjunto
 de stores. W1 global continúa abierto únicamente por el browser gate F3-07.
+F5-01 añadió la proyección canónica data-only desde ProjectStore y el viewport
+activo de WorkspaceStore. La raíz se resuelve por workspace, selección durable
+y orden documental; asset, region, composition, variant y cel quedan
+normalizados e inmutables sin introducir Canvas, URLs, playback ni decisiones
+de rasterización. F5-02 puede implementar el compositor sobre este único input.
 
 ## Reglas de ejecución
 
