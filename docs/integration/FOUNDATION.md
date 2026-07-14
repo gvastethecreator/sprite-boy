@@ -176,6 +176,13 @@ interface AssetRepository {
   comparten carga y URL. Release del último owner, replace, remove o dispose
   revocan exactamente una vez; cargas tardías nunca pueden revocar la URL de
   una generación viva.
+- Import, replace y remove serializan mutaciones por asset. El storage devuelve
+  el record anterior observado dentro de la misma transacción, actualiza la
+  metadata y recolecta el blob anterior sólo cuando perdió su última referencia.
+- Replace/remove invalidan Object URLs únicamente después del commit; mientras
+  una mutación está pendiente no se pueden adquirir leases nuevas para ese
+  asset. `dispose` aborta providers y operaciones pendientes antes de cerrar el
+  storage, por lo que una identidad tardía no puede confirmar escrituras.
 - Borrado sólo ocurre cuando no hay referencias o después de una cascada confirmada.
 - Importación valida MIME real, dimensiones, límites y decode; filename no basta.
 - Una cuota insuficiente produce error recuperable y ofrece exportar/limpiar/reintentar.

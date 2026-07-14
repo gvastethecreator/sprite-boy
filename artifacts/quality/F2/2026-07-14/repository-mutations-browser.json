@@ -1,0 +1,89 @@
+{
+  "slice": "F2-05",
+  "date": "2026-07-14",
+  "runtime": "Chromium via Playwright",
+  "origin": "http://127.0.0.1:4173/",
+  "initialDedup": {
+    "sameHash": true
+  },
+  "failedReplace": {
+    "error": {
+      "code": "ASSET_STORAGE_UNAVAILABLE",
+      "operation": "put",
+      "assetId": "asset-a"
+    },
+    "metadataHashUnchanged": "d48cef733bda4d0037a208064949faa115a82664f99cf294b6c95cc76b2f2da1",
+    "oldUrlFetchable": true,
+    "oldUrlText": "shared-old"
+  },
+  "replaceCommit": {
+    "newHash": "5a504406eef95d5f31f550dcf3fbad77a267f1d75884ff512c35cc833610d44b",
+    "hashChanged": true,
+    "oldUrlFetchable": false,
+    "metadataCount": 2,
+    "blobCount": 2,
+    "sharedOldBytes": "shared-old"
+  },
+  "removeLastSharedOwner": {
+    "metadataCount": 1,
+    "blobCount": 1
+  },
+  "failedRemove": {
+    "error": {
+      "code": "ASSET_STORAGE_UNAVAILABLE",
+      "operation": "remove",
+      "assetId": "asset-a"
+    },
+    "metadataStillPresent": true,
+    "urlStillFetchable": true,
+    "urlText": "replacement-new"
+  },
+  "removeCommit": {
+    "urlFetchable": false,
+    "metadataError": {
+      "code": "ASSET_NOT_FOUND",
+      "operation": "get-metadata"
+    },
+    "metadataCount": 0,
+    "blobCount": 0
+  },
+  "canonicalProvenance": {
+    "source": "derived",
+    "sourceId": "source-a",
+    "importedAt": "2026-07-14T00:30:00.000Z",
+    "note": "kept exactly",
+    "recipeId": "recipe-a",
+    "artifactId": "artifact-a",
+    "parentAssetId": "parent-a"
+  },
+  "rejectRemovalMutationGate": {
+    "leaseDuringRemove": {
+      "code": "ASSET_LEASE_CONFLICT",
+      "operation": "create-url"
+    },
+    "objectUrlsCreated": 0
+  },
+  "disposeDuringIdentity": {
+    "outcome": {
+      "status": "error",
+      "code": "ASSET_TRANSACTION_ABORTED",
+      "operation": "put"
+    },
+    "storagePutCalls": 0,
+    "storageCloseCalls": 1
+  },
+  "urlBalance": {
+    "created": 2,
+    "revoked": 2,
+    "balanced": true
+  },
+  "cleanup": {
+    "remainingDatabases": 0
+  },
+  "pageErrors": [],
+  "expectedConsoleErrors": [
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND",
+    "Failed to load resource: net::ERR_FILE_NOT_FOUND"
+  ],
+  "expectedConsoleErrorReason": "Intentional fetch probes after committed replace/remove revocation"
+}

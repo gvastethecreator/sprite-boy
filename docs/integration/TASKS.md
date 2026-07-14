@@ -37,8 +37,8 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0 y F1/F2-01/F2-02/F2-03/F2-04 están aceptados. El frontier activo es
-`F2-05` (import/replace/remove service con transaction boundary y rollback).
+F0, B0 y F1/F2-01/F2-02/F2-03/F2-04/F2-05 están aceptados. El frontier activo
+es `F2-06` (integrity scan y garbage-collection preview sin borrado implícito).
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 

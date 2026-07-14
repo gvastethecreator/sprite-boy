@@ -247,6 +247,33 @@ los lotes que sí modifican producto.
   balance final 3 creadas/3 revocadas. Los dos ERR_FILE_NOT_FOUND son probes
   intencionales después de revoke; cero page errors.
 
+## F2-05 — Transactional asset repository mutations
+
+- **Estado:** `accept` después de reparaciones independientes de lifecycle,
+  procedencia y exclusión mutación/lease.
+- **Servicio:** import, replace y remove unen identidad SHA, IndexedDB y leases
+  runtime detrás del contrato público. La frontera sólo acepta metadata propia,
+  enumerable y data-only, y conserva los siete campos canónicos de provenance.
+- **Atomicidad:** `put` obtiene el record anterior real dentro de la misma
+  transacción que confirma metadata/blob; el blob reemplazado se elimina sólo
+  al perder su última referencia global. La invalidación de URL ocurre después
+  del commit exitoso, por lo que fallos inyectados conservan record, bytes y URL
+  previos. Remove mantiene la misma garantía.
+- **Concurrencia y cierre:** un gate por asset cubre la mutación completa y
+  rechaza leases nuevas durante replace/remove. `dispose` aborta identity
+  providers y storage waits pendientes antes de cerrar; una operación tardía
+  termina tipada y no alcanza `put`.
+- **Evidencia:** 23/23 tests focales; checkpoint acumulado 22 suites/216 tests,
+  typecheck, build y lint exit 0. Chromium real en
+  `../../artifacts/quality/F2/2026-07-14/repository-mutations-browser.json`
+  verificó dedup, rollback/commit de replace y remove, provenance exacta,
+  exclusión de leases durante mutación, dispose pendiente y balance 2 URL
+  creadas/2 revocadas. Los probes post-revoke producen únicamente los dos
+  `ERR_FILE_NOT_FOUND` esperados; cero page errors.
+- **Revisión:** el reviewer reprodujo la pérdida de provenance, el provider de
+  identidad no cooperativo y la ventana remove/lease; las regresiones finales
+  pasan y el veredicto independiente es `accept`.
+
 ## Frontier pendiente de review
 
-- F2-05: import/replace/remove service y rollback boundary.
+- F2-06: integrity scan y garbage-collection preview sin borrado implícito.

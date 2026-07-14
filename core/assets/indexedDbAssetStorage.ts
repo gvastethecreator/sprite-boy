@@ -62,6 +62,13 @@ export interface AssetStorageRemoval {
   removedBlob: boolean;
 }
 
+export interface AssetStoragePutResult {
+  current: AssetRecord;
+  previous?: AssetRecord;
+  replacedBinary: boolean;
+  removedPreviousBlob: boolean;
+}
+
 interface TransactionMonitor<T> {
   promise: Promise<T>;
   setResult(value: T): void;
@@ -415,20 +422,23 @@ export class IndexedDbAssetStorage {
     record: AssetRecord,
     blob: Blob,
     options?: AssetOperationOptions,
-  ): Promise<void> {
+    precomputedIdentity?: AssetContentIdentity,
+  ): Promise<AssetStoragePutResult> {
     throwIfAborted(options, "put", record?.id);
     validatePutInput(this.projectId, record, blob);
     let identity: AssetContentIdentity;
     try {
-      identity = validateAssetContentIdentity(
-        await awaitAbortableAssetOperation(
-          Promise.resolve().then(() => this.identityProvider(blob, options)),
-          options,
-          "put",
-          record.id,
-        ),
-        { operation: "put", assetId: record.id },
-      );
+      identity = precomputedIdentity
+        ? validateAssetContentIdentity(precomputedIdentity, { operation: "put", assetId: record.id })
+        : validateAssetContentIdentity(
+            await awaitAbortableAssetOperation(
+              Promise.resolve().then(() => this.identityProvider(blob, options)),
+              options,
+              "put",
+              record.id,
+            ),
+            { operation: "put", assetId: record.id },
+          );
       assertAssetRecordContentIdentity(record, blob, identity);
     } catch (error) {
       if (options?.signal?.aborted) {
@@ -460,20 +470,30 @@ export class IndexedDbAssetStorage {
       "put",
       record.id,
     );
-    const monitor = monitorTransaction(transaction, "put", record.id, options, undefined);
+    const monitor = monitorTransaction<AssetStoragePutResult | undefined>(
+      transaction,
+      "put",
+      record.id,
+      options,
+      undefined,
+    );
     let metadataStore: IDBObjectStore;
     let blobStore: IDBObjectStore;
     let blobRequest: IDBRequest<unknown>;
+    let previousMetadataRequest: IDBRequest<unknown>;
     try {
       metadataStore = transaction.objectStore(ASSET_METADATA_STORE);
       blobStore = transaction.objectStore(ASSET_BLOB_STORE);
       blobRequest = blobStore.get(record.blobKey);
+      previousMetadataRequest = metadataStore.get(metadataKey(this.projectId, record.id));
     } catch (error) {
       monitor.fail(structuralStorageError("put", error, record.id));
-      await monitor.promise;
-      return;
+      return await monitor.promise as AssetStoragePutResult;
     }
-    blobRequest.onsuccess = () => {
+    let blobReady = false;
+    let metadataReady = false;
+    const writeReplacement = (): void => {
+      if (!blobReady || !metadataReady) return;
       try {
         if (blobRequest.result === undefined) {
           blobStore.add({
@@ -512,6 +532,33 @@ export class IndexedDbAssetStorage {
           blobKey: record.blobKey,
           record,
         } satisfies StoredAssetMetadataEntry);
+        const previous = previousMetadataRequest.result as StoredAssetMetadataEntry | undefined;
+        if (previous && previous.blobKey !== record.blobKey) {
+          const oldBlobReferences = metadataStore
+            .index(ASSET_BLOB_KEY_INDEX)
+            .count(previous.blobKey);
+          oldBlobReferences.onsuccess = () => {
+            try {
+              const removedPreviousBlob = oldBlobReferences.result === 0;
+              if (removedPreviousBlob) blobStore.delete(previous.blobKey);
+              monitor.setResult({
+                current: record,
+                previous: previous.record,
+                replacedBinary: true,
+                removedPreviousBlob,
+              });
+            } catch (error) {
+              monitor.fail(structuralStorageError("put", error, record.id));
+            }
+          };
+        } else {
+          monitor.setResult({
+            current: record,
+            ...(previous ? { previous: previous.record } : {}),
+            replacedBinary: false,
+            removedPreviousBlob: false,
+          });
+        }
       } catch (error) {
         monitor.fail(normalizeAssetRepositoryError(error, {
           operation: "put",
@@ -519,7 +566,23 @@ export class IndexedDbAssetStorage {
         }));
       }
     };
-    await monitor.promise;
+    blobRequest.onsuccess = () => {
+      blobReady = true;
+      writeReplacement();
+    };
+    previousMetadataRequest.onsuccess = () => {
+      metadataReady = true;
+      writeReplacement();
+    };
+    const result = await monitor.promise;
+    if (!result) {
+      throw new AssetRepositoryError(
+        "ASSET_STORAGE_UNAVAILABLE",
+        `Asset put completed without a transaction result for ${record.id}.`,
+        { operation: "put", assetId: record.id },
+      );
+    }
+    return result;
   }
 
   async getMetadata(
