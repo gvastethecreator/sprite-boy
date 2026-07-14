@@ -653,9 +653,28 @@ los lotes que sí modifican producto.
   typecheck, lint focal `--deny-warnings`, build y diff-check verdes. Revisión
   final independiente: `accept`. Warning chunk >500 kB permanece como baseline.
 
+## F5-04 — Shared-compositor thumbnail adapter
+
+- **Estado:** `accept` después de revisión independiente `repair+repair+accept`.
+- **Contrato:** layout aspect-fit acotado a 2048 por eje, sin crop/padding ni
+  upscale implícito. Empty scene no crea surface ni resuelve assets. Resultado
+  frozen publica project/revision/workspace, source/output size, sampling, MIME y
+  draw count para caches externos.
+- **Pipeline:** `renderSceneThumbnail` entrega la proyección al compositor
+  compartido y exige surface target/encode/dispose. El browser path transforma
+  directamente al tamaño final sobre OffscreenCanvas o HTMLCanvas fallback; no
+  aloja un canvas intermedio source-sized. Background, alpha, painter order y
+  transforms provienen exclusivamente del compositor.
+- **Repairs de review:** `instanceof Blob` rechazaba encoders de otro realm. La
+  primera corrección por `toStringTag` aceptaba impostores estructurales. El gate
+  final usa `Blob.prototype.slice` como brand check de internal slot: acepta
+  iframe Blob real y rechaza spoof, conservando size/MIME exacto y cleanup.
+- **Evidencia:** 16/16 focales y 32/32 compositor+thumbnail; suite acumulada
+  41/41 archivos y 403/403 tests; typecheck, lint focal `--deny-warnings`, build
+  y diff-check verdes. Revisión final: `accept`; warning >500 kB es baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F5-04/F5-05: autorizados y deben consumir el mismo draw plan/compositor sin
-  bifurcar pixels.
+- F5-05: activo; debe consumir el mismo draw plan/compositor sin bifurcar pixels.

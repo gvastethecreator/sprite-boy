@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06 y F5-01..F5-03 aceptados. Frontiers: F3-07 pendiente de browser; F5-04/F5-05 autorizados.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06 y F5-01..F5-04 aceptados. Frontiers: F3-07 pendiente de browser; F5-05 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -33,6 +33,11 @@ playback. El host queda en cero callbacks al entrar en idle; dispose y fallos no
 reactivan trabajo tardío. Los boundaries reentrantes del host están probados,
 incluidos throw + observer que reinvalida y release/dispose antes de recibir el
 handle solicitado.
+F5-04 añadió thumbnails bounded sin reinterpretar la escena: aspect-fit sin
+crop/padding, no-upscale por defecto y un único surface final de hasta 2048 por
+eje. Software goldens prueban los cinco roots; Browser Canvas2D/OffscreenCanvas
+usa las mismas matrices y cleanup obligatorio. PNG/WebP conserva MIME exacto,
+incluido Blob cross-realm, sin aceptar objetos que falsifiquen la marca Blob.
 
 ## Reglas de ejecución
 
