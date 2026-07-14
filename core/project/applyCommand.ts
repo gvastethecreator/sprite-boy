@@ -2,6 +2,7 @@ import type {
   EntityId,
   Region,
   StudioProjectV1,
+  WorkspaceId,
 } from "./schema";
 import {
   cloneStudioProject,
@@ -20,7 +21,9 @@ import type {
   ProjectCommandResult,
   ProjectCommandWarning,
   RegionPatch,
+  WorkspacePatch,
 } from "./commands";
+import { isEntityId } from "./primitives";
 import { validateStudioProject } from "./validation";
 import { applyCompositionFamilyCommand } from "./applyCompositionCommands";
 import { applyAnimationFamilyCommand } from "./applyAnimationCommands";
@@ -113,6 +116,7 @@ const SUPPORTED_COMMAND_KEYS: Partial<Record<ProjectCommand["type"], readonly st
   "collision.add": ["type", "collisionSetId", "shape", "atIndex"],
   "collision.update": ["type", "collisionSetId", "shapeId", "patch"],
   "collision.remove": ["type", "collisionSetId", "shapeId"],
+  "workspace.update": ["type", "patch"],
 };
 
 const SUPPORTED_COMMAND_OPTIONAL_KEYS: Partial<Record<ProjectCommand["type"], readonly string[]>> = {
@@ -453,6 +457,153 @@ function applyProjectRename(
   return finalize(original, prepared, {}, directImpact([]), inverse);
 }
 
+const WORKSPACE_PATCH_FIELDS = [
+  "activeWorkspace",
+  "selectedAssetId",
+  "selectedRegionId",
+  "selectedCompositionId",
+  "selectedLayerId",
+  "selectedVariantSetId",
+  "selectedSequenceId",
+  "selectedCelIds",
+] as const;
+
+const WORKSPACE_IDS: readonly WorkspaceId[] = [
+  "assets",
+  "slice",
+  "compose",
+  "animate",
+  "collision",
+  "export",
+];
+
+type WorkspacePatchField = (typeof WORKSPACE_PATCH_FIELDS)[number];
+
+function validateWorkspaceCelIds(
+  value: unknown,
+): EntityId[] | ProjectCommandDiagnostic {
+  if (!Array.isArray(value)) {
+    return diagnostic("INVALID_PATCH", "selectedCelIds must be a dense EntityId array.", "$.patch.selectedCelIds");
+  }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+  if (
+    !lengthDescriptor ||
+    !("value" in lengthDescriptor) ||
+    !Number.isSafeInteger(lengthDescriptor.value) ||
+    lengthDescriptor.value < 0
+  ) {
+    return diagnostic("INVALID_PATCH", "selectedCelIds must expose a data-only array length.", "$.patch.selectedCelIds");
+  }
+  const length = lengthDescriptor.value;
+  const keys = Reflect.ownKeys(value);
+  if (
+    keys.some((key) =>
+      key !== "length" &&
+      (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= length))
+  ) {
+    return diagnostic("INVALID_PATCH", "selectedCelIds cannot contain custom fields.", "$.patch.selectedCelIds");
+  }
+  const ids: EntityId[] = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !("value" in descriptor) || !descriptor.enumerable || !isEntityId(descriptor.value)) {
+      return diagnostic(
+        "INVALID_PATCH",
+        "selectedCelIds must contain enumerable EntityId data values.",
+        `$.patch.selectedCelIds[${index}]`,
+      );
+    }
+    ids.push(descriptor.value);
+  }
+  if (new Set(ids).size !== ids.length) {
+    return diagnostic("INVALID_PATCH", "selectedCelIds cannot contain duplicates.", "$.patch.selectedCelIds");
+  }
+  return ids;
+}
+
+function applyWorkspaceUpdate(
+  original: StudioProjectV1,
+  command: Extract<ProjectCommand, { type: "workspace.update" }>,
+  context: ProjectCommandContext,
+): ProjectCommandResult {
+  if (!isPlainRecord(command.patch)) {
+    return failure(original, [
+      diagnostic("INVALID_PATCH", "workspace.update patch must be a plain data object.", "$.patch"),
+    ]);
+  }
+
+  const patchValues = new Map<WorkspacePatchField, unknown>();
+  for (const key of Reflect.ownKeys(command.patch)) {
+    if (typeof key !== "string" || !(WORKSPACE_PATCH_FIELDS as readonly string[]).includes(key)) {
+      return failure(original, [
+        diagnostic("INVALID_PATCH", `Field ${String(key)} cannot be patched on workspace.`, "$.patch"),
+      ]);
+    }
+    const workspaceKey = key as WorkspacePatchField;
+    const descriptor = Object.getOwnPropertyDescriptor(command.patch, key);
+    if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+      return failure(original, [
+        diagnostic("INVALID_PATCH", `Workspace field ${key} must be enumerable data.`, `$.patch.${key}`),
+      ]);
+    }
+    const value = descriptor.value;
+    if (value !== undefined) {
+      if (key === "activeWorkspace") {
+        if (!WORKSPACE_IDS.includes(value as WorkspaceId)) {
+          return failure(original, [
+            diagnostic("INVALID_PATCH", "activeWorkspace is invalid.", "$.patch.activeWorkspace"),
+          ]);
+        }
+      } else if (key === "selectedCelIds") {
+        const ids = validateWorkspaceCelIds(value);
+        if (!Array.isArray(ids)) return failure(original, [ids]);
+        patchValues.set(workspaceKey, ids);
+        continue;
+      } else if (!isEntityId(value)) {
+        return failure(original, [
+          diagnostic("INVALID_PATCH", `${key} must be an EntityId.`, `$.patch.${key}`),
+        ]);
+      }
+    }
+    patchValues.set(workspaceKey, value);
+  }
+
+  const inversePatch: Record<string, unknown> = {};
+  let changesWorkspace = false;
+  for (const [key, value] of patchValues) {
+    const current = original.workspace[key];
+    if (hasOwn(original.workspace, key)) inversePatch[key] = clonePayload(current);
+    else inversePatch[key] = undefined;
+    if (value === undefined ? hasOwn(original.workspace, key) : !jsonValuesEqual(current, value)) {
+      changesWorkspace = true;
+    }
+  }
+  const inverse: ProjectCommandInverse = {
+    type: "workspace.update",
+    patch: inversePatch as WorkspacePatch,
+  };
+  if (!changesWorkspace) return noChangeCommandResult(original, directImpact([]), inverse);
+
+  const prepared = prepareCandidate(original);
+  if (isResult(prepared)) return prepared;
+  for (const [key, value] of patchValues) {
+    if (value === undefined) delete prepared.workspace[key];
+    else setRecordValue(
+      prepared.workspace as unknown as Record<string, unknown>,
+      key,
+      clonePayload(value),
+    );
+  }
+  prepared.updatedAt = context.now();
+  return finalize(
+    original,
+    prepared,
+    { workspace: [original.id] },
+    directImpact([]),
+    inverse,
+  );
+}
+
 function applyAssetImport(
   original: StudioProjectV1,
   command: Extract<ProjectCommand, { type: "asset.import" }>,
@@ -781,6 +932,8 @@ export function applyProjectCommand(
     switch (command.type) {
       case "project.rename":
         return applyProjectRename(project, command, context);
+      case "workspace.update":
+        return applyWorkspaceUpdate(project, command, context);
       case "asset.import":
         return applyAssetImport(project, command, context);
       case "asset.replace":

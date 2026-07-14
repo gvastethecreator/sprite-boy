@@ -155,6 +155,20 @@ notifican. Dispatch reentrante se rechaza; cada listener observa como máximo el
 commit actual y sus fallos se aíslan mediante un diagnostic genérico sin causa.
 El overflow de revision se decide antes de invocar reloj o IdFactory.
 
+El controller de history vive junto al ProjectStore, pero fuera de su API
+pública y del documento serializable. `record` crea una entrada, `coalesce`
+agrupa sólo commands de la misma transaction y branch, e `ignore` establece una
+frontera. Un `workspace.update` ignorado rebasa workspace y `updatedAt` sobre
+cada snapshot; las selecciones se podan cuando la entidad no existe en ese
+target. Undo/redo crean revisiones canónicas, cierran el epoch de coalescing y
+rechazan reentrancia incluso durante notificaciones anidadas. Los summaries son
+frozen y no exponen inverses ni APIs serialize/hydrate.
+
+`workspace.update` es el único command para workspace/selección durable: acepta
+un patch data-only exacto, valida IDs y referencias, clona `selectedCelIds`,
+elimina campos opcionales con `undefined`, actualiza `updatedAt` y conserva
+atomicidad/no-op/inverse round-trip.
+
 Workspace/Interaction/Job/Playback usan factories concretos sobre una runtime
 privada: snapshots data-only frozen, subscription aislada y dispatch sin
 serialize/hydrate/history. Acciones se clonan desde descriptors, rechazan
@@ -382,6 +396,12 @@ Todos los entries aparecen en header/command palette cuando son aplicables. Si f
 - **Entregable:** Project/Workspace/Interaction/Playback/Job stores y selectores granulares.
 - **Prueba:** render-count tests; un drag = un undo; batch = un undo; transient state no ensucia autosave.
 - **Retorno:** cada lote `needs-review`; no retirar controller legacy hasta migrar todos sus consumidores.
+
+F4-04 cierra la semántica base `record/coalesce/ignore`: transacciones de drag
+producen un solo undo, branches posteriores a undo/redo no reabren una
+transaction histórica y los cambios ignorados de documento no pueden ser
+revertidos accidentalmente. Batch y guard de mutación externa permanecen en
+F4-06.
 
 ### F5 — RenderEngine por invalidación
 

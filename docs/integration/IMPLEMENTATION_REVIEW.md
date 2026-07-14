@@ -524,8 +524,31 @@ los lotes que sí modifican producto.
   reentrancia/observer failure, job order/pollution y playback inválido.
   Veredicto independiente final: `repair+accept`.
 
+## F4-04 — Transactional project history
+
+- **Estado:** `accept` después de tres rondas independientes `repair+accept`.
+- **Semántica:** el controller separado registra, agrupa por transaction o
+  ignora commands sin serializar inverses. Undo/redo aplican snapshots por el
+  runtime interno del ProjectStore, generan una nueva revision y publican
+  summaries frozen sólo después del commit.
+- **Boundaries:** un ignore documental invalida ambos stacks; un
+  `workspace.update` ignorado rebasa workspace y `updatedAt`, poda selecciones
+  inexistentes por snapshot y valida el target. Undo/redo cierran el epoch para
+  que una branch nueva no coalesce con historia recuperada.
+- **Reparaciones de review:** se cerraron el undo de cambios ignorados, snapshots
+  inválidos por selecciones nuevas, pérdida de `updatedAt`, reapertura de una
+  transaction tras undo/redo, lectura Proxy de `selectedCelIds.length` y el
+  guard booleano que fallaba durante notifications anidadas. El command
+  `workspace.update` quedó implementado data-only, atómico y con inverse exacta.
+- **Evidencia:** 34/34 tests focales de history/store/command, typecheck, lint
+  focal `--deny-warnings` y diff-check verdes. Las reproducciones import→select
+  ignored→undo/redo, transaction reuse y clear→dispatch anidado→undo pasan.
+  Veredicto independiente final: `repair+accept`.
+- **Diferido:** guard de mutación externa y retención/tamaño de snapshots son
+  gates explícitos de F4-06, no blockers de F4-04.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F4-04/F4-05: autorizados desde F4-02/F4-03 aceptados.
+- F4-05: autorizado; F4-06 espera selectors/consumer batch además de F4-04.
