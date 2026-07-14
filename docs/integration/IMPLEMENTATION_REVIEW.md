@@ -186,6 +186,25 @@ los lotes que sí modifican producto.
 - **Decisión:** F2-02 implementa storage IndexedDB; hashing/content identity y
   URL refcount permanecen en F2-03/F2-04 para no mezclar responsabilidades.
 
+## F2-02 — IndexedDB metadata/blob adapter
+
+- **Estado:** `accept` tras dos rondas `repair` y reproducción final.
+- **Storage:** metadata compound key por project/asset, índices project,
+  project+hash y blobKey; blobs globales por key para deduplicación posterior.
+  Put usa una transacción; remove conserva blobs compartidos y borra sólo al
+  último metadata ref.
+- **Lifecycle:** abort signals, close/reopen, versionchange y destroy bloqueado
+  esperan eventos terminales. Opens tardíos se invalidan por generation y
+  jamás reinstalan una conexión después de close.
+- **Errores:** fallos sync/async de transaction/store/index y callbacks quedan
+  tipados. `transaction.onerror` registra, pero el await sólo settle en
+  complete/abort, después del rollback real.
+- **Evidencia:** 17/17 tests focales y checkpoint acumulado 19 suites/181 tests,
+  build, typecheck y lint; Chromium real en
+  `../../artifacts/quality/F2/2026-07-14/indexeddb-browser.json` verificó reopen,
+  dos proyectos, blob compartido, último-ref GC, DataClone rollback metadata y
+  blob, abort, close-during-open y delete blocked; cero page errors.
+
 ## Frontier pendiente de review
 
-- F2-02: adapter IndexedDB metadata/blob.
+- F2-03: SHA-256/content identity y collision path.

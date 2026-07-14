@@ -19,6 +19,7 @@ export const ASSET_REPOSITORY_ERROR_CODES = [
 export type AssetRepositoryErrorCode = (typeof ASSET_REPOSITORY_ERROR_CODES)[number];
 
 export type AssetRepositoryOperation =
+  | "open"
   | "put"
   | "get-metadata"
   | "get-blob"
@@ -157,7 +158,7 @@ export function normalizeAssetRepositoryError(
       ? "ASSET_NOT_FOUND"
       : name === "AbortError"
         ? "ASSET_TRANSACTION_ABORTED"
-        : name === "DataError" || name === "TypeError"
+        : name === "DataError" || name === "DataCloneError" || name === "TypeError"
           ? "ASSET_INVALID_INPUT"
           : "ASSET_STORAGE_UNAVAILABLE";
   return new AssetRepositoryError(

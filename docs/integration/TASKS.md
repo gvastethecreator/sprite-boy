@@ -37,8 +37,8 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1 y F2-01 están aceptados. El frontier activo es `F2-02`
-(adapter IndexedDB real para metadata y blobs con errores tipados).
+F0, B0 y F1/F2-01/F2-02 están aceptados. El frontier activo es `F2-03`
+(SHA-256, content identity y deduplicación binaria con collision path).
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 
