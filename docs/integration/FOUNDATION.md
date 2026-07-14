@@ -177,6 +177,16 @@ revision. No-op conserva identidad y no notifica. Playback no puede seek sin
 sequence ni advance sin `playing`; errores externos se redactan antes de cruzar
 la frontera. Job entries quedan extensibles sólo con data plain para F7.
 
+Los selectors de Project/Workspace/Interaction/Job/Playback devuelven slices o
+entidades existentes sin clonar. Los hooks React se apoyan en
+`useSyncExternalStore`, memoizan por render y sólo comparan contra el último
+selection committed, de modo que un render concurrente abortado no cambia el
+selector observado. Equality estable evita rerenders por notifications ajenas.
+El primer batch `timeline-layout` monta los stores locales una vez y mueve sólo
+la altura del timeline a `WorkspaceStore.panelSizes.timeline`; el leaf memoized
+clampa lecturas/interacciones a 120..500, expone separator accesible y limpia
+listeners/cursor en mouseup o unmount.
+
 ## AssetRepository
 
 Contrato requerido:
@@ -402,6 +412,12 @@ producen un solo undo, branches posteriores a undo/redo no reabren una
 transaction histórica y los cambios ignorados de documento no pueden ser
 revertidos accidentalmente. Batch y guard de mutación externa permanecen en
 F4-06.
+
+F4-05 cierra selectors granulares y el batch `timeline-layout`: cambios de
+preferences, InteractionStore o slices documentales no seleccionados no
+rerenderizan el consumer; altura, ARIA, teclado, drag y cleanup quedan cubiertos
+por component/render-count tests. La migración del resto de `ProjectContext`
+permanece dividida por batches posteriores y no se adelantó aquí.
 
 ### F5 — RenderEngine por invalidación
 

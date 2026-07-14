@@ -1,5 +1,6 @@
 export * from "./contracts";
 export * from "./localStores";
+export * from "./selectors";
 export {
   createProjectStore,
   type CreateProjectStoreOptions,

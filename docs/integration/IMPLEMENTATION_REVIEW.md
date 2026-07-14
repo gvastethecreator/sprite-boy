@@ -547,8 +547,28 @@ los lotes que sí modifican producto.
 - **Diferido:** guard de mutación externa y retención/tamaño de snapshots son
   gates explícitos de F4-06, no blockers de F4-04.
 
+## F4-05 — Granular selectors and timeline-layout consumer batch
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Selectors:** Project/Workspace/Interaction/Job/Playback exponen slices
+  puros por referencia y lookups own-property. Los hooks concretos usan
+  `useSyncExternalStore`, memo por render, equality opcional y el último valor
+  committed; no mutan selector/equality refs durante render concurrente.
+- **Consumer batch:** `StudioLocalStoresProvider` conserva lifetime estable y
+  `TimelinePanel` consume exclusivamente `panelSizes.timeline`. `React.memo`
+  evita que rerenders del ProjectContext legacy atraviesen el leaf; AppLayout
+  dejó de leer decenas de controller fields muertos.
+- **Reparaciones de review/autopsia:** la primera cache podía observar selector
+  de un render abortado; se reemplazó por el patrón with-selector. Un tamaño
+  externo 900/20 podía contradecir ARIA y viewport; el selector de lectura ahora
+  clampa 120..500 además de teclado/drag.
+- **Evidencia:** 26/26 gate focal inicial y 6/6 selectors+timeline tras repairs;
+  typecheck, lint focal `--deny-warnings`, build y diff-check verdes. El warning
+  de chunk >500 kB continúa como baseline previo. Revisión final: `accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F4-05: autorizado; F4-06 espera selectors/consumer batch además de F4-04.
+- F4-06: autorizado por F4-04/F4-05; debe cerrar batch undo/redo, mutation guard
+  y presupuesto/retención de snapshots.

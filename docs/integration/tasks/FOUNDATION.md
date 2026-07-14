@@ -49,7 +49,7 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F4-02 | J | F4-01 | ProjectStore con revision y dispatch canónico | UT dispatch/subscription | done |
 | F4-03 | E | F4-01 | Stores efímeros sin serialization/history | UT isolation + REV | done |
 | F4-04 | J | F4-02 | History transactions record/coalesce/ignore | UT drag→single undo | done |
-| F4-05 | E | F4-02,F4-03 | Selectores granulares y primer consumer batch declarado | Render-count UT + REV | todo |
+| F4-05 | E | F4-02,F4-03 | Selectores granulares y primer consumer batch declarado | Render-count UT + REV | done |
 | F4-06 | J | F4-04,F4-05 | Batch undo/redo, external mutation guard y W1 store gate | IT + CT + REV | todo |
 
 ## Wave 2 — Render, shell, jobs y CI
