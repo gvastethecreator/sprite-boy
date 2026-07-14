@@ -222,6 +222,13 @@ del step y violaciones del contrato cruzan la frontera como errores tipados.
 Accessors, arrays no enumerables, thenables hostiles y mutación del input quedan
 contenidos sin ejecutar código implícito ni convertir pérdida en éxito.
 
+El step legacy V0→V1 exige identidades binarias resueltas por hash y una elección
+explícita cuando `sourceIndex` coincide con Frame y Builder slot. Antes de
+completar, convierte frames/regiones, hitboxes, canvas/layers Builder,
+animaciones/cels, pivots/timing y grid recipe; después ejecuta el validator V1.
+Assets con el mismo content hash se deduplican y cualquier constraint/UI/ratio
+sin representación durable aparece como `loss`, nunca como éxito silencioso.
+
 Formato de trabajo:
 
 - Autosave: documento JSON versionado + blobs deduplicados en IndexedDB.

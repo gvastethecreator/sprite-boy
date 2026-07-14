@@ -371,6 +371,31 @@ los lotes que sí modifican producto.
   typecheck, build y lint exit 0 con las mismas 144 warnings legacy y warning
   de bundle. Veredicto independiente final: `repair+accept`.
 
+## F3-03 — Real legacy V0 fixture migration to canonical V1
+
+- **Estado:** `accept` después de dos rondas independientes `repair` y
+  regresiones para cada hallazgo reproducido.
+- **Preview/resolution:** sin contexto devuelve `needs-input` con dos
+  `LEGACY_ASSET_NEEDS_RELINK` y `AMBIGUOUS_LEGACY_CEL_SOURCE`; no aplica el step
+  ni adivina precedencia. Asset resolutions requieren hash/blobKey/bytes/MIME
+  coherentes y la cel ambigua exige elección frame o Builder slot.
+- **Conversión:** produce IDs estables, AssetRecords deduplicados por content
+  hash, Regions y CollisionSets, composición Builder con slot/free layers,
+  Sequences/Cels con `1000/fps`, pivots incluso negativos, recipe de grilla y
+  workspace durable. La elección Builder crea una composición propiedad del
+  cel; la elección frame referencia la Region.
+- **Pérdida visible:** constraints fit/alignment quedan aplanados al transform
+  visual actual; `aspectRatio`, labels/colores/onion y spacing no representable
+  aparecen como issues tipados. Campos legacy desconocidos fallan: no se
+  descarta estado durable silenciosamente.
+- **Reparaciones de review:** context/resolution accessors podían ejecutarse;
+  un builder asset llamado `source-sheet` pisaba el rol sintético; hash iguales
+  no se deduplicaban; `aspectRatio` se descartaba; pivots negativos válidos se
+  rechazaban. Todos tienen regresión y frontera descriptor-safe.
+- **Evidencia:** 11/11 tests del fixture/migration, ProjectCodec round-trip y
+  validator V1; checkpoint 26 suites/260 tests, typecheck, build y lint exit 0
+  con deuda legacy/bundle sin cambios. Veredicto final: `repair+accept`.
+
 ## Frontier pendiente de review
 
-- F3-03: migración del fixture legacy real al V1 con invariant validation.
+- F3-04: package `.spriteboy` document+blobs con hashes verificados.
