@@ -1,9 +1,9 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef } from "react";
 import Header from "./Header";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
 import CanvasArea from "../canvas/CanvasArea";
-import Timeline from "../common/Timeline";
+import TimelinePanel from "./TimelinePanel";
 import ExportModal from "../overlays/ExportModal";
 import SettingsModal from "../overlays/SettingsModal";
 import HelpModal from "../overlays/HelpModal";
@@ -14,7 +14,6 @@ import AnalysisModal from "../overlays/AnalysisModal";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useProject } from "../../contexts/ProjectContext";
 import { AppMode, CanvasHandle } from "../../types";
-import { GripHorizontal } from "lucide-react";
 
 const AppLayout: React.FC = () => {
   const controller = useProject();
@@ -29,147 +28,35 @@ const AppLayout: React.FC = () => {
     setIsCommandPaletteOpen,
     commands,
     currentMode,
-    handleSetMode,
-    isLoading,
-    loadingMessage,
     toasts,
     removeToast,
     slicerImage,
-    activeGrid,
-    builderGrid,
     frames,
-    builderSlots,
-    animations,
-    builderAssets,
     activeAnimationId,
-    setActiveAnimationId,
-    playbackFrameIndex,
-    setPlaybackFrameIndex,
     isPlaying,
     setIsPlaying,
-    templateConfig,
-    setTemplateConfig,
     exportModal,
-    setExportModal,
     selectedIndex,
-    setSelectedIndex,
     builderCanvas,
-    setBuilderCanvas,
     undo,
     redo,
     canUndo,
     canRedo,
-    handleSetGridConfig,
     handleUpdateFrame,
-    handleUpdateFrameEphemeral,
-    handleAddFrame,
-    handleUpload,
-    handleAutoSlice,
-    handleRemoveBackground,
-    handlePreviewBackground,
-    handleCancelPreview,
-    handleCreateCanvas,
-    handleAddAsset,
-    handleDeleteAsset,
-    handleUpdateSlot,
-    handleUpdateSlotEphemeral,
-    handleAddAnimation,
-    handleDeleteAnimation,
-    handleDuplicateAnimation,
-    handleAddKeyframe,
-    handleDeleteKeyframe,
-    handleUpdateAnimation,
-    handleUpdateKeyframe,
-    handleReorderFrames,
     handleStepFrame,
     handleGenerateCode,
-    onionSkin,
-    setOnionSkin,
     showToast,
-    isEyedropperActive,
-    setIsEyedropperActive,
-    eyedropperColor,
-    setEyedropperColor,
-    isMagicWandActive,
-    setIsMagicWandActive,
-    wandTolerance,
-    setWandTolerance,
     handleDeleteSelection,
-    handleFrameToAsset,
-    handleSyncGrid,
-    handleAddKeyframeFromAsset,
-    handleDuplicateFrame,
     generationModal,
-    setGenerationModal,
-    handleGenerateSlot,
-    handleSmartFillSlot,
-    handleSwapSlots,
-    genPanel,
-    setGenPanel,
-    isPreviewActive,
-    bgPreviewBlobUrl,
-    handleSaveProject,
-    handleLoadProject,
-    handleNewProject,
     analysisResult,
     setAnalysisResult,
     handleAnalyzeSheet,
-    viewport,
-    setViewport,
-    currentAspectRatio,
-    handleSetAspectRatio: onSetAspectRatio,
-    handleToggleFrameVisibility,
     handleExportZip,
     handleExportGif,
-    handleDeleteFrame,
-    handleRunAIProjectGen,
-    handleDropContextToAI,
-    handleClearAIContext,
-    handleMagicWandSelect,
   } = controller;
 
   const canvasRef = useRef<CanvasHandle>(null);
-  const activeAnim = activeAnimationId
-    ? animations.find((a: any) => a.id === activeAnimationId)
-    : null;
   const hasWorkspace = !!slicerImage || !!builderCanvas;
-
-  const activeImageSource =
-    isPreviewActive && bgPreviewBlobUrl && slicerImage
-      ? { ...slicerImage, src: bgPreviewBlobUrl }
-      : slicerImage;
-
-  // Timeline Resize Logic
-  const [timelineHeight, setTimelineHeight] = useState(220);
-  const isResizingTimeline = useRef(false);
-
-  const startTimelineResize = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isResizingTimeline.current = true;
-      const startY = e.clientY;
-      const startHeight = timelineHeight;
-
-      const handleMouseMove = (e: MouseEvent) => {
-        if (!isResizingTimeline.current) return;
-        const delta = startY - e.clientY;
-        const newHeight = Math.min(Math.max(120, startHeight + delta), 500);
-        setTimelineHeight(newHeight);
-      };
-
-      const handleMouseUp = () => {
-        isResizingTimeline.current = false;
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-        document.body.style.cursor = "";
-      };
-
-      document.body.style.cursor = "row-resize";
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    },
-    [timelineHeight],
-  );
 
   useKeyboardShortcuts({
     undo,
@@ -233,21 +120,7 @@ const AppLayout: React.FC = () => {
             <CanvasArea ref={canvasRef} />
           </div>
           {hasWorkspace && currentMode !== AppMode.BUILDER && (
-            <div
-              style={{ height: timelineHeight }}
-              className="bg-panel rounded-panel shrink-0 flex flex-col border border-border/20 overflow-hidden animate-slide-up relative"
-            >
-              <div
-                onMouseDown={startTimelineResize}
-                className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-accent/20 z-20 group flex justify-center items-center"
-              >
-                <GripHorizontal
-                  size={10}
-                  className="text-transparent group-hover:text-textMuted opacity-50"
-                />
-              </div>
-              <Timeline />
-            </div>
+            <TimelinePanel />
           )}
         </div>
 
