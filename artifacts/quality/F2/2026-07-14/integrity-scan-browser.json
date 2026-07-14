@@ -1,0 +1,76 @@
+{
+  "slice": "F2-06",
+  "date": "2026-07-14",
+  "runtime": "Chromium via Playwright",
+  "origin": "http://127.0.0.1:4173/",
+  "assets": [
+    {
+      "assetId": "asset-corrupt",
+      "status": "hash-mismatch"
+    },
+    {
+      "assetId": "asset-missing",
+      "status": "blob-missing"
+    },
+    {
+      "assetId": "asset-ok",
+      "status": "ok"
+    }
+  ],
+  "storageIssues": [],
+  "garbageCollection": {
+    "mode": "preview",
+    "candidates": [
+      {
+        "blobKey": "sha256:88f6811ab5d8fc6d3177f9b7609ae0fcebfda187e5046b62d38bb539e88b74d7",
+        "byteSize": 6,
+        "contentHash": "88f6811ab5d8fc6d3177f9b7609ae0fcebfda187e5046b62d38bb539e88b74d7",
+        "reason": "unreferenced"
+      }
+    ],
+    "reclaimableBytes": 6
+  },
+  "summary": {
+    "assetCount": 3,
+    "okCount": 1,
+    "assetIssueCount": 2,
+    "storageIssueCount": 0,
+    "orphanBlobCount": 1,
+    "reclaimableBytes": 6
+  },
+  "deterministicRepeat": true,
+  "sharedOtherProjectBlobKey": "sha256:a4d26868017c0ccffe2efe50944ef4211834660cca834c6e9f86dec6a88246fa",
+  "sharedOtherProjectIsCandidate": false,
+  "countsBefore": {
+    "metadata": 4,
+    "blobs": 4
+  },
+  "countsAfter": {
+    "metadata": 4,
+    "blobs": 4
+  },
+  "noImplicitDeletion": true,
+  "preAbort": {
+    "status": "error",
+    "code": "ASSET_TRANSACTION_ABORTED",
+    "operation": "scan-integrity"
+  },
+  "frozen": {
+    "report": true,
+    "assets": true,
+    "candidates": true
+  },
+  "hostileBoundary": {
+    "coercionReads": 0,
+    "proxyTraps": 0,
+    "issues": [
+      "blob-envelope-invalid",
+      "blob-envelope-invalid"
+    ]
+  },
+  "cleanup": {
+    "databaseDeleted": true
+  },
+  "pageErrors": [],
+  "unexpectedConsoleErrors": []
+}

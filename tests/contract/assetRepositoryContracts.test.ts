@@ -53,6 +53,20 @@ const fakeRepository: AssetRepository = {
     expectedMimeType: contractRecord.mimeType,
     actualMimeType: contractRecord.mimeType,
   }),
+  scanIntegrity: async () => ({
+    projectId: "project-contract",
+    assets: [],
+    storageIssues: [],
+    garbageCollection: { mode: "preview", candidates: [], reclaimableBytes: 0 },
+    summary: {
+      assetCount: 0,
+      okCount: 0,
+      assetIssueCount: 0,
+      storageIssueCount: 0,
+      orphanBlobCount: 0,
+      reclaimableBytes: 0,
+    },
+  }),
   remove: async () => undefined,
   async *exportMany() {
     yield {
@@ -82,6 +96,7 @@ describe("AssetRepository contract (F2-01)", () => {
     for await (const payload of fakeRepository.exportMany([record.id])) exported.push(payload);
     expect(exported).toHaveLength(1);
     expect(exported[0].blob).toBeInstanceOf(Blob);
+    expect((await fakeRepository.scanIntegrity()).garbageCollection.mode).toBe("preview");
   });
 
   it("publishes unique stable error codes and safe recovery diagnostics", () => {

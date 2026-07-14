@@ -9,6 +9,7 @@ import type {
   AssetMetadata,
   AssetOperationOptions,
   AssetStorageListOptions,
+  AssetStorageInventory,
   AssetStoragePort,
   AssetStoragePutResult,
   AssetStorageRemoval,
@@ -83,6 +84,33 @@ class MemoryAssetStorage implements AssetStoragePort {
     return [...this.records.values()]
       .filter((record) => !options?.contentHash || record.contentHash === options.contentHash)
       .sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  async inspect(): Promise<AssetStorageInventory> {
+    const metadataEntries = [...this.records.values()].map((record) => ({
+      projectId: this.projectId,
+      assetId: record.id,
+      contentHash: record.contentHash,
+      blobKey: record.blobKey,
+      record,
+    }));
+    const blobEntries = [];
+    const seen = new Set<string>();
+    for (const record of this.records.values()) {
+      if (seen.has(record.blobKey)) continue;
+      const blob = this.blobs.get(record.id);
+      if (!blob) continue;
+      seen.add(record.blobKey);
+      const identity = await computeAssetContentIdentity(blob);
+      blobEntries.push({
+        blobKey: record.blobKey,
+        contentHash: identity.contentHash,
+        verificationHash: identity.verificationHash,
+        byteSize: identity.byteSize,
+        blob,
+      });
+    }
+    return { metadataEntries, blobEntries };
   }
 
   async remove(assetId: EntityId): Promise<AssetStorageRemoval> {

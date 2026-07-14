@@ -156,6 +156,7 @@ interface AssetRepository {
   getBlob(assetId: EntityId, options?: AssetOperationOptions): Promise<Blob>;
   list(options?: AssetListOptions): Promise<readonly AssetRecord[]>;
   verify(assetId: EntityId, options?: AssetOperationOptions): Promise<AssetIntegrity>;
+  scanIntegrity(options?: AssetOperationOptions): Promise<AssetIntegrityScan>;
   remove(assetId: EntityId, policy: AssetRemovalPolicy, options?: AssetOperationOptions): Promise<void>;
   exportMany(assetIds: readonly EntityId[], options?: AssetOperationOptions): AsyncIterable<AssetPayload>;
   createRuntimeUrl(assetId: EntityId, owner: object, options?: AssetOperationOptions): Promise<string>;
@@ -183,6 +184,14 @@ interface AssetRepository {
   una mutación está pendiente no se pueden adquirir leases nuevas para ese
   asset. `dispose` aborta providers y operaciones pendientes antes de cerrar el
   storage, por lo que una identidad tardía no puede confirmar escrituras.
+- `scanIntegrity` captura metadata y blobs globales dentro de una única
+  transacción readonly, hashea cada blob de proyecto una vez y devuelve un
+  reporte determinista de faltantes/corrupción. El preview de GC sólo incluye
+  blobs sin metadata en ningún proyecto, expone bytes recuperables y no posee
+  una operación implícita de borrado.
+- Los envelopes del inventario se leen como data properties propias. Hashes no
+  se coercionan y los Blob se brand-checkean/normalizan con métodos nativos
+  antes del provider, evitando getters o traps hostiles en el scan.
 - Borrado sólo ocurre cuando no hay referencias o después de una cascada confirmada.
 - Importación valida MIME real, dimensiones, límites y decode; filename no basta.
 - Una cuota insuficiente produce error recuperable y ofrece exportar/limpiar/reintentar.

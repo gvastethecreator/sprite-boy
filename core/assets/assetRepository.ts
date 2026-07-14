@@ -11,7 +11,9 @@ import {
   normalizeAssetRepositoryError,
 } from "./contracts";
 import type {
+  AssetGarbageCollectionCandidate,
   AssetIntegrity,
+  AssetIntegrityScan,
   AssetListOptions,
   AssetMetadata,
   AssetOperationOptions,
@@ -20,9 +22,11 @@ import type {
   AssetRepository,
   AssetRepositoryDiagnostic,
   AssetRepositoryOperation,
+  AssetStorageIntegrityIssue,
 } from "./contracts";
 import {
   computeAssetContentIdentity,
+  inspectNativeAssetBlob,
   validateAssetContentIdentity,
 } from "./contentIdentity";
 import type {
@@ -33,6 +37,7 @@ import {
   IndexedDbAssetStorage,
 } from "./indexedDbAssetStorage";
 import type {
+  AssetStorageInventory,
   AssetStorageListOptions,
   AssetStorageRemoval,
   AssetStoragePutResult,
@@ -56,6 +61,7 @@ export interface AssetStoragePort {
   getMetadata(assetId: EntityId, options?: AssetOperationOptions): Promise<AssetRecord>;
   getBlob(assetId: EntityId, options?: AssetOperationOptions): Promise<Blob>;
   list(options?: AssetStorageListOptions): Promise<readonly AssetRecord[]>;
+  inspect(options?: AssetOperationOptions): Promise<AssetStorageInventory>;
   remove(assetId: EntityId, options?: AssetOperationOptions): Promise<AssetStorageRemoval>;
   close(): void;
 }
@@ -77,6 +83,134 @@ interface SanitizedMetadata {
   provenance: AssetProvenance;
   declaredMimeType?: string;
   expectedContentHash?: string;
+}
+
+interface InventoryMetadata {
+  projectId: EntityId;
+  assetId: EntityId;
+  blobKey: string;
+  contentHash: string;
+  expectedByteSize: number;
+  expectedMimeType: string;
+}
+
+interface InventoryBlob {
+  blobKey: string;
+  contentHash?: string;
+  verificationHash?: string;
+  byteSize?: number;
+  blob: Blob;
+  actualByteSize: number;
+}
+
+interface OwnDataRead {
+  found: boolean;
+  value?: unknown;
+}
+
+function readOwnData(value: unknown, key: string): OwnDataRead {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return { found: false };
+  }
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !("value" in descriptor)) return { found: false };
+    return { found: true, value: descriptor.value };
+  } catch {
+    return { found: false };
+  }
+}
+
+function readInventoryReference(entry: unknown): string | undefined {
+  const blobKey = readOwnData(entry, "blobKey");
+  return blobKey.found && typeof blobKey.value === "string" && blobKey.value.length > 0
+    ? blobKey.value
+    : undefined;
+}
+
+function parseInventoryMetadata(entry: unknown): InventoryMetadata | undefined {
+  const projectId = readOwnData(entry, "projectId");
+  const assetId = readOwnData(entry, "assetId");
+  const blobKey = readOwnData(entry, "blobKey");
+  const contentHash = readOwnData(entry, "contentHash");
+  const recordValue = readOwnData(entry, "record");
+  if (
+    !projectId.found || !isEntityId(projectId.value)
+    || !assetId.found || !isEntityId(assetId.value)
+    || !blobKey.found || typeof blobKey.value !== "string" || blobKey.value.length === 0
+    || !contentHash.found || typeof contentHash.value !== "string"
+    || !/^[0-9a-f]{64}$/.test(contentHash.value)
+    || blobKey.value !== `sha256:${contentHash.value}`
+    || !recordValue.found || recordValue.value === null || typeof recordValue.value !== "object"
+  ) {
+    return undefined;
+  }
+  const recordId = readOwnData(recordValue.value, "id");
+  const recordBlobKey = readOwnData(recordValue.value, "blobKey");
+  const recordHash = readOwnData(recordValue.value, "contentHash");
+  const recordMime = readOwnData(recordValue.value, "mimeType");
+  const recordSize = readOwnData(recordValue.value, "byteSize");
+  if (
+    !recordId.found || recordId.value !== assetId.value
+    || !recordBlobKey.found || recordBlobKey.value !== blobKey.value
+    || !recordHash.found || recordHash.value !== contentHash.value
+    || !recordMime.found || typeof recordMime.value !== "string" || recordMime.value.length === 0
+    || !recordSize.found || !Number.isSafeInteger(recordSize.value)
+    || (recordSize.value as number) < 0
+  ) {
+    return undefined;
+  }
+  return {
+    projectId: projectId.value,
+    assetId: assetId.value,
+    blobKey: blobKey.value,
+    contentHash: contentHash.value,
+    expectedByteSize: recordSize.value as number,
+    expectedMimeType: recordMime.value,
+  };
+}
+
+function parseInventoryBlob(entry: unknown): InventoryBlob | undefined {
+  const blobKey = readOwnData(entry, "blobKey");
+  const blob = readOwnData(entry, "blob");
+  const contentHash = readOwnData(entry, "contentHash");
+  const verificationHash = readOwnData(entry, "verificationHash");
+  const byteSize = readOwnData(entry, "byteSize");
+  const nativeBlob = inspectNativeAssetBlob(blob.value);
+  if (
+    !blobKey.found || typeof blobKey.value !== "string" || blobKey.value.length === 0
+    || !blob.found || !nativeBlob
+  ) {
+    return undefined;
+  }
+  const identityFields = [contentHash.value, verificationHash.value, byteSize.value];
+  const identityMissing = identityFields.every((value) => value === undefined);
+  const identityValid = contentHash.found && typeof contentHash.value === "string"
+    && /^[0-9a-f]{64}$/.test(contentHash.value)
+    && blobKey.value === `sha256:${contentHash.value}`
+    && verificationHash.found && typeof verificationHash.value === "string"
+    && /^[0-9a-f]{128}$/.test(verificationHash.value)
+    && byteSize.found && Number.isSafeInteger(byteSize.value) && (byteSize.value as number) >= 0;
+  if (!identityMissing && !identityValid) return undefined;
+  return {
+    blobKey: blobKey.value,
+    blob: nativeBlob.blob,
+    actualByteSize: nativeBlob.byteSize,
+    ...(identityMissing ? {} : {
+      contentHash: contentHash.value as string,
+      verificationHash: verificationHash.value as string,
+      byteSize: byteSize.value as number,
+    }),
+  };
+}
+
+function compareStorageIssues(
+  left: AssetStorageIntegrityIssue,
+  right: AssetStorageIntegrityIssue,
+): number {
+  return left.code.localeCompare(right.code)
+    || (left.assetId ?? "").localeCompare(right.assetId ?? "")
+    || (left.blobKey ?? "").localeCompare(right.blobKey ?? "");
 }
 
 function ownDataValue(
@@ -505,6 +639,206 @@ export class IndexedDbAssetRepository implements AssetRepository {
     if (record.contentHash !== actual.contentHash) return { ...observed, status: "hash-mismatch" };
     if (record.mimeType !== blob.type) return { ...observed, status: "mime-mismatch" };
     return { ...observed, status: "ok" };
+  }
+
+  async scanIntegrity(options?: AssetOperationOptions): Promise<AssetIntegrityScan> {
+    this.ensureActive("scan-integrity");
+    const scopedOptions = this.operationOptions(options);
+    throwIfAborted(scopedOptions, "scan-integrity");
+    let inventory: AssetStorageInventory;
+    try {
+      inventory = await awaitAbortableAssetOperation(
+        this.storage.inspect(scopedOptions),
+        scopedOptions,
+        "scan-integrity",
+      );
+    } catch (error) {
+      throw boundaryError(error, "scan-integrity");
+    }
+    const metadataEntriesValue = readOwnData(inventory, "metadataEntries");
+    const blobEntriesValue = readOwnData(inventory, "blobEntries");
+    if (
+      !metadataEntriesValue.found || !Array.isArray(metadataEntriesValue.value)
+      || !blobEntriesValue.found || !Array.isArray(blobEntriesValue.value)
+    ) {
+      throw new AssetRepositoryError(
+        "ASSET_STORAGE_UNAVAILABLE",
+        "Asset integrity snapshot returned an invalid inventory.",
+        { operation: "scan-integrity" },
+      );
+    }
+
+    const storageIssues: AssetStorageIntegrityIssue[] = [];
+    const issueKeys = new Set<string>();
+    const addStorageIssue = (issue: AssetStorageIntegrityIssue): void => {
+      const key = `${issue.code}\u0000${issue.assetId ?? ""}\u0000${issue.blobKey ?? ""}`;
+      if (issueKeys.has(key)) return;
+      issueKeys.add(key);
+      storageIssues.push(Object.freeze({ ...issue }));
+    };
+
+    const referenceCounts = new Map<string, number>();
+    const projectMetadata: InventoryMetadata[] = [];
+    for (const rawEntry of metadataEntriesValue.value as readonly unknown[]) {
+      const referencedBlobKey = readInventoryReference(rawEntry);
+      if (referencedBlobKey) {
+        referenceCounts.set(referencedBlobKey, (referenceCounts.get(referencedBlobKey) ?? 0) + 1);
+      }
+      const parsed = parseInventoryMetadata(rawEntry);
+      if (parsed) {
+        if (parsed.projectId === this.projectId) projectMetadata.push(parsed);
+        continue;
+      }
+      const rawProjectId = readOwnData(rawEntry, "projectId");
+      if (rawProjectId.found && rawProjectId.value === this.projectId) {
+        const rawAssetId = readOwnData(rawEntry, "assetId");
+        addStorageIssue({
+          code: "metadata-envelope-invalid",
+          ...(rawAssetId.found && isEntityId(rawAssetId.value)
+            ? { assetId: rawAssetId.value }
+            : {}),
+          ...(referencedBlobKey ? { blobKey: referencedBlobKey } : {}),
+        });
+      }
+    }
+    projectMetadata.sort((left, right) => left.assetId.localeCompare(right.assetId)
+      || left.blobKey.localeCompare(right.blobKey));
+    const uniqueProjectMetadata: InventoryMetadata[] = [];
+    const seenAssetIds = new Set<EntityId>();
+    for (const entry of projectMetadata) {
+      if (seenAssetIds.has(entry.assetId)) {
+        addStorageIssue({
+          code: "metadata-duplicate",
+          assetId: entry.assetId,
+          blobKey: entry.blobKey,
+        });
+        continue;
+      }
+      seenAssetIds.add(entry.assetId);
+      uniqueProjectMetadata.push(entry);
+    }
+
+    const blobsByKey = new Map<string, InventoryBlob>();
+    for (const rawEntry of blobEntriesValue.value as readonly unknown[]) {
+      const rawBlobKey = readInventoryReference(rawEntry);
+      const parsed = parseInventoryBlob(rawEntry);
+      if (!parsed) {
+        addStorageIssue({
+          code: "blob-envelope-invalid",
+          ...(rawBlobKey ? { blobKey: rawBlobKey } : {}),
+        });
+        continue;
+      }
+      if (blobsByKey.has(parsed.blobKey)) {
+        addStorageIssue({ code: "blob-duplicate", blobKey: parsed.blobKey });
+        continue;
+      }
+      blobsByKey.set(parsed.blobKey, parsed);
+      if (!parsed.contentHash) {
+        addStorageIssue({ code: "blob-identity-missing", blobKey: parsed.blobKey });
+      }
+    }
+
+    const identities = new Map<string, AssetContentIdentity>();
+    const assets: AssetIntegrity[] = [];
+    for (const metadataEntry of uniqueProjectMetadata) {
+      throwIfAborted(scopedOptions, "scan-integrity", metadataEntry.assetId);
+      const {
+        assetId,
+        blobKey,
+        contentHash: expectedHash,
+        expectedByteSize,
+        expectedMimeType,
+      } = metadataEntry;
+      const stored = blobsByKey.get(blobKey);
+      if (!stored) {
+        assets.push(Object.freeze({
+          assetId,
+          status: "blob-missing",
+          expectedHash,
+          expectedByteSize,
+          expectedMimeType,
+        }));
+        continue;
+      }
+      let actual = identities.get(blobKey);
+      if (!actual) {
+        try {
+          actual = validateAssetContentIdentity(
+            await awaitAbortableAssetOperation(
+              Promise.resolve().then(() => this.identify(stored.blob, scopedOptions)),
+              scopedOptions,
+              "scan-integrity",
+              assetId,
+            ),
+            { operation: "scan-integrity", assetId },
+          );
+        } catch (error) {
+          throw boundaryError(error, "scan-integrity", assetId);
+        }
+        identities.set(blobKey, actual);
+      }
+      const observed = {
+        assetId,
+        expectedHash,
+        actualHash: actual.contentHash,
+        expectedByteSize,
+        actualByteSize: actual.byteSize,
+        expectedMimeType,
+        actualMimeType: expectedMimeType,
+      };
+      if (
+        expectedByteSize !== actual.byteSize
+        || (stored.byteSize !== undefined && stored.byteSize !== actual.byteSize)
+      ) {
+        assets.push(Object.freeze({ ...observed, status: "size-mismatch" }));
+      } else if (
+        expectedHash !== actual.contentHash
+        || blobKey !== actual.blobKey
+        || (stored.contentHash !== undefined && stored.contentHash !== actual.contentHash)
+        || (stored.verificationHash !== undefined
+          && stored.verificationHash !== actual.verificationHash)
+      ) {
+        assets.push(Object.freeze({ ...observed, status: "hash-mismatch" }));
+      } else {
+        assets.push(Object.freeze({ ...observed, status: "ok" }));
+      }
+    }
+
+    const candidates: AssetGarbageCollectionCandidate[] = [];
+    for (const stored of [...blobsByKey.values()].sort((left, right) => (
+      left.blobKey.localeCompare(right.blobKey)
+    ))) {
+      if ((referenceCounts.get(stored.blobKey) ?? 0) !== 0) continue;
+      candidates.push(Object.freeze({
+        blobKey: stored.blobKey,
+        byteSize: stored.actualByteSize,
+        ...(stored.contentHash ? { contentHash: stored.contentHash } : {}),
+        reason: "unreferenced",
+      }));
+    }
+    storageIssues.sort(compareStorageIssues);
+    const reclaimableBytes = candidates.reduce((total, candidate) => total + candidate.byteSize, 0);
+    const okCount = assets.filter((asset) => asset.status === "ok").length;
+    const garbageCollection = Object.freeze({
+      mode: "preview" as const,
+      candidates: Object.freeze(candidates),
+      reclaimableBytes,
+    });
+    return Object.freeze({
+      projectId: this.projectId,
+      assets: Object.freeze(assets),
+      storageIssues: Object.freeze(storageIssues),
+      garbageCollection,
+      summary: Object.freeze({
+        assetCount: assets.length,
+        okCount,
+        assetIssueCount: assets.length - okCount,
+        storageIssueCount: storageIssues.length,
+        orphanBlobCount: candidates.length,
+        reclaimableBytes,
+      }),
+    });
   }
 
   async remove(

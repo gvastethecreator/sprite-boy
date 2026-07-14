@@ -36,8 +36,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F2-03 | J | F2-02 | Hash/content identity y deduplicación binaria | UT known hashes + collision path | done |
 | F2-04 | E | F2-02 | Runtime URL lease/revoke registry separado del documento | UT leak/refcount + REV | done |
 | F2-05 | J | F2-03,F2-04 | Import/replace/remove service con transaction boundary | IT rollback on failure | done |
-| F2-06 | J | F2-05 | Integrity scan y garbage-collection preview sin borrado implícito | IT missing/orphan blobs | active |
-| F2-07 | J | F2-06 | Reload/cleanup browser journey del repository | BR + no leaked URLs | todo |
+| F2-06 | J | F2-05 | Integrity scan y garbage-collection preview sin borrado implícito | IT missing/orphan blobs | done |
+| F2-07 | J | F2-06 | Reload/cleanup browser journey del repository | BR + no leaked URLs | active |
 | F3-01 | J | F1-08,F2-07 | `ProjectCodec` encode/decode con version dispatch | RT V1 exactness | todo |
 | F3-02 | J | F3-01 | Migrator step interface y migration report tipado | MIG ordered steps | todo |
 | F3-03 | J | F3-02 | Migración del fixture legacy real al V1 | MIG + invariant validation | todo |

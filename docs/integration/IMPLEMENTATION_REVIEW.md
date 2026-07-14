@@ -274,6 +274,31 @@ los lotes que sí modifican producto.
   identidad no cooperativo y la ventana remove/lease; las regresiones finales
   pasan y el veredicto independiente es `accept`.
 
+## F2-06 — Read-only integrity scan and garbage-collection preview
+
+- **Estado:** `accept` después de una revisión independiente `repair` y dos
+  reproducciones hostiles cerradas.
+- **Snapshot:** metadata de todos los proyectos y blobs globales se capturan en
+  una única transacción IndexedDB readonly. El reporte del proyecto ordena
+  assets, hashea una sola vez cada blob compartido y distingue `ok`, faltante,
+  tamaño y hash; issues del envelope quedan separados.
+- **GC seguro:** un candidato requiere cero referencias de metadata globales,
+  no sólo cero referencias del proyecto abierto. El resultado es explícitamente
+  `mode: preview`, calcula bytes recuperables y no llama ni expone delete.
+- **Boundary/lifecycle:** arrays, entries, hashes y records se leen sin getters;
+  hashes exigen strings primitivas. Blob usa brand-check, slice y arrayBuffer
+  nativos antes de un identity provider validado/abort-raced. Caller abort y
+  `dispose` terminan scans aunque snapshot/provider no cooperen.
+- **Reparación de review:** `String(contentHash)` ejecutaba `toString` hostil e
+  `instanceof Blob` podía activar `getPrototypeOf` de un Proxy. Las regresiones
+  finales observan cero coerciones y cero traps, sin errores crudos.
+- **Evidencia:** 39/39 tests focales; checkpoint acumulado 23 suites/223 tests,
+  typecheck, build y lint exit 0. Chromium real en
+  `../../artifacts/quality/F2/2026-07-14/integrity-scan-browser.json` verificó
+  `ok/blob-missing/hash-mismatch`, un único huérfano, blob de otro proyecto no
+  recolectable, reporte repetible, conteos 4→4, pre-abort, boundary hostil,
+  cleanup y cero page/console errors. Veredicto independiente final: `accept`.
+
 ## Frontier pendiente de review
 
-- F2-06: integrity scan y garbage-collection preview sin borrado implícito.
+- F2-07: reload/cleanup browser journey del repository sin leaked URLs.
