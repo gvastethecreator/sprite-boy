@@ -205,6 +205,15 @@ interface AssetRepository {
 
 ## ProjectCodec y paquetes
 
+`ProjectCodec` despacha primero por `schemaVersion`; V1 nunca intenta leer un
+documento future como si fuera current y los migrators permanecen fuera del
+codec. Encode valida el input, copia sólo data properties propias a un snapshot
+con keys ordenadas por code unit, revalida y recién entonces llama
+`JSON.stringify`. Decode parsea, despacha, valida y devuelve otro snapshot
+canónico. Accessors, `toJSON`, ciclos, runtime URLs, non-finite/negative-zero y
+Proxy revocado quedan detrás de `ProjectCodecError`; el diagnostic público no
+expone la causa del parser/runtime.
+
 Formato de trabajo:
 
 - Autosave: documento JSON versionado + blobs deduplicados en IndexedDB.

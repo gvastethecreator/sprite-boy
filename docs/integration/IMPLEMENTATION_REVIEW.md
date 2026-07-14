@@ -324,6 +324,29 @@ los lotes que sí modifican producto.
   prueba reload, integridad, balance exacto 3/3, cleanup y cero page errors.
   Veredicto independiente final: `accept`.
 
+## F3-01 — Canonical ProjectCodec and explicit version dispatch
+
+- **Estado:** `accept` después de una revisión independiente `repair` de una
+  fuga con Proxy revocado.
+- **Encode:** valida el documento, crea snapshot recursivo sólo desde data
+  properties propias, ordena keys por code unit, revalida y serializa el
+  snapshot. No ejecuta accessors ni `toJSON`; ciclos, runtime values, non-finite
+  y negative-zero no pueden producir JSON con round-trip ambiguo.
+- **Decode/dispatch:** input debe ser string JSON. `schemaVersion` se extrae sin
+  accessor, versiones futuras fallan como unsupported antes de V1, versiones
+  ausentes/fraccionales/menores a uno son invalid document y V1 usa el validator
+  canónico. La salida se normaliza de nuevo y re-encode es byte-estable.
+- **Seguridad/exactitud:** diagnostics tipados no exponen `cause`; IDs como
+  `__proto__` sobreviven como own data sin contaminar prototipos. Orden de
+  inserción distinto produce el mismo JSON.
+- **Reparación de review:** `Array.isArray` quedaba fuera del `try` de
+  `readSchemaVersion`; un Proxy revocado filtraba `TypeError`. El preflight
+  completo quedó contenido y la regresión exige `PROJECT_CODEC_INVALID_DOCUMENT`
+  más diagnostic estable, sin causa pública.
+- **Evidencia:** 44/44 tests focales; checkpoint 24 suites/235 tests, typecheck,
+  build y lint exit 0 con deuda legacy/bundle sin cambios. Veredicto
+  independiente final: `accept`.
+
 ## Frontier pendiente de review
 
-- F3-01: `ProjectCodec` encode/decode con version dispatch y round-trip V1.
+- F3-02: migrator step interface y migration report tipado.

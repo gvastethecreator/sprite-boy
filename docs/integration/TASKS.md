@@ -37,8 +37,8 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1 y F2 completo (F2-01/F2-07) están aceptados. El frontier activo es
-`F3-01` (`ProjectCodec` encode/decode con dispatch explícito de versión).
+F0, B0, F1, F2 y F3-01 están aceptados. El frontier activo es `F3-02`
+(interface de migrator por pasos ordenados y migration report tipado).
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 
