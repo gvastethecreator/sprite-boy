@@ -410,14 +410,23 @@ Todos los entries aparecen en header/command palette cuando son aplicables. Si f
 F4-04 cierra la semántica base `record/coalesce/ignore`: transacciones de drag
 producen un solo undo, branches posteriores a undo/redo no reabren una
 transaction histórica y los cambios ignorados de documento no pueden ser
-revertidos accidentalmente. Batch y guard de mutación externa permanecen en
-F4-06.
+revertidos accidentalmente.
 
 F4-05 cierra selectors granulares y el batch `timeline-layout`: cambios de
 preferences, InteractionStore o slices documentales no seleccionados no
 rerenderizan el consumer; altura, ARIA, teclado, drag y cleanup quedan cubiertos
 por component/render-count tests. La migración del resto de `ProjectContext`
 permanece dividida por batches posteriores y no se adelantó aquí.
+
+F4-06 cierra el gate de stores: `command.batch` es una sola revisión y una sola
+entrada de history con rollback total; undo/redo restaura el documento exacto.
+La frontera pública clona por descriptores un grafo data-only antes de reducer e
+history, por lo que Proxies, accessors, `toJSON`, ciclos y arrays no densos no
+pueden ejecutar código ni mutar snapshots publicados. Proyecto, resultados e
+inverses son deep-frozen. History retiene 100 entradas por defecto y acepta un
+límite explícito 1..1000; Workspace/Interaction/Job/Playback permanecen fuera
+del history documental. El store gate de W1 está aceptado; el gate W1 completo
+sigue pendiente sólo de la ejecución browser F3-07.
 
 ### F5 — RenderEngine por invalidación
 

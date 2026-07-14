@@ -4,18 +4,19 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06 y F4-01..F4-05 aceptados. Frontiers: F3-07 pendiente de browser; F4-06 autorizado.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06 y F4-01..F4-06 aceptados. Frontiers: F3-07 pendiente de browser; F5-01 autorizado.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
 F4 avanza en paralelo porque su contrato depende de F1-08, ya aceptado. Esto no
 degrada F3-07: su harness queda `ready-for-browser`, pero el gate continúa
 abierto hasta ejecutar J1/J8 en el perfil Chrome real y revisar el artefacto.
-F4-04/F4-05 ya cerraron history, selectors y el primer batch `timeline-layout`:
+F4-04/F4-05 cerraron history, selectors y el primer batch `timeline-layout`:
 provider local y migración exclusiva de `WorkspaceStore.panelSizes.timeline`
 desde `AppLayout` a un leaf consumer. `ProjectContext` y el documento legacy
-quedaron fuera. F4-06 queda autorizado para batch undo/redo, mutation guard y
-el gate conjunto de stores.
+quedaron fuera. F4-06 cerró batch undo/redo, frontera data-only contra mutación
+o código externo, retención configurable (100 por defecto) y el gate conjunto
+de stores. W1 global continúa abierto únicamente por el browser gate F3-07.
 
 ## Reglas de ejecución
 

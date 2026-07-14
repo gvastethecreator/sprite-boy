@@ -566,9 +566,34 @@ los lotes que sí modifican producto.
   typecheck, lint focal `--deny-warnings`, build y diff-check verdes. El warning
   de chunk >500 kB continúa como baseline previo. Revisión final: `accept`.
 
+## F4-06 — Atomic batches, mutation boundary and history retention
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Batch/history:** `command.batch` analiza y ejecuta una única copia estable,
+  publica una revisión y registra una entrada. Un child fallido revierte todo;
+  el batch vacío es no-op y `project.restoreSnapshot` continúa privado para
+  undo/redo. Retención por cantidad conserva las 100 entradas más recientes por
+  defecto y acepta límites data-only de 1 a 1000.
+- **Mutation guard:** initialProject se preflighta como data-only, se aísla con
+  `structuredClone` y se valida otra vez. Todo comando público se clona
+  recursivamente por descriptors antes del reducer y del hook de history;
+  accessors, Proxies vivos, `toJSON`, ciclos, arrays sparse/custom y prototipos
+  exóticos quedan rechazados o separados sin ejecutar getters. Snapshots,
+  resultados, diagnostics e inverses se recorren y deep-freezean incluso si un
+  root ya estaba shallow-frozen.
+- **Reparaciones de review:** se eliminó la lectura directa repetida de
+  `batch.commands`; después se cerraron tres escapes adicionales: history
+  releía el batch externo, nested accessors sobrevivían el primer clon y los
+  comandos individuales conservaban su Proxy. Los repros finales observan cero
+  traps/getters y rollback/revision/history estables.
+- **Evidencia:** gate focal 29/29; suite completo 37/37 archivos y 343/343 tests;
+  typecheck, lint focal `--deny-warnings`, build y diff-check verdes. El warning
+  de chunk >500 kB continúa como baseline previo. Veredicto final: `accept`.
+- **Alcance del gate:** F4 y el store gate de W1 quedan aceptados. W1 global no
+  se declara cerrado mientras F3-07 no ejecute J1/J8 en Chrome real.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F4-06: autorizado por F4-04/F4-05; debe cerrar batch undo/redo, mutation guard
-  y presupuesto/retención de snapshots.
+- F5-01: autorizado por F1-08/F4-06 para iniciar `SceneProjection` canónica.

@@ -60,6 +60,7 @@ export interface ProjectStoreWithHistory {
 }
 
 export interface CreateProjectStoreWithHistoryOptions extends CreateProjectStoreOptions {
+  readonly maxHistoryEntries?: number;
   readonly onHistorySubscriberError?: (
     diagnostic: ProjectHistorySubscriberDiagnostic,
   ) => void;
@@ -74,6 +75,9 @@ const HISTORY_SUBSCRIBER_FAILED: ProjectHistorySubscriberDiagnostic = Object.fre
   code: "PROJECT_HISTORY_SUBSCRIBER_FAILED",
   message: "A ProjectHistory subscriber failed while observing a committed stack.",
 });
+
+const DEFAULT_MAX_HISTORY_ENTRIES = 100;
+const MAX_HISTORY_ENTRIES = 1_000;
 
 const WORKSPACE_SELECTION_COLLECTIONS = Object.freeze({
   selectedAssetId: "assets",
@@ -135,6 +139,9 @@ function normalizeHistoryObserver(
     if (!isPlainRecord(options)) throw new TypeError();
     const descriptor = Object.getOwnPropertyDescriptor(options, "onHistorySubscriberError");
     if (!descriptor) return undefined;
+    if ("value" in descriptor && descriptor.enumerable && descriptor.value === undefined) {
+      return undefined;
+    }
     if (!("value" in descriptor) || !descriptor.enumerable || typeof descriptor.value !== "function") {
       throw new TypeError();
     }
@@ -142,6 +149,31 @@ function normalizeHistoryObserver(
     return (diagnostic) => Reflect.apply(handler, undefined, [diagnostic]);
   } catch {
     throw new TypeError("ProjectHistory options require a data-only subscriber reporter.");
+  }
+}
+
+function normalizeHistoryEntryLimit(options: CreateProjectStoreWithHistoryOptions): number {
+  try {
+    if (!isPlainRecord(options)) throw new TypeError();
+    const descriptor = Object.getOwnPropertyDescriptor(options, "maxHistoryEntries");
+    if (!descriptor) return DEFAULT_MAX_HISTORY_ENTRIES;
+    if ("value" in descriptor && descriptor.enumerable && descriptor.value === undefined) {
+      return DEFAULT_MAX_HISTORY_ENTRIES;
+    }
+    if (!(
+      "value" in descriptor &&
+      descriptor.enumerable &&
+      Number.isSafeInteger(descriptor.value) &&
+      descriptor.value >= 1 &&
+      descriptor.value <= MAX_HISTORY_ENTRIES
+    )) {
+      throw new TypeError();
+    }
+    return descriptor.value;
+  } catch {
+    throw new TypeError(
+      `ProjectHistory maxHistoryEntries must be an enumerable data integer from 1 to ${MAX_HISTORY_ENTRIES}.`,
+    );
   }
 }
 
@@ -181,6 +213,7 @@ export function createProjectStoreWithHistory(
   options: CreateProjectStoreWithHistoryOptions,
 ): ProjectStoreWithHistory {
   const onHistorySubscriberError = normalizeHistoryObserver(options);
+  const maxHistoryEntries = normalizeHistoryEntryLimit(options);
   const historyListeners = new Set<StoreListener>();
   let undoEntries: readonly InternalHistoryEntry[] = Object.freeze([]);
   let redoEntries: readonly InternalHistoryEntry[] = Object.freeze([]);
@@ -279,7 +312,7 @@ export function createProjectStoreWithHistory(
         inverse: event.result.inverse,
         coalesceEpoch,
       });
-      nextUndo = Object.freeze([...undoEntries, entry]);
+      nextUndo = Object.freeze([...undoEntries, entry].slice(-maxHistoryEntries));
     }
     return stageHistory(nextUndo, []);
   };

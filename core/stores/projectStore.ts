@@ -1,15 +1,19 @@
 import {
   applyProjectCommand,
+  applyProjectCommandBatch,
   applyProjectCommandInverse,
   isEntityId,
   isISO8601Timestamp,
   type ProjectCommand,
+  type ProjectCommandBatch,
+  type ProjectDispatchCommand,
   type ProjectCommandContext,
   type ProjectCommandEnvelope,
   type ProjectCommandMetadata,
   type ProjectCommandInverse,
   type ProjectCommandResult,
 } from "../project";
+import { cloneDataOnly } from "../project/dataBoundary";
 import { createProjectSnapshot, type ProjectRevision } from "../project/graph";
 import type { StudioProjectV1 } from "../project/schema";
 import { validateStudioProject } from "../project/validation";
@@ -47,7 +51,7 @@ export interface ProjectStoreInternalCommitEvent {
   readonly after: ProjectStoreState;
   readonly result: Extract<ProjectCommandResult, { ok: true }>;
   readonly envelope?: {
-    readonly command: ProjectCommand;
+    readonly command: ProjectDispatchCommand;
     readonly metadata: ProjectCommandMetadata;
   };
 }
@@ -65,13 +69,72 @@ export interface ProjectStoreRuntime {
 }
 
 type EnvelopeReadResult =
-  | { readonly ok: true; readonly command: ProjectCommand; readonly metadata: ProjectCommandMetadata }
+  | { readonly ok: true; readonly command: ProjectDispatchCommand; readonly metadata: ProjectCommandMetadata }
   | { readonly ok: false; readonly path: string; readonly message: string };
 
 const SUBSCRIBER_FAILED_DIAGNOSTIC: ProjectStoreSubscriberDiagnostic = Object.freeze({
   code: "PROJECT_STORE_SUBSCRIBER_FAILED",
   message: "A ProjectStore subscriber failed while observing a committed revision.",
 });
+
+function deepFreezeData<T>(value: T, seen = new WeakSet<object>()): T {
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return value;
+  seen.add(value);
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor && "value" in descriptor) deepFreezeData(descriptor.value, seen);
+  }
+  return Object.isFrozen(value) ? value : Object.freeze(value);
+}
+
+function isDataOnlyGraph(value: unknown, seen = new WeakSet<object>()): boolean {
+  if (value === null || typeof value !== "object") return true;
+  if (seen.has(value)) return true;
+  seen.add(value);
+  try {
+    const array = Array.isArray(value);
+    if (!array) {
+      const prototype = Object.getPrototypeOf(value);
+      if (prototype !== Object.prototype && prototype !== null) return false;
+    }
+    for (const key of Reflect.ownKeys(value)) {
+      if (array && key === "length") continue;
+      if (typeof key !== "string") return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) return false;
+      if (!isDataOnlyGraph(descriptor.value, seen)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function immutableDispatchResult(
+  revision: ProjectRevision,
+  result: ProjectCommandResult,
+): ProjectStoreDispatchResult {
+  return Object.freeze({ revision, result: deepFreezeData(result) });
+}
+
+function applyDispatchCommand(
+  project: StudioProjectV1,
+  command: ProjectDispatchCommand,
+  context: ProjectCommandContext,
+): ProjectCommandResult {
+  try {
+    if (command !== null && typeof command === "object") {
+      const type = Object.getOwnPropertyDescriptor(command, "type");
+      if (type && "value" in type && type.enumerable && type.value === "command.batch") {
+        return applyProjectCommandBatch(project, command as ProjectCommandBatch, context);
+      }
+    }
+  } catch {
+    // The canonical reducer maps hostile command shapes to stable diagnostics.
+  }
+  return applyProjectCommand(project, command as ProjectCommand, context);
+}
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -161,6 +224,13 @@ function readEnvelope(envelope: unknown): EnvelopeReadResult {
     if (!commandProperty?.present) {
       return invalidEnvelope("$.command", "Envelope command must be an own enumerable data property.");
     }
+    const detachedCommand = cloneDataOnly(commandProperty.value);
+    if (!detachedCommand.ok) {
+      return invalidEnvelope(
+        "$.command",
+        "Envelope command must be a finite, dense, data-only graph without accessors.",
+      );
+    }
     const metadataProperty = readDataProperty(envelope, "metadata");
     if (!metadataProperty?.present || !isPlainRecord(metadataProperty.value)) {
       return invalidEnvelope("$.metadata", "Envelope metadata must be a plain data object.");
@@ -227,7 +297,7 @@ function readEnvelope(envelope: unknown): EnvelopeReadResult {
 
     return {
       ok: true,
-      command: commandProperty.value as ProjectCommand,
+      command: detachedCommand.value as ProjectDispatchCommand,
       metadata: {
         commandId: commandIdProperty.value,
         origin: originProperty.value as ProjectCommandMetadata["origin"],
@@ -298,15 +368,22 @@ export function createProjectStoreRuntime(
   if (!normalizedOptions) {
     throw new TypeError("ProjectStore options require a data-only ProjectCommandContext.");
   }
-  const validation = validateStudioProject(initialProject);
-  if (!validation.valid) {
-    const first = validation.diagnostics[0];
-    throw new TypeError(
-      `ProjectStore requires a valid StudioProjectV1${first ? `: ${first.code} at ${first.path}` : "."}`,
-    );
+  let project: StudioProjectV1;
+  try {
+    if (!isDataOnlyGraph(initialProject)) throw new TypeError();
+    const isolated = structuredClone(initialProject);
+    const validation = validateStudioProject(isolated);
+    if (!validation.valid) {
+      const first = validation.diagnostics[0];
+      throw new TypeError(
+        `ProjectStore requires a valid StudioProjectV1${first ? `: ${first.code} at ${first.path}` : "."}`,
+      );
+    }
+    project = deepFreezeData(isolated);
+  } catch (error) {
+    if (error instanceof TypeError && error.message.startsWith("ProjectStore requires")) throw error;
+    throw new TypeError("ProjectStore could not isolate the initial StudioProjectV1.");
   }
-
-  let project = initialProject;
   let state: ProjectStoreState = createProjectSnapshot(
     project,
     normalizedOptions.initialRevision,
@@ -350,8 +427,9 @@ export function createProjectStoreRuntime(
     onCommit?: ProjectStoreInternalCommitHook,
     envelope?: ProjectStoreInternalCommitEvent["envelope"],
   ): ProjectStoreDispatchResult => {
+    deepFreezeData(result);
     if (!result.ok || result.project === project) {
-      return Object.freeze({ revision: state.revision, result });
+      return immutableDispatchResult(state.revision, result);
     }
 
     const before = state;
@@ -366,7 +444,7 @@ export function createProjectStoreRuntime(
 
     project = result.project;
     state = after;
-    const dispatchResult = Object.freeze({ revision: committedRevision, result });
+    const dispatchResult = immutableDispatchResult(committedRevision, result);
     afterCommit?.();
     notify();
     return dispatchResult;
@@ -374,28 +452,22 @@ export function createProjectStoreRuntime(
 
   const dispatch = (envelope: ProjectCommandEnvelope): ProjectStoreDispatchResult => {
     if (dispatching) {
-      return Object.freeze({
-        revision: state.revision,
-        result: reentrantDispatchResult(project),
-      });
+      return immutableDispatchResult(state.revision, reentrantDispatchResult(project));
     }
     dispatching = true;
     try {
       const envelopeRead = readEnvelope(envelope);
       if (!envelopeRead.ok) {
-        return Object.freeze({
-          revision: state.revision,
-          result: envelopeFailure(project, envelopeRead.path, envelopeRead.message),
-        });
+        return immutableDispatchResult(
+          state.revision,
+          envelopeFailure(project, envelopeRead.path, envelopeRead.message),
+        );
       }
       if (state.revision === Number.MAX_SAFE_INTEGER) {
-        return Object.freeze({
-          revision: state.revision,
-          result: exhaustedRevisionResult(project),
-        });
+        return immutableDispatchResult(state.revision, exhaustedRevisionResult(project));
       }
 
-      const result = applyProjectCommand(
+      const result = applyDispatchCommand(
         project,
         envelopeRead.command,
         normalizedOptions.context,
@@ -424,18 +496,12 @@ export function createProjectStoreRuntime(
     onCommit?: ProjectStoreInternalCommitHook,
   ): ProjectStoreDispatchResult => {
     if (dispatching) {
-      return Object.freeze({
-        revision: state.revision,
-        result: reentrantDispatchResult(project),
-      });
+      return immutableDispatchResult(state.revision, reentrantDispatchResult(project));
     }
     dispatching = true;
     try {
       if (state.revision === Number.MAX_SAFE_INTEGER) {
-        return Object.freeze({
-          revision: state.revision,
-          result: exhaustedRevisionResult(project),
-        });
+        return immutableDispatchResult(state.revision, exhaustedRevisionResult(project));
       }
       const result = applyProjectCommandInverse(project, inverse, normalizedOptions.context);
       return commitResult(result, onCommit);
