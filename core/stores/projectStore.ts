@@ -1,11 +1,13 @@
 import {
   applyProjectCommand,
+  applyProjectCommandInverse,
   isEntityId,
   isISO8601Timestamp,
   type ProjectCommand,
   type ProjectCommandContext,
   type ProjectCommandEnvelope,
   type ProjectCommandMetadata,
+  type ProjectCommandInverse,
   type ProjectCommandResult,
 } from "../project";
 import { createProjectSnapshot, type ProjectRevision } from "../project/graph";
@@ -38,6 +40,28 @@ interface NormalizedProjectStoreOptions {
   readonly context: ProjectCommandContext;
   readonly initialRevision: ProjectRevision;
   readonly onSubscriberError?: (diagnostic: ProjectStoreSubscriberDiagnostic) => void;
+}
+
+export interface ProjectStoreInternalCommitEvent {
+  readonly before: ProjectStoreState;
+  readonly after: ProjectStoreState;
+  readonly result: Extract<ProjectCommandResult, { ok: true }>;
+  readonly envelope?: {
+    readonly command: ProjectCommand;
+    readonly metadata: ProjectCommandMetadata;
+  };
+}
+
+export type ProjectStoreInternalCommitHook = (
+  event: ProjectStoreInternalCommitEvent,
+) => void | (() => void);
+
+export interface ProjectStoreRuntime {
+  readonly store: ProjectStore;
+  readonly applyInverse: (
+    inverse: ProjectCommandInverse,
+    onCommit?: ProjectStoreInternalCommitHook,
+  ) => ProjectStoreDispatchResult;
 }
 
 type EnvelopeReadResult =
@@ -194,6 +218,13 @@ function readEnvelope(envelope: unknown): EnvelopeReadResult {
       return invalidEnvelope("$.metadata.issuedAt", "Metadata issuedAt must be an ISO-8601 timestamp.");
     }
 
+    if (historyProperty.value === "coalesce" && !transactionIdProperty.present) {
+      return invalidEnvelope(
+        "$.metadata.transactionId",
+        "Coalesced commands require a transactionId.",
+      );
+    }
+
     return {
       ok: true,
       command: commandProperty.value as ProjectCommand,
@@ -258,10 +289,11 @@ function exhaustedRevisionResult(project: StudioProjectV1): ProjectCommandResult
  * Create the canonical document store. History is layered on this dispatch
  * boundary by F4-04; no alternate setter is exposed.
  */
-export function createProjectStore(
+export function createProjectStoreRuntime(
   initialProject: StudioProjectV1,
   options: CreateProjectStoreOptions,
-): ProjectStore {
+  onCommandCommit?: ProjectStoreInternalCommitHook,
+): ProjectStoreRuntime {
   const normalizedOptions = normalizeOptions(options);
   if (!normalizedOptions) {
     throw new TypeError("ProjectStore options require a data-only ProjectCommandContext.");
@@ -313,6 +345,33 @@ export function createProjectStore(
     }
   };
 
+  const commitResult = (
+    result: ProjectCommandResult,
+    onCommit?: ProjectStoreInternalCommitHook,
+    envelope?: ProjectStoreInternalCommitEvent["envelope"],
+  ): ProjectStoreDispatchResult => {
+    if (!result.ok || result.project === project) {
+      return Object.freeze({ revision: state.revision, result });
+    }
+
+    const before = state;
+    const committedRevision = state.revision + 1;
+    const after = createProjectSnapshot(result.project, committedRevision);
+    const afterCommit = onCommit?.(Object.freeze({
+      before,
+      after,
+      result,
+      ...(envelope ? { envelope } : {}),
+    }));
+
+    project = result.project;
+    state = after;
+    const dispatchResult = Object.freeze({ revision: committedRevision, result });
+    afterCommit?.();
+    notify();
+    return dispatchResult;
+  };
+
   const dispatch = (envelope: ProjectCommandEnvelope): ProjectStoreDispatchResult => {
     if (dispatching) {
       return Object.freeze({
@@ -329,8 +388,6 @@ export function createProjectStore(
           result: envelopeFailure(project, envelopeRead.path, envelopeRead.message),
         });
       }
-      void envelopeRead.metadata;
-
       if (state.revision === Number.MAX_SAFE_INTEGER) {
         return Object.freeze({
           revision: state.revision,
@@ -344,22 +401,16 @@ export function createProjectStore(
         normalizedOptions.context,
       );
 
-      if (!result.ok || result.project === project) {
-        return Object.freeze({ revision: state.revision, result });
-      }
-
-      project = result.project;
-      const committedRevision = state.revision + 1;
-      state = createProjectSnapshot(project, committedRevision);
-      const dispatchResult = Object.freeze({ revision: committedRevision, result });
-      notify();
-      return dispatchResult;
+      return commitResult(result, onCommandCommit, Object.freeze({
+        command: envelopeRead.command,
+        metadata: envelopeRead.metadata,
+      }));
     } finally {
       dispatching = false;
     }
   };
 
-  return Object.freeze({
+  const store = Object.freeze({
     kind: "project",
     persistence: "durable",
     history: "command",
@@ -367,4 +418,39 @@ export function createProjectStore(
     subscribe,
     dispatch,
   });
+
+  const applyInverse = (
+    inverse: ProjectCommandInverse,
+    onCommit?: ProjectStoreInternalCommitHook,
+  ): ProjectStoreDispatchResult => {
+    if (dispatching) {
+      return Object.freeze({
+        revision: state.revision,
+        result: reentrantDispatchResult(project),
+      });
+    }
+    dispatching = true;
+    try {
+      if (state.revision === Number.MAX_SAFE_INTEGER) {
+        return Object.freeze({
+          revision: state.revision,
+          result: exhaustedRevisionResult(project),
+        });
+      }
+      const result = applyProjectCommandInverse(project, inverse, normalizedOptions.context);
+      return commitResult(result, onCommit);
+    } finally {
+      dispatching = false;
+    }
+  };
+
+  return Object.freeze({ store, applyInverse });
+}
+
+/** Create a ProjectStore without attaching a history controller. */
+export function createProjectStore(
+  initialProject: StudioProjectV1,
+  options: CreateProjectStoreOptions,
+): ProjectStore {
+  return createProjectStoreRuntime(initialProject, options).store;
 }
