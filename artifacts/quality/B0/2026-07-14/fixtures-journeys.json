@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "availableFixtures": [
+    {
+      "path": "tests/contract/fixtures/legacyProjectV0.ts",
+      "kind": "sanitized-legacy-project",
+      "validated": true,
+      "coveredBy": "tests/contract/legacyProjectV0.test.ts"
+    },
+    {
+      "path": "tests/contract/fixtures/studioProjectV1.ts",
+      "kind": "representative-canonical-project",
+      "validated": true,
+      "coveredBy": "tests/contract/projectValidation.test.ts"
+    }
+  ],
+  "missingFixtureFamilies": [
+    {
+      "plannedPath": "tests/fixtures/grid_3x3_green_bg.png",
+      "journeys": ["J2"],
+      "owner": "G1/G2",
+      "status": "missing"
+    },
+    {
+      "plannedPath": "tests/fixtures/grid_irregular_components.png",
+      "journeys": ["J2"],
+      "owner": "S1",
+      "status": "missing"
+    },
+    {
+      "plannedPath": "tests/fixtures/migration",
+      "journeys": ["J1", "J8"],
+      "owner": "F3",
+      "status": "missing",
+      "cases": ["expired-blob-url", "future-schema", "corrupt", "missing-asset", "quota"]
+    },
+    {
+      "plannedPath": "tests/fixtures/export",
+      "journeys": ["J7"],
+      "owner": "A11",
+      "status": "missing",
+      "cases": ["generic", "unity", "phaser3", "godot"]
+    },
+    {
+      "plannedPath": "tests/fixtures/generation",
+      "journeys": ["J5"],
+      "owner": "A7/A8/A9",
+      "status": "missing",
+      "cases": ["fake-provider", "partial", "cancel", "provider-failure"]
+    }
+  ],
+  "browserHarness": {
+    "playwrightConfig": { "path": "playwright.config.ts", "exists": false },
+    "e2eDirectory": { "path": "tests/e2e", "exists": false },
+    "visualDirectory": { "path": "tests/visual", "exists": false }
+  },
+  "journeys": [
+    { "id": "J1", "name": "Proyecto durable", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J2", "name": "Grid completo", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J3", "name": "Compose completo", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J4", "name": "Timeline y playback", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J5", "name": "Generation determinista", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J6", "name": "Alignment y colisiones", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J7", "name": "Export completo", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J8", "name": "Migración y recovery", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" },
+    { "id": "J9", "name": "Keyboard/accessibility", "definition": "docs/integration/QUALITY_GATES.md", "implementation": null, "status": "missing" }
+  ],
+  "review": "accept-as-baseline-with-missing-work-explicit"
+}

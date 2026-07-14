@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "coverage": {
+    "command": "bun run test:coverage",
+    "exitCode": 0,
+    "suites": 12,
+    "tests": 118,
+    "provider": "v8",
+    "instrumentedFiles": 54,
+    "statements": { "covered": 257, "total": 2865, "percent": 8.97 },
+    "branches": { "covered": 88, "total": 1654, "percent": 5.32 },
+    "functions": { "covered": 69, "total": 654, "percent": 10.55 },
+    "lines": { "covered": 226, "total": 2581, "percent": 8.75 },
+    "configuredIncludes": ["utils/**", "hooks/**", "components/**", "types/**"],
+    "coreProjectIncluded": false,
+    "gap": "The existing Vitest coverage include list omits core/project; F8-04 must add canonical modules before enforcing their 90/85 thresholds."
+  },
+  "bundle": {
+    "command": "bun run build",
+    "exitCode": 0,
+    "mainChunk": "dist/assets/index-BSDTj0Q8.js",
+    "bytes": 841827,
+    "gzipLevel9Bytes": 224866,
+    "viteReportedGzipKilobytes": 227.48,
+    "releaseBudgetGzipKilobytes": 180,
+    "status": "baseline-over-budget",
+    "gap": "No feature lazy chunks exist for the future AI/export codecs; main-chunk code splitting is required before release."
+  },
+  "review": "accept-as-measured-baseline-not-release-gate"
+}

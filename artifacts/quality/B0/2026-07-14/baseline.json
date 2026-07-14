@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-14T03:46:14.6791390-03:00",
+  "workingTree": {
+    "inventoryCommand": "node scripts/studio-baseline.mjs --root .",
+    "deterministicDoubleRun": true,
+    "files": 118,
+    "bytes": 748040,
+    "lines": 19260,
+    "surfaces": 11,
+    "stdoutBytes": 13150,
+    "stdoutSha256": "1497eac53872a953989aeefc9fe72fdb88ed6aa96c1d57dcedc73502f610d3e7",
+    "symlinkPolicy": "exclude"
+  },
+  "checks": {
+    "test": {
+      "command": "bun run test",
+      "exitCode": 0,
+      "suites": 12,
+      "tests": 118
+    },
+    "typecheck": {
+      "command": "bun run typecheck",
+      "exitCode": 0
+    },
+    "lint": {
+      "command": "bun run lint",
+      "exitCode": 0,
+      "legacyWarnings": 144,
+      "focusedSliceWarnings": 0
+    },
+    "build": {
+      "command": "bun run build",
+      "exitCode": 0,
+      "mainChunk": "index-BSDTj0Q8.js",
+      "mainChunkBytes": 841827,
+      "reportedGzipKilobytes": 227.48,
+      "releaseBudgetGzipKilobytes": 180,
+      "budgetStatus": "baseline-over-budget"
+    }
+  },
+  "ownership": {
+    "packageJson": "pre-existing-user-change-preserved",
+    "dependencyMutation": false
+  },
+  "review": {
+    "B0-01": "accept-after-symlink-repair",
+    "B0-02": "accept-with-legacy-debt-separated"
+  }
+}

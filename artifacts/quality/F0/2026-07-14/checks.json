@@ -1,0 +1,53 @@
+{
+  "capturedAt": "2026-07-14T03:16:30.0973355-03:00",
+  "workingTreeBaseline": "4e16041",
+  "runs": [
+    {
+      "command": "bunx vitest run tests/contract/projectValidation.test.ts tests/contract/legacyProjectV0.test.ts --reporter=verbose",
+      "exitCode": 0,
+      "summary": "2 files, 35 tests passed",
+      "startedAt": "2026-07-14T03:16:01-03:00"
+    },
+    {
+      "command": "bunx tsc --noEmit --pretty false",
+      "exitCode": 0,
+      "summary": "no diagnostics",
+      "startedAt": "2026-07-14T03:16:01-03:00"
+    },
+    {
+      "command": "bunx oxlint core/project tests/contract",
+      "exitCode": 0,
+      "summary": "0 warnings",
+      "finishedAt": "2026-07-14T03:16:14-03:00"
+    },
+    {
+      "command": "bun run test",
+      "exitCode": 0,
+      "summary": "9 files, 92 tests passed",
+      "startedAt": "2026-07-14T03:16:01-03:00"
+    },
+    {
+      "command": "bun run build",
+      "exitCode": 0,
+      "summary": "production build passed; pre-existing main chunk size warning remains",
+      "startedAt": "2026-07-14T03:16:01-03:00"
+    },
+    {
+      "command": "explicit trailing-whitespace scan over all F0 code/tests/docs",
+      "exitCode": 0,
+      "summary": "0 issues; includes untracked files that git diff --check cannot see"
+    }
+  ],
+  "sha256": {
+    "core/project/schema.ts": "52a74626613117c2f3673f7a7ab930ba3053277ea3ac341ee37c90104b636ee2",
+    "core/project/primitives.ts": "8625d46a40685bea8ad069667f1c9c919147b6610616838d36ff4152640080b7",
+    "core/project/factory.ts": "4899ca73cf2d55aebca8d34561c88a6dd284703f669acd66b1666c57a58dd024",
+    "core/project/validation.ts": "ebbeb6e9d00cfde4bf530fd58ed2ca4cfffb17cb2830be777571f1e973403fe4",
+    "core/project/index.ts": "628582b802ed11c4c5d840414c8b60b2a154c41546dbf6962d6d399455f9ea1a",
+    "tests/contract/fixtures/legacyProjectV0.ts": "f789eef1a0184b5c78be9e3611bd56d17b119bf114b256687796ffb5aeb132a4",
+    "tests/contract/fixtures/studioProjectV1.ts": "e2445d3b8b80159d0ccfb52580fcc36b58f884285a83db14287508b2410bf604",
+    "tests/contract/legacyProjectV0.test.ts": "6b4bd42121c9562ec8cd86b7cf0df12b0f3961b810303e0bebdc7ec25c45c0f2",
+    "tests/contract/projectValidation.test.ts": "7ee76286c70c7ed7e4ccfe45c066246c437909d8830826e11d2f51ba09758eaf",
+    "docs/architecture/ADR-001-canonical-project-model.md": "7d708ad6e624b3255517cc4c22da39b57a077201a40c1fc86a0cf04763bf2fe6"
+  }
+}
