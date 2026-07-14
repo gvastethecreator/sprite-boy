@@ -205,6 +205,28 @@ los lotes que sí modifican producto.
   dos proyectos, blob compartido, último-ref GC, DataClone rollback metadata y
   blob, abort, close-during-open y delete blocked; cero page errors.
 
+## F2-03 — Content identity y deduplicación binaria
+
+- **Estado:** `accept` tras una ronda `repair` independiente y reproducción de
+  todos los hallazgos.
+- **Identidad:** SHA-256 hex lowercase produce `sha256:<hash>`; SHA-512 queda
+  como verificador independiente. Metadata hash/key/size/MIME debe describir
+  exactamente el Blob antes de abrir storage.
+- **Dedup/colisión:** dos metadata pueden compartir un único blob. Una misma
+  key con verifier o tamaño distinto aborta la transacción con
+  `ASSET_INTEGRITY_MISMATCH` y conserva blob/metadata anteriores.
+- **Aborto/boundary:** `arrayBuffer`, digest e identity providers no
+  cooperativos compiten con AbortSignal; outputs malformados y accessors
+  hostiles quedan tipados sin lecturas ni promises pendientes.
+- **Compatibilidad:** IndexedDB v2 prelee y hashea entries v1, revalida dentro
+  del write transaction y backfillea identidad junto con metadata. Estados
+  parciales o bytes diferentes fallan cerrados.
+- **Evidencia:** 26/26 tests focales; checkpoint 20 suites/190 tests, build,
+  typecheck y lint. Chromium real en
+  `../../artifacts/quality/F2/2026-07-14/content-identity-browser.json` probó
+  known vector, 2 metadata/1 blob, MIME wrapper, colisión con rollback, upgrade
+  v1→v2, provider bloqueado abortado antes de abrir DB y cleanup sin errores.
+
 ## Frontier pendiente de review
 
-- F2-03: SHA-256/content identity y collision path.
+- F2-04: runtime Object URL lease/revoke registry.

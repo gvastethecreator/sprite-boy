@@ -185,6 +185,38 @@ export interface AssetOperationOptions {
   signal?: AbortSignal;
 }
 
+/** Race non-cancelable browser work with AbortSignal and detach every listener. */
+export function awaitAbortableAssetOperation<T>(
+  work: PromiseLike<T>,
+  options: AssetOperationOptions | undefined,
+  operation: AssetRepositoryOperation,
+  assetId?: EntityId,
+): Promise<T> {
+  const signal = options?.signal;
+  if (!signal) return Promise.resolve(work);
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => signal.removeEventListener("abort", onAbort);
+    const finish = (callback: () => void): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const onAbort = (): void => finish(() => reject(new AssetRepositoryError(
+      "ASSET_TRANSACTION_ABORTED",
+      `Asset repository ${operation} was aborted${assetId ? ` for ${assetId}` : ""}.`,
+      { operation, assetId, cause: signal.reason },
+    )));
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve(work).then(
+      (value) => finish(() => resolve(value)),
+      (error: unknown) => finish(() => reject(error)),
+    );
+    if (signal.aborted) onAbort();
+  });
+}
+
 export interface AssetListOptions extends AssetOperationOptions {
   contentHash?: string;
 }

@@ -46,6 +46,29 @@ describe("IndexedDbAssetStorage preflight (F2-02)", () => {
       });
   });
 
+  it("settles promptly when an identity provider ignores abort", async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const storage = new IndexedDbAssetStorage("project-storage", {
+      factory: null,
+      identityProvider: () => {
+        calls += 1;
+        return new Promise(() => undefined);
+      },
+    });
+    const pending = storage.put(record, new Blob(["test"], { type: "image/png" }), {
+      signal: controller.signal,
+    });
+    for (let turn = 0; turn < 10 && calls < 1; turn += 1) await Promise.resolve();
+    expect(calls).toBe(1);
+    controller.abort("cancel stuck provider");
+    await expect(pending).rejects.toMatchObject({
+      code: "ASSET_TRANSACTION_ABORTED",
+      operation: "put",
+      assetId: "asset-storage",
+    });
+  });
+
   it("rejects invalid IDs and non-Blob payloads before touching IndexedDB", async () => {
     const factory = {
       open() {

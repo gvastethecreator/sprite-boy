@@ -33,8 +33,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F1-08 | J | F1-07 | Property tests de delete/reorder/duplicate y graph invariants | UT seeded/property suite | done |
 | F2-01 | J | F1-08 | Contrato `AssetRepository` y errores integrity/quota/not-found | Type contract + REV | done |
 | F2-02 | E | F2-01 | Adapter IndexedDB para put/get/remove/list metadata/blob | IT real IndexedDB + REV | done |
-| F2-03 | J | F2-02 | Hash/content identity y deduplicación binaria | UT known hashes + collision path | active |
-| F2-04 | E | F2-02 | Runtime URL lease/revoke registry separado del documento | UT leak/refcount + REV | todo |
+| F2-03 | J | F2-02 | Hash/content identity y deduplicación binaria | UT known hashes + collision path | done |
+| F2-04 | E | F2-02 | Runtime URL lease/revoke registry separado del documento | UT leak/refcount + REV | active |
 | F2-05 | J | F2-03,F2-04 | Import/replace/remove service con transaction boundary | IT rollback on failure | todo |
 | F2-06 | J | F2-05 | Integrity scan y garbage-collection preview sin borrado implícito | IT missing/orphan blobs | todo |
 | F2-07 | J | F2-06 | Reload/cleanup browser journey del repository | BR + no leaked URLs | todo |

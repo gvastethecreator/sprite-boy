@@ -166,6 +166,10 @@ interface AssetRepository {
 ```
 
 - SHA-256 evita duplicados accidentales y permite integrity checks.
+- `contentHash` es SHA-256 hex lowercase y `blobKey` usa `sha256:<hash>`; un
+  SHA-512 secundario guardado en IndexedDB detecta colisiones de la identidad
+  primaria antes de reutilizar bytes. Database v2 verifica y backfillea los
+  blobs v1 dentro del siguiente put atómico; nunca confía sólo en tamaño.
 - IndexedDB contiene blobs y metadata indexada por project/content hash.
 - El runtime URL manager usa reference counting y revoca al desmontar/reemplazar/cerrar proyecto.
 - Borrado sólo ocurre cuando no hay referencias o después de una cascada confirmada.
