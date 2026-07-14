@@ -80,7 +80,9 @@ export interface ProjectCommandMetadata {
   issuedAt?: ISO8601Timestamp;
 }
 
-export interface ProjectCommandEnvelope<TCommand extends ProjectCommand = ProjectCommand> {
+export interface ProjectCommandEnvelope<
+  TCommand extends ProjectDispatchCommand = ProjectDispatchCommand,
+> {
   command: TCommand;
   metadata: ProjectCommandMetadata;
 }
@@ -133,6 +135,8 @@ export interface ProjectCommandBatch {
   type: "command.batch";
   commands: ProjectCommand[];
 }
+
+export type ProjectDispatchCommand = ProjectCommand | ProjectCommandBatch;
 
 export interface ProjectSnapshotInverse {
   type: "project.restoreSnapshot";

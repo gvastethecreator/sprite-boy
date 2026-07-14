@@ -466,14 +466,26 @@ function ownedSourceBlocker(
 
 function readBatchCommands(value: unknown): unknown[] | undefined {
   if (!Array.isArray(value)) return undefined;
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+  if (
+    !lengthDescriptor ||
+    !("value" in lengthDescriptor) ||
+    !Number.isSafeInteger(lengthDescriptor.value) ||
+    lengthDescriptor.value < 0
+  ) return undefined;
+  const length = lengthDescriptor.value;
   const result: unknown[] = [];
   for (const key of Reflect.ownKeys(value)) {
     if (key === "length") continue;
-    if (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key)) return undefined;
+    if (
+      typeof key !== "string" ||
+      !/^(0|[1-9]\d*)$/.test(key) ||
+      Number(key) >= length
+    ) return undefined;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) return undefined;
   }
-  for (let index = 0; index < value.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) return undefined;
     result.push(descriptor.value);

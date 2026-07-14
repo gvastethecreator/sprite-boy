@@ -35,6 +35,7 @@ import {
 } from "./applyDestructiveCommands";
 import { analyzeProjectCommandImpact } from "./impact";
 import { PROJECT_RECORD_COLLECTIONS } from "./schema";
+import { cloneDataOnly } from "./dataBoundary";
 
 /**
  * Apply the small, non-destructive ProjectEngine command surface used by F1-03.
@@ -320,8 +321,15 @@ function clonePayload<T>(value: T, seen = new WeakMap<object, unknown>()): T {
   if (existing !== undefined) return existing as T;
 
   if (Array.isArray(value)) {
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+    if (
+      !lengthDescriptor ||
+      !("value" in lengthDescriptor) ||
+      !Number.isSafeInteger(lengthDescriptor.value) ||
+      lengthDescriptor.value < 0
+    ) throw new TypeError("Array payload length must be data-only.");
     const target: unknown[] = [];
-    target.length = value.length;
+    target.length = lengthDescriptor.value;
     seen.set(objectValue, target);
     for (const key of Reflect.ownKeys(value)) {
       if (key === "length") continue;
@@ -342,6 +350,67 @@ function clonePayload<T>(value: T, seen = new WeakMap<object, unknown>()): T {
     Object.defineProperty(target, key, descriptor);
   }
   return target as T;
+}
+
+/**
+ * Detach an external batch before impact analysis and execution. Descriptor
+ * reads avoid executing getters; the copied commands provide one stable view
+ * for the complete atomic transaction.
+ */
+function normalizeProjectCommandBatch(batch: unknown): ProjectCommandBatch | undefined {
+  try {
+    if (!isPlainRecord(batch)) return undefined;
+    const keys = Reflect.ownKeys(batch);
+    if (
+      keys.length !== 2 ||
+      keys.some((key) => typeof key !== "string" || (key !== "type" && key !== "commands"))
+    ) return undefined;
+
+    const typeDescriptor = Object.getOwnPropertyDescriptor(batch, "type");
+    const commandsDescriptor = Object.getOwnPropertyDescriptor(batch, "commands");
+    if (
+      !typeDescriptor ||
+      !("value" in typeDescriptor) ||
+      !typeDescriptor.enumerable ||
+      typeDescriptor.value !== "command.batch" ||
+      !commandsDescriptor ||
+      !("value" in commandsDescriptor) ||
+      !commandsDescriptor.enumerable ||
+      !Array.isArray(commandsDescriptor.value)
+    ) return undefined;
+
+    const source = commandsDescriptor.value;
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(source, "length");
+    if (
+      !lengthDescriptor ||
+      !("value" in lengthDescriptor) ||
+      !Number.isSafeInteger(lengthDescriptor.value) ||
+      lengthDescriptor.value < 0
+    ) return undefined;
+    const length = lengthDescriptor.value;
+    for (const key of Reflect.ownKeys(source)) {
+      if (key === "length") continue;
+      if (
+        typeof key !== "string" ||
+        !/^(0|[1-9]\d*)$/.test(key) ||
+        Number(key) >= length
+      ) return undefined;
+      const descriptor = Object.getOwnPropertyDescriptor(source, key);
+      if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) return undefined;
+    }
+
+    const commands: ProjectCommand[] = [];
+    for (let index = 0; index < length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(source, String(index));
+      if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) return undefined;
+      const command = cloneDataOnly(descriptor.value);
+      if (!command.ok) return undefined;
+      commands.push(command.value as ProjectCommand);
+    }
+    return { type: "command.batch", commands };
+  } catch {
+    return undefined;
+  }
 }
 
 function prepareCandidate(project: StudioProjectV1): StudioProjectV1 | ProjectCommandResult {
@@ -972,14 +1041,15 @@ export function applyProjectCommandBatch(
   batch: ProjectCommandBatch,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
-  const impact = analyzeProjectCommandImpact(project, batch);
+  const normalizedBatch = normalizeProjectCommandBatch(batch);
+  if (!normalizedBatch) return malformedCommand(project);
+  const impact = analyzeProjectCommandImpact(project, normalizedBatch);
   if (impact.blockers.length > 0) {
     return { ok: false, project, diagnostics: impact.blockers, impact };
   }
-  if (!Array.isArray(batch.commands)) return malformedCommand(project);
 
-  const nonRemovals = batch.commands.filter((command) => !isPureRemoveCommand(command));
-  const removals = batch.commands.filter((command) => isPureRemoveCommand(command));
+  const nonRemovals = normalizedBatch.commands.filter((command) => !isPureRemoveCommand(command));
+  const removals = normalizedBatch.commands.filter((command) => isPureRemoveCommand(command));
 
   let current = project;
   const changedIds: ChangedEntityIds = {};
