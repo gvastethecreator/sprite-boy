@@ -114,6 +114,7 @@ describe("AssetRepository contract (F2-01)", () => {
     ["NotFoundError", "ASSET_NOT_FOUND", ["relink", "retry"]],
     ["AbortError", "ASSET_TRANSACTION_ABORTED", ["retry"]],
     ["DataError", "ASSET_INVALID_INPUT", []],
+    ["DataCloneError", "ASSET_INVALID_INPUT", []],
   ] as const)("normalizes %s without exposing adapter-specific errors", (name, code, actions) => {
     const native = new Error("private adapter message");
     native.name = name;

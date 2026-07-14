@@ -1,0 +1,46 @@
+{
+  "task": "F2-02",
+  "status": "pass",
+  "origin": "http://127.0.0.1:4173/",
+  "browser": "Chromium headless via Playwright",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "screenshot": ".scratch/runtime/f2-indexeddb-browser.png",
+  "checks": {
+    "closeReopenMetadataId": "asset-a",
+    "closeReopenBlobSize": 4,
+    "recordContainsRuntimeUrl": false,
+    "projectAList": [
+      "asset-a"
+    ],
+    "projectBHashFilteredList": [
+      "asset-b"
+    ],
+    "firstSharedRemovalDeletedBlob": false,
+    "sharedBlobSizeAfterFirstRemoval": 4,
+    "lastSharedRemovalDeletedBlob": true,
+    "blobCountAfterLastRemoval": 0,
+    "atomicFailureCode": "ASSET_INVALID_INPUT",
+    "atomicFailureOperation": "put",
+    "metadataAfterAtomicFailure": [],
+    "blobCountAfterAtomicFailure": 0,
+    "abortFailureCode": "ASSET_TRANSACTION_ABORTED",
+    "abortFailureOperation": "put",
+    "metadataAfterAbortedPut": [],
+    "closeDuringPendingOpen": {
+      "outcome": "rejected",
+      "code": "ASSET_TRANSACTION_ABORTED",
+      "operation": "open"
+    },
+    "reopenAfterClose": [
+      "asset-lifecycle"
+    ],
+    "destroyStateWhileBlocked": "pending",
+    "destroyFinalState": "resolved",
+    "databaseListedAfterDestroy": false
+  },
+  "pageErrors": [],
+  "unexpectedConsoleErrors": []
+}
