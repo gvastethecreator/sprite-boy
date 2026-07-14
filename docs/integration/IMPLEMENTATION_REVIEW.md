@@ -443,7 +443,31 @@ los lotes que sí modifican producto.
   build y lint exit 0 con deuda legacy/bundle sin cambios. Lint focal estricto
   y diff check verdes. Veredicto independiente: `repair+accept`.
 
+## F3-06 — Quarantined hostile recovery report
+
+- **Estado:** `accept` después de revisión independiente `repair+accept` y
+  matriz hostile completa.
+- **Cuarentena:** el analyzer sólo recibe JSON, source, signal y un verifier de
+  assets; no tiene setter/persistence callback. El proyecto decodificado y todo
+  el report quedan deep-frozen. `canActivate` sólo es true con documento actual
+  y todos los assets sanos.
+- **Clasificación:** schema futuro, JSON/schema inválido, verifier ausente o
+  fallido, metadata/blob missing y size/hash/MIME mismatch producen disposition,
+  issue y acción deterministas sin reemplazar el activo ni esconder causa.
+- **Integridad:** status y campos `expected*` del adapter no son autoridad. Las
+  observaciones reales se comparan de nuevo con cada `AssetRecord` candidato;
+  un falso mismatch saludable no bloquea y un falso `ok` no puede ocultar bytes
+  ajenos.
+- **Reparaciones de review:** los estados no-`ok` inicialmente se confiaban y
+  podían crear falsos corruptos; la resolución nativa de un PromiseLike podía
+  asimilar un `then` hostil anidado. Ahora toda observación se reclasifica y el
+  valor resuelto se boxea antes de validar.
+- **Evidencia:** 13/13 tests focales; checkpoint 29 suites/292 tests, typecheck,
+  build y lint exit 0 con deuda legacy/bundle sin cambios. Accessors/Proxies,
+  thenables anidados, abort/listener balance, frozen graph y causa privada
+  cubiertos. Veredicto independiente final: `repair+accept`.
+
 ## Frontier pendiente de review
 
-- F3-06: recovery report para schema futuro, documento/blob corrupto y assets
-  faltantes sin reemplazar el proyecto activo.
+- F3-07: journey browser save-close-reload y export/import portable en storage
+  limpio.

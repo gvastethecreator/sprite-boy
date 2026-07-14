@@ -37,9 +37,8 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1, F2 y F3-01..F3-05 están aceptados. El frontier activo es `F3-06`
-(recovery report para schema futuro, documento/blob corrupto y assets faltantes
-sin reemplazar el proyecto activo).
+F0, B0, F1, F2 y F3-01..F3-06 están aceptados. El frontier activo es `F3-07`
+(journey browser save-close-reload y export/import portable en storage limpio).
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 

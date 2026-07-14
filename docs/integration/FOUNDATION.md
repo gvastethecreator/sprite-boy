@@ -246,6 +246,14 @@ esa transacción aborta, el checkpoint anterior y el journal sobreviven juntos.
 Al reiniciar, un journal válido descendiente del último checkpoint se expone
 como recovery candidate y nunca se sobreescribe sin commit o descarte explícito.
 
+`assessProjectRecovery` mantiene todo documento decodificado en cuarentena y no
+acepta setters ni callbacks del proyecto activo. Schema futuro, JSON/schema
+inválido, verifier ausente/fallido y cada estado missing/corrupt producen un
+report congelado con disposition, issues y acciones explícitas; sólo un
+candidato con todos sus blobs verificados puede declarar `canActivate: true`.
+Las observaciones binarias se recalculan contra el `AssetRecord` candidato: el
+status o metadata declarados por un adapter nunca se toman como verdad.
+
 Formato de trabajo:
 
 - Autosave: documento JSON versionado + blobs deduplicados en IndexedDB.
