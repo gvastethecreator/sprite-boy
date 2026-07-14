@@ -25,6 +25,7 @@ export type AssetRepositoryOperation =
   | "get-blob"
   | "list"
   | "verify"
+  | "scan-integrity"
   | "remove"
   | "export"
   | "create-url"
@@ -262,6 +263,52 @@ export type AssetIntegrity =
   | (AssetIntegrityIdentity & AssetIntegrityObserved & { status: "hash-mismatch" })
   | (AssetIntegrityIdentity & AssetIntegrityObserved & { status: "mime-mismatch" });
 
+export type AssetStorageIntegrityIssueCode =
+  | "metadata-envelope-invalid"
+  | "metadata-duplicate"
+  | "blob-envelope-invalid"
+  | "blob-duplicate"
+  | "blob-identity-missing";
+
+/** Corruption in the IndexedDB envelope that cannot be represented as one asset check. */
+export interface AssetStorageIntegrityIssue {
+  code: AssetStorageIntegrityIssueCode;
+  assetId?: EntityId;
+  blobKey?: string;
+}
+
+/** A global blob with no metadata references in any project at snapshot time. */
+export interface AssetGarbageCollectionCandidate {
+  blobKey: string;
+  byteSize: number;
+  contentHash?: string;
+  reason: "unreferenced";
+}
+
+export interface AssetGarbageCollectionPreview {
+  mode: "preview";
+  candidates: readonly AssetGarbageCollectionCandidate[];
+  reclaimableBytes: number;
+}
+
+export interface AssetIntegrityScanSummary {
+  assetCount: number;
+  okCount: number;
+  assetIssueCount: number;
+  storageIssueCount: number;
+  orphanBlobCount: number;
+  reclaimableBytes: number;
+}
+
+/** Deterministic, read-only health report from one consistent storage snapshot. */
+export interface AssetIntegrityScan {
+  projectId: EntityId;
+  assets: readonly AssetIntegrity[];
+  storageIssues: readonly AssetStorageIntegrityIssue[];
+  garbageCollection: AssetGarbageCollectionPreview;
+  summary: AssetIntegrityScanSummary;
+}
+
 /**
  * Project-scoped durable binary boundary. Runtime URL leases never enter the
  * returned AssetRecord or the canonical project document.
@@ -277,6 +324,7 @@ export interface AssetRepository {
   getBlob(assetId: EntityId, options?: AssetOperationOptions): Promise<Blob>;
   list(options?: AssetListOptions): Promise<readonly AssetRecord[]>;
   verify(assetId: EntityId, options?: AssetOperationOptions): Promise<AssetIntegrity>;
+  scanIntegrity(options?: AssetOperationOptions): Promise<AssetIntegrityScan>;
   remove(
     assetId: EntityId,
     policy: AssetRemovalPolicy,

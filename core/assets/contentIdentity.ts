@@ -52,6 +52,40 @@ function defaultDigest(): AssetDigest | null {
   }
 }
 
+export interface NativeAssetBlobView {
+  blob: Blob;
+  byteSize: number;
+  mimeType: string;
+}
+
+/** Brand-check a Blob through native accessors without consulting user properties. */
+export function inspectNativeAssetBlob(value: unknown): NativeAssetBlobView | undefined {
+  if (value === null || typeof value !== "object" || typeof Blob === "undefined") {
+    return undefined;
+  }
+  try {
+    const sizeGetter = Object.getOwnPropertyDescriptor(Blob.prototype, "size")?.get;
+    const typeGetter = Object.getOwnPropertyDescriptor(Blob.prototype, "type")?.get;
+    const sliceMethod = Object.getOwnPropertyDescriptor(Blob.prototype, "slice")?.value;
+    if (!sizeGetter || !typeGetter || typeof sliceMethod !== "function") return undefined;
+    const byteSize = Reflect.apply(sizeGetter, value, []) as unknown;
+    const mimeType = Reflect.apply(typeGetter, value, []) as unknown;
+    if (!Number.isSafeInteger(byteSize) || (byteSize as number) < 0 || typeof mimeType !== "string") {
+      return undefined;
+    }
+    const normalized = Reflect.apply(
+      sliceMethod,
+      value,
+      [0, byteSize as number, mimeType],
+    ) as unknown;
+    const normalizedSize = Reflect.apply(sizeGetter, normalized, []) as unknown;
+    if (normalizedSize !== byteSize) return undefined;
+    return { blob: normalized as Blob, byteSize: byteSize as number, mimeType };
+  } catch {
+    return undefined;
+  }
+}
+
 function bytesToHex(buffer: unknown, expectedBytes: number): string {
   let byteLength: number | undefined;
   try {
@@ -95,7 +129,8 @@ export async function computeAssetContentIdentity(
   blob: Blob,
   options: AssetContentIdentityOptions = {},
 ): Promise<AssetContentIdentity> {
-  if (!(blob instanceof Blob)) {
+  const nativeBlob = inspectNativeAssetBlob(blob);
+  if (!nativeBlob) {
     throw new AssetRepositoryError(
       "ASSET_INVALID_INPUT",
       "Asset content identity requires a Blob.",
@@ -114,7 +149,13 @@ export async function computeAssetContentIdentity(
 
   let bytes: ArrayBuffer;
   try {
-    bytes = await awaitAbortableAssetOperation(blob.arrayBuffer(), options, "verify");
+    const arrayBufferMethod = Object.getOwnPropertyDescriptor(Blob.prototype, "arrayBuffer")?.value;
+    if (typeof arrayBufferMethod !== "function") throw new TypeError("Blob.arrayBuffer is unavailable.");
+    bytes = await awaitAbortableAssetOperation(
+      Reflect.apply(arrayBufferMethod, nativeBlob.blob, []) as Promise<ArrayBuffer>,
+      options,
+      "verify",
+    );
   } catch (cause) {
     throwIfHashingAborted(options.signal);
     throw new AssetRepositoryError(
@@ -151,7 +192,7 @@ export async function computeAssetContentIdentity(
     contentHash,
     blobKey: `${ASSET_BLOB_KEY_PREFIX}${contentHash}`,
     verificationHash: bytesToHex(verification, 64),
-    byteSize: blob.size,
+    byteSize: nativeBlob.byteSize,
   });
 }
 
@@ -217,16 +258,20 @@ export function assertAssetRecordContentIdentity(
   operation: AssetRepositoryOperation = "put",
 ): void {
   const context = { operation, assetId: record.id } satisfies IdentityErrorContext;
+  const nativeBlob = inspectNativeAssetBlob(blob);
+  if (!nativeBlob) {
+    throw integrityMismatch("Asset payload is not a readable native Blob.", context);
+  }
   if (record.contentHash !== identity.contentHash) {
     throw integrityMismatch("Asset metadata contentHash does not match the payload.", context);
   }
   if (record.blobKey !== identity.blobKey) {
     throw integrityMismatch("Asset metadata blobKey does not match the payload.", context);
   }
-  if (record.byteSize !== identity.byteSize || record.byteSize !== blob.size) {
+  if (record.byteSize !== identity.byteSize || record.byteSize !== nativeBlob.byteSize) {
     throw integrityMismatch("Asset metadata byteSize does not match the payload.", context);
   }
-  if (record.mimeType !== blob.type) {
+  if (record.mimeType !== nativeBlob.mimeType) {
     throw integrityMismatch("Asset metadata mimeType does not match the payload.", context);
   }
 }

@@ -69,6 +69,12 @@ export interface AssetStoragePutResult {
   removedPreviousBlob: boolean;
 }
 
+/** Raw entries captured together by one readonly transaction for health analysis. */
+export interface AssetStorageInventory {
+  metadataEntries: readonly StoredAssetMetadataEntry[];
+  blobEntries: readonly StoredAssetBlobEntry[];
+}
+
 interface TransactionMonitor<T> {
   promise: Promise<T>;
   setResult(value: T): void;
@@ -740,6 +746,60 @@ export class IndexedDbAssetStorage {
         .sort((left, right) => left.id.localeCompare(right.id)));
     };
     return monitor.promise;
+  }
+
+  async inspect(options?: AssetOperationOptions): Promise<AssetStorageInventory> {
+    throwIfAborted(options, "scan-integrity");
+    const database = await this.getDatabase();
+    throwIfAborted(options, "scan-integrity");
+    const transaction = createTransaction(
+      database,
+      [ASSET_METADATA_STORE, ASSET_BLOB_STORE],
+      "readonly",
+      "scan-integrity",
+    );
+    const monitor = monitorTransaction<AssetStorageInventory | undefined>(
+      transaction,
+      "scan-integrity",
+      undefined,
+      options,
+      undefined,
+    );
+    let metadataRequest: IDBRequest<unknown[]>;
+    let blobRequest: IDBRequest<unknown[]>;
+    try {
+      metadataRequest = transaction.objectStore(ASSET_METADATA_STORE).getAll();
+      blobRequest = transaction.objectStore(ASSET_BLOB_STORE).getAll();
+    } catch (error) {
+      monitor.fail(structuralStorageError("scan-integrity", error));
+      return await monitor.promise as AssetStorageInventory;
+    }
+    let metadataReady = false;
+    let blobsReady = false;
+    const settleInventory = (): void => {
+      if (!metadataReady || !blobsReady) return;
+      monitor.setResult({
+        metadataEntries: metadataRequest.result as StoredAssetMetadataEntry[],
+        blobEntries: blobRequest.result as StoredAssetBlobEntry[],
+      });
+    };
+    metadataRequest.onsuccess = () => {
+      metadataReady = true;
+      settleInventory();
+    };
+    blobRequest.onsuccess = () => {
+      blobsReady = true;
+      settleInventory();
+    };
+    const result = await monitor.promise;
+    if (!result) {
+      throw new AssetRepositoryError(
+        "ASSET_STORAGE_UNAVAILABLE",
+        "Asset integrity snapshot completed without an inventory.",
+        { operation: "scan-integrity" },
+      );
+    }
+    return result;
   }
 
   async remove(
