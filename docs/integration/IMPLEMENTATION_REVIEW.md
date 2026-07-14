@@ -419,7 +419,31 @@ los lotes que sí modifican producto.
   focal `--deny-warnings` y `git diff --check` verdes. Veredicto independiente:
   `repair+accept`.
 
+## F3-05 — Autosave journal and atomic recovery candidate
+
+- **Estado:** `accept` después de revisión independiente `repair+accept` y
+  checkpoint acumulado verde.
+- **Contrato:** cada proyecto conserva un checkpoint confirmado y como máximo
+  un journal pendiente con revision, base checkpoint, JSON canónico, SHA-256 y
+  bytes. Otro autosave no puede pisar un recovery candidate sin commit o
+  descarte explícito.
+- **Atomicidad:** stage usa compare-and-write contra el checkpoint observado.
+  Commit relee base+journal y escribe checkpoint+borrado dentro de una única
+  transacción IndexedDB `readwrite`; stale writers fallan tipados.
+- **Crash/recovery:** un fallo antes o durante commit deja intacto el último
+  checkpoint y preserva el journal. Inspect verifica hash/bytes, codec y
+  re-encode canónico antes de exponerlo como recovery candidate; nunca reemplaza
+  el proyecto UI activo.
+- **Reparaciones de review:** `QuotaExceededError` nativo se mapea sin ejecutar
+  accessors; apertura IDB no cooperativa compite con abort y limpia listeners;
+  options del adapter y resultados Promise-like son descriptor-safe; JSON
+  válido pero no canónico ya no pasa integridad.
+- **Evidencia:** 10/10 tests focales, incluido mock IDB con rollback de
+  checkpoint+delete ante quota; checkpoint 28 suites/279 tests, typecheck,
+  build y lint exit 0 con deuda legacy/bundle sin cambios. Lint focal estricto
+  y diff check verdes. Veredicto independiente: `repair+accept`.
+
 ## Frontier pendiente de review
 
-- F3-05: autosave journal, checkpoint atómico y recovery candidate ante crash
-  o escritura parcial.
+- F3-06: recovery report para schema futuro, documento/blob corrupto y assets
+  faltantes sin reemplazar el proyecto activo.

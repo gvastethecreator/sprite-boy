@@ -238,6 +238,14 @@ verifica documento y blobs por tamaño/hash y recién entonces entrega un batch
 para persistir. Una importación incompleta o abortada no modifica storage ni el
 proyecto activo.
 
+El autosave mantiene por proyecto un checkpoint confirmado y, como máximo, un
+journal pendiente. Stage codifica con `ProjectCodec`, registra SHA-256/bytes y
+la identidad exacta del checkpoint base mediante compare-and-write. Commit
+promueve el journal y lo elimina dentro de una sola transacción IndexedDB; si
+esa transacción aborta, el checkpoint anterior y el journal sobreviven juntos.
+Al reiniciar, un journal válido descendiente del último checkpoint se expone
+como recovery candidate y nunca se sobreescribe sin commit o descarte explícito.
+
 Formato de trabajo:
 
 - Autosave: documento JSON versionado + blobs deduplicados en IndexedDB.
