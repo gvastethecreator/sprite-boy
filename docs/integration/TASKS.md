@@ -37,8 +37,8 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1, F2 y F3-01 están aceptados. El frontier activo es `F3-02`
-(interface de migrator por pasos ordenados y migration report tipado).
+F0, B0, F1, F2, F3-01 y F3-02 están aceptados. El frontier activo es `F3-03`
+(migración determinista del fixture legacy real al V1 con validación canónica).
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
 de Foundation.
 

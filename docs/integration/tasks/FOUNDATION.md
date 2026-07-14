@@ -39,8 +39,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F2-06 | J | F2-05 | Integrity scan y garbage-collection preview sin borrado implícito | IT missing/orphan blobs | done |
 | F2-07 | J | F2-06 | Reload/cleanup browser journey del repository | BR + no leaked URLs | done |
 | F3-01 | J | F1-08,F2-07 | `ProjectCodec` encode/decode con version dispatch | RT V1 exactness | done |
-| F3-02 | J | F3-01 | Migrator step interface y migration report tipado | MIG ordered steps | active |
-| F3-03 | J | F3-02 | Migración del fixture legacy real al V1 | MIG + invariant validation | todo |
+| F3-02 | J | F3-01 | Migrator step interface y migration report tipado | MIG ordered steps | done |
+| F3-03 | J | F3-02 | Migración del fixture legacy real al V1 | MIG + invariant validation | active |
 | F3-04 | E | F3-01,F2-07 | Package `.spriteboy` document+blobs import/export | ART unzip/hash + REV | todo |
 | F3-05 | J | F3-03,F3-04 | Autosave journal, atomic checkpoint y recovery candidate | IT crash/partial write | todo |
 | F3-06 | J | F3-05 | Future/corrupt/missing-asset recovery report sin pisar activo | MIG hostile fixture matrix | todo |

@@ -214,6 +214,14 @@ canónico. Accessors, `toJSON`, ciclos, runtime URLs, non-finite/negative-zero y
 Proxy revocado quedan detrás de `ProjectCodecError`; el diagnostic público no
 expone la causa del parser/runtime.
 
+`ProjectMigrator` preflighta la ruta completa antes de ejecutar, encadena pasos
+contiguos `N→N+1` sobre copias data-only congeladas y agrega un report estable
+con `change`, `warning`, `loss`, `needs-relink` y `ambiguity`. Un paso con datos
+no resueltos devuelve `needs-input` sin aplicar el paso pendiente; abort, fallos
+del step y violaciones del contrato cruzan la frontera como errores tipados.
+Accessors, arrays no enumerables, thenables hostiles y mutación del input quedan
+contenidos sin ejecutar código implícito ni convertir pérdida en éxito.
+
 Formato de trabajo:
 
 - Autosave: documento JSON versionado + blobs deduplicados en IndexedDB.

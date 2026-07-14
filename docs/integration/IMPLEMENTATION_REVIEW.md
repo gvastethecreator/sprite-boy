@@ -347,6 +347,30 @@ los lotes que sí modifican producto.
   build y lint exit 0 con deuda legacy/bundle sin cambios. Veredicto
   independiente final: `accept`.
 
+## F3-02 — Ordered migrator and typed migration report
+
+- **Estado:** `accept` después de revisión independiente `repair` sobre dos
+  límites hostiles reproducidos.
+- **Orden/atomicidad:** el constructor exige IDs/source versions únicos y pasos
+  contiguos. `migrate` preflighta la ruta completa antes de invocar un paso,
+  entrega a cada uno una copia data-only congelada y conserva el último
+  documento aplicado si el siguiente queda `needs-input`.
+- **Report:** `unchanged | migrated | needs-input`, versiones source/target/
+  reached, pasos applied/pending e issues discriminados `change`, `warning`,
+  `loss`, `needs-relink` y `ambiguity`. Un completed no admite blockers y un
+  needs-input exige al menos uno.
+- **Frontera hostil:** requests/resultados se leen por descriptors; ciclos,
+  accessors, arrays sparse/no-enumerables, símbolos, prototypes runtime y
+  Proxies se contienen como errores tipados. Abort compite con pasos async no
+  cooperativos y los diagnostics no exponen la causa privada.
+- **Reparación de review:** índices no enumerables se clonaban como visibles y
+  la asimilación Promise podía ejecutar un getter `then` antes del validator.
+  El clonado ahora preserva semántica data-only y la adopción de PromiseLike
+  sólo acepta métodos `then` obtenidos por descriptor, sin ejecutar accessors.
+- **Evidencia:** 14/14 tests del migrator; checkpoint 25 suites/249 tests,
+  typecheck, build y lint exit 0 con las mismas 144 warnings legacy y warning
+  de bundle. Veredicto independiente final: `repair+accept`.
+
 ## Frontier pendiente de review
 
-- F3-02: migrator step interface y migration report tipado.
+- F3-03: migración del fixture legacy real al V1 con invariant validation.
