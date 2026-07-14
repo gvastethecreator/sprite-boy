@@ -612,8 +612,30 @@ los lotes que sí modifican producto.
   ambos archivos pasaron 20/20 con un worker y la repetición unificada con tres
   workers cerró verde. El warning de chunk >500 kB continúa como baseline.
 
+## F5-02 — Shared scene compositor
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Semántica:** ADR-002 fija `layerIds` bottom-to-top, x/y de layer como centro,
+  transform afín translate/rotate/scale+flip/origin, y pivot de cel colocado en
+  centro de canvas más offset. El background queda fijo al canvas.
+- **Pipeline:** `createSceneDrawPlan` produce operaciones JSON-safe, copiadas y
+  frozen; `compositeScene` resuelve assets únicos antes de `beginFrame`, dibuja
+  en orden y devuelve error estable sin éxito parcial. Viewport/UI/playback no
+  entran en el plan.
+- **Canvas:** el target lógico limpia, normaliza alpha/composite/filter/shadow,
+  aplica crop/matriz/opacity/sampling y restaura el estado externo incluso ante
+  throw. DPR/resize/base viewport quedan explícitamente para F5-06.
+- **Repair de review:** `abortFrame` era opcional y permitía que un target
+  fallido retuviera estado/output parcial. Ahora es obligatorio (no-op para
+  targets stateless) y draw/end failures prueban rollback exacto.
+- **Evidencia:** 30/30 focales con pixel goldens de cinco roots, crop, painter
+  order, flip, rotation, pivot, alpha y background; suite acumulada 39/39
+  archivos y 373/373 tests; typecheck, lint focal `--deny-warnings`, build y
+  diff-check verdes. Warning chunk >500 kB permanece como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F5-02: autorizado por F5-01 para implementar el compositor compartido.
+- F5-03/F5-04/F5-05: autorizados por F5-02; scheduler y adapters deben consumir
+  el mismo draw plan/compositor sin bifurcar pixels.
