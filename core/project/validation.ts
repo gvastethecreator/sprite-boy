@@ -140,6 +140,8 @@ function inspectJson(value: unknown, path: string, diagnostics: ProjectDiagnosti
     case "number":
       if (!Number.isFinite(value)) {
         push(diagnostics, "INVALID_NUMBER", path, "Numbers must be finite.");
+      } else if (Object.is(value, -0)) {
+        push(diagnostics, "INVALID_NUMBER", path, "Negative zero is not a canonical JSON number.");
       }
       return;
     case "boolean":
