@@ -150,13 +150,18 @@ Contrato requerido:
 
 ```ts
 interface AssetRepository {
-  put(blob: Blob, metadata: AssetMetadata): Promise<AssetRecord>;
-  getBlob(assetId: EntityId): Promise<Blob>;
-  createRuntimeUrl(assetId: EntityId, owner: object): Promise<string>;
+  readonly projectId: EntityId;
+  put(blob: Blob, metadata: AssetMetadata, options?: AssetOperationOptions): Promise<AssetRecord>;
+  getMetadata(assetId: EntityId, options?: AssetOperationOptions): Promise<AssetRecord>;
+  getBlob(assetId: EntityId, options?: AssetOperationOptions): Promise<Blob>;
+  list(options?: AssetListOptions): Promise<readonly AssetRecord[]>;
+  verify(assetId: EntityId, options?: AssetOperationOptions): Promise<AssetIntegrity>;
+  remove(assetId: EntityId, policy: AssetRemovalPolicy, options?: AssetOperationOptions): Promise<void>;
+  exportMany(assetIds: readonly EntityId[], options?: AssetOperationOptions): AsyncIterable<AssetPayload>;
+  createRuntimeUrl(assetId: EntityId, owner: object, options?: AssetOperationOptions): Promise<string>;
   releaseRuntimeUrl(assetId: EntityId, owner: object): void;
-  remove(assetId: EntityId, policy: RemovalPolicy): Promise<void>;
-  exportMany(assetIds: EntityId[]): AsyncIterable<AssetPayload>;
-  verify(assetId: EntityId): Promise<AssetIntegrity>;
+  releaseOwner(owner: object): void;
+  dispose(): void;
 }
 ```
 
@@ -166,6 +171,9 @@ interface AssetRepository {
 - Borrado sólo ocurre cuando no hay referencias o después de una cascada confirmada.
 - Importación valida MIME real, dimensiones, límites y decode; filename no basta.
 - Una cuota insuficiente produce error recuperable y ofrece exportar/limpiar/reintentar.
+- Not-found, blob-missing, integrity, quota, invalid-input, storage, abort y
+  lease-conflict cruzan la frontera como `AssetRepositoryError` tipado; nunca
+  como strings del adapter. Los diagnostics no serializan la causa privada.
 
 ## ProjectCodec y paquetes
 

@@ -171,6 +171,21 @@ los lotes que sí modifican producto.
   IDs deliberadamente fuera de orden. El reviewer verificó además IDs hostiles
   como `__proto__`, owners de colisión remapeados y rollback exacto.
 
+## F2-01 — AssetRepository boundary and recoverable errors
+
+- **Estado:** `accept` después de reparar la lectura de `DOMException` nativa.
+- **Contrato:** repositorio scoped por proyecto, metadata/blob separados,
+  list/verify/remove/export, abort signals y leases de Object URL con
+  `releaseOwner`/`dispose` fuera del documento durable.
+- **Errores:** ocho códigos estables para not-found, blob-missing, integrity,
+  quota, invalid-input, storage, abort y lease-conflict; recovery actions
+  explícitas y diagnostic seguro sin `cause` privada.
+- **Evidencia:** 8/8 tests, typecheck y lint focal verdes. La revisión reprodujo
+  DOMException quota/not-found/abort/data, getter override con cero lecturas y
+  Proxy contenido como storage-unavailable.
+- **Decisión:** F2-02 implementa storage IndexedDB; hashing/content identity y
+  URL refcount permanecen en F2-03/F2-04 para no mezclar responsabilidades.
+
 ## Frontier pendiente de review
 
-- F2-01: contrato AssetRepository y taxonomía de errores.
+- F2-02: adapter IndexedDB metadata/blob.
