@@ -67,8 +67,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F6-03 | E | F6-01 | Shell layout/header/nav usando registry | BR navigation + REV | done |
 | F6-04 | E | F6-03 | Panel/modal primitives, focus contract y compact layout | A11Y + viewport proof + REV | done |
 | F6-05 | J | F6-02,F6-04 | Empty/error/loading states de cinco workspaces | BR + A11Y | done |
-| F6-06 | J | F6-05 | W2 shell gate: keyboard, no unreachable mode, no inert command | J9 + REV | active |
-| F7-01 | J | F1-08,F4-06 | Typed Job lifecycle/progress/cancel/retry/timeout contracts | State-machine UT | todo |
+| F6-06 | J | F6-05 | W2 shell gate: keyboard, no unreachable mode, no inert command | J9 + REV | done |
+| F7-01 | J | F1-08,F4-06 | Typed Job lifecycle/progress/cancel/retry/timeout contracts | State-machine UT | active |
 | F7-02 | J | F7-01 | Worker/job runner con abort y late-write suppression | IT cancel/crash/timeout | todo |
 | F7-03 | J | F7-02 | Job Center store/selectors and retention policy | UT state isolation | todo |
 | F7-04 | E | F7-03,F6-04 | Job Center UI con progress/cancel/retry/errors | BR/A11Y + REV | todo |

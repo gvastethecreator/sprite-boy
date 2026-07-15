@@ -219,8 +219,8 @@ const AppLayout: React.FC = () => {
   }, [activeWorkspace, commandContext, commandRegistry, showToast]);
 
   useKeyboardShortcuts({
-    undo,
-    redo,
+    registry: commandRegistry,
+    executeStudioCommand: executeCommand,
     deleteSelection: handleDeleteSelection,
     nudge: (dx: number, dy: number) => {
       if (selectedIndex !== null)
@@ -229,19 +229,12 @@ const AppLayout: React.FC = () => {
           y: frames[selectedIndex].y + dy,
         });
     },
-    copyHitboxes: () => {},
-    pasteHitboxes: () => {},
     togglePlay: () => setIsPlaying(!isPlaying),
     stepFrame: handleStepFrame,
-    toggleCommandPalette: () => setIsCommandPaletteOpen(!isCommandPaletteOpen),
-    resetView: () => canvasRef.current?.resetView(),
     closeModals: () => {
       setCompactPanel(null);
       controller.closeAllModals();
     },
-    currentMode,
-    canUndo,
-    canRedo,
     isModalOpen:
       isSettingsOpen ||
       isHelpOpen ||

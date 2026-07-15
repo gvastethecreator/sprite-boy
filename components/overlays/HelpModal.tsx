@@ -1,13 +1,15 @@
 import React from "react";
 import { X, Keyboard, Command } from "lucide-react";
+import { STUDIO_COMMANDS } from "../../core/studio";
 import { StudioDialog } from "../studio/StudioDialog";
+import { studioShortcutTokens } from "../studio/shortcutPresentation";
 
 interface HelpModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const ShortcutRow = ({ keys, desc }: { keys: string[]; desc: string }) => (
+const ShortcutRow = ({ keys, desc }: { keys: readonly string[]; desc: string }) => (
   <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
     <span className="text-sm text-textMain">{desc}</span>
     <div className="flex gap-1">
@@ -22,6 +24,14 @@ const ShortcutRow = ({ keys, desc }: { keys: string[]; desc: string }) => (
     </div>
   </div>
 );
+
+const STUDIO_SHORTCUT_ROWS = Object.freeze(STUDIO_COMMANDS.flatMap((command) =>
+  command.shortcuts.map((shortcut, index) => Object.freeze({
+    id: `${command.id}-${index}`,
+    keys: studioShortcutTokens(shortcut),
+    description: index === 0 ? command.label : `${command.label} (alternate)`,
+  })),
+));
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   return (
@@ -48,21 +58,27 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
 
         <div className="p-6 overflow-y-auto max-h-[70vh] custom-scrollbar bg-app">
           <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Command size={12} /> Studio commands
+          </h3>
+          <div className="mb-6 space-y-1">
+            {STUDIO_SHORTCUT_ROWS.map((row) => (
+              <ShortcutRow key={row.id} keys={row.keys} desc={row.description} />
+            ))}
+          </div>
+
+          <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
             <Command size={12} /> Canvas & Navigation
           </h3>
           <div className="mb-6 space-y-1">
             <ShortcutRow keys={["Space + Drag"]} desc="Pan View" />
             <ShortcutRow keys={["Wheel"]} desc="Scroll Vertical" />
-            <ShortcutRow keys={["Ctrl", "Wheel"]} desc="Zoom In / Out" />
-            <ShortcutRow keys={["Ctrl", "0"]} desc="Reset View" />
+            <ShortcutRow keys={["Ctrl/Cmd", "Wheel"]} desc="Zoom In / Out" />
           </div>
 
           <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
             <Command size={12} /> Editing
           </h3>
           <div className="mb-6 space-y-1">
-            <ShortcutRow keys={["Ctrl", "Z"]} desc="Undo" />
-            <ShortcutRow keys={["Ctrl", "Y"]} desc="Redo" />
             <ShortcutRow keys={["Delete"]} desc="Delete Selection" />
             <ShortcutRow keys={["Arrows"]} desc="Nudge Selection (1px)" />
             <ShortcutRow keys={["Shift", "Arrows"]} desc="Nudge Selection (10px)" />
@@ -76,13 +92,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             <ShortcutRow keys={["←", "→"]} desc="Prev / Next Frame" />
           </div>
 
-          <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Command size={12} /> Hitboxes
-          </h3>
-          <div className="space-y-1">
-            <ShortcutRow keys={["Ctrl", "C"]} desc="Copy Hitboxes (from frame)" />
-            <ShortcutRow keys={["Ctrl", "V"]} desc="Paste Hitboxes (to frame)" />
-          </div>
         </div>
 
         <div className="p-4 bg-panel border-t border-border flex justify-center text-[10px] text-textMuted">

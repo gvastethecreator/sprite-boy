@@ -212,4 +212,40 @@ describe("executable Studio command registry", () => {
     expect(() => registry.getCommand("future.command" as StudioCommandId))
       .toThrow(/Unknown Studio command/);
   });
+
+  it("matches keyboard codes across Ctrl/Cmd with exact modifiers", () => {
+    const registry = createStudioCommandRegistry(handlers());
+    const input = {
+      code: "Digit4",
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      editable: false,
+    };
+
+    expect(registry.findByKeyboardInput(input)?.id).toBe("workspace.open.collision");
+    expect(registry.findByKeyboardInput({ ...input, ctrlKey: false, metaKey: true })?.id)
+      .toBe("workspace.open.collision");
+    expect(registry.findByKeyboardInput({ ...input, altKey: true })).toBeNull();
+    expect(registry.findByKeyboardInput({ ...input, code: "" })).toBeNull();
+    expect(registry.findByKeyboardInput({ ...input, code: "KeyZ", shiftKey: true })?.id)
+      .toBe("edit.redo");
+  });
+
+  it("honors editable shortcut policy without key-label assumptions", () => {
+    const registry = createStudioCommandRegistry(handlers());
+    const editableInput = {
+      code: "KeyS",
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      editable: true,
+    };
+
+    expect(registry.findByKeyboardInput(editableInput)).toBeNull();
+    expect(registry.findByKeyboardInput({ ...editableInput, code: "KeyK" })?.id)
+      .toBe("app.openCommandPalette");
+  });
 });

@@ -9,15 +9,12 @@ import {
   PlusSquare,
   Layers,
   Film,
-  Box,
   CheckCircle2,
   Sparkles,
-  BrainCircuit,
 } from "lucide-react";
 import SlicerTools from "../panels/left/SlicerTools";
 import BgRemovalTool from "../panels/left/BgRemovalTool";
 import AnimationList from "../panels/left/AnimationList";
-import AssetLibrary from "../panels/left/AssetLibrary";
 import GenerationPanel from "../panels/right/GenerationPanel";
 import NumberControl from "../common/NumberControl";
 import { useProject } from "../../contexts/ProjectContext";
@@ -141,7 +138,9 @@ const ViewTools: React.FC = () => {
 
       <div className="p-4 bg-surface/50 border-t border-white/10 backdrop-blur-md">
         <button
-          onClick={() => {}}
+          type="button"
+          data-studio-action="export-snapshot"
+          onClick={() => setExportModal({ isOpen: true, type: "png" })}
           className="w-full py-4 bg-accent hover:bg-accentHover text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-glow active:scale-95 transition-all"
         >
           <Camera size={18} /> Download Snapshot (PNG)

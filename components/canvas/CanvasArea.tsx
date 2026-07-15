@@ -1,5 +1,5 @@
 import React, { useRef, useLayoutEffect, forwardRef, useImperativeHandle } from "react";
-import { AppMode, CanvasHandle, DragMode } from "../../types";
+import { AppMode, CanvasHandle } from "../../types";
 import { Upload, Plus, Maximize2, Monitor } from "lucide-react";
 import { CanvasRenderer } from "../../utils/renderUtils";
 import { ASPECT_RATIOS } from "./CanvasToolbar";
@@ -42,19 +42,14 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
     loadingMessage,
     isEyedropperActive,
     setEyedropperColor: onPickColor,
-    isMagicWandActive,
-    wandTolerance: magicWandTolerance,
     handleUpdateFrame: onUpdateFrame,
     handleUpdateFrameEphemeral: onUpdateFrameEphemeral,
-    handleAddFrame: onAddFrame,
     handleSwapSlots: onSwapSlots,
     viewport,
     setViewport,
     currentAspectRatio,
     handleSetAspectRatio: onSetAspectRatio,
     preferences,
-    handleMagicWandSelect: onMagicWandSelect,
-    handleDeleteSelection: onDeleteSelection,
   } = useProject();
 
   const activeAnimation = activeAnimationId
@@ -68,7 +63,9 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
   const localInputRef = useRef<HTMLInputElement>(null);
 
   // --- Extracted hooks ---
-  const { isSpacePressed, modifiers } = useCanvasKeyboard();
+  const { isSpacePressed, modifiers } = useCanvasKeyboard({
+    spacePanEnabled: !activeAnimationId,
+  });
   const { initW, setInitW, initH, setInitH, initRatio, handleRatioSelect } = useInitCanvasForm();
   const slicerImgObj = useImageLoader(imageMeta);
   const assetCache = useAssetCache(builderAssets);
@@ -271,7 +268,13 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
         style={{ cursor: mouse.getCursor() }}
-        onMouseDown={mouse.handleMouseDown}
+        onMouseDown={(event) => {
+          const workspaceContent = event.currentTarget.closest("[data-studio-workspace-content]");
+          if (workspaceContent instanceof HTMLElement) {
+            workspaceContent.focus({ preventScroll: true });
+          }
+          mouse.handleMouseDown(event);
+        }}
         onMouseMove={mouse.handleMouseMove}
         onMouseUp={mouse.handleMouseUp}
         onMouseLeave={mouse.handleMouseUp}

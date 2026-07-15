@@ -43,6 +43,16 @@ export interface StudioShortcut {
   readonly editable: StudioShortcutEditablePolicy;
 }
 
+export interface StudioKeyboardInput {
+  /** Locale-independent event code. `key` is intentionally not part of this contract. */
+  readonly code: string;
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly altKey: boolean;
+  readonly shiftKey: boolean;
+  readonly editable: boolean;
+}
+
 export interface CreateStudioShortcutOptions {
   readonly primary?: boolean;
   readonly alt?: boolean;
@@ -398,6 +408,7 @@ export interface StudioCommandRegistry {
   getCommand(commandId: StudioCommandId): StudioCommand;
   getState(commandId: StudioCommandId, context: StudioCommandContext): StudioCommandState;
   findByShortcut(shortcut: StudioShortcut): StudioCommand | null;
+  findByKeyboardInput(input: StudioKeyboardInput): StudioCommand | null;
   execute(
     commandId: StudioCommandId,
     context: StudioCommandContext,
@@ -410,6 +421,30 @@ for (const command of STUDIO_COMMANDS) {
   for (const shortcut of command.shortcuts) {
     COMMAND_BY_SHORTCUT.set(studioShortcutSignature(shortcut), command);
   }
+}
+
+function keyboardInputSignature(input: StudioKeyboardInput): string | null {
+  if (typeof input.code !== "string" || !/^[A-Za-z][A-Za-z0-9]*$/.test(input.code)) {
+    return null;
+  }
+  const modifiers: StudioShortcutModifier[] = [];
+  if (input.ctrlKey || input.metaKey) modifiers.push("primary");
+  if (input.altKey) modifiers.push("alt");
+  if (input.shiftKey) modifiers.push("shift");
+  return [...modifiers, input.code].join("+");
+}
+
+function findKeyboardCommand(input: StudioKeyboardInput): StudioCommand | null {
+  const signature = keyboardInputSignature(input);
+  if (!signature) return null;
+  const command = COMMAND_BY_SHORTCUT.get(signature);
+  if (!command) return null;
+  const matchedShortcut = command.shortcuts.find(
+    (shortcut) => studioShortcutSignature(shortcut) === signature,
+  );
+  if (!matchedShortcut) return null;
+  if (input.editable && matchedShortcut.editable !== "always") return null;
+  return command;
 }
 
 function requireCommand(commandId: StudioCommandId): StudioCommand {
@@ -462,6 +497,9 @@ export function createStudioCommandRegistry(
     },
     findByShortcut(shortcut: StudioShortcut): StudioCommand | null {
       return COMMAND_BY_SHORTCUT.get(studioShortcutSignature(shortcut)) ?? null;
+    },
+    findByKeyboardInput(input: StudioKeyboardInput): StudioCommand | null {
+      return findKeyboardCommand(input);
     },
     async execute(
       commandId: StudioCommandId,

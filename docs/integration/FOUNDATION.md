@@ -499,6 +499,19 @@ El gate aceptado suma 15/15 tests focales, 57/57 acumulados de F6, typecheck,
 lint estricto, build y Chrome productivo sobre las cinco rutas, empty→ready,
 recovery con foco nombrado, page fit y cero errores/excepciones.
 
+F6-06 conecta `KeyboardEvent.code` a metadata canónica sin instalar otro
+listener: el registry matchea Ctrl/Cmd, Alt/Shift exactos y editable policy; el
+hook existente despacha IDs y deja flechas/Delete/playback como shortcuts de
+dominio. Modal y controles editables suspenden comandos/mutación; Space-pan
+requiere foco en workspace, se deshabilita cuando playback tiene ownership y
+blur limpia Space/modificadores. Se eliminaron el Header no montado, el command
+array legacy con Open/Analyze vacíos y la documentación Hitbox copy/paste que no
+existía. Help y Palette comparten tokens del registry; Snapshot abre el modal
+PNG real. El gate acumulado cerró 65/65 y el repair de blur 17/17, además de
+typecheck, lint estricto, build, static reachability y review `accept`. Chrome
+J9 probó cinco rutas, focus transfer, modal/editable guards, Ctrl+0 y Snapshot
+sin console errors/exceptions.
+
 ### F7 — Observabilidad, jobs y error taxonomy
 
 - **Owner:** `[gpt-5.6-sol | xhigh]`.

@@ -5,9 +5,9 @@ import type {
   StudioCommandContext,
   StudioCommandId,
   StudioCommandRegistry,
-  StudioShortcut,
 } from "../../core/studio";
 import { StudioDialog } from "../studio/StudioDialog";
+import { studioShortcutTokens } from "../studio/shortcutPresentation";
 
 interface CommandPaletteProps {
   readonly isOpen: boolean;
@@ -15,20 +15,6 @@ interface CommandPaletteProps {
   readonly registry: StudioCommandRegistry;
   readonly context: StudioCommandContext;
   readonly onExecute: (commandId: StudioCommandId) => void;
-}
-
-function shortcutTokens(shortcut: StudioShortcut | undefined): readonly string[] {
-  if (!shortcut) return [];
-  const modifiers = shortcut.modifiers.map((modifier) => {
-    if (modifier === "primary") return "Ctrl/Cmd";
-    return modifier[0].toUpperCase() + modifier.slice(1);
-  });
-  const code = shortcut.code
-    .replace(/^Key/, "")
-    .replace(/^Digit/, "")
-    .replace(/^Comma$/, ",")
-    .replace(/^Slash$/, "/");
-  return [...modifiers, code];
 }
 
 function searchableText(command: StudioCommand): string {
@@ -137,7 +123,9 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
           ) : (
             filteredCommands.map((command, index) => {
               const state = registry.getState(command.id, context);
-              const shortcut = shortcutTokens(command.shortcuts[0]);
+              const shortcut = command.shortcuts[0]
+                ? studioShortcutTokens(command.shortcuts[0])
+                : [];
               const selected = index === selectedIndex;
               return (
                 <button

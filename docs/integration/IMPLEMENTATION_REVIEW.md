@@ -835,9 +835,36 @@ los lotes que sí modifican producto.
   lint focal `--deny-warnings`, build y diff-check verdes. Revisión final:
   `accept`; warning chunk >500 kB continúa como baseline.
 
+## F6-06 — W2 keyboard, reachability and no-inert shell gate
+
+- **Estado:** `accept` después de J9 y repair independiente. El review inicial
+  encontró stuck Space-pan al perder focus antes del keyup; `window.blur` ahora
+  resetea pan/modifiers y el listener se limpia en unmount.
+- **Keyboard owner:** `StudioCommandRegistry.findByKeyboardInput` usa `code`,
+  Ctrl o Cmd como primary, modificadores exactos y policy editable. Un único
+  `useKeyboardShortcuts` ejecuta command IDs; modal/editable guards preceden a
+  arrows, Delete, frame stepping y playback locales. Repeat no reabre comandos
+  ni alterna playback varias veces.
+- **Canvas:** Space-pan sólo captura cuando el contenido central tiene foco y no
+  hay animación activa. Pointer sobre canvas transfiere ese foco; textarea,
+  select, input, role textbox y contenteditable quedan excluidos. Keyup conserva
+  modificadores restantes y blur limpia todos.
+- **Reachability:** se eliminaron `components/layout/Header.tsx`, el array
+  `CommandPaletteItem` del controller y sus Open/Analyze vacíos o rutas AppMode
+  paralelas. El botón Snapshot ejecuta Export PNG real. Help sale de los mismos
+  shortcuts frozen y ya no promete Hitbox copy/paste inexistente.
+- **Browser J9:** Ctrl+1..5 alcanzó cinco hashes y focalizó cada destino;
+  Preferences, Help y Palette respetaron modal/input guards; Ctrl+0 llevó zoom
+  125%→100% y Snapshot abrió `Export Spritesheet`. 15 comandos documentados,
+  cero console errors/exceptions.
+- **Evidencia:** 20/20 focales iniciales, 65/65 acumulados F6, repair 17/17,
+  typecheck, lint focal, build, diff/static reachability y review final `accept`.
+  El primer server browser eligió un puerto ocupado y no contó; el harness final
+  cerró verde con procesos/perfil propios.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F6-06: activo; debe cerrar J9 con keyboard registry-driven, cinco destinos
-  alcanzables y ausencia demostrada de modos o commands inertes.
+- F7-01: activo; debe congelar lifecycle/progress/cancel/retry/timeout de jobs
+  sin adelantar workers, Job Center ni format providers.
