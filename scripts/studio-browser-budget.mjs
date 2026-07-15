@@ -42,7 +42,7 @@ function percentile95(samples) {
 }
 
 const EXPECTED_WORKSPACE_TRANSITIONS = Object.freeze(
-  Array.from({ length: 3 }, (_, run) => ["compose", "animate", "collision", "export", "slice"]
+  Array.from({ length: 4 }, (_, run) => ["compose", "animate", "collision", "export", "slice"]
     .map((workspaceId) => Object.freeze({ run, workspaceId })))
     .flat(),
 );

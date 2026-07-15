@@ -37,9 +37,8 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 están aceptados. `F3-07` sigue
-pendiente del journey browser save-close-reload/export-import; el gate de
-stores de W1 y el gate job/export de W2 están cerrados; `F8-03` está
+F0, B0, F1, F2, F3-01..F3-07, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 están aceptados. W1 y W2
+están cerrados con journeys browser, budgets y cleanup revisados. `F8-03` está
 condicionado por la decisión package/lock. F8-06 espera F8-03 y los release
 thresholds que siguen explícitamente rojos.
 Ninguna tarea Grid o Editor está autorizada antes de sus dependencias

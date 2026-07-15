@@ -325,6 +325,35 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
     expect(validateStudioProject(project).valid).toBe(true);
   });
 
+  it("relinks expired runtime URLs without persisting them in provenance", async () => {
+    const legacy = cloneLegacy() as {
+      project: {
+        imageMeta: { src: string };
+        builderAssets: Array<{ src: string }>;
+      };
+    };
+    const sourceRef = "blob:https://expired.invalid/source";
+    const builderRef = "blob:https://expired.invalid/builder";
+    legacy.project.imageMeta.src = sourceRef;
+    legacy.project.builderAssets[0].src = builderRef;
+    const context = baseContext();
+    context.assetResolutions = {
+      [sourceRef]: context.assetResolutions["fixture://source-sheet"],
+      [builderRef]: context.assetResolutions["fixture://builder-asset"],
+    };
+
+    const result = await migrateLegacyProjectV0(legacy, context);
+    const project = result.document as StudioProjectV1;
+
+    expect(result.report.status).toBe("migrated");
+    expect(project.assets["asset-source-sheet"].provenance.sourceId).toBe("source-sheet");
+    expect(project.assets["asset-builder-piece"].provenance.sourceId).toBe(
+      "builder:legacy-builder-asset",
+    );
+    expect(projectCodec.encode(project)).not.toContain("blob:");
+    expect(validateStudioProject(project)).toMatchObject({ valid: true, diagnostics: [] });
+  });
+
   it("reports an unmatched legacy sourceIndex as needs-relink", async () => {
     const legacy = cloneLegacy() as {
       project: { animations: Array<{ keyframes: Array<{ uid: string; sourceIndex: number }> }> };

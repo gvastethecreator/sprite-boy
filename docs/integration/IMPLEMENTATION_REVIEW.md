@@ -1090,16 +1090,17 @@ los lotes que sí modifican producto.
 
 ## F8-05 — Bundle, performance and accessibility budgets
 
-- **Estado:** `accept` después de dos tandas de repairs y revisión independiente
-  final sin P0-P3.
+- **Estado:** `accept` después del repair final de estabilidad browser y
+  re-revisión independiente sin P0-P3.
 - **Lint:** el ratchet heredado de 47 warnings pasa a cero con cleanup acotado;
   `--deny-warnings` es ahora el gate estable.
 - **Bundle:** HTML productivo descubre sólo assets iniciales allowlisted y un
   helper Node mide gzip level 9 sobre archivos físicos. Ratchet 245999 bytes
-  verde; target release 180000 bytes rojo deliberado.
+  verde con 245999 bytes; target release 180000 bytes rojo deliberado.
 - **Browser:** perfil Chrome efímero, settle y Long Task API obligatoria; 5 s
-  idle, 3 recorridos/15 transiciones afirmadas y p95 recomputado. Resultado: 0
-  rAF, 46.4 ms p95, 0 long tasks y heap observado 4003712 bytes.
+  idle, 4 recorridos/20 transiciones afirmadas y p95 recomputado. Resultado
+  estable en tres repeticiones: 0 rAF, 34.5/34.7/49.8 ms p95 y 0 long tasks;
+  el `all` final midió 38 ms.
 - **A11y:** árbol AX nativo agregado sin labels/URLs: 65 nodos, 15 interactivos,
   cero sin nombre y un `main`. El canvas dejó de anidar otro landmark.
 - **Límite declarado:** no sustituye Axe/WCAG completo ni los budgets de los
@@ -1108,21 +1109,63 @@ los lotes que sí modifican producto.
   interactivos cubren option/search/menu/tree/scrollbar; `main` es exactamente
   uno; Long Tasks conserva agregados sin cap y drena records pendientes. El
   segundo pase añadió nodos AX focusable, rect visible positivo y parsing HTML
-  case-insensitive/token-list para no subcontar controles, rutas o preload.
+  case-insensitive/token-list para no subcontar controles, rutas o preload. El
+  pase final corrigió p95=max con n=15, cold mount de Timeline, throttling
+  headless y liveness/retry de cleanup Windows sin subir thresholds. La última
+  revisión añadió deadlines internos 40/70 s, exhaustividad del workspace map y
+  cleanup de resize al ocultar Timeline; ambos timeouts inyectados dejaron cero
+  huérfanos y perfiles.
 - **Coverage repair:** el primer `all` observó 76.74% branches frente a 76.75.
   No se bajó el umbral: un contract test de IDs/timestamps cubrió límites
   offset/calendario y elevó coverage a 82.31/76.81/91.79/86.17.
-- **Evidencia final:** 27/27 focales; 22/138 unit, 43/463 contract, 1/6
-  integration, 66/607 coverage, fixtures 7/7, typecheck, lint cero, build,
-  bundle y browser budget. `all` completó diez steps, exit 0; release bundle
+- **Evidencia final:** 30/30 focales; 23/150 unit, 43/464 contract, 1/6
+  integration, 67/620 coverage, fixtures 7/7, typecheck, lint cero, build,
+  bundle 245999/245999 y browser budget. `all` completó 11 steps, exit 0; release bundle
   real conserva exit 1. Policy:
   [F8 budget policy](./F8_BUDGET_POLICY.md).
 
+## F3-07 — Durable reload and clean portable import
+
+- **Estado:** `accept`; PID/profile cleanup y ambos paths están verdes. La
+  revisión incremental no encontró P0-P3 y cierra W1.
+- **Journey:** tres documentos en un perfil Chrome temporal. Prepare persiste
+  V1+assets+checkpoint+package; dos pagehide/reload prueban reopen, borrado de
+  storage, import limpio y reopen final.
+- **Migration/J8:** fixture V0 con dos Blob URLs expiradas produce preview con
+  tres blockers (dos relink + una ambigüedad); resoluciones explícitas migran a
+  V1 válido y reemplazan runtime provenance por IDs durables.
+- **Asset real:** PNG alpha 192x64 se codifica y decodifica; un pixel alpha 128 y
+  otro transparente se afirman antes de persistir. Dos assets comparten un blob.
+- **Exactitud:** JSON del codec, content hashes y ZIP/hash/bytes permanecen
+  exactos. El segundo package mide 2633 bytes y ambas revisions son 1.
+- **Cleanup/privacidad:** dos DB con nombres por run se eliminan y verifican
+  ausentes. El perfil se retira sólo tras verificar runtime terminado; si no
+  puede terminar, el gate falla cerrado y no borra archivos en uso. El resultado
+  no contiene nombres, nonces ni hashes; éstos sólo cruzan reload dentro de
+  sessionStorage del perfil temporal. Cinco contadores browser terminan en cero.
+- **Repairs de review:** CLI valida y sanitiza el resultado público; revisions y
+  dedupe/hash cardinality deben ser coherentes. Child cleanup verifica exit,
+  escala a SIGKILL y falla si Chrome/Vite permanece vivo. El package runner que
+  fugaba servidores Vite se reemplazó por el CLI local como child Node directo.
+  Una primera corrida `all` reveló que 10/20 s eran insuficientes bajo carga;
+  CDP/readiness pasaron a 30/60 s sin cambiar el timeout del gate ni reintentar.
+  La auditoría incremental detectó que el timeout externo podía matar Bun antes
+  del `finally`; un deadline interno de 130 s reserva cleanup bounded. Una
+  inyección real a 100 ms dejó procesos y perfiles en cero.
+  El pase posterior reemplazó metadata de exit no fiable bajo Bun por sondeo de
+  PID y `rmSync` por retries async acotados; failure y success volvieron a cero.
+- **Evidencia final:** 34/34 focales, typecheck, lint focal cero y tres gates
+  `persistence` consecutivos exit 0 con `ORPHANS=0`. Revisions 1→1, assets 2 /
+  blob único 1, legacy 2 URLs / 3 blockers / 5 notas, dos reloads, DB cero y
+  cinco contadores de error cero. `all` completó 11 steps: 23/150 unit,
+  43/464 contract, 1/6 integration y 67/620 coverage con
+  82.31/76.82/91.79/86.17; build/bundle/browser verdes y 0 huérfanos. Policy:
+  [F3 persistence browser](./F3_PERSISTENCE_BROWSER.md).
+
 ## Frontiers abiertos
 
-- F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
-  save-close-reload y export/import portable en storage limpio.
+- F3-07: `accept`; lifecycle browser y W1 cerrados.
 - F8-03: condicionado; frozen install requiere decisión explícita y patch
   atómico del package/lock user-owned.
-- F8-05: `accept`; budgets y lint cero cerrados, release debt preservada.
+- F8-05: `accept`; budgets y cleanup browser cerrados.
 - F8-06: espera F8-03 y los release thresholds aún rojos.

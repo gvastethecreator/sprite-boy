@@ -66,6 +66,12 @@ const STEPS = Object.freeze({
     ["scripts/studio-browser-budget.mjs", "--profile", "ratchet"],
     120_000,
   ),
+  persistenceBrowser: processStep(
+    "persistence-browser",
+    "Durable reload and portable package browser journey",
+    ["scripts/studio-persistence-browser.mjs"],
+    180_000,
+  ),
   browser: processStep(
     "browser-smoke",
     "Production Chrome smoke",
@@ -93,6 +99,7 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
       STEPS.bundle,
       STEPS.browserBudget,
     ]),
+    persistence: gate("persistence", "Durable persistence browser journey", [STEPS.persistenceBrowser]),
     build: gate("build", "Production build", [STEPS.build]),
     e2e: gate("e2e", "Production browser smoke", [STEPS.build, STEPS.browser]),
     all: gate("all", "Complete local gate", [
@@ -103,6 +110,7 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
       STEPS.integration,
       STEPS.coverage,
       STEPS.fixtures,
+      STEPS.persistenceBrowser,
       STEPS.build,
       STEPS.bundle,
       STEPS.browserBudget,

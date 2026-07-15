@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>F3-07 Persistence Browser Gate</title>
+  </head>
+  <body>
+    <main aria-labelledby="journey-title">
+      <h1 id="journey-title">F3-07 persistence journey</h1>
+      <p>Real IndexedDB, pagehide/reload and portable package verification.</p>
+      <output id="journey-status" aria-live="polite">Ready</output>
+    </main>
+    <script type="module">
+      import {
+        finishStudioPersistenceJourney,
+        prepareStudioPersistenceJourney,
+        resumeStudioPersistenceJourney,
+      } from "./studioPersistenceJourney.ts";
+
+      const documentId = crypto.randomUUID();
+      Object.defineProperty(globalThis, "__spriteBoyF307", {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: Object.freeze({
+          ready: true,
+          documentId,
+          prepare: prepareStudioPersistenceJourney,
+          resume: resumeStudioPersistenceJourney,
+          finish: finishStudioPersistenceJourney,
+        }),
+      });
+      document.querySelector("#journey-status").value = `Ready ${documentId.slice(0, 8)}`;
+    </script>
+  </body>
+</html>

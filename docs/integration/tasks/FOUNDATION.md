@@ -44,7 +44,7 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F3-04 | E | F3-01,F2-07 | Package `.spriteboy` document+blobs import/export | ART unzip/hash + REV | done |
 | F3-05 | J | F3-03,F3-04 | Autosave journal, atomic checkpoint y recovery candidate | IT crash/partial write | done |
 | F3-06 | J | F3-05 | Future/corrupt/missing-asset recovery report sin pisar activo | MIG hostile fixture matrix | done |
-| F3-07 | J | F3-06 | Journey save-close-reload + portable export/import | BR J1/J8 | active |
+| F3-07 | J | F3-06 | Journey save-close-reload + portable export/import | BR J1/J8 | done |
 | F4-01 | J | F1-08 | Contratos separados Project/Workspace/Interaction/Job/Playback store | Type/API review | done |
 | F4-02 | J | F4-01 | ProjectStore con revision y dispatch canónico | UT dispatch/subscription | done |
 | F4-03 | E | F4-01 | Stores efímeros sin serialization/history | UT isolation + REV | done |

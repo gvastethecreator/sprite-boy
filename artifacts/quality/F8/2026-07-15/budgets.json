@@ -23,7 +23,7 @@
     "buildCommand": "bun x vite build",
     "measurement": "Node zlib gzip level 9",
     "initialChunkCount": 1,
-    "initialJsBytes": 918655,
+    "initialJsBytes": 918631,
     "initialJsGzipBytes": 245999,
     "ratchetBytes": 245999,
     "ratchetStatus": "pass",
@@ -38,17 +38,20 @@
     "idleWindowMs": 5000,
     "idleRafRequests": 0,
     "idleRafLimit": 1,
-    "interactionRuns": 3,
-    "interactionSamples": 15,
-    "verifiedWorkspaceTransitions": 15,
-    "inputToPaintP95Ms": 46.4,
+    "interactionRuns": 4,
+    "interactionSamples": 20,
+    "verifiedWorkspaceTransitions": 20,
+    "inputToPaintP95Ms": 38,
+    "stabilityP95Ms": [34.5, 34.7, 49.8],
     "inputToPaintLimitMs": 50,
     "longTaskObserverAvailable": true,
     "longTaskCount": 0,
     "longTaskMaxMs": 0,
     "longTaskLimitMs": 100,
     "longTaskTotalMs": 0,
-    "jsHeapUsedBytes": 4003712,
+    "jsHeapUsedBytes": 4335316,
+    "headlessRendererThrottlingDisabled": true,
+    "timelineColdMountAvoided": true,
     "accessibility": {
       "exposedNodes": 65,
       "interactiveNodes": 15,
@@ -80,24 +83,25 @@
   "fullGate": {
     "command": "bun scripts/studio-gates.mjs --gate all",
     "status": "pass",
-    "unit": { "files": 22, "tests": 138 },
-    "contract": { "files": 43, "tests": 463 },
+    "unit": { "files": 23, "tests": 150 },
+    "contract": { "files": 43, "tests": 464 },
     "integration": { "files": 1, "tests": 6 },
     "coverage": {
       "files": 66,
-      "tests": 607,
+      "tests": 620,
       "statements": 82.31,
-      "branches": 76.81,
+      "branches": 76.82,
       "functions": 91.79,
       "lines": 86.17
     },
     "fixtures": { "roots": 2, "retained": 7 },
-    "completedSteps": 10
+    "completedSteps": 11
   },
   "review": {
-    "status": "accept",
-    "findingsClosed": 7,
+    "status": "accepted",
+    "findingsClosed": 11,
     "remainingP0P3": 0,
-    "reviewerBrowserP95Ms": 34.2
+    "focalTests": "4 files / 30 tests",
+    "verdict": "accept"
   }
 }

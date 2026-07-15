@@ -38,19 +38,13 @@ import {
 } from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
 
-function legacyModeForWorkspace(workspaceId: StudioWorkspaceId): AppMode {
-  switch (workspaceId) {
-    case "slice":
-    case "compose":
-      return AppMode.BUILDER;
-    case "animate":
-      return AppMode.ANIMATION;
-    case "collision":
-      return AppMode.COLLISION;
-    case "export":
-      return AppMode.TEMPLATE;
-  }
-}
+const LEGACY_MODE_BY_WORKSPACE = {
+  slice: AppMode.BUILDER,
+  compose: AppMode.BUILDER,
+  animate: AppMode.ANIMATION,
+  collision: AppMode.COLLISION,
+  export: AppMode.TEMPLATE,
+} as const satisfies Record<StudioWorkspaceId, AppMode>;
 
 const COMPACT_STUDIO_QUERY = "(max-width: 1279px)";
 
@@ -147,7 +141,7 @@ const AppLayout: React.FC = () => {
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
 
   useEffect(() => {
-    const legacyMode = legacyModeForWorkspace(activeWorkspace);
+    const legacyMode = LEGACY_MODE_BY_WORKSPACE[activeWorkspace];
     if (currentMode !== legacyMode) handleSetMode(legacyMode);
   }, [activeWorkspace, currentMode, handleSetMode]);
 
@@ -170,7 +164,10 @@ const AppLayout: React.FC = () => {
     importAsset: () => assetInputRef.current?.click(),
     undo,
     redo,
-    openWorkspace: navigate,
+    openWorkspace: (workspaceId) => {
+      handleSetMode(LEGACY_MODE_BY_WORKSPACE[workspaceId]);
+      navigate(workspaceId);
+    },
     resetCanvas: () => canvasRef.current?.resetView(),
     openCommandPalette: () => setIsCommandPaletteOpen(true),
     openPreferences: () => setIsSettingsOpen(true),
@@ -178,6 +175,7 @@ const AppLayout: React.FC = () => {
   }), [
     handleNewProject,
     handleSaveProject,
+    handleSetMode,
     navigate,
     redo,
     setIsCommandPaletteOpen,
@@ -369,8 +367,8 @@ const AppLayout: React.FC = () => {
               />
             )}
           </main>
-          {hasWorkspace && activeWorkspaceDefinition.capabilities.timeline === "editable" && (
-            <TimelinePanel />
+          {hasWorkspace && (
+            <TimelinePanel hidden={activeWorkspaceDefinition.capabilities.timeline !== "editable"} />
           )}
         </div>
 

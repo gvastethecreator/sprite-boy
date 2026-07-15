@@ -4,19 +4,21 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 aceptados. Frontiers: F3-07 pendiente de browser; F8-03 condicionado por ownership de package/lock; F8-06 espera esas dependencias y los release thresholds rojos.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-07, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 aceptados. Frontiers: F8-03 condicionado por ownership de package/lock; F8-06 espera esa dependencia y los release thresholds rojos. W1/W2 están cerrados.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
-F4 avanza en paralelo porque su contrato depende de F1-08, ya aceptado. Esto no
-degrada F3-07: su harness queda `ready-for-browser`, pero el gate continúa
-abierto hasta ejecutar J1/J8 en el perfil Chrome real y revisar el artefacto.
+F4 avanzó en paralelo porque su contrato depende de F1-08, ya aceptado. F3-07
+ya ejecutó la porción Foundation J1/J8 en Chrome real: dos reloads/pagehide,
+storage limpio, documento/assets/package exactos y cleanup total. La auditoría
+incremental aceptó el deadline interno, la failure injection y el success path;
+W1 queda cerrado.
 F4-04/F4-05 cerraron history, selectors y el primer batch `timeline-layout`:
 provider local y migración exclusiva de `WorkspaceStore.panelSizes.timeline`
 desde `AppLayout` a un leaf consumer. `ProjectContext` y el documento legacy
 quedaron fuera. F4-06 cerró batch undo/redo, frontera data-only contra mutación
 o código externo, retención configurable (100 por defecto) y el gate conjunto
-de stores. W1 global continúa abierto únicamente por el browser gate F3-07.
+de stores. W1 global queda aceptado junto con el browser gate F3-07.
 F5-01 añadió la proyección canónica data-only desde ProjectStore y el viewport
 activo de WorkspaceStore. La raíz se resuelve por workspace, selección durable
 y orden documental; asset, region, composition, variant y cel quedan
@@ -174,13 +176,14 @@ manifest exhaustivo retiene siete fixtures/goldens tracked bajo dos roots con
 identidad SHA-256/bytes cross-platform, prohibición de symlinks y detección de
 missing/unmanifested/drift. F8-05 automatizó budgets y retiró warnings.
 F8-05 retiró el ratchet de 47 warnings y automatizó un gate productivo único de
-bundle, idle, interacción, long tasks y árbol AX. El bundle actual queda
-ratcheted en 245999 bytes gzip, mientras el target release de 180000 permanece
-deliberadamente rojo. Chrome fresco pasa 0 rAF idle, 46.4 ms p95/15 transiciones, cero
-long tasks, cero interactivos sin nombre y un `main`. El lote recibió revisión
-independiente `accept`; los budgets específicos de features y Axe completo
-conservan ownership posterior y no se presentan como cubiertos. El gate `all`
-final pasó sus diez steps y coverage quedó sobre el ratchet sin rebajarlo.
+bundle, idle, interacción, long tasks y árbol AX. El bundle actual queda en
+245999 bytes gzip dentro del ratchet, mientras el target release de 180000 permanece
+deliberadamente rojo. Chrome fresco pasa 0 rAF idle y tres repeticiones de 20
+transiciones en 34.5/34.7/49.8 ms p95, sin long tasks, sin interactivos sin
+nombre y con un `main`; el `all` final midió 38 ms. La revisión aceptó cold
+mount, p95 nearest-rank, throttling, deadlines internos y cleanup Windows sin
+P0-P3; los budgets específicos de
+features y Axe completo conservan ownership posterior.
 
 ## Reglas de ejecución
 

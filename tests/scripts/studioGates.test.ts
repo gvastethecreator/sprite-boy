@@ -1,3 +1,6 @@
+import { EventEmitter } from "node:events";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   GATE_SCHEMA_VERSION,
@@ -12,6 +15,12 @@ import {
   CdpClient,
   chromeExecutableCandidates,
   resolveChromeExecutable,
+  resolveNodeExecutable,
+  runWithBrowserRuntimeDeadline,
+  safeRemoveProfile,
+  spawnViteServer,
+  terminateChildProcess,
+  waitForExit,
 } from "../../scripts/studio-browser-smoke.mjs";
 
 function outputBuffer() {
@@ -70,6 +79,7 @@ describe("studio gate manifest", () => {
       "coverage",
       "fixtures",
       "budgets",
+      "persistence",
       "build",
       "e2e",
       "all",
@@ -93,6 +103,7 @@ describe("studio gate manifest", () => {
       "integration",
       "coverage",
       "fixtures",
+      "persistence-browser",
       "build",
       "bundle-budget",
       "browser-budget",
@@ -105,6 +116,9 @@ describe("studio gate manifest", () => {
       "build",
       "bundle-budget",
       "browser-budget",
+    ]);
+    expect(STUDIO_GATE_MANIFEST.gates.persistence.steps.map(({ id }) => id)).toEqual([
+      "persistence-browser",
     ]);
   });
 
@@ -245,6 +259,119 @@ describe("studio gate execution", () => {
 });
 
 describe("Chrome executable resolution", () => {
+  it("reserves outer-gate cleanup time when the browser operation stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      const cleanup = vi.fn().mockResolvedValue(undefined);
+      const pending = runWithBrowserRuntimeDeadline(
+        () => new Promise(() => {}),
+        cleanup,
+        25,
+      );
+      const rejected = expect(pending).rejects.toThrow(/deadline exceeded/);
+
+      await vi.advanceTimersByTimeAsync(25);
+      await rejected;
+      expect(cleanup).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries temporary profile removal independently of runtime rmSync behavior", async () => {
+    const remove = vi.fn()
+      .mockRejectedValueOnce(new Error("locked"))
+      .mockRejectedValueOnce(new Error("still locked"))
+      .mockResolvedValue(undefined);
+    const wait = vi.fn().mockResolvedValue(undefined);
+    await expect(safeRemoveProfile(join(tmpdir(), "sprite-boy-test-profile"), {
+      delay: wait,
+      rm: remove,
+    })).resolves.toBeUndefined();
+    expect(remove).toHaveBeenCalledTimes(3);
+    expect(wait).toHaveBeenCalledTimes(2);
+  });
+
+  it("resolves Node explicitly when the gate itself is running under Bun", () => {
+    const lookup = vi.fn().mockReturnValue({
+      status: 0,
+      stdout: "C:/Program Files/nodejs/node.exe\r\n",
+    });
+    expect(resolveNodeExecutable({
+      env: {},
+      execPath: "C:/bun.exe",
+      existsSync: (value: string) => value === "C:/Program Files/nodejs/node.exe",
+      platform: "win32",
+      runtimeIsBun: true,
+      spawnSync: lookup,
+    })).toBe("C:/Program Files/nodejs/node.exe");
+    expect(lookup).toHaveBeenCalledWith(
+      "where",
+      ["node"],
+      expect.objectContaining({ shell: false }),
+    );
+  });
+
+  it("owns the direct Vite CLI process instead of spawning through a package runner", () => {
+    const child = { exitCode: null };
+    const spawn = vi.fn().mockReturnValue(child);
+    const result = spawnViteServer("D:/repo", 4173, "preview", {
+      createRequire: () => ({
+        resolve: () => "D:/repo/node_modules/vite/package.json",
+      }),
+      env: { MODE: "test" },
+      execPath: "C:/node.exe",
+      existsSync: () => true,
+      spawn,
+    });
+
+    expect(result).toBe(child);
+    expect(spawn).toHaveBeenCalledWith(
+      "C:/node.exe",
+      [
+        expect.stringMatching(/vite[\\/]bin[\\/]vite\.js$/u),
+        "preview",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "4173",
+        "--strictPort",
+      ],
+      expect.objectContaining({
+        env: { MODE: "test" },
+        shell: false,
+        stdio: "ignore",
+        windowsHide: true,
+      }),
+    );
+    expect(spawn.mock.calls[0]?.[1]).not.toContain("x");
+  });
+
+  it("fails closed and escalates when a child process never exits", async () => {
+    const child = Object.assign(new EventEmitter(), {
+      exitCode: null,
+      signalCode: null,
+      kill: vi.fn(() => true),
+    });
+    await expect(waitForExit(child, 5)).rejects.toThrow(/timed out/);
+    await expect(terminateChildProcess(child, 5)).rejects.toThrow(/timed out/);
+    expect(child.kill).toHaveBeenNthCalledWith(1);
+    expect(child.kill).toHaveBeenNthCalledWith(2, "SIGKILL");
+  });
+
+  it("accepts PID liveness as exit proof when Bun does not publish child metadata", async () => {
+    const child = Object.assign(new EventEmitter(), {
+      exitCode: null,
+      signalCode: null,
+      pid: 42,
+    });
+    await expect(waitForExit(child, 5, {
+      kill: () => {
+        throw Object.assign(new Error("gone"), { code: "ESRCH" });
+      },
+    })).resolves.toBeUndefined();
+  });
+
   it("builds explicit Windows, macOS and Linux candidates without shell interpolation", () => {
     const windows = chromeExecutableCandidates("win32", {
       STUDIO_CHROME_PATH: "D:/portable/chrome.exe",

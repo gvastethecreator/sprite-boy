@@ -339,12 +339,14 @@ Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
 
 - El lint de repositorio pasa con cero warnings y `--deny-warnings`; se retiró
   el ratchet heredado de 47 sin cambiar dependencias.
-- El bundle inicial mide 918655 bytes raw / 245999 bytes gzip level 9. El
+- El bundle inicial mide 918631 bytes raw / 245999 bytes gzip level 9. El
   ratchet de no-regresión pasa y el perfil release de 180000 falla
   deliberadamente; code splitting sigue como deuda release obligatoria.
 - Chrome productivo fresco a 1440x900 DPR 1 midió 0 rAF en 5 segundos idle,
-  46.4 ms input-to-paint p95 sobre 15 transiciones calientes verificadas y 0
-  long tasks.
+  38 ms input-to-paint p95 sobre 20 transiciones calientes verificadas y 0
+  long tasks. Cuatro recorridos hacen que nearest-rank p95 deje de colapsar al
+  máximo; Timeline permanece hidden/montado y Chrome headless no aplica
+  throttling de background/occlusion.
 - El árbol AX nativo expuso 15 interactivos, cero sin accessible name y un
   landmark `main`. Labels y URLs no se guardan en artifacts.
 - Este gate Foundation no sustituye Axe/WCAG completo ni declara probados los
@@ -353,4 +355,36 @@ Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
 Política, método y límites: [F8_BUDGET_POLICY.md](./F8_BUDGET_POLICY.md).
 Artifact de ejecución:
 [`budgets.json`](../../artifacts/quality/F8/2026-07-15/budgets.json).
-Review independiente `accept`; `--gate all` completó sus diez steps con exit 0.
+Repair de estabilidad browser pendiente de revisión independiente incremental.
+
+## Enforcement F3-07 — 2026-07-15
+
+- `bun scripts/studio-gates.mjs --gate persistence` abre un perfil Chrome
+  temporal y cruza tres documentos con dos `pagehide` confiables verificados.
+- El fixture legacy V0 usa dos Blob URLs expiradas: preview exige dos relinks y
+  una resolución de cel ambigua; las decisiones explícitas migran a V1 sin
+  persistir runtime URLs.
+- Un PNG alpha real 192x64 se decodifica antes de persistir. Dos assets lógicos
+  comparten un blob, y documento, hashes y package se conservan exactos tras
+  reload, borrado de storage e import limpio.
+- La segunda recarga reproduce el `.spriteboy` byte-identical y elimina ambas
+  bases; `indexedDB.databases()` confirma cero targets restantes.
+- Evidencia pública guarda sólo counts/flags. Nombres de DB, nonces y hashes
+  cruzan reload temporalmente dentro del perfil descartable, pero no se emiten
+  ni entran al artifact. Consola/runtime/log/red/HTTP terminan en cero.
+- Vite se ejecuta desde el CLI local como child Node directo: tres repeticiones
+  consecutivas terminaron con cero procesos server huérfanos.
+- Bajo la carga completa, CDP usa 30 s por comando awaited y 60 s de readiness
+  dentro del timeout del step de 180 s. `--gate all` cerró sus 11 steps con
+  23/150 unit, 43/464 contract, 1/6 integration y 67/620 coverage tests;
+  persistence quedó verde y no dejó procesos Vite ni perfiles temporales.
+- Un deadline interno de 130 s reserva 50 s para cleanup antes del timeout
+  externo. La inyección a 100 ms terminó Vite/Chrome, eliminó el perfil y dejó
+  cero huérfanos; el success path volvió a pasar después.
+- Cierra la porción Foundation de J1/J8; UI/screenshot de Compose y el recovery
+  R1/R2 completo conservan ownership posterior explícito.
+
+Método y límites: [F3_PERSISTENCE_BROWSER.md](./F3_PERSISTENCE_BROWSER.md).
+Artifact:
+[`persistence-browser.json`](../../artifacts/quality/F3/2026-07-15/persistence-browser.json).
+Review independiente `accept`; no quedan findings P0-P3 y W1 está cerrado.

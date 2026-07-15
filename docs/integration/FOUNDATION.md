@@ -425,8 +425,10 @@ history, por lo que Proxies, accessors, `toJSON`, ciclos y arrays no densos no
 pueden ejecutar código ni mutar snapshots publicados. Proyecto, resultados e
 inverses son deep-frozen. History retiene 100 entradas por defecto y acepta un
 límite explícito 1..1000; Workspace/Interaction/Job/Playback permanecen fuera
-del history documental. El store gate de W1 está aceptado; el gate W1 completo
-sigue pendiente sólo de la ejecución browser F3-07.
+del history documental. El store gate de W1 está aceptado; F3-07 revalidó legacy
+relink/migration, dos reloads, import limpio y failure-injected lifecycle de
+storage/runtime tras reparar PID/profile cleanup. La revisión incremental no
+encontró P0-P3 y W1 queda cerrado.
 
 ### F5 — RenderEngine por invalidación
 

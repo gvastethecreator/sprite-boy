@@ -14,15 +14,15 @@ function passingSmoke() {
     budgets: {
       idleWindowMs: 5_000,
       idleRafRequests: 0,
-      interactionSamplesMs: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
-      interactionTransitions: Array.from({ length: 3 }, (_, run) => workspaceIds.map((workspaceId) => ({
+      interactionSamplesMs: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+      interactionTransitions: Array.from({ length: 4 }, (_, run) => workspaceIds.map((workspaceId) => ({
         run,
         workspaceId,
         finalHash: `#/studio/${workspaceId}`,
         active: true,
         contentActive: true,
       }))).flat(),
-      inputToPaintP95Ms: 24,
+      inputToPaintP95Ms: 28,
       longTaskCount: 1,
       longTaskMaxMs: 55,
       longTaskTotalMs: 55,
@@ -54,8 +54,8 @@ describe("browser performance and accessibility budgets", () => {
       exceeded: [],
       metrics: {
         idleRafRequests: 0,
-        inputToPaintP95Ms: 24,
-        verifiedTransitionCount: 15,
+        inputToPaintP95Ms: 28,
+        verifiedTransitionCount: 20,
         unlabeledInteractiveCount: 0,
       },
     });
@@ -64,7 +64,8 @@ describe("browser performance and accessibility budgets", () => {
   it("fails every exceeded performance/a11y dimension and invalid evidence", () => {
     const failing = passingSmoke();
     failing.budgets.idleRafRequests = 2;
-    failing.budgets.interactionSamplesMs[14] = 51;
+    failing.budgets.interactionSamplesMs[18] = 51;
+    failing.budgets.interactionSamplesMs[19] = 52;
     failing.budgets.inputToPaintP95Ms = 51;
     failing.budgets.longTaskMaxMs = 101;
     failing.budgets.longTaskTotalMs = 101;

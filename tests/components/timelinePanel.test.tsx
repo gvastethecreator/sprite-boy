@@ -36,6 +36,40 @@ afterEach(() => {
 });
 
 describe("TimelinePanel consumer batch", () => {
+  it("stays mounted but leaves layout and accessibility when hidden", () => {
+    const stores = createStores();
+    render(
+      <StudioLocalStoresProvider stores={stores}>
+        <TimelinePanel hidden />
+      </StudioLocalStoresProvider>,
+    );
+    expect(screen.getByTestId("timeline-panel")).not.toBeVisible();
+    expect(screen.queryByRole("separator", { name: "Resize timeline" })).toBeNull();
+  });
+
+  it("releases an active pointer resize when the mounted panel becomes hidden", () => {
+    const stores = createStores();
+    const view = render(
+      <StudioLocalStoresProvider stores={stores}>
+        <TimelinePanel />
+      </StudioLocalStoresProvider>,
+    );
+    const separator = screen.getByRole("separator", { name: "Resize timeline" });
+
+    fireEvent.mouseDown(separator, { clientY: 400 });
+    expect(document.body.style.cursor).toBe("row-resize");
+    view.rerender(
+      <StudioLocalStoresProvider stores={stores}>
+        <TimelinePanel hidden />
+      </StudioLocalStoresProvider>,
+    );
+
+    expect(document.body.style.cursor).toBe("");
+    expect(screen.queryByRole("separator", { name: "Resize timeline" })).toBeNull();
+    fireEvent.mouseMove(window, { clientY: 100 });
+    expect(stores.workspace.getSnapshot().panelSizes.timeline).toBeUndefined();
+  });
+
   it("rerenders only for its selected panel size and supports keyboard resize", () => {
     const stores = createStores();
     render(
