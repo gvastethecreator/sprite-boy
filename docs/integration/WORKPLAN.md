@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06 y F6-01 aceptados. Frontiers: F3-07 pendiente de browser; F6-02 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06 y F6-01..F6-02 aceptados. Frontiers: F3-07 pendiente de browser; F6-03 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -54,6 +54,11 @@ Export con hrefs hash, command IDs, orden y capacidades tipadas. `assets` sigue
 siendo contexto canónico de selección/render y Asset Library compartida, no un
 sexto destino. La partición compile/runtime cubre todo `WorkspaceId`; reducer,
 validator y WorkspaceStore consumen una única lista canónica.
+F6-02 registró 15 comandos de shell data-only y profundamente inmutables. Un
+port obligatorio capturado ejecuta cada ID; estados disabled tipados bloquean
+sin llamar handlers y los failures se propagan. Atajos por `KeyboardEvent.code`
+usan modificador `primary`, policy editable y auditoría de IDs/conflictos. Open
+y Analyze legacy vacíos no forman parte del registry.
 
 ## Reglas de ejecución
 

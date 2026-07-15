@@ -454,6 +454,15 @@ WorkspaceStore; un tripwire de tipos exige clasificar cualquier ID futuro. El
 contrato cerró con 6 tests focales, suite 44/44 archivos y 435/435 tests,
 typecheck, lint estricto, build y revisión independiente `accept`.
 
+F6-02 publica 15 comandos data-only para proyecto, assets, undo/redo, cinco
+workspaces, canvas y app. El registry sólo se construye con un port exhaustivo
+de handlers own-data capturado defensivamente; metadata visible nunca contiene
+callbacks. Enablement devuelve códigos/reasons frozen, disabled no ejecuta y
+errores sync/async conservan su rechazo. Los atajos usan `KeyboardEvent.code`,
+`primary` Ctrl/Cmd y policy editable; una auditoría bloquea IDs o chords en
+conflicto. Cerró con 15 tests registry+workspace, suite 45/45 archivos y 444/444
+tests, typecheck, lint estricto, build y revisión independiente `accept`.
+
 ### F7 — Observabilidad, jobs y error taxonomy
 
 - **Owner:** `[gpt-5.6-sol | xhigh]`.

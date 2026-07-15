@@ -747,9 +747,25 @@ los lotes que sí modifican producto.
   `--deny-warnings`, build y diff-check verdes. Revisión final: `accept`; warning
   de chunk >500 kB permanece como baseline.
 
+## F6-02 — Typed executable command registry
+
+- **Estado:** `accept` después de revisión independiente sin hallazgos.
+- **Superficie:** 15 comandos ordenados para project new/open/save, asset
+  import, undo/redo, cinco workspaces, canvas reset, palette, preferences y help.
+  Analyze se omite porque no posee handler real; metadata no publica `action`.
+- **Ejecución:** factory exige y captura un port exhaustivo de own-data
+  functions. Cada ID tiene mapping compile-time exhaustivo; disabled retorna un
+  resultado tipado sin invocar, mientras throws/rejections atraviesan el límite.
+- **Shortcuts:** `KeyboardEvent.code`, modifiers semánticos primary/alt/shift y
+  policy editable producen firmas canónicas. Auditoría determinista detecta IDs
+  duplicados y chords compartidos antes de construir consumers.
+- **Evidencia:** 15/15 registry+workspace focales; suite acumulada 45/45 archivos
+  y 444/444 tests; typecheck, lint focal `--deny-warnings`, build y diff-check
+  verdes. Revisión final: `accept`; warning chunk >500 kB sigue como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F6-02: activo; debe congelar command registry, enablement y detección de
-  conflictos sin handlers placeholder.
+- F6-03: activo; debe reemplazar header/nav/layout legacy por el registry y
+  demostrar navegación browser de los cinco workspaces.
