@@ -4,6 +4,8 @@ export { StudioDialog } from "./StudioDialog";
 export type { StudioDialogProps } from "./StudioDialog";
 export { StudioPanel } from "./StudioPanel";
 export type { StudioPanelProps, StudioPanelVariant } from "./StudioPanel";
+export { StudioWorkspaceStateView } from "./StudioWorkspaceState";
+export type { StudioWorkspaceStateProps } from "./StudioWorkspaceState";
 export {
   navigateStudioWorkspace,
   useStudioNavigation,

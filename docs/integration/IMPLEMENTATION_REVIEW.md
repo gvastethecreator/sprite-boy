@@ -811,9 +811,33 @@ los lotes que sí modifican producto.
   16/17 pero palette excedió el timeout fijo de 5s bajo saturación; aislada con
   ventana 20s terminó en 2.28s. Revisión final: `accept`.
 
+## F6-05 — Workspace-aware empty/loading/error states
+
+- **Estado:** `accept` después de browser repair y segunda revisión
+  independiente. El primer review devolvió `repair` por pérdida de foco al
+  desmontar la acción Compose→Slice; el journey endurecido prueba ahora foco en
+  `Slice workspace content`.
+- **Contrato:** `resolveStudioWorkspaceState` devuelve un union frozen y
+  exhaustivo. Loading precede error; error precede ready/empty. Readiness usa
+  source para Slice, canvas para Compose, cualquier escena para Animate/Export
+  y al menos un frame seguro para Collision.
+- **Presentación:** cada workspace tiene heading, descripción, icono y recovery
+  distintos. Loading usa status/busy, error usa alert/retry/dismiss y empty sólo
+  expone commands reales con disabled reason. No se agregó store ni placeholder.
+- **Shell:** CanvasArea sólo monta para ready. Un shell failure conserva
+  workspace/command para retry; cambiar de workspace limpia error transitorio.
+  Navegar enfoca el contenido central nombrado. View transitions rápidas
+  consumen su rejection de presentación sin ocultar ni cancelar el state update.
+- **Browser:** build productivo recorrió cinco empty states, commands/recovery,
+  Compose→Slice con foco y Slice empty→ready tras importar una imagen. Todos los
+  layouts entraron en viewport; cero console errors y excepciones.
+- **Evidencia:** 15/15 focales tras repair, gate acumulado F6 57/57, typecheck,
+  lint focal `--deny-warnings`, build y diff-check verdes. Revisión final:
+  `accept`; warning chunk >500 kB continúa como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F6-05: activo; debe diferenciar estados empty/loading/error de los cinco
-  workspaces sin crear bodies o stores paralelos.
+- F6-06: activo; debe cerrar J9 con keyboard registry-driven, cinco destinos
+  alcanzables y ausencia demostrada de modos o commands inertes.

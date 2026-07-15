@@ -16,11 +16,18 @@ import { useProject } from "../../contexts/ProjectContext";
 import {
   createStudioCommandRegistry,
   getStudioWorkspace,
+  resolveStudioWorkspaceState,
   type StudioCommandContext,
   type StudioCommandId,
   type StudioWorkspaceId,
 } from "../../core/studio";
-import { StudioDialog, StudioHeader, StudioPanel, useStudioNavigation } from "../studio";
+import {
+  StudioDialog,
+  StudioHeader,
+  StudioPanel,
+  StudioWorkspaceStateView,
+  useStudioNavigation,
+} from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
 
 function legacyModeForWorkspace(workspaceId: StudioWorkspaceId): AppMode {
@@ -38,6 +45,12 @@ function legacyModeForWorkspace(workspaceId: StudioWorkspaceId): AppMode {
 }
 
 const COMPACT_STUDIO_QUERY = "(max-width: 1279px)";
+
+interface StudioShellError {
+  readonly workspaceId: StudioWorkspaceId;
+  readonly commandId: StudioCommandId;
+  readonly message: string;
+}
 
 function useCompactStudioLayout(): boolean {
   const readMatch = () =>
@@ -104,13 +117,17 @@ const AppLayout: React.FC = () => {
     handleSaveProject,
     handleNewProject,
     isLoading,
+    loadingMessage,
+    animations,
   } = controller;
 
   const canvasRef = useRef<CanvasHandle>(null);
+  const workspaceContentRef = useRef<HTMLDivElement>(null);
   const assetInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
   const { activeWorkspace, navigate } = useStudioNavigation();
   const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
+  const [studioError, setStudioError] = useState<StudioShellError | null>(null);
   const isCompactLayout = useCompactStudioLayout();
   const hasWorkspace = !!slicerImage || !!builderCanvas;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
@@ -122,7 +139,12 @@ const AppLayout: React.FC = () => {
 
   useEffect(() => {
     setCompactPanel(null);
+    setStudioError(null);
   }, [activeWorkspace, isCompactLayout]);
+
+  useEffect(() => {
+    workspaceContentRef.current?.focus({ preventScroll: true });
+  }, [activeWorkspace]);
 
   const commandRegistry = useMemo(() => createStudioCommandRegistry({
     newProject: () => {
@@ -158,15 +180,43 @@ const AppLayout: React.FC = () => {
     canvasAvailable: hasWorkspace,
   }), [canRedo, canUndo, hasWorkspace, isLoading]);
 
+  const workspaceState = useMemo(() => resolveStudioWorkspaceState({
+    workspaceId: activeWorkspace,
+    availability: {
+      sourceAvailable: !!slicerImage,
+      compositionAvailable: !!builderCanvas,
+      frameCount: frames.length,
+      animationCount: animations.length,
+    },
+    loading: isLoading,
+    loadingMessage,
+    failure: studioError?.workspaceId === activeWorkspace
+      ? { message: studioError.message, retryCommandId: studioError.commandId }
+      : null,
+  }), [
+    activeWorkspace,
+    animations.length,
+    builderCanvas,
+    frames.length,
+    isLoading,
+    loadingMessage,
+    slicerImage,
+    studioError,
+  ]);
+
   const executeCommand = useCallback((commandId: StudioCommandId) => {
-    void commandRegistry.execute(commandId, commandContext).catch((error: unknown) => {
-      console.error(`Studio command failed: ${commandId}`, error);
-      showToast(
-        error instanceof Error ? error.message : `Could not run ${commandId}.`,
-        "error",
-      );
-    });
-  }, [commandContext, commandRegistry, showToast]);
+    void commandRegistry.execute(commandId, commandContext)
+      .then((result) => {
+        if (result.status !== "executed") return;
+        setStudioError((current) => current?.commandId === commandId ? null : current);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : `Could not run ${commandId}.`;
+        console.error(`Studio command failed: ${commandId}`, error);
+        setStudioError({ workspaceId: activeWorkspace, commandId, message });
+        showToast(message, "error");
+      });
+  }, [activeWorkspace, commandContext, commandRegistry, showToast]);
 
   useKeyboardShortcuts({
     undo,
@@ -288,8 +338,24 @@ const AppLayout: React.FC = () => {
         )}
 
         <div className="flex-1 flex flex-col min-w-0 gap-2">
-          <div className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20">
-            <CanvasArea ref={canvasRef} />
+          <div
+            ref={workspaceContentRef}
+            tabIndex={-1}
+            data-studio-workspace-content={activeWorkspace}
+            aria-label={`${activeWorkspaceDefinition.label} workspace content`}
+            className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {workspaceState.kind === "ready" ? (
+              <CanvasArea ref={canvasRef} />
+            ) : (
+              <StudioWorkspaceStateView
+                state={workspaceState}
+                registry={commandRegistry}
+                commandContext={commandContext}
+                onExecute={executeCommand}
+                onDismissError={() => setStudioError(null)}
+              />
+            )}
           </div>
           {hasWorkspace && activeWorkspaceDefinition.capabilities.timeline === "editable" && (
             <TimelinePanel />

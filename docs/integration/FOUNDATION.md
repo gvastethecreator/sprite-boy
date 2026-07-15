@@ -487,6 +487,18 @@ probó 1440x900 y 1024x768, trap/restore/Escape/reduced-motion, page fit y cero
 errores/excepciones. Un combinado agotó el timeout de 5s en palette bajo carga;
 su repetición aislada terminó en 2.28s y pasó 3/3.
 
+F6-05 añade un resolver puro y frozen para `empty/loading/error/ready`, derivado
+de los facts ya existentes del controller y del workspace activo. Cada destino
+publica copy y recovery propios; los botones consultan enablement y ejecutan IDs
+del registry, mientras CanvasArea sólo monta en `ready`. Los fallos del shell
+conservan command ID para retry y se limpian al cambiar de workspace, sin store
+persistente paralelo. El primer browser gate descubrió dos `AbortError` al
+cancelar view transitions rápidas y la revisión independiente encontró pérdida
+de foco al navegar desde un empty state; ambos defects se repararon y reprobaron.
+El gate aceptado suma 15/15 tests focales, 57/57 acumulados de F6, typecheck,
+lint estricto, build y Chrome productivo sobre las cinco rutas, empty→ready,
+recovery con foco nombrado, page fit y cero errores/excepciones.
+
 ### F7 — Observabilidad, jobs y error taxonomy
 
 - **Owner:** `[gpt-5.6-sol | xhigh]`.

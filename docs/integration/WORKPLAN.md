@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06 y F6-01..F6-04 aceptados. Frontiers: F3-07 pendiente de browser; F6-05 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06 y F6-01..F6-05 aceptados. Frontiers: F3-07 pendiente de browser; F6-06 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -73,6 +73,16 @@ Properties siguen alcanzables a 1024x768. Los seis overlays legacy migraron al
 contrato, incluidos dos repairs de hook order. Chrome productivo probó 1440x900
 y 1024x768 sin overflow, errores ni excepciones. F6-05 puede añadir estados por
 workspace sobre estas superficies.
+F6-05 reemplazó el empty genérico de Builder por un resolver exhaustivo de
+Slice/Compose/Animate/Collision/Export. Loading viene del UI controller, los
+fallos de command quedan locales y reintentables, y ready se deriva sólo de
+source/canvas/frames existentes; no apareció otro store. Las acciones usan IDs
+ejecutables del registry y CanvasArea sólo monta cuando el destino está ready.
+Chrome productivo recorrió las cinco rutas, transición empty→ready y recovery
+Compose→Slice con transferencia de foco al contenido nuevo. También expuso y
+cerró rejections `AbortError` de view transitions rápidas; el gate final quedó
+sin overflow, console errors ni excepciones. F6-06 puede consolidar shortcuts y
+retirar rutas/commands legacy inalcanzables.
 
 ## Reglas de ejecución
 
