@@ -230,7 +230,8 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
   }));
 
   return (
-    <main
+    <section
+      aria-label="Canvas workspace"
       className="h-full bg-app relative flex flex-col select-none group/canvas"
       onWheel={mouse.handleWheel}
       onDragOver={mouse.handleDragOver}
@@ -391,7 +392,7 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
           isHoveringInteractive={selectedFrameIndex !== null}
         />
       )}
-    </main>
+    </section>
   );
 });
 

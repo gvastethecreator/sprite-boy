@@ -56,7 +56,7 @@ function getDB(): Promise<IDBDatabase> {
             const writeStore = writeTransaction.objectStore(STORE_NAME);
             DEFAULT_ASSETS.forEach((asset) => {
               const blob = dataURIToBlob(asset.src);
-              const { src, ...rest } = asset;
+              const { src: _src, ...rest } = asset;
               writeStore.put({ ...rest, blob });
             });
             writeTransaction.oncomplete = () => resolve(db);

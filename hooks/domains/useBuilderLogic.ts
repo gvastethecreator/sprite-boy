@@ -1,7 +1,6 @@
 import {
   ProjectState,
   SlotData,
-  BuilderCanvasSize,
   UserPreferences,
   AIModelId,
   AIGenerationMode,
@@ -163,7 +162,7 @@ export function useBuilderLogic(
 
       showToast(`Added Slice #${frame.id} to library`, "success");
       if (preferences.soundEnabled) uiFeedback.play("success");
-    } catch (e) {
+    } catch {
       showToast("Failed to crop frame", "error");
     } finally {
       setIsLoading(false);

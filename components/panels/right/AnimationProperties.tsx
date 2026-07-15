@@ -5,7 +5,6 @@ import {
   Crosshair,
   Copy,
   Trash2,
-  MoveDiagonal,
   RotateCw,
   Ghost,
   Maximize,

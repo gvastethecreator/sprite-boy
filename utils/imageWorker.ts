@@ -115,8 +115,8 @@ function rgbToHsl(r: number, g: number, b: number) {
   const max = Math.max(r, g, b),
     min = Math.min(r, g, b);
   let h = 0,
-    s = 0,
-    l = (max + min) / 2;
+    s = 0;
+  const l = (max + min) / 2;
   if (max === min) {
     h = s = 0;
   } else {
@@ -146,7 +146,7 @@ export function removeBackground(
   tolerance: number,
   softness: number,
 ) {
-  let hex = targetHex.replace("#", "");
+  const hex = targetHex.replace("#", "");
   let rT = 0,
     gT = 0,
     bT = 0;

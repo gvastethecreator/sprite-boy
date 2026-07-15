@@ -6,7 +6,6 @@ import {
   SpriteAnimation,
   TemplateConfig,
   OnionSkinConfig,
-  Keyframe,
   FrameLabelConfig,
   SlotAlignment,
 } from "../types";
@@ -85,7 +84,6 @@ export class CanvasRenderer {
       offset,
       isExport,
       templateConfig,
-      isPlaying,
       activeAnimation,
       isDragOverCanvas,
       currentMode,
@@ -173,7 +171,6 @@ export class CanvasRenderer {
       labelConfig,
       currentMode,
       draggingSlotIndex,
-      mousePos,
     } = state as RenderContext;
     if (!ctx || !builderGrid || !builderSlots) return;
     const { rows, cols, marginX, marginY, paddingX, paddingY, cellW, cellH } = calculateGeometry(

@@ -3,8 +3,6 @@ import { ProjectState, FrameData, UserPreferences } from "../../types";
 import { detectSprites, removeBackground } from "../../utils/algorithms";
 import { uiFeedback } from "../../utils/uiFeedback";
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
 /** Slicer mode: auto-detect sprites, manage frames, background removal. */
 export function useSlicerLogic(
   project: ProjectState,
@@ -31,7 +29,7 @@ export function useSlicerLogic(
       const frames = await detectSprites(img);
       setProject((prev) => ({ ...prev, frames }));
       showToast(`Detected ${frames.length} sprites`, "success");
-    } catch (e) {
+    } catch {
       showToast("Slice failed", "error");
     } finally {
       setIsLoading(false);
@@ -103,7 +101,7 @@ export function useSlicerLogic(
         };
         reader.readAsDataURL(blob);
       }
-    } catch (e) {
+    } catch {
       showToast("Failed to remove background", "error");
     } finally {
       setIsLoading(false);

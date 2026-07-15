@@ -69,6 +69,7 @@ describe("studio gate manifest", () => {
       "integration",
       "coverage",
       "fixtures",
+      "budgets",
       "build",
       "e2e",
       "all",
@@ -93,11 +94,17 @@ describe("studio gate manifest", () => {
       "coverage",
       "fixtures",
       "build",
-      "browser-smoke",
+      "bundle-budget",
+      "browser-budget",
     ]);
     expect(STUDIO_GATE_MANIFEST.gates.all.steps.filter(({ id }) => id === "build")).toHaveLength(1);
     expect(STUDIO_GATE_MANIFEST.gates.lint.steps[0]?.args).toEqual([
-      "x", "oxlint", ".", "--max-warnings=47",
+      "x", "oxlint", ".", "--deny-warnings",
+    ]);
+    expect(STUDIO_GATE_MANIFEST.gates.budgets.steps.map(({ id }) => id)).toEqual([
+      "build",
+      "bundle-budget",
+      "browser-budget",
     ]);
   });
 

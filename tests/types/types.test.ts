@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { GridConfig } from "../../types/config";
-import type { FrameData, SpriteAnimation, Keyframe, ProjectState } from "../../types/core";
+import type { FrameData, SpriteAnimation, Keyframe } from "../../types/core";
 import { AppMode, HitboxType } from "../../types/enums";
 
 describe("Type definitions", () => {
