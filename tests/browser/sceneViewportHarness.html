@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>F5-06 Scene Viewport Browser Gate</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-monospace, Consolas, monospace; }
+      body { margin: 0; min-height: 100vh; background: #10131a; color: #e8ecf4; display: grid; place-items: center; }
+      main { width: min(760px, calc(100vw - 48px)); padding: 24px; border: 1px solid #303849; border-radius: 16px; background: #171c26; box-shadow: 0 24px 80px #0008; }
+      h1 { margin: 0 0 8px; font-size: 18px; }
+      p { margin: 0 0 18px; color: #9da8ba; font-size: 12px; }
+      .stage { width: 320px; height: 180px; border: 1px solid #46516a; background: repeating-conic-gradient(#222936 0 25%, #1b202b 0 50%) 0 / 16px 16px; }
+      canvas { display: block; width: 100%; height: 100%; }
+      pre { margin: 18px 0 0; min-height: 140px; padding: 14px; border-radius: 10px; background: #0d1016; color: #d5dced; white-space: pre-wrap; font-size: 11px; line-height: 1.5; }
+      pre[data-status="pass"] { border: 1px solid #2f9e66; }
+      pre[data-status="fail"] { border: 1px solid #e05263; color: #ffbdc5; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>F5-06 · Canonical browser viewport</h1>
+      <p>Real Canvas2D · DPR · ResizeObserver · context recovery · zero idle rAF</p>
+      <div id="stage" class="stage"><canvas id="scene"></canvas></div>
+      <pre id="result" data-status="running">Running browser gate…</pre>
+    </main>
+    <script type="module" src="./sceneViewportJourney.ts"></script>
+  </body>
+</html>

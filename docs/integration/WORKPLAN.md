@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06 y F5-01..F5-05 aceptados. Frontiers: F3-07 pendiente de browser; F5-06 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06 y F5-01..F5-06 aceptados. Frontiers: F3-07 pendiente de browser; F6-01 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -43,6 +43,12 @@ pre-allocation, metadata tipada, MIME exacto y cleanup total sobre OffscreenCanv
 o HTMLCanvas. Export y thumbnail capturan un único draw plan antes de crear la
 surface, por lo que un boundary reentrante no puede desacoplar dimensiones,
 revision y pixels. ZIP/GIF/video, URLs, download, hashing y jobs siguen en F7/A11.
+F5-06 cerró el viewport browser: content-box + DPR producen backing pixels
+exactos; DPR y workspace viewport forman una única base matrix; scheduler queda
+en cero rAF idle. Context loss suspende sin perder dirty/leases y restore redraws
+una vez. Generations async superseded no bloquean el frame fresco; dispose corta
+observer/listeners/rAF/completions y libera el backing a 0x0. Chrome real DPR 2
+probó resize, pixel sample, idle, restore y cleanup sin errores.
 
 ## Reglas de ejecución
 

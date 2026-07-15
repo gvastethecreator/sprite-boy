@@ -60,6 +60,7 @@ export interface RenderContinuityLease {
 
 export interface RenderSchedulerSnapshot {
   readonly disposed: boolean;
+  readonly suspended: boolean;
   readonly failed: boolean;
   readonly scheduled: boolean;
   readonly rendering: boolean;
@@ -125,6 +126,7 @@ export class RenderScheduler {
   private scheduledHandle: number | null = null;
   private requestingFrame = false;
   private rendering = false;
+  private suspended = false;
   private disposed = false;
   private failed = false;
   private frameCount = 0;
@@ -203,6 +205,7 @@ export class RenderScheduler {
     const projectRevision = this.pendingRevision;
     return Object.freeze({
       disposed: this.disposed,
+      suspended: this.suspended,
       failed: this.failed,
       scheduled: this.scheduledToken !== null,
       rendering: this.rendering,
@@ -220,6 +223,7 @@ export class RenderScheduler {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.suspended = false;
     if (this.scheduledToken !== null) {
       const handle = this.scheduledHandle;
       this.scheduledToken = null;
@@ -241,6 +245,31 @@ export class RenderScheduler {
     this.continuityLeases.clear();
     this.rendering = false;
     this.failed = false;
+  }
+
+  suspend(): void {
+    if (this.disposed || this.suspended) return;
+    this.suspended = true;
+    if (this.scheduledToken === null) return;
+    const handle = this.scheduledHandle;
+    this.scheduledToken = null;
+    this.scheduledHandle = null;
+    if (handle !== null) {
+      try {
+        this.host.cancelFrame(handle);
+      } catch {
+        this.reportError({
+          code: "RENDER_SCHEDULER_HOST_FAILED",
+          message: "Render scheduler could not cancel a suspended frame.",
+        });
+      }
+    }
+  }
+
+  resume(): void {
+    if (this.disposed || !this.suspended) return;
+    this.suspended = false;
+    this.scheduleIfNeeded();
   }
 
   private releaseContinuous(reason: ContinuousRenderReason, token: symbol): void {
@@ -274,6 +303,7 @@ export class RenderScheduler {
   private scheduleIfNeeded(): void {
     if (
       this.disposed ||
+      this.suspended ||
       this.failed ||
       this.requestingFrame ||
       this.rendering ||

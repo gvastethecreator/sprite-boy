@@ -699,9 +699,39 @@ los lotes que sí modifican producto.
   verdes. Ledger: 198/198 IDs únicos. Revisión final: `accept`; warning chunk
   >500 kB permanece como baseline.
 
+## F5-06 — Browser scene viewport lifecycle
+
+- **Estado:** `accept` después de revisión independiente
+  `repair+accept+repair+accept` y gate Chrome real.
+- **Contrato:** un owner por HTML canvas, container externo obligatorio como
+  content-box resize target, backing `round(css × DPR)` acotado, y matriz base
+  DPR × workspace scale/offset. Canvas2D background/draw comparten transform;
+  exports/thumbnails permanecen en coordenadas lógicas.
+- **Scheduling:** scene/asset/viewport/overlay/resize son one-shot; drag/playback
+  usan leases. Context loss suspende scheduler conservando dirty/leases; restore
+  readquiere contexto, invalida y reanuda una vez. Resize/restore durante asset
+  resolve retira la generación vieja sin marcar failure ni perder follow-up.
+- **Cleanup:** dispose invalida completions tardías, cancela rAF, desconecta
+  ResizeObserver, window/MQL/canvas listeners y libera backing 0x0. Callbacks MQL
+  ya encolados no pueden rearmar listeners. Init parcial hace rollback por port.
+- **Repairs de review/browser:** una generación stale inicialmente marcaba el
+  scheduler failed y varaba el resize nuevo; un callback DPR tardío rearmaba MQL
+  tras dispose. Chrome detectó mezcla border-box/content-box. Review final halló
+  feedback destructivo si el canvas se observaba a sí mismo en DPR>1
+  (`300→600→1200…`). Suspend/resume, stale-neutral, guards post-dispose,
+  content-box único y container externo obligatorio cierran los cuatro paths.
+- **Browser/PERF:** Chrome headless real, URL
+  `/tests/browser/sceneViewportHarness.html`, viewport 900×700 y DPR 2: backing
+  640×360→400×200, pixel `[255,48,64,255]`, frame count idle estable `2`, restore
+  redraw `3`, cleanup `0×0`, screenshot legible y `errors: []`.
+- **Evidencia:** 45/45 compositor+scheduler+viewport; suite acumulada 43/43
+  archivos y 429/429 tests; typecheck, lint focal `--deny-warnings`, build y
+  diff-check verdes. Ledger 198/198. Revisión final: `accept`; warning chunk
+  >500 kB permanece como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F5-06: activo; debe cerrar DPR, resize, context loss y cleanup del runtime de
-  render antes de habilitar el registry de workspaces F6.
+- F6-01: activo; debe congelar el registry exhaustivo y rutas alcanzables de
+  Slice/Compose/Animate/Collision/Export sobre stores/render canónicos.
