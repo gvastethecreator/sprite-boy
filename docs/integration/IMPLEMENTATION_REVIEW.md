@@ -1004,9 +1004,33 @@ los lotes que sí modifican producto.
 - **Evidencia:** 6/6 focales; gate F7 acumulado 5 archivos/68 tests; typecheck,
   lint focal `--deny-warnings` y build verdes. Revisión final: `accept`.
 
+## F7-07 — Export job adapter, safe diagnostics and W2 gate
+
+- **Boundary:** `core/processing/exportJobTask.ts` es el único adapter. Captura
+  port/request/source, omite identidad/signal del config y los deriva siempre
+  del `JobTaskContext` del intento. ExportPort continúa job/store/UI-agnostic.
+- **Policy:** once códigos ExportPort mapean exhaustivamente a Job code, copy y
+  retry. Invalid/unsupported/config/artifact/receipt son terminales; provider,
+  storage, unknown y quota son retryable. Quota indica liberar espacio.
+- **Security:** ExportPortError tiene brand privado, validación runtime y freeze.
+  DOMException quota usa el getter nativo. Getters, proxies, prototype spoof,
+  causes, stacks y mensajes privados nunca cruzan al Job Center.
+- **Authority:** cancel/timeout del runner ganan antes de abort; el posterior
+  failure del adapter se ignora. Retry crea un request ID nuevo y conserva root,
+  parent y terminal fuente.
+- **Repair:** review reprodujo fuga P1 en `createExportFormatRegistry`: un getter
+  del array externo podía lanzar un error prototype-spoofed o branded privado y
+  atravesar el catch por `instanceof`. El registry ahora snapshottea el array en
+  un catch siempre redactado y valida/conflicta fuera de él.
+- **Evidencia:** 27/27 adapter+port; 74/74 F7; 42 archivos/461 contract tests;
+  suite completa 61 archivos/579 tests; typecheck, lint focal `--deny-warnings`
+  y build verdes. Reviewer añadió timeout adversarial con snapshot estable,
+  writer/listeners/active cero. Revisión final: `accept`. Arquitectura:
+  [ADR-008](../architecture/ADR-008-export-job-diagnostics.md).
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F7-07: activo; debe congelar el adapter Job↔Export, códigos/mensajes/retry,
-  redacción y el manifest W2 con revisión de seguridad independiente.
+- F8-01: activo; debe reconciliar ownership real de `package.json` y lockfile
+  antes de cambiar scripts/dependencies o declarar install reproducible.

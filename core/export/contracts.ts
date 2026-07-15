@@ -93,37 +93,54 @@ export interface ExportResult {
   readonly receipt: ExportReceipt;
 }
 
-export type ExportPortErrorCode =
-  | "EXPORT_FORMAT_INVALID"
-  | "EXPORT_FORMAT_CONFLICT"
-  | "EXPORT_INVALID_REQUEST"
-  | "EXPORT_UNSUPPORTED_FORMAT"
-  | "EXPORT_PROVIDER_FAILED"
-  | "EXPORT_ARTIFACT_INVALID"
-  | "EXPORT_ARTIFACT_TOO_LARGE"
-  | "EXPORT_WRITER_FAILED"
-  | "EXPORT_RECEIPT_INVALID"
-  | "EXPORT_ABORTED";
+export const EXPORT_PORT_ERROR_CODES = Object.freeze([
+  "EXPORT_FORMAT_INVALID",
+  "EXPORT_FORMAT_CONFLICT",
+  "EXPORT_INVALID_REQUEST",
+  "EXPORT_UNSUPPORTED_FORMAT",
+  "EXPORT_PROVIDER_FAILED",
+  "EXPORT_ARTIFACT_INVALID",
+  "EXPORT_ARTIFACT_TOO_LARGE",
+  "EXPORT_QUOTA_EXCEEDED",
+  "EXPORT_WRITER_FAILED",
+  "EXPORT_RECEIPT_INVALID",
+  "EXPORT_ABORTED",
+] as const);
+
+export type ExportPortErrorCode = (typeof EXPORT_PORT_ERROR_CODES)[number];
 
 const RETRYABLE_EXPORT_ERRORS: ReadonlySet<ExportPortErrorCode> = new Set([
   "EXPORT_PROVIDER_FAILED",
+  "EXPORT_QUOTA_EXCEEDED",
   "EXPORT_WRITER_FAILED",
 ]);
+
+const EXPORT_PORT_ERROR_BRAND = new WeakSet<object>();
 
 export class ExportPortError extends Error {
   readonly code: ExportPortErrorCode;
   readonly retryable: boolean;
 
   constructor(code: ExportPortErrorCode, message: string) {
+    if (!EXPORT_PORT_ERROR_CODES.includes(code)) {
+      throw new TypeError("Export error code is invalid.");
+    }
+    if (typeof message !== "string" || message.trim().length === 0) {
+      throw new TypeError("Export error message must be non-empty.");
+    }
     super(message);
     this.name = "ExportPortError";
     this.code = code;
     this.retryable = RETRYABLE_EXPORT_ERRORS.has(code);
+    EXPORT_PORT_ERROR_BRAND.add(this);
+    Object.freeze(this);
   }
 }
 
 export function isExportPortError(value: unknown): value is ExportPortError {
-  return value instanceof ExportPortError;
+  return !!value && typeof value === "object" &&
+    EXPORT_PORT_ERROR_BRAND.has(value) &&
+    Object.getPrototypeOf(value) === ExportPortError.prototype;
 }
 
 export interface ExportFormatRegistry {

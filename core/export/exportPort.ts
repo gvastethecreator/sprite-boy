@@ -41,6 +41,9 @@ const ABORTED_GETTER =
   Object.getOwnPropertyDescriptor(AbortSignal.prototype, "aborted")?.get;
 const ADD_EVENT_LISTENER = AbortSignal.prototype.addEventListener;
 const REMOVE_EVENT_LISTENER = AbortSignal.prototype.removeEventListener;
+const DOM_EXCEPTION_NAME_GETTER = typeof DOMException === "function"
+  ? Object.getOwnPropertyDescriptor(DOMException.prototype, "name")?.get
+  : undefined;
 
 function invalidRequest(message: string): ExportPortError {
   return new ExportPortError("EXPORT_INVALID_REQUEST", message);
@@ -67,6 +70,15 @@ function nativeSignalAborted(signal: AbortSignal): boolean {
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal && nativeSignalAborted(signal)) {
     throw new ExportPortError("EXPORT_ABORTED", "Export was cancelled.");
+  }
+}
+
+function isNativeQuotaExceededError(value: unknown): boolean {
+  if (!value || typeof value !== "object" || !DOM_EXCEPTION_NAME_GETTER) return false;
+  try {
+    return Reflect.apply(DOM_EXCEPTION_NAME_GETTER, value, []) === "QuotaExceededError";
+  } catch {
+    return false;
   }
 }
 
@@ -338,7 +350,12 @@ export function createExportPort(options: CreateExportPortOptions): ExportPort {
         if (normalized.signal && nativeSignalAborted(normalized.signal)) {
           throwIfAborted(normalized.signal);
         }
-        void error;
+        if (isNativeQuotaExceededError(error)) {
+          throw new ExportPortError(
+            "EXPORT_QUOTA_EXCEEDED",
+            "The export destination has insufficient storage quota.",
+          );
+        }
         throw new ExportPortError(
           "EXPORT_WRITER_FAILED",
           "The artifact writer could not complete the export.",

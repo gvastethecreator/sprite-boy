@@ -110,23 +110,24 @@ export function createExportFormatRegistry(
   if (!Array.isArray(providers)) {
     throw formatError("Export format providers must be an array.");
   }
+  let candidates: readonly ExportFormatProvider[];
+  try {
+    candidates = Array.from(providers);
+  } catch {
+    throw formatError("Export format providers could not be read.");
+  }
   const byId = new Map<ExportFormatId, ExportFormatProvider>();
   const descriptors: ExportFormatDescriptor[] = [];
-  try {
-    for (const candidate of providers) {
-      const provider = captureProvider(candidate);
-      if (byId.has(provider.format.id)) {
-        throw new ExportPortError(
-          "EXPORT_FORMAT_CONFLICT",
-          `Export format ID "${provider.format.id}" is registered more than once.`,
-        );
-      }
-      byId.set(provider.format.id, provider);
-      descriptors.push(provider.format);
+  for (const candidate of candidates) {
+    const provider = captureProvider(candidate);
+    if (byId.has(provider.format.id)) {
+      throw new ExportPortError(
+        "EXPORT_FORMAT_CONFLICT",
+        `Export format ID "${provider.format.id}" is registered more than once.`,
+      );
     }
-  } catch (error) {
-    if (error instanceof ExportPortError) throw error;
-    throw formatError("Export format providers could not be read.");
+    byId.set(provider.format.id, provider);
+    descriptors.push(provider.format);
   }
   const visible = Object.freeze([...descriptors]);
 
