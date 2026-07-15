@@ -785,9 +785,35 @@ los lotes que sí modifican producto.
   agotaron 10/5 minutos bajo saturación externa sin publicar resultados; no se
   contabilizan como green ni como failure funcional.
 
+## F6-04 — Shared modal/panel and compact accessibility contract
+
+- **Estado:** `accept` después de implementación Luna acotada, repairs Sol,
+  browser gate productivo y revisión independiente sin findings P0-P3.
+- **Dialog:** `StudioDialog` concentra role/name/aria-modal, foco inicial,
+  Tab/Shift+Tab cíclico, Escape, backdrop y restore exacto en close/unmount. No
+  deja listeners/timers; `matchMedia` se suscribe sólo mientras está abierto.
+- **Migración:** Settings, Help, Analysis, Generation, Export y Command Palette
+  usan el primitive. Generation/Export movieron todos sus hooks antes de guards,
+  eliminando hook-order variable. CSS global y GSAP compatibility path respetan
+  `prefers-reduced-motion`.
+- **Panels:** `StudioPanel` conserva un único árbol de Left/RightSidebar. A
+  1440x900 se monta como Tools/Properties inline; a 1024x768 sólo existe el
+  drawer solicitado dentro del focus boundary. Resize y workspace change cierran
+  estado compacto transitorio.
+- **Header compacto:** Project y workspace menus implementan roles, Arrow/Home/
+  End/Escape, disabled filtering y restore. El breakpoint `xl` coincide con el
+  layout; los cinco IDs/hrefs salen del registry.
+- **Browser:** build productivo con reduced-motion forzado pasó 1440x900 y
+  1024x768: cinco nav desktop/compact, dos panels desktop, Tools drawer, Collision,
+  Settings y palette; foco interno/restaurado, page fit, cero errores/excepciones.
+- **Evidencia:** primitives 8/8, header 6/6, palette 3/3; typecheck, lint focal
+  `--deny-warnings`, build y diff-check verdes. La primera combinación ejecutó
+  16/17 pero palette excedió el timeout fijo de 5s bajo saturación; aislada con
+  ventana 20s terminó en 2.28s. Revisión final: `accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F6-04: activo; debe cerrar primitives de panel/modal, restauración de foco,
-  reduced motion y navegación compacta sin destinos inalcanzables.
+- F6-05: activo; debe diferenciar estados empty/loading/error de los cinco
+  workspaces sin crear bodies o stores paralelos.

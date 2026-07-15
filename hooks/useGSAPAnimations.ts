@@ -18,6 +18,12 @@ export function useModalEntrance() {
       const backdrop = el;
       const panel = el.querySelector("[data-modal-panel]") as HTMLElement | null;
 
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        gsap.set(backdrop, { opacity: 1 });
+        if (panel) gsap.set(panel, { opacity: 1, y: 0, scale: 1 });
+        return;
+      }
+
       gsap.fromTo(backdrop, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out" });
       if (panel) {
         gsap.fromTo(

@@ -5,7 +5,6 @@ import {
   Monitor,
   Save,
   HelpCircle,
-  Check,
   Volume2,
   Moon,
   Sun,
@@ -14,7 +13,7 @@ import {
 } from "lucide-react";
 import { UserPreferences, FrameLabelPosition } from "../../types";
 import NumberControl from "../common/NumberControl";
-import { useModalEntrance } from "../../hooks/useGSAPAnimations";
+import { StudioDialog } from "../studio/StudioDialog";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -55,9 +54,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   preferences,
   onUpdatePreferences,
 }) => {
-  const modalRef = useModalEntrance();
-  if (!isOpen) return null;
-
   const updateLabel = (key: keyof typeof preferences.frameLabel, val: any) => {
     onUpdatePreferences({
       ...preferences,
@@ -66,19 +62,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div
-      ref={modalRef}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+    <StudioDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy="studio-settings-title"
+      backdropClassName="items-center bg-black/80 pt-4"
+      panelClassName="max-w-lg border-border shadow-modal"
     >
-      <div
-        data-modal-panel
-        className="bg-panel border border-border rounded-xl shadow-modal w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
-          <h2 className="text-base font-bold text-textMain">Settings</h2>
+          <h2 id="studio-settings-title" className="text-base font-bold text-textMain">Settings</h2>
           <button
+            type="button"
+            aria-label="Close settings"
             onClick={onClose}
             className="text-textMuted hover:text-textMain transition-colors"
           >
@@ -284,8 +279,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             Done
           </button>
         </div>
-      </div>
-    </div>
+    </StudioDialog>
   );
 };
 

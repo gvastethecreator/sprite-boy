@@ -7,6 +7,7 @@ import type {
   StudioCommandRegistry,
   StudioShortcut,
 } from "../../core/studio";
+import { StudioDialog } from "../studio/StudioDialog";
 
 interface CommandPaletteProps {
   readonly isOpen: boolean;
@@ -105,21 +106,20 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 pt-[15vh] backdrop-blur-sm"
-      onClick={onClose}
-      role="presentation"
+    <StudioDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Command palette"
+      initialFocusRef={inputRef}
+      backdropClassName="pt-[15vh]"
+      panelClassName="max-h-[70vh] max-w-[640px] border-white/10"
     >
-      <section
-        aria-label="Command palette"
-        className="flex max-h-[70vh] w-[min(640px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-panel shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
         <div className="flex h-12 items-center gap-3 border-b border-border bg-input px-4">
           <Search className="text-textMuted" size={18} aria-hidden="true" />
           <input
             ref={inputRef}
             aria-label="Search commands"
+            aria-controls="studio-command-results"
             className="h-full flex-1 border-none bg-transparent text-sm text-textMain outline-none placeholder:text-textMuted/50"
             placeholder="Search commands…"
             value={query}
@@ -131,7 +131,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
           </kbd>
         </div>
 
-        <div ref={listRef} className="custom-scrollbar max-h-[360px] overflow-y-auto bg-panel p-2">
+        <div id="studio-command-results" ref={listRef} className="custom-scrollbar max-h-[360px] overflow-y-auto bg-panel p-2">
           {filteredCommands.length === 0 ? (
             <div className="py-10 text-center text-sm text-textMuted">No matching commands.</div>
           ) : (
@@ -184,8 +184,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
             Arrows to navigate <ArrowRight size={10} aria-hidden="true" /> Enter to run
           </span>
         </footer>
-      </section>
-    </div>
+    </StudioDialog>
   );
 };
 

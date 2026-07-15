@@ -8,12 +8,11 @@ import {
   Layers,
   Film,
   Sparkles,
-  Check,
   Loader2,
 } from "lucide-react";
-import { ExportModalState, SpriteAnimation, CodeFormat } from "../../types";
+import { CodeFormat } from "../../types";
 import { useProject } from "../../contexts/ProjectContext";
-import { useModalEntrance } from "../../hooks/useGSAPAnimations";
+import { StudioDialog } from "../studio/StudioDialog";
 
 interface ExportModalProps {
   onGenerateCode: (animId: string, scale: number, format: CodeFormat) => string;
@@ -33,11 +32,6 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const { exportModal, setExportModal, animations } = useProject();
   const { isOpen, type } = exportModal;
   const onClose = () => setExportModal({ ...exportModal, isOpen: false });
-
-  if (!isOpen || !type) return null;
-
-  const modalRef = useModalEntrance();
-
   const [pngGrid, setPngGrid] = useState(false);
   const [selectedAnimId, setSelectedAnimId] = useState<string>(animations[0]?.id || "");
   const [codeScale, setCodeScale] = useState(1);
@@ -78,26 +72,29 @@ const ExportModal: React.FC<ExportModalProps> = ({
     gif: Film,
   };
 
+  if (!isOpen || !type) return null;
+
   const Icon = Icons[type];
 
   return (
-    <div
-      ref={modalRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+    <StudioDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy="studio-export-title"
+      backdropClassName="items-center bg-black/80 pt-4"
+      panelClassName="max-h-[90vh] max-w-2xl border-border shadow-modal"
     >
-      <div
-        data-modal-panel
-        className="bg-panel border border-border rounded-xl shadow-modal w-full max-w-2xl flex flex-col overflow-hidden max-h-[90vh]"
-      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
-          <h2 className="text-sm font-bold text-white flex items-center gap-3">
+          <h2 id="studio-export-title" className="text-sm font-bold text-white flex items-center gap-3">
             <div className="p-1.5 bg-accent/20 rounded-lg text-accent">
               <Icon size={18} />
             </div>
             {titles[type]}
           </h2>
           <button
+            type="button"
+            aria-label="Close export"
             onClick={onClose}
             className="text-textMuted hover:text-white transition-colors p-1 hover:bg-white/5 rounded-full"
           >
@@ -301,8 +298,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </StudioDialog>
   );
 };
 

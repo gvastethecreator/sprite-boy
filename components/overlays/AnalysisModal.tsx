@@ -1,6 +1,6 @@
 import React from "react";
 import { X, BrainCircuit } from "lucide-react";
-import { useModalEntrance } from "../../hooks/useGSAPAnimations";
+import { StudioDialog } from "../studio/StudioDialog";
 
 interface AnalysisModalProps {
   isOpen: boolean;
@@ -9,25 +9,21 @@ interface AnalysisModalProps {
 }
 
 const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, analysisResult }) => {
-  const modalRef = useModalEntrance();
-  if (!isOpen) return null;
-
   return (
-    <div
-      ref={modalRef}
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+    <StudioDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy="studio-analysis-title"
+      backdropClassName="items-center pt-4"
+      panelClassName="max-w-2xl border-border"
     >
-      <div
-        data-modal-panel
-        className="bg-panel border border-border rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
-          <h2 className="text-lg font-semibold text-textMain flex items-center gap-2">
+          <h2 id="studio-analysis-title" className="text-lg font-semibold text-textMain flex items-center gap-2">
             <BrainCircuit size={20} className="text-accent" /> Gemini Sheet Analysis
           </h2>
           <button
+            type="button"
+            aria-label="Close analysis"
             onClick={onClose}
             className="text-textMuted hover:text-textMain transition-colors p-1 hover:bg-white/10 rounded-full"
           >
@@ -58,8 +54,7 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, analysis
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </StudioDialog>
   );
 };
 

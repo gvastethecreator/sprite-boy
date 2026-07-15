@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   createStudioCommandRegistry,
@@ -88,9 +88,9 @@ describe("StudioHeader", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Project/ }));
     const menu = screen.getByRole("menu", { name: "Project actions" });
-    fireEvent.click(within(menu).getByRole("button", { name: "New project" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "New project" }));
     fireEvent.click(screen.getByRole("button", { name: "Project" }));
-    fireEvent.click(within(screen.getByRole("menu", { name: "Project actions" })).getByRole("button", { name: "Import image" }));
+    fireEvent.click(within(screen.getByRole("menu", { name: "Project actions" })).getByRole("menuitem", { name: "Import image" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     fireEvent.click(screen.getByRole("button", { name: "Redo" }));
@@ -126,7 +126,7 @@ describe("StudioHeader", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Project/ }));
-    const save = within(screen.getByRole("menu", { name: "Project actions" })).getByRole("button", { name: "Save project" });
+    const save = within(screen.getByRole("menu", { name: "Project actions" })).getByRole("menuitem", { name: "Save project" });
     expect(save).toBeDisabled();
     expect(save).toHaveAttribute("title", "Open or create a project first.");
     fireEvent.click(save);
@@ -142,5 +142,32 @@ describe("StudioHeader", () => {
     expect(cta).toHaveAttribute("href", "#/studio/export");
     fireEvent.click(cta);
     expect(onExecute).toHaveBeenCalledWith("workspace.open.export");
+  });
+
+  it("keeps every workspace reachable from the compact menu and restores focus", async () => {
+    const { onExecute } = renderHeader("compose");
+    const trigger = screen.getByRole("button", { name: "Compose" });
+
+    fireEvent.click(trigger);
+    const menu = screen.getByRole("menu", { name: "Studio workspaces" });
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items.map((item) => item.textContent?.trim())).toEqual([
+      "Slice",
+      "Compose",
+      "Animate",
+      "Collision",
+      "Export",
+    ]);
+    await waitFor(() => expect(items[0]).toHaveFocus());
+
+    fireEvent.keyDown(menu, { key: "End" });
+    expect(items[4]).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    fireEvent.click(trigger);
+    fireEvent.click(within(screen.getByRole("menu", { name: "Studio workspaces" })).getByRole("menuitem", { name: "Collision" }));
+    expect(onExecute).toHaveBeenLastCalledWith("workspace.open.collision");
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

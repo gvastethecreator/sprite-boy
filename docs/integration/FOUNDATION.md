@@ -474,6 +474,19 @@ independiente quedaron verdes; la suite acumulada monolítica y su shard 1/4
 agotaron su ventana bajo saturación del host, después de la baseline 45/45 y
 444/444 ya aceptada. F6-04 debe cerrar foco, semántica modal y compact desktop.
 
+F6-04 publica `StudioDialog` y `StudioPanel` como owners efímeros de presentación
+y foco, nunca de documento. Dialog implementa naming, `aria-modal`, foco inicial,
+Tab/Shift+Tab cíclico, Escape/backdrop y restore incluso al desmontar; el media
+query se limpia y CSS/GSAP respetan reduced motion. Settings, Help, Analysis,
+Generation, Export y Command Palette migraron al mismo boundary; Generation y
+Export además corrigieron hooks condicionales. A `xl` se montan dos sidebars; por
+debajo se monta sólo el drawer solicitado, con Tools/Properties y el selector de
+cinco workspaces siempre alcanzables. Tests focales 8+6+3, typecheck/lint/build/
+diff-check y review independiente quedaron verdes. Chrome sobre build productivo
+probó 1440x900 y 1024x768, trap/restore/Escape/reduced-motion, page fit y cero
+errores/excepciones. Un combinado agotó el timeout de 5s en palette bajo carga;
+su repetición aislada terminó en 2.28s y pasó 3/3.
+
 ### F7 — Observabilidad, jobs y error taxonomy
 
 - **Owner:** `[gpt-5.6-sol | xhigh]`.

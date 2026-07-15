@@ -1,8 +1,7 @@
-import React, { useState } from "react";
-import { X, Sparkles, ArrowRight, Layers, Image as ImageIcon, Grid } from "lucide-react";
-import { BuilderAsset, SlotData } from "../../types";
+import React, { useRef, useState } from "react";
+import { X, Sparkles, ArrowRight, Image as ImageIcon, Grid } from "lucide-react";
 import { useProject } from "../../contexts/ProjectContext";
-import { useModalEntrance } from "../../hooks/useGSAPAnimations";
+import { StudioDialog } from "../studio/StudioDialog";
 
 const GenerationModal: React.FC = () => {
   const {
@@ -14,13 +13,12 @@ const GenerationModal: React.FC = () => {
   } = useProject();
   const { isOpen, targetSlotIndex } = generationModal;
   const onClose = () => setGenerationModal({ ...generationModal, isOpen: false });
-
-  const modalRef = useModalEntrance();
-  if (!isOpen || targetSlotIndex === null) return null;
-
   const [prompt, setPrompt] = useState("");
   const [contextType, setContextType] = useState<"neighbor" | "library" | "empty">("neighbor");
   const [selectedAssetId, setSelectedAssetId] = useState<string>(builderAssets[0]?.id || "");
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  if (!isOpen || targetSlotIndex === null) return null;
 
   // Determine neighbors for context suggestions
   // Assuming we don't have easy access to grid geometry here, we'll just offer "Previous Slot" as a simplified neighbor
@@ -38,19 +36,21 @@ const GenerationModal: React.FC = () => {
   };
 
   return (
-    <div
-      ref={modalRef}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+    <StudioDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy="studio-generation-title"
+      initialFocusRef={promptRef}
+      backdropClassName="items-center pt-4"
+      panelClassName="max-w-lg border-border"
     >
-      <div
-        data-modal-panel
-        className="bg-panel border border-border rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col"
-      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
-          <h2 className="text-lg font-semibold text-textMain flex items-center gap-2">
+          <h2 id="studio-generation-title" className="text-lg font-semibold text-textMain flex items-center gap-2">
             <Sparkles size={18} className="text-purple-400" /> Generate Frame
           </h2>
           <button
+            type="button"
+            aria-label="Close frame generation"
             onClick={onClose}
             className="text-textMuted hover:text-textMain transition-colors p-1 hover:bg-white/10 rounded-full"
           >
@@ -64,11 +64,11 @@ const GenerationModal: React.FC = () => {
               Instruction
             </label>
             <textarea
+              ref={promptRef}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe the variation (e.g., 'Make it look damaged', 'Change color to red', 'Add a glow effect')..."
               className="w-full h-24 bg-input border border-border rounded-md p-3 text-sm text-textMain focus:border-accent focus:ring-1 focus:ring-accent outline-none resize-none"
-              autoFocus
             />
           </div>
 
@@ -152,8 +152,7 @@ const GenerationModal: React.FC = () => {
             <Sparkles size={14} /> Generate Variation
           </button>
         </div>
-      </div>
-    </div>
+    </StudioDialog>
   );
 };
 
