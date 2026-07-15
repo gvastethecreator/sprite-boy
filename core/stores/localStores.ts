@@ -1,4 +1,9 @@
-import { WORKSPACE_IDS, isEntityId, type WorkspaceId } from "../project";
+import { WORKSPACE_IDS, isEntityId, type EntityId, type WorkspaceId } from "../project";
+import {
+  assertJobReplacement,
+  assertJobRetryLineage,
+  assertJobSnapshot,
+} from "../processing";
 import {
   STUDIO_STORE_CONTRACTS,
   type DeepReadonly,
@@ -530,6 +535,9 @@ function createInitialJobState(): DeepReadonly<JobStoreState> {
   return Object.freeze({
     jobs: Object.freeze(Object.create(null) as Record<string, JobStoreEntry>),
     order: Object.freeze([]),
+    retiredRequestIds: Object.freeze([]),
+    retiredJobIds: Object.freeze([]),
+    consumedRetrySourceIds: Object.freeze([]),
   });
 }
 
@@ -551,11 +559,54 @@ function reduceJob(
       ) {
         throw new TypeError("JobStore entries cannot contain project or revision state.");
       }
-      if (runtimeDataEqual(state.jobs[action.job.id], action.job)) return state;
-      const exists = state.jobs[action.job.id] !== undefined;
+      assertJobSnapshot(action.job);
+      const job = action.job;
+      if (runtimeDataEqual(state.jobs[job.id], job)) return state;
+      const exists = state.jobs[job.id] !== undefined;
+      if (!exists && job.status !== "queued") {
+        throw new TypeError("JobStore only accepts new jobs in queued state.");
+      }
+      if (!exists && state.retiredJobIds.includes(job.id)) {
+        throw new TypeError("JobStore job identities are single-use and cannot be recycled.");
+      }
+      if (
+        !exists &&
+        (
+          state.retiredRequestIds.includes(job.requestId) ||
+          state.order.some((jobId) => state.jobs[jobId]?.requestId === job.requestId)
+        )
+      ) {
+        throw new TypeError("JobStore request identities must be unique and never recycled.");
+      }
+      if (!exists && job.attempt > 1) {
+        const previous = job.previousJobId === null
+          ? undefined
+          : state.jobs[job.previousJobId];
+        const root = state.jobs[job.rootJobId];
+        if (!previous || !root) {
+          throw new TypeError("JobStore retry lineage must reference retained jobs.");
+        }
+        if (
+          state.consumedRetrySourceIds.includes(previous.id) ||
+          state.order.some((jobId) => state.jobs[jobId]?.previousJobId === previous.id)
+        ) {
+          throw new TypeError("JobStore only permits one retry child per terminal attempt.");
+        }
+        assertJobRetryLineage(previous, job);
+      }
+      if (exists) {
+        assertJobReplacement(
+          state.jobs[job.id] as DeepReadonly<JobStoreEntry>,
+          job,
+        );
+      }
       return Object.freeze({
-        jobs: updateRecord(state.jobs, action.job.id, action.job as DeepReadonly<JobStoreEntry>),
-        order: exists ? state.order : Object.freeze([...state.order, action.job.id]),
+        ...state,
+        jobs: updateRecord(state.jobs, job.id, job as DeepReadonly<JobStoreEntry>),
+        order: exists ? state.order : Object.freeze([...state.order, job.id]),
+        consumedRetrySourceIds: !exists && job.attempt > 1
+          ? Object.freeze([...state.consumedRetrySourceIds, job.previousJobId as EntityId])
+          : state.consumedRetrySourceIds,
       });
     }
     case "job.remove": {
@@ -563,20 +614,52 @@ function reduceJob(
         throw new TypeError("Invalid job removal action.");
       }
       if (state.jobs[action.jobId] === undefined) return state;
+      if (
+        state.order.some((jobId) => {
+          if (jobId === action.jobId) return false;
+          const job = state.jobs[jobId];
+          return job?.rootJobId === action.jobId || job?.previousJobId === action.jobId;
+        })
+      ) {
+        throw new TypeError("JobStore cannot remove a job retained by retry lineage.");
+      }
+      const removedJob = state.jobs[action.jobId] as DeepReadonly<JobStoreEntry>;
       return Object.freeze({
+        ...state,
         jobs: updateRecord<DeepReadonly<JobStoreEntry>>(
           state.jobs,
           action.jobId,
           DELETE_RECORD_VALUE,
         ),
         order: Object.freeze(state.order.filter((id) => id !== action.jobId)),
+        retiredRequestIds: state.retiredRequestIds.includes(removedJob.requestId)
+          ? state.retiredRequestIds
+          : Object.freeze([...state.retiredRequestIds, removedJob.requestId]),
+        retiredJobIds: state.retiredJobIds.includes(removedJob.id)
+          ? state.retiredJobIds
+          : Object.freeze([...state.retiredJobIds, removedJob.id]),
       });
     }
     case "job.reset":
       if (!exactKeys(action, ["type"])) throw new TypeError("Invalid job reset action.");
-      return state.order.length === 0 && Object.keys(state.jobs).length === 0
-        ? state
-        : createInitialJobState();
+      if (state.order.length === 0 && Object.keys(state.jobs).length === 0) return state;
+      return Object.freeze({
+        ...state,
+        jobs: Object.freeze(Object.create(null) as Record<string, JobStoreEntry>),
+        order: Object.freeze([]),
+        retiredRequestIds: Object.freeze([
+          ...state.retiredRequestIds,
+          ...state.order
+            .map((jobId) => state.jobs[jobId]?.requestId)
+            .filter((requestId): requestId is EntityId =>
+              requestId !== undefined && !state.retiredRequestIds.includes(requestId)
+            ),
+        ]),
+        retiredJobIds: Object.freeze([
+          ...state.retiredJobIds,
+          ...state.order.filter((jobId) => !state.retiredJobIds.includes(jobId)),
+        ]),
+      });
     default:
       throw new TypeError("Unsupported JobStore action.");
   }

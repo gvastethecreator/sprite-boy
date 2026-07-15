@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createQueuedJob, retryJob, transitionJob } from "../../core/processing";
 import {
   createInteractionStore,
   createJobStore,
@@ -7,6 +8,15 @@ import {
   type InteractionAction,
   type JobStoreAction,
 } from "../../core/stores";
+
+const queuedJob = (id: string, kind = "export") => createQueuedJob({
+  id,
+  requestId: `${id}-request`,
+  kind,
+  label: `${kind} job`,
+  createdAt: "2026-07-14T12:00:00.000Z",
+  timeoutMs: 30_000,
+});
 
 describe("local Studio stores", () => {
   it("keeps workspace view state partial, frozen and outside document history", () => {
@@ -79,15 +89,21 @@ describe("local Studio stores", () => {
 
   it("maintains safe job identity/order and rejects document pollution", () => {
     const store = createJobStore();
-    const first = { id: "__proto__", kind: "export" };
+    const first = queuedJob("__proto__");
     store.dispatch({ type: "job.replace", job: first });
-    store.dispatch({ type: "job.replace", job: { id: "job-2", kind: "worker" } });
-    store.dispatch({ type: "job.replace", job: { id: "__proto__", kind: "export-updated" } });
+    store.dispatch({ type: "job.replace", job: queuedJob("job-2", "worker") });
+    const started = transitionJob(first, {
+      type: "job.start",
+      requestId: first.requestId,
+      at: "2026-07-14T12:00:01.000Z",
+    }).job;
+    store.dispatch({ type: "job.replace", job: started });
 
     expect(store.getSnapshot().order).toEqual(["__proto__", "job-2"]);
-    expect(store.getSnapshot().jobs["__proto__"]).toEqual({
+    expect(store.getSnapshot().jobs["__proto__"]).toMatchObject({
       id: "__proto__",
-      kind: "export-updated",
+      kind: "export",
+      status: "running",
     });
     expect(Object.getPrototypeOf(store.getSnapshot().jobs)).toBeNull();
     expect(() =>
@@ -105,6 +121,116 @@ describe("local Studio stores", () => {
     store.dispatch({ type: "job.remove", jobId: "__proto__" });
     expect(store.getSnapshot().jobs["__proto__"]).toBeUndefined();
     expect(store.getSnapshot().order).toEqual(["job-2"]);
+    expect(store.getSnapshot().retiredRequestIds).toEqual([first.requestId]);
+    expect(store.getSnapshot().retiredJobIds).toEqual([first.id]);
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: {
+        ...queuedJob(first.id, "export"),
+        requestId: "fresh-request-for-retired-job",
+      },
+    })).toThrow(/single-use/);
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: queuedJob("job-recycled-request", "export"),
+    })).not.toThrow();
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: {
+        ...queuedJob("job-forbidden-request", "export"),
+        requestId: first.requestId,
+      },
+    })).toThrow(/never recycled/);
+    const retainedRequestId = queuedJob("job-recycled-request", "export").requestId;
+    store.dispatch({ type: "job.reset" });
+    expect(store.getSnapshot().order).toEqual([]);
+    expect(store.getSnapshot().retiredRequestIds).toEqual(
+      expect.arrayContaining([first.requestId, retainedRequestId, "job-2-request"]),
+    );
+    expect(store.getSnapshot().retiredJobIds).toEqual(
+      expect.arrayContaining([first.id, "job-recycled-request", "job-2"]),
+    );
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: {
+        ...queuedJob("job-after-reset", "export"),
+        requestId: retainedRequestId,
+      },
+    })).toThrow(/never recycled/);
+  });
+
+  it("enforces retained retry lineage and globally unique request identities", () => {
+    const store = createJobStore();
+    const first = queuedJob("job-root", "worker");
+    store.dispatch({ type: "job.replace", job: first });
+    const running = transitionJob(first, {
+      type: "job.start",
+      requestId: first.requestId,
+      at: "2026-07-14T12:00:01.000Z",
+    }).job;
+    store.dispatch({ type: "job.replace", job: running });
+    const failed = transitionJob(running, {
+      type: "job.fail",
+      requestId: first.requestId,
+      at: "2026-07-14T12:00:02.000Z",
+      error: { code: "worker-crash", message: "Worker stopped", retryable: true },
+    }).job;
+    store.dispatch({ type: "job.replace", job: failed });
+    const retry = retryJob(failed, {
+      id: "job-retry",
+      requestId: "request-retry",
+      createdAt: "2026-07-14T12:00:03.000Z",
+    }).retry!;
+
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: { ...retry, id: "job-duplicate-request", requestId: first.requestId },
+    })).toThrow(/request identities must be unique/);
+    store.dispatch({ type: "job.replace", job: retry });
+    expect(store.getSnapshot().order).toEqual(["job-root", "job-retry"]);
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: { ...retry, id: "job-branch", requestId: "request-branch" },
+    })).toThrow(/one retry child/);
+    expect(() => store.dispatch({ type: "job.remove", jobId: first.id })).toThrow(
+      /retained by retry lineage/,
+    );
+    store.dispatch({ type: "job.remove", jobId: retry.id });
+    expect(store.getSnapshot().retiredRequestIds).toContain(retry.requestId);
+    expect(store.getSnapshot().retiredJobIds).toContain(retry.id);
+    expect(store.getSnapshot().consumedRetrySourceIds).toEqual([first.id]);
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: { ...retry, id: "job-retry-recycled" },
+    })).toThrow(/never recycled/);
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: {
+        ...retry,
+        id: "job-retry-second-child",
+        requestId: "request-second-child",
+      },
+    })).toThrow(/one retry child/);
+    store.dispatch({ type: "job.remove", jobId: first.id });
+    expect(() => store.dispatch({
+      type: "job.replace",
+      job: {
+        ...queuedJob(first.id, "worker"),
+        requestId: "fresh-request-for-reused-root",
+      },
+    })).toThrow(/single-use/);
+
+    const isolated = createJobStore();
+    expect(() => isolated.dispatch({
+      type: "job.replace",
+      job: {
+        ...retry,
+        id: "job-orphan",
+        requestId: "request-orphan",
+        rootJobId: "missing-root",
+        previousJobId: "missing-parent",
+      },
+    })).toThrow(/lineage must reference retained jobs/);
   });
 
   it("validates playback transitions and resets the transient clock", () => {
@@ -298,9 +424,10 @@ describe("local Studio stores", () => {
     interaction.dispatch({ type: "interaction.setHover", target: { ...target } });
     expect(interaction.getSnapshot()).toBe(hoverSnapshot);
 
-    jobs.dispatch({ type: "job.replace", job: { id: "job-1", kind: "export" } });
+    const job = queuedJob("job-1");
+    jobs.dispatch({ type: "job.replace", job });
     const jobSnapshot = jobs.getSnapshot();
-    jobs.dispatch({ type: "job.replace", job: { kind: "export", id: "job-1" } });
+    jobs.dispatch({ type: "job.replace", job: queuedJob("job-1") });
     expect(jobs.getSnapshot()).toBe(jobSnapshot);
     expect(listeners[1]).toHaveBeenCalledTimes(1);
     expect(listeners[2]).toHaveBeenCalledTimes(1);
