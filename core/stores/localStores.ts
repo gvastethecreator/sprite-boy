@@ -18,6 +18,7 @@ import {
   type JobStoreAction,
   type JobStoreEntry,
   type JobStoreState,
+  LocalStoreDispatchBusyError,
   type PlaybackAction,
   type PlaybackState,
   type PlaybackStore,
@@ -30,6 +31,12 @@ import {
   type WorkspaceStore,
   type WorkspaceViewport,
 } from "./contracts";
+import {
+  DEFAULT_JOB_RETENTION_POLICY,
+  applyJobRetention,
+  normalizeJobRetentionPolicy,
+  type JobRetentionPolicy,
+} from "./jobRetention";
 
 type LocalStoreKind = "workspace" | "interaction" | "job" | "playback";
 type LocalStore = WorkspaceStore | InteractionStore | JobStore | PlaybackStore;
@@ -42,6 +49,10 @@ export interface LocalStoreSubscriberDiagnostic {
 
 export interface CreateLocalStoreOptions {
   readonly onSubscriberError?: (diagnostic: LocalStoreSubscriberDiagnostic) => void;
+}
+
+export interface CreateJobStoreOptions extends CreateLocalStoreOptions {
+  readonly retention?: JobRetentionPolicy;
 }
 
 type LocalReducer<TKind extends LocalStoreKind> = (
@@ -291,6 +302,46 @@ function normalizeObserver(
   }
 }
 
+function normalizeJobStoreOptions(options: CreateJobStoreOptions | undefined): {
+  readonly localOptions: CreateLocalStoreOptions | undefined;
+  readonly retention: JobRetentionPolicy;
+} {
+  if (options === undefined) {
+    return Object.freeze({ localOptions: undefined, retention: DEFAULT_JOB_RETENTION_POLICY });
+  }
+  if (!isPlainRecord(options)) throw new TypeError("JobStore options must be data-only.");
+  const keys = Reflect.ownKeys(options);
+  if (keys.some((key) => key !== "onSubscriberError" && key !== "retention")) {
+    throw new TypeError("JobStore options contain an unsupported field.");
+  }
+
+  const observerDescriptor = Object.getOwnPropertyDescriptor(options, "onSubscriberError");
+  let localOptions: CreateLocalStoreOptions | undefined;
+  if (observerDescriptor) {
+    if (
+      !("value" in observerDescriptor) || !observerDescriptor.enumerable ||
+      typeof observerDescriptor.value !== "function"
+    ) {
+      throw new TypeError("onSubscriberError must be an enumerable data method.");
+    }
+    localOptions = Object.freeze({ onSubscriberError: observerDescriptor.value });
+  }
+
+  const retentionDescriptor = Object.getOwnPropertyDescriptor(options, "retention");
+  if (
+    retentionDescriptor &&
+    (!("value" in retentionDescriptor) || !retentionDescriptor.enumerable)
+  ) {
+    throw new TypeError("JobStore retention must be an enumerable data field.");
+  }
+  const retention = normalizeJobRetentionPolicy(
+    retentionDescriptor && "value" in retentionDescriptor
+      ? retentionDescriptor.value as JobRetentionPolicy
+      : undefined,
+  );
+  return Object.freeze({ localOptions, retention });
+}
+
 function createLocalStore<TKind extends LocalStoreKind>(
   kind: TKind,
   initialState: DeepReadonly<StudioStoreStateMap[TKind]>,
@@ -333,7 +384,7 @@ function createLocalStore<TKind extends LocalStoreKind>(
     }
   };
   const dispatch = (action: StudioStoreActionMap[TKind]): void => {
-    if (dispatching) throw new TypeError(`${kind} store does not allow reentrant dispatch.`);
+    if (dispatching) throw new LocalStoreDispatchBusyError(kind);
     dispatching = true;
     try {
       let normalizedAction: DeepReadonly<StudioStoreActionMap[TKind]>;
@@ -544,6 +595,7 @@ function createInitialJobState(): DeepReadonly<JobStoreState> {
 function reduceJob(
   state: DeepReadonly<JobStoreState>,
   value: DeepReadonly<JobStoreAction>,
+  retention: JobRetentionPolicy,
 ): DeepReadonly<JobStoreState> {
   const action = requireActionRecord(value);
   switch (action.type) {
@@ -600,7 +652,7 @@ function reduceJob(
           job,
         );
       }
-      return Object.freeze({
+      const next = Object.freeze({
         ...state,
         jobs: updateRecord(state.jobs, job.id, job as DeepReadonly<JobStoreEntry>),
         order: exists ? state.order : Object.freeze([...state.order, job.id]),
@@ -608,6 +660,7 @@ function reduceJob(
           ? Object.freeze([...state.consumedRetrySourceIds, job.previousJobId as EntityId])
           : state.consumedRetrySourceIds,
       });
+      return applyJobRetention(next, retention);
     }
     case "job.remove": {
       if (!exactKeys(action, ["type", "jobId"]) || !isEntityId(action.jobId)) {
@@ -750,8 +803,14 @@ export function createInteractionStore(options?: CreateLocalStoreOptions): Inter
   return createLocalStore("interaction", createInitialInteractionState(), reduceInteraction, options);
 }
 
-export function createJobStore(options?: CreateLocalStoreOptions): JobStore {
-  return createLocalStore("job", createInitialJobState(), reduceJob, options);
+export function createJobStore(options?: CreateJobStoreOptions): JobStore {
+  const normalized = normalizeJobStoreOptions(options);
+  return createLocalStore(
+    "job",
+    createInitialJobState(),
+    (state, action) => reduceJob(state, action, normalized.retention),
+    normalized.localOptions,
+  );
 }
 
 export function createPlaybackStore(options?: CreateLocalStoreOptions): PlaybackStore {

@@ -1,5 +1,5 @@
 import { isEntityId, type EntityId } from "../project";
-import type { JobStore } from "../stores/contracts";
+import { LocalStoreDispatchBusyError, type JobStore } from "../stores/contracts";
 import {
   JOB_FAILURE_CODES,
   assertJobSnapshot,
@@ -115,6 +115,7 @@ interface ActiveRun<TResult> {
   job: JobSnapshot;
   phase: RunPhase;
   pendingTerminal: PendingTerminal | null;
+  terminalFlushScheduled: boolean;
   timeoutHandle: unknown | typeof NO_TIMER;
   callerSignal: AbortSignal | null;
   callerAbortListener: (() => void) | null;
@@ -280,6 +281,7 @@ class DefaultJobRunner implements JobRunner {
       job,
       phase: "settling-nonterminal",
       pendingTerminal: null,
+      terminalFlushScheduled: false,
       timeoutHandle: NO_TIMER,
       callerSignal,
       callerAbortListener: null,
@@ -401,14 +403,16 @@ class DefaultJobRunner implements JobRunner {
     if (entry.phase !== "open") return;
     try {
       const value = await Reflect.apply(task, undefined, [context]) as TResult;
-      if (entry.phase === "open") this.settleSuccess(entry, value);
+      if (entry.phase === "open" && !entry.pendingTerminal) this.settleSuccess(entry, value);
     } catch (error) {
-      if (entry.phase === "open") this.settleFailure(entry, normalizeTaskFailure(error));
+      if (entry.phase === "open" && !entry.pendingTerminal) {
+        this.settleFailure(entry, normalizeTaskFailure(error));
+      }
     }
   }
 
   private reportProgress<TResult>(entry: ActiveRun<TResult>, progress: JobTaskProgress): boolean {
-    if (entry.phase !== "open") return false;
+    if (entry.phase !== "open" || entry.pendingTerminal) return false;
     const transition = this.commitNonTerminal(entry, {
       type: "job.progress",
       requestId: entry.requestId,
@@ -436,6 +440,7 @@ class DefaultJobRunner implements JobRunner {
       return transition;
     } catch (error) {
       entry.phase = "open";
+      if (taskOwned && error instanceof LocalStoreDispatchBusyError) return null;
       if (taskOwned) {
         this.settleFailure(
           entry,
@@ -454,8 +459,9 @@ class DefaultJobRunner implements JobRunner {
   ): boolean {
     if (entry.phase === "settled") return false;
     if (entry.phase === "settling-terminal") return false;
+    if (entry.pendingTerminal) return false;
     if (entry.phase === "settling-nonterminal") {
-      if (!entry.pendingTerminal) entry.pendingTerminal = terminal;
+      entry.pendingTerminal = terminal;
       this.abort(entry, terminal.message);
       return true;
     }
@@ -469,6 +475,24 @@ class DefaultJobRunner implements JobRunner {
     const pending = entry.pendingTerminal;
     entry.pendingTerminal = null;
     this.requestTerminal(entry, pending);
+  }
+
+  private deferTerminal<TResult>(
+    entry: ActiveRun<TResult>,
+    terminal: PendingTerminal,
+  ): void {
+    if (entry.phase === "settled") return;
+    entry.phase = "open";
+    if (!entry.pendingTerminal) entry.pendingTerminal = terminal;
+    if (!entry.terminalFlushScheduled) {
+      entry.terminalFlushScheduled = true;
+      queueMicrotask(() => {
+        if (!entry.terminalFlushScheduled) return;
+        entry.terminalFlushScheduled = false;
+        this.flushPending(entry);
+      });
+    }
+    this.abort(entry, entry.pendingTerminal.message);
   }
 
   private settleSuccess<TResult>(entry: ActiveRun<TResult>, value: TResult): void {
@@ -541,6 +565,10 @@ class DefaultJobRunner implements JobRunner {
       this.cleanup(entry);
       entry.resolve(Object.freeze({ status: "cancelled", job: transition.job }));
     } catch (error) {
+      if (error instanceof LocalStoreDispatchBusyError) {
+        this.deferTerminal(entry, { type: "cancel", message });
+        return;
+      }
       this.closeWithFault(entry, error);
     }
   }
@@ -565,6 +593,10 @@ class DefaultJobRunner implements JobRunner {
       this.cleanup(entry);
       entry.resolve(Object.freeze({ status: "timed-out", job: transition.job }));
     } catch (error) {
+      if (error instanceof LocalStoreDispatchBusyError) {
+        this.deferTerminal(entry, { type: "timeout", message });
+        return;
+      }
       this.closeWithFault(entry, error);
     }
   }
@@ -639,6 +671,7 @@ class DefaultJobRunner implements JobRunner {
   }
 
   private cleanup<TResult>(entry: ActiveRun<TResult>): void {
+    entry.terminalFlushScheduled = false;
     if (entry.timeoutHandle !== NO_TIMER) {
       const handle = entry.timeoutHandle;
       entry.timeoutHandle = NO_TIMER;

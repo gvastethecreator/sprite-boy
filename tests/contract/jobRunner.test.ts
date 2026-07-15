@@ -393,6 +393,88 @@ describe("JobRunner", () => {
     expect(task).not.toHaveBeenCalled();
   });
 
+  it("defers cross-job cancellation until the current JobStore publish completes", async () => {
+    const store = createJobStore();
+    const host = new ManualHost();
+    const runner = createJobRunner({ store, host });
+    const pending = deferred<string>();
+    let firstContext!: JobTaskContext;
+    const first = runner.run(queuedJob("job-cross-first", null), (context) => {
+      firstContext = context;
+      return pending.promise;
+    });
+    let requested = false;
+    let cancelResult: boolean | null = null;
+    store.subscribe(() => {
+      if (!requested && store.getSnapshot().jobs["job-cross-second"]?.status === "queued") {
+        requested = true;
+        cancelResult = first.cancel("Cross-job subscriber cancel");
+      }
+    });
+
+    const second = runner.run(queuedJob("job-cross-second", null), () => "second");
+    expect(cancelResult).toBe(true);
+    expect(first.cancel("Must not replace first reason")).toBe(false);
+    expect(firstContext.signal.aborted).toBe(true);
+    await expect(first.result).resolves.toMatchObject({
+      status: "cancelled",
+      job: { error: { message: "Cross-job subscriber cancel" } },
+    });
+    await expect(second.result).resolves.toMatchObject({ status: "succeeded", value: "second" });
+    expect(store.getSnapshot().jobs[first.jobId]?.status).toBe("cancelled");
+    expect(runner.getActiveCount()).toBe(0);
+    pending.resolve("late");
+    await flushMicrotasks();
+  });
+
+  it("lets a deferred cancel beat an already-queued task completion", async () => {
+    const store = createJobStore();
+    const runner = createJobRunner({ store });
+    const first = runner.run(queuedJob("job-cross-resolved", null), () =>
+      Promise.resolve("must-not-win")
+    );
+    let requested = false;
+    store.subscribe(() => {
+      if (!requested && store.getSnapshot().jobs["job-cross-trigger"]?.status === "queued") {
+        requested = true;
+        first.cancel("Cancel wins");
+      }
+    });
+
+    const trigger = runner.run(queuedJob("job-cross-trigger", null), () => "trigger");
+    await expect(first.result).resolves.toMatchObject({ status: "cancelled" });
+    await expect(trigger.result).resolves.toMatchObject({ status: "succeeded" });
+    expect(store.getSnapshot().jobs[first.jobId]?.status).toBe("cancelled");
+  });
+
+  it("rejects cross-job progress during notify without orphaning its run", async () => {
+    const store = createJobStore();
+    const runner = createJobRunner({ store });
+    const output = deferred<string>();
+    let context!: JobTaskContext;
+    const first = runner.run(queuedJob("job-cross-progress", null), (taskContext) => {
+      context = taskContext;
+      return output.promise;
+    });
+    let progressResult: boolean | null = null;
+    store.subscribe(() => {
+      if (store.getSnapshot().jobs["job-progress-trigger"]?.status === "queued") {
+        progressResult = context.reportProgress({ ratio: 0.5, phase: "cross-notify" });
+      }
+    });
+
+    const trigger = runner.run(queuedJob("job-progress-trigger", null), () => "trigger");
+    expect(progressResult).toBe(false);
+    expect(store.getSnapshot().jobs[first.jobId]).toMatchObject({
+      status: "running",
+      progress: { ratio: 0 },
+    });
+    output.resolve("done");
+    await expect(first.result).resolves.toMatchObject({ status: "succeeded", value: "done" });
+    await expect(trigger.result).resolves.toMatchObject({ status: "succeeded" });
+    expect(runner.getActiveCount()).toBe(0);
+  });
+
   it("cancels a reserved run when a queued-state subscriber disposes the runner", async () => {
     const store = createJobStore();
     const host = new ManualHost();

@@ -27,6 +27,18 @@ export type StudioStoreKind = (typeof STUDIO_STORE_KINDS)[number];
 export type StorePersistence = "durable" | "partial" | "ephemeral";
 export type StoreHistoryPolicy = "command" | "none";
 
+/** Signals a synchronous local-store commit already in progress. */
+export class LocalStoreDispatchBusyError extends TypeError {
+  readonly code = "LOCAL_STORE_DISPATCH_BUSY" as const;
+  readonly storeKind: StudioStoreKind;
+
+  constructor(storeKind: StudioStoreKind) {
+    super(`${storeKind} store does not allow reentrant dispatch.`);
+    this.name = "LocalStoreDispatchBusyError";
+    this.storeKind = storeKind;
+  }
+}
+
 export interface StoreContractDefinition<
   TKind extends StudioStoreKind = StudioStoreKind,
   TPersistence extends StorePersistence = StorePersistence,
