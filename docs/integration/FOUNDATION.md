@@ -463,6 +463,17 @@ errores sync/async conservan su rechazo. Los atajos usan `KeyboardEvent.code`,
 conflicto. Cerró con 15 tests registry+workspace, suite 45/45 archivos y 444/444
 tests, typecheck, lint estricto, build y revisión independiente `accept`.
 
+F6-03 conecta esos contratos al shell productivo. `useStudioNavigation` hace de
+la URL hash la única ruta temporal y proyecta el destino hacia `AppMode` legacy
+sin almacenar otro workspace ni montar un ProjectStore vacío. Header, cinco
+tabs, Project menu, undo/redo, Export y command palette consumen los registries;
+Open/Import disparan inputs reales y el timeline sigue capabilities. Chrome
+1440x900 probó rutas directas, tabs, back, reload y Ctrl+K→Export con cero
+errores. El gate focal cerró 27/27, typecheck/lint/build/diff-check y revisión
+independiente quedaron verdes; la suite acumulada monolítica y su shard 1/4
+agotaron su ventana bajo saturación del host, después de la baseline 45/45 y
+444/444 ya aceptada. F6-04 debe cerrar foco, semántica modal y compact desktop.
+
 ### F7 — Observabilidad, jobs y error taxonomy
 
 - **Owner:** `[gpt-5.6-sol | xhigh]`.

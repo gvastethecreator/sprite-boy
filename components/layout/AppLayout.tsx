@@ -1,5 +1,4 @@
-import React, { useRef } from "react";
-import Header from "./Header";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
 import CanvasArea from "../canvas/CanvasArea";
@@ -13,7 +12,29 @@ import GenerationModal from "../overlays/GenerationModal";
 import AnalysisModal from "../overlays/AnalysisModal";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useProject } from "../../contexts/ProjectContext";
+import {
+  createStudioCommandRegistry,
+  getStudioWorkspace,
+  type StudioCommandContext,
+  type StudioCommandId,
+  type StudioWorkspaceId,
+} from "../../core/studio";
+import { StudioHeader, useStudioNavigation } from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
+
+function legacyModeForWorkspace(workspaceId: StudioWorkspaceId): AppMode {
+  switch (workspaceId) {
+    case "slice":
+    case "compose":
+      return AppMode.BUILDER;
+    case "animate":
+      return AppMode.ANIMATION;
+    case "collision":
+      return AppMode.COLLISION;
+    case "export":
+      return AppMode.TEMPLATE;
+  }
+}
 
 const AppLayout: React.FC = () => {
   const controller = useProject();
@@ -26,7 +47,6 @@ const AppLayout: React.FC = () => {
     setIsHelpOpen,
     isCommandPaletteOpen,
     setIsCommandPaletteOpen,
-    commands,
     currentMode,
     toasts,
     removeToast,
@@ -50,13 +70,71 @@ const AppLayout: React.FC = () => {
     generationModal,
     analysisResult,
     setAnalysisResult,
-    handleAnalyzeSheet,
     handleExportZip,
     handleExportGif,
+    handleSetMode,
+    handleUpload,
+    handleLoadProject,
+    handleSaveProject,
+    handleNewProject,
+    isLoading,
   } = controller;
 
   const canvasRef = useRef<CanvasHandle>(null);
+  const assetInputRef = useRef<HTMLInputElement>(null);
+  const projectInputRef = useRef<HTMLInputElement>(null);
+  const { activeWorkspace, navigate } = useStudioNavigation();
   const hasWorkspace = !!slicerImage || !!builderCanvas;
+  const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
+
+  useEffect(() => {
+    const legacyMode = legacyModeForWorkspace(activeWorkspace);
+    if (currentMode !== legacyMode) handleSetMode(legacyMode);
+  }, [activeWorkspace, currentMode, handleSetMode]);
+
+  const commandRegistry = useMemo(() => createStudioCommandRegistry({
+    newProject: () => {
+      handleNewProject();
+      navigate("slice");
+    },
+    openProject: () => projectInputRef.current?.click(),
+    saveProject: handleSaveProject,
+    importAsset: () => assetInputRef.current?.click(),
+    undo,
+    redo,
+    openWorkspace: navigate,
+    resetCanvas: () => canvasRef.current?.resetView(),
+    openCommandPalette: () => setIsCommandPaletteOpen(true),
+    openPreferences: () => setIsSettingsOpen(true),
+    openHelp: () => setIsHelpOpen(true),
+  }), [
+    handleNewProject,
+    handleSaveProject,
+    navigate,
+    redo,
+    setIsCommandPaletteOpen,
+    setIsHelpOpen,
+    setIsSettingsOpen,
+    undo,
+  ]);
+
+  const commandContext = useMemo<StudioCommandContext>(() => ({
+    projectAvailable: true,
+    busy: isLoading,
+    canUndo,
+    canRedo,
+    canvasAvailable: hasWorkspace,
+  }), [canRedo, canUndo, hasWorkspace, isLoading]);
+
+  const executeCommand = useCallback((commandId: StudioCommandId) => {
+    void commandRegistry.execute(commandId, commandContext).catch((error: unknown) => {
+      console.error(`Studio command failed: ${commandId}`, error);
+      showToast(
+        error instanceof Error ? error.message : `Could not run ${commandId}.`,
+        "error",
+      );
+    });
+  }, [commandContext, commandRegistry, showToast]);
 
   useKeyboardShortcuts({
     undo,
@@ -92,20 +170,44 @@ const AppLayout: React.FC = () => {
   });
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-app text-textMain overflow-hidden p-2 gap-2 select-none">
-      <Header
-        onAnalyzeSheet={async () => {
-          try {
-            const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
-            if (!hasKey) {
-              await (window as any).aistudio?.openSelectKey();
-            }
-          } catch (e) {
-            console.warn("API Key selection skipped or failed", e);
-          }
-          const b = await canvasRef.current?.exportSnapshot(false);
-          if (b) handleAnalyzeSheet(b);
+    <div
+      className="h-screen w-screen flex flex-col bg-app text-textMain overflow-hidden p-2 gap-2 select-none"
+      data-studio-workspace={activeWorkspace}
+    >
+      <input
+        ref={assetInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (!file) return;
+          handleUpload(file);
+          navigate("slice");
         }}
+      />
+      <input
+        ref={projectInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (file) handleLoadProject(file);
+        }}
+      />
+
+      <StudioHeader
+        activeWorkspace={activeWorkspace}
+        registry={commandRegistry}
+        commandContext={commandContext}
+        onExecute={executeCommand}
       />
 
       <div className="flex-1 flex min-h-0 gap-2">
@@ -119,7 +221,7 @@ const AppLayout: React.FC = () => {
           <div className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20">
             <CanvasArea ref={canvasRef} />
           </div>
-          {hasWorkspace && currentMode !== AppMode.BUILDER && (
+          {hasWorkspace && activeWorkspaceDefinition.capabilities.timeline === "editable" && (
             <TimelinePanel />
           )}
         </div>
@@ -135,7 +237,9 @@ const AppLayout: React.FC = () => {
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
-        commands={commands}
+        registry={commandRegistry}
+        context={commandContext}
+        onExecute={executeCommand}
       />
       <ExportModal
         onGenerateCode={handleGenerateCode}

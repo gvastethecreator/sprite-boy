@@ -763,9 +763,31 @@ los lotes que sí modifican producto.
   y 444/444 tests; typecheck, lint focal `--deny-warnings`, build y diff-check
   verdes. Revisión final: `accept`; warning chunk >500 kB sigue como baseline.
 
+## F6-03 — Registry-driven Studio shell
+
+- **Estado:** `accept` después de ejecución Luna acotada, integración Sol y
+  revisión independiente sin defectos reproducibles.
+- **Ruta:** `useStudioNavigation` normaliza `#/studio/<workspace>`, expone una
+  subscription concurrent-safe a hash/history y conserva `history.state`.
+  Back/forward, reload y links modificados no dependen de estado React duplicado.
+- **Bridge:** la ruta activa se proyecta one-way a Builder/Animation/Collision/
+  Template legacy. No existe ProjectStore paralelo; Slice y Compose comparten
+  temporalmente Builder hasta que sus bodies migren en F6-05 y streams feature.
+- **Shell:** header, cinco destinos, Project menu, undo/redo, Export CTA y palette
+  se derivan de workspace/command registries. Disabled reasons se muestran sin
+  dispatch; Open/Import alcanzan inputs reales y el timeline respeta capability.
+- **Browser:** Chrome limpio 1440x900 probó invalid→Slice, Compose, Collision,
+  back→Compose, reload→Compose y Ctrl+K/Export→Export. Los cinco links fueron
+  visibles, label/URL concordaron y no hubo console errors ni exceptions.
+- **Evidencia:** 27/27 focales; typecheck, lint focal `--deny-warnings`, build y
+  diff-check verdes; review final `accept`. La baseline acumulada previa es
+  45/45 archivos y 444/444 tests. El nuevo full run monolítico y shard 1/4
+  agotaron 10/5 minutos bajo saturación externa sin publicar resultados; no se
+  contabilizan como green ni como failure funcional.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F6-03: activo; debe reemplazar header/nav/layout legacy por el registry y
-  demostrar navegación browser de los cinco workspaces.
+- F6-04: activo; debe cerrar primitives de panel/modal, restauración de foco,
+  reduced motion y navegación compacta sin destinos inalcanzables.

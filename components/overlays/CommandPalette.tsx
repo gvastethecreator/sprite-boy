@@ -1,64 +1,103 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Search, Command, ArrowRight } from "lucide-react";
-import { CommandPaletteItem } from "../../types";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Command, Search } from "lucide-react";
+import type {
+  StudioCommand,
+  StudioCommandContext,
+  StudioCommandId,
+  StudioCommandRegistry,
+  StudioShortcut,
+} from "../../core/studio";
 
 interface CommandPaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
-  commands: CommandPaletteItem[];
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly registry: StudioCommandRegistry;
+  readonly context: StudioCommandContext;
+  readonly onExecute: (commandId: StudioCommandId) => void;
 }
 
-const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, commands }) => {
+function shortcutTokens(shortcut: StudioShortcut | undefined): readonly string[] {
+  if (!shortcut) return [];
+  const modifiers = shortcut.modifiers.map((modifier) => {
+    if (modifier === "primary") return "Ctrl/Cmd";
+    return modifier[0].toUpperCase() + modifier.slice(1);
+  });
+  const code = shortcut.code
+    .replace(/^Key/, "")
+    .replace(/^Digit/, "")
+    .replace(/^Comma$/, ",")
+    .replace(/^Slash$/, "/");
+  return [...modifiers, code];
+}
+
+function searchableText(command: StudioCommand): string {
+  return [command.label, command.description, command.category, ...command.keywords]
+    .join(" ")
+    .toLocaleLowerCase();
+}
+
+const CommandPalette: React.FC<CommandPaletteProps> = ({
+  isOpen,
+  onClose,
+  registry,
+  context,
+  onExecute,
+}) => {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const filteredCommands = commands.filter(
-    (cmd) =>
-      cmd.label.toLowerCase().includes(query.toLowerCase()) ||
-      cmd.category.toLowerCase().includes(query.toLowerCase()),
-  );
+  const filteredCommands = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    if (normalizedQuery.length === 0) return registry.commands;
+    return registry.commands.filter((command) => searchableText(command).includes(normalizedQuery));
+  }, [query, registry]);
 
   useEffect(() => {
-    if (isOpen) {
-      setQuery("");
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    setQuery("");
+    setSelectedIndex(0);
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
   }, [isOpen]);
 
   useEffect(() => {
-    // Reset selection when query changes
     setSelectedIndex(0);
   }, [query]);
 
   useEffect(() => {
-    // Scroll selected into view
-    if (listRef.current && listRef.current.children[selectedIndex]) {
-      (listRef.current.children[selectedIndex] as HTMLElement).scrollIntoView({ block: "nearest" });
+    const item = listRef.current?.children[selectedIndex];
+    if (item instanceof HTMLElement && typeof item.scrollIntoView === "function") {
+      item.scrollIntoView({ block: "nearest" });
     }
   }, [selectedIndex]);
 
-  const execute = (cmd: CommandPaletteItem) => {
-    cmd.action();
+  const execute = (command: StudioCommand) => {
+    if (!registry.getState(command.id, context).enabled) return;
+    onExecute(command.id);
     onClose();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % filteredCommands.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (filteredCommands[selectedIndex]) {
-        execute(filteredCommands[selectedIndex]);
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (filteredCommands.length > 0) {
+        setSelectedIndex((previous) => (previous + 1) % filteredCommands.length);
       }
-    } else if (e.key === "Escape") {
-      e.preventDefault();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (filteredCommands.length > 0) {
+        setSelectedIndex((previous) =>
+          (previous - 1 + filteredCommands.length) % filteredCommands.length,
+        );
+      }
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const selected = filteredCommands[selectedIndex];
+      if (selected) execute(selected);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
       onClose();
     }
   };
@@ -67,88 +106,85 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/50 backdrop-blur-sm animate-in fade-in duration-100"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 pt-[15vh] backdrop-blur-sm"
       onClick={onClose}
+      role="presentation"
     >
-      <div
-        className="w-full max-w-xl bg-panel border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-top-2 duration-150 ring-1 ring-white/10"
-        onClick={(e) => e.stopPropagation()}
+      <section
+        aria-label="Command palette"
+        className="flex max-h-[70vh] w-[min(640px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-white/10 bg-panel shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="h-12 border-b border-border flex items-center px-4 gap-3 bg-input">
-          <Search className="text-textMuted" size={18} />
+        <div className="flex h-12 items-center gap-3 border-b border-border bg-input px-4">
+          <Search className="text-textMuted" size={18} aria-hidden="true" />
           <input
             ref={inputRef}
-            className="flex-1 bg-transparent border-none outline-none text-textMain text-sm placeholder:text-textMuted/50 h-full"
-            placeholder="Type a command or search..."
+            aria-label="Search commands"
+            className="h-full flex-1 border-none bg-transparent text-sm text-textMain outline-none placeholder:text-textMuted/50"
+            placeholder="Search commands…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <div className="flex items-center gap-1">
-            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-panel px-1.5 font-mono text-[10px] font-medium text-textMuted opacity-100">
-              <span className="text-xs">ESC</span>
-            </kbd>
-          </div>
+          <kbd className="rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-textMuted">
+            Esc
+          </kbd>
         </div>
 
-        <div
-          ref={listRef}
-          className="max-h-[300px] overflow-y-auto custom-scrollbar p-2 space-y-1 bg-panel"
-        >
+        <div ref={listRef} className="custom-scrollbar max-h-[360px] overflow-y-auto bg-panel p-2">
           {filteredCommands.length === 0 ? (
-            <div className="py-8 text-center text-textMuted text-sm">No results found.</div>
+            <div className="py-10 text-center text-sm text-textMuted">No matching commands.</div>
           ) : (
-            filteredCommands.map((cmd, idx) => (
-              <button
-                key={cmd.id}
-                onClick={() => execute(cmd)}
-                onMouseEnter={() => setSelectedIndex(idx)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-left transition-colors ${idx === selectedIndex ? "bg-accent text-white" : "text-textMain hover:bg-tool"}`}
-              >
-                <div className="flex items-center gap-3">
-                  {cmd.icon ? (
-                    <cmd.icon
-                      size={16}
-                      className={idx === selectedIndex ? "text-white" : "text-textMuted"}
-                    />
-                  ) : (
-                    <Command size={16} />
-                  )}
-                  <span className="text-sm font-medium">{cmd.label}</span>
-                  {query === "" && (
-                    <span
-                      className={`text-[10px] ml-2 px-1.5 py-0.5 rounded-full ${idx === selectedIndex ? "bg-white/20 text-white" : "bg-tool border border-border text-textMuted"}`}
-                    >
-                      {cmd.category}
+            filteredCommands.map((command, index) => {
+              const state = registry.getState(command.id, context);
+              const shortcut = shortcutTokens(command.shortcuts[0]);
+              const selected = index === selectedIndex;
+              return (
+                <button
+                  key={command.id}
+                  type="button"
+                  disabled={!state.enabled}
+                  title={state.enabled ? command.description : state.reason}
+                  onClick={() => execute(command)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={`mb-1 flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left transition-colors last:mb-0 ${
+                    selected ? "bg-accent text-white" : "text-textMain hover:bg-tool"
+                  } disabled:cursor-not-allowed disabled:opacity-45`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Command size={16} aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{command.label}</span>
+                      <span className={`block truncate text-[10px] ${selected ? "text-white/70" : "text-textMuted"}`}>
+                        {state.enabled ? command.description : state.reason}
+                      </span>
+                    </span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${selected ? "bg-white/15" : "bg-tool text-textMuted"}`}>
+                      {command.category}
+                    </span>
+                  </span>
+                  {shortcut.length > 0 && (
+                    <span className="ml-3 flex shrink-0 gap-1">
+                      {shortcut.map((token) => (
+                        <kbd key={token} className="min-w-5 rounded border border-current/20 px-1 py-0.5 text-center font-mono text-[9px]">
+                          {token}
+                        </kbd>
+                      ))}
                     </span>
                   )}
-                </div>
-                {cmd.shortcut && (
-                  <div className="flex gap-1">
-                    {cmd.shortcut.map((k, i) => (
-                      <kbd
-                        key={i}
-                        className={`min-w-[20px] text-center px-1 py-0.5 rounded text-[10px] font-mono border ${idx === selectedIndex ? "border-white/20 bg-white/10 text-white" : "border-border bg-input text-textMuted"}`}
-                      >
-                        {k}
-                      </kbd>
-                    ))}
-                  </div>
-                )}
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
 
-        <div className="bg-panelHeader border-t border-border px-3 py-1.5 flex items-center justify-between text-[10px] text-textMuted">
-          <span>
-            Protip: Use <kbd className="font-sans">Ctrl+K</kbd> to open this
+        <footer className="flex items-center justify-between border-t border-border bg-panelHeader px-3 py-1.5 text-[10px] text-textMuted">
+          <span>Commands reflect the active workspace.</span>
+          <span className="flex items-center gap-1.5">
+            Arrows to navigate <ArrowRight size={10} aria-hidden="true" /> Enter to run
           </span>
-          <div className="flex items-center gap-2">
-            <span>Navigate</span> <ArrowRight size={10} /> <span>Select</span>
-          </div>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 };
