@@ -23,7 +23,11 @@ const selectTimelineHeight = (
   state: Parameters<typeof selectStoredTimelineHeight>[0],
 ): number => clampTimelineHeight(selectStoredTimelineHeight(state));
 
-const TimelinePanel = memo(function TimelinePanel() {
+interface TimelinePanelProps {
+  readonly hidden?: boolean;
+}
+
+const TimelinePanel = memo(function TimelinePanel({ hidden }: TimelinePanelProps) {
   const store = useWorkspaceStore();
   const height = useWorkspaceStoreSelector(store, selectTimelineHeight);
   const resizeOrigin = useRef<{ readonly pointerY: number; readonly height: number } | null>(null);
@@ -67,11 +71,12 @@ const TimelinePanel = memo(function TimelinePanel() {
     setHeight(height + (event.key === "ArrowUp" ? TIMELINE_KEYBOARD_STEP : -TIMELINE_KEYBOARD_STEP));
   }, [height, setHeight]);
 
-  useEffect(() => removeResizeListeners, [removeResizeListeners]);
+  useEffect(() => removeResizeListeners, [hidden, removeResizeListeners]);
 
   return (
     <div
       data-testid="timeline-panel"
+      hidden={hidden}
       style={{ height }}
       className="bg-panel rounded-panel shrink-0 flex flex-col border border-border/20 overflow-hidden animate-slide-up relative"
     >

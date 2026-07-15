@@ -1,12 +1,16 @@
 /** Production build smoke using Chrome DevTools Protocol and no browser dependency. */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, posix, resolve, win32 } from "node:path";
+import { dirname, join, posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const HOST = "127.0.0.1";
+const BROWSER_SMOKE_RUNTIME_DEADLINE_MS = 40_000;
+const BROWSER_BUDGET_RUNTIME_DEADLINE_MS = 70_000;
 
 function delay(milliseconds) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
@@ -21,6 +25,30 @@ async function withTimeout(promise, milliseconds, message) {
     return await Promise.race([promise, timeout]);
   } finally {
     clearTimeout(handle);
+  }
+}
+
+export async function runWithBrowserRuntimeDeadline(
+  operation,
+  cleanup,
+  timeoutMs,
+  message = "Browser internal runtime deadline exceeded.",
+) {
+  if (typeof operation !== "function" || typeof cleanup !== "function") {
+    throw new TypeError("Browser runtime operation and cleanup must be functions.");
+  }
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+    throw new TypeError("Browser runtime deadline is invalid.");
+  }
+  let timeoutHandle;
+  const timeout = new Promise((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  try {
+    return await Promise.race([Promise.resolve().then(operation), timeout]);
+  } finally {
+    clearTimeout(timeoutHandle);
+    await cleanup();
   }
 }
 
@@ -76,7 +104,7 @@ export function resolveChromeExecutable(options = {}) {
   throw new Error("Chrome executable is unavailable.");
 }
 
-async function allocatePort() {
+export async function allocatePort() {
   const server = createServer();
   await new Promise((resolvePromise, reject) => {
     server.once("error", reject);
@@ -89,12 +117,70 @@ async function allocatePort() {
   return port;
 }
 
-async function waitForPreview(url, child, timeoutMs = 20_000) {
+export function resolveViteCliEntry(cwd = process.cwd(), dependencies = {}) {
+  const requireFromProject = (dependencies.createRequire ?? createRequire)(
+    join(resolve(cwd), "package.json"),
+  );
+  const packagePath = requireFromProject.resolve("vite/package.json");
+  const cliPath = join(dirname(packagePath), "bin", "vite.js");
+  if (!(dependencies.existsSync ?? existsSync)(cliPath)) {
+    throw new Error("Vite CLI entry is unavailable.");
+  }
+  return cliPath;
+}
+
+export function resolveNodeExecutable(options = {}) {
+  const env = options.env ?? process.env;
+  const exists = options.existsSync ?? existsSync;
+  if (env.STUDIO_NODE_PATH && exists(env.STUDIO_NODE_PATH)) return env.STUDIO_NODE_PATH;
+
+  const currentExecutable = options.execPath ?? process.execPath;
+  const runtimeIsBun = options.runtimeIsBun ?? Boolean(process.versions.bun);
+  if (!runtimeIsBun && exists(currentExecutable)) return currentExecutable;
+
+  const command = (options.platform ?? process.platform) === "win32" ? "where" : "which";
+  const result = (options.spawnSync ?? spawnSync)(command, ["node"], {
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+  });
+  const candidate = result.status === 0
+    ? String(result.stdout).split(/\r?\n/u).map((value) => value.trim()).find(Boolean)
+    : undefined;
+  if (candidate && exists(candidate)) return candidate;
+  throw new Error("Node executable is unavailable.");
+}
+
+export function spawnViteServer(cwd, port, mode = "dev", dependencies = {}) {
+  if (mode !== "dev" && mode !== "preview") {
+    throw new TypeError("Vite server mode is invalid.");
+  }
+  const cliPath = resolveViteCliEntry(cwd, dependencies);
+  const args = [
+    cliPath,
+    ...(mode === "preview" ? ["preview"] : []),
+    "--host", HOST,
+    "--port", String(port),
+    "--strictPort",
+  ];
+  return (dependencies.spawn ?? spawn)(resolveNodeExecutable(dependencies), args, {
+    cwd: resolve(cwd),
+    env: dependencies.env ?? process.env,
+    shell: false,
+    stdio: "ignore",
+    windowsHide: true,
+  });
+}
+
+export async function waitForPreview(url, child, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error("Preview process exited before readiness.");
     try {
-      const response = await fetch(url, { redirect: "manual" });
+      const response = await fetch(url, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(Math.max(1, Math.min(1_000, deadline - Date.now()))),
+      });
       if (response.ok) return;
     } catch {
       // Preview is still starting.
@@ -104,7 +190,7 @@ async function waitForPreview(url, child, timeoutMs = 20_000) {
   throw new Error("Preview readiness timed out.");
 }
 
-async function waitForDevToolsPort(profileDirectory, child, timeoutMs = 20_000) {
+export async function waitForDevToolsPort(profileDirectory, child, timeoutMs = 20_000) {
   const filePath = join(profileDirectory, "DevToolsActivePort");
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -272,8 +358,10 @@ export class CdpClient {
   }
 }
 
-async function connectToPage(port) {
-  const targets = await fetch(`http://${HOST}:${port}/json/list`).then((response) => response.json());
+export async function connectToPage(port, commandTimeoutMs = 10_000) {
+  const targets = await fetch(`http://${HOST}:${port}/json/list`, {
+    signal: AbortSignal.timeout(10_000),
+  }).then((response) => response.json());
   const page = targets.find((candidate) => candidate.type === "page");
   if (!page?.webSocketDebuggerUrl) throw new Error("Chrome page target is unavailable.");
   const socket = new WebSocket(page.webSocketDebuggerUrl);
@@ -285,26 +373,111 @@ async function connectToPage(port) {
     10_000,
     "Chrome connection timed out.",
   );
-  return new CdpClient(socket);
+  return new CdpClient(socket, commandTimeoutMs);
 }
 
-async function waitForExit(child, timeoutMs = 5_000) {
-  if (child.exitCode !== null) return;
-  await withTimeout(
-    new Promise((resolvePromise) => child.once("exit", resolvePromise)),
-    timeoutMs,
-    "Process exit timed out.",
-  ).catch(() => undefined);
+export function processHasExited(child, dependencies = {}) {
+  if (child.exitCode !== null || child.signalCode !== null) return true;
+  if (!Number.isSafeInteger(child.pid) || child.pid <= 0) return false;
+  try {
+    (dependencies.kill ?? process.kill)(child.pid, 0);
+    return false;
+  } catch (error) {
+    return error?.code === "ESRCH";
+  }
 }
 
-function safeRemoveProfile(profileDirectory) {
+export async function waitForExit(child, timeoutMs = 5_000, dependencies = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (processHasExited(child, dependencies)) return;
+    await delay(50);
+  }
+  if (!processHasExited(child, dependencies)) throw new Error("Process exit timed out.");
+}
+
+export async function terminateChildProcess(child, timeoutMs = 5_000, dependencies = {}) {
+  if (!child || processHasExited(child, dependencies)) return;
+  try {
+    child.kill();
+  } catch {
+    // Escalation below remains authoritative.
+  }
+  try {
+    await waitForExit(child, timeoutMs, dependencies);
+    return;
+  } catch {
+    if (!processHasExited(child, dependencies)) {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // The verified wait below decides whether cleanup succeeded.
+      }
+    }
+  }
+  await waitForExit(child, timeoutMs, dependencies);
+}
+
+export async function safeRemoveProfile(profileDirectory, dependencies = {}) {
   if (!profileDirectory) return;
   const temporaryRoot = resolve(tmpdir());
   const resolvedProfile = resolve(profileDirectory);
   if (!resolvedProfile.startsWith(`${temporaryRoot}${process.platform === "win32" ? "\\" : "/"}`)) {
     throw new Error("Temporary Chrome profile path is invalid.");
   }
-  rmSync(resolvedProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  const remove = dependencies.rm ?? rm;
+  const wait = dependencies.delay ?? delay;
+  let lastError;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      await remove(resolvedProfile, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 39) await wait(500);
+    }
+  }
+  throw lastError;
+}
+
+export async function cleanupBrowserRuntime(
+  client,
+  chrome,
+  server,
+  profileDirectory,
+  failureMessage = "Browser runtime cleanup failed.",
+) {
+  const cleanupFailures = [];
+  if (client) {
+    try {
+      await withTimeout(client.send("Browser.close"), 2_000, "Browser close timed out.");
+    } catch {
+      // The process termination check below remains authoritative.
+    }
+    client.close();
+  }
+  try {
+    await terminateChildProcess(chrome);
+  } catch {
+    cleanupFailures.push("chrome");
+  }
+  try {
+    await terminateChildProcess(server);
+  } catch {
+    cleanupFailures.push("server");
+  }
+  if (!chrome || processHasExited(chrome)) {
+    try {
+      await safeRemoveProfile(profileDirectory);
+    } catch {
+      cleanupFailures.push("profile");
+    }
+  } else {
+    cleanupFailures.push("profile-in-use");
+  }
+  if (cleanupFailures.length > 0) {
+    throw new Error(`${failureMessage} (${cleanupFailures.join(",")}).`);
+  }
 }
 
 const BUDGET_INSTRUMENTATION_SOURCE = `(() => {
@@ -413,7 +586,7 @@ async function collectBrowserBudgetEvidence(client, idleWindowMs, settleMs) {
     const samples = [];
     const transitions = [];
     const workspaceIds = ["compose", "animate", "collision", "export", "slice"];
-    for (let run = 0; run < 3; run += 1) {
+    for (let run = 0; run < 4; run += 1) {
       for (const workspaceId of workspaceIds) {
         const target = document.querySelector('[data-workspace-id="' + workspaceId + '"]');
         if (!(target instanceof HTMLElement)) throw new Error("Workspace target is unavailable.");
@@ -512,6 +685,17 @@ async function collectBrowserBudgetEvidence(client, idleWindowMs, settleMs) {
 }
 
 export async function runBrowserSmoke(options = {}) {
+  const collectBudgets = options.collectBudgets === true;
+  const maximumRuntimeDeadlineMs = collectBudgets
+    ? BROWSER_BUDGET_RUNTIME_DEADLINE_MS
+    : BROWSER_SMOKE_RUNTIME_DEADLINE_MS;
+  const runtimeDeadlineMs = options.runtimeDeadlineMs ?? maximumRuntimeDeadlineMs;
+  if (
+    !Number.isSafeInteger(runtimeDeadlineMs) || runtimeDeadlineMs <= 0 ||
+    runtimeDeadlineMs > maximumRuntimeDeadlineMs
+  ) {
+    throw new TypeError("Browser runtime deadline cannot exceed its cleanup-safe maximum.");
+  }
   const cwd = resolve(options.cwd ?? process.cwd());
   const chromePath = resolveChromeExecutable(options);
   const port = await allocatePort();
@@ -521,24 +705,19 @@ export async function runBrowserSmoke(options = {}) {
   let chrome;
   let client;
 
-  try {
-    preview = spawn(process.execPath, [
-      "x", "vite", "preview", "--host", HOST, "--port", String(port), "--strictPort",
-    ], {
-      cwd,
-      env: process.env,
-      shell: false,
-      stdio: "ignore",
-      windowsHide: true,
-    });
+  return runWithBrowserRuntimeDeadline(async () => {
+    preview = spawnViteServer(cwd, port, "preview");
     await waitForPreview(baseUrl, preview);
 
     chrome = spawn(chromePath, [
       "--headless=new",
       "--disable-background-networking",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
       "--disable-component-update",
       "--disable-default-apps",
       "--disable-extensions",
+      "--disable-renderer-backgrounding",
       "--disable-sync",
       "--metrics-recording-only",
       "--no-default-browser-check",
@@ -555,7 +734,6 @@ export async function runBrowserSmoke(options = {}) {
     });
     const devToolsPort = await waitForDevToolsPort(profileDirectory, chrome);
     client = await connectToPage(devToolsPort);
-    const collectBudgets = options.collectBudgets === true;
     await Promise.all([
       client.send("Page.enable"),
       client.send("Runtime.enable"),
@@ -654,21 +832,7 @@ export async function runBrowserSmoke(options = {}) {
       httpErrorCount: client.httpErrorCount,
       ...(budgets ? { budgets } : {}),
     });
-  } finally {
-    if (client) {
-      try {
-        await client.send("Browser.close");
-      } catch {
-        // The browser may already be closing after a failed CDP operation.
-      }
-      client.close();
-    }
-    if (chrome && chrome.exitCode === null) chrome.kill();
-    if (chrome) await waitForExit(chrome);
-    if (preview && preview.exitCode === null) preview.kill();
-    if (preview) await waitForExit(preview);
-    safeRemoveProfile(profileDirectory);
-  }
+  }, () => cleanupBrowserRuntime(client, chrome, preview, profileDirectory), runtimeDeadlineMs);
 }
 
 export async function runBrowserSmokeCli(io = {}) {

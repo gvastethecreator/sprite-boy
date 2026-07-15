@@ -907,7 +907,7 @@ function buildCanonicalProject(
       updatedAt: context.timestamp,
       provenance: {
         source: "legacy",
-        sourceId: source.sourceRef,
+        sourceId: /^(?:blob:|data:)/iu.test(source.sourceRef) ? sourceKey : source.sourceRef,
         importedAt: context.timestamp,
       },
     };
