@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_MAX_EXPORT_ARTIFACT_BYTES,
+  EXPORT_PORT_ERROR_CODES,
   ExportPortError,
   createExportFileName,
   createExportFormatRegistry,
   createExportPort,
+  isExportPortError,
   type ArtifactWriteRequest,
   type ArtifactWriteReceipt,
   type ArtifactWriter,
@@ -173,6 +175,38 @@ describe("ExportFormatRegistry", () => {
       code: "EXPORT_FORMAT_INVALID",
       message: "Export format provider could not be read.",
     }));
+  });
+
+  it("redacts spoofed and branded errors thrown by the external provider array", () => {
+    const thrownErrors: unknown[] = [
+      Object.assign(Object.create(ExportPortError.prototype), {
+        message: "private spoof detail",
+        code: "EXPORT_UNSUPPORTED_FORMAT",
+      }),
+      new ExportPortError("EXPORT_UNSUPPORTED_FORMAT", "private branded detail"),
+    ];
+    for (const thrown of thrownErrors) {
+      const providers: ExportFormatProvider[] = [];
+      Object.defineProperty(providers, "0", {
+        configurable: true,
+        get() {
+          throw thrown;
+        },
+      });
+      Object.defineProperty(providers, "length", { value: 1 });
+
+      expect(() => createExportFormatRegistry(providers)).toThrowError(
+        expect.objectContaining({
+          code: "EXPORT_FORMAT_INVALID",
+          message: "Export format providers could not be read.",
+        }),
+      );
+      try {
+        createExportFormatRegistry(providers);
+      } catch (error) {
+        expect(String(error)).not.toMatch(/private|spoof|branded/);
+      }
+    }
   });
 });
 
@@ -450,6 +484,37 @@ describe("ExportPort", () => {
       message: "The artifact writer could not complete the export.",
     });
 
+    const quotaError = new DOMException(
+      "private filesystem capacity detail",
+      "QuotaExceededError",
+    );
+    Object.defineProperty(quotaError, "name", {
+      configurable: true,
+      get() {
+        throw new Error("private shadowed name");
+      },
+    });
+    const quotaPort = makePort({
+      writer: fakeWriter(() => {
+        throw quotaError;
+      }),
+    }).port;
+    await expect(quotaPort.run(BASE_REQUEST)).rejects.toMatchObject({
+      code: "EXPORT_QUOTA_EXCEEDED",
+      retryable: true,
+      message: "The export destination has insufficient storage quota.",
+    });
+    await expect(quotaPort.run(BASE_REQUEST)).rejects.not.toThrow(/filesystem|shadowed/);
+
+    const quotaSpoofPort = makePort({
+      writer: fakeWriter(() => {
+        throw { name: "QuotaExceededError", message: "private spoof" };
+      }),
+    }).port;
+    await expect(quotaSpoofPort.run(BASE_REQUEST)).rejects.toMatchObject({
+      code: "EXPORT_WRITER_FAILED",
+    });
+
     const mismatches: Array<(request: ArtifactWriteRequest) => ArtifactWriteReceipt> = [
       (request) => ({ ...matchingReceipt(request), requestId: "wrong-request" }),
       (request) => ({ ...matchingReceipt(request), artifactId: "wrong-artifact" }),
@@ -681,9 +746,22 @@ describe("ExportPort", () => {
 
   it("marks only provider and writer failures as retryable", () => {
     const retryable = new ExportPortError("EXPORT_PROVIDER_FAILED", "safe");
+    const quota = new ExportPortError("EXPORT_QUOTA_EXCEEDED", "safe");
     const terminal = new ExportPortError("EXPORT_ARTIFACT_TOO_LARGE", "safe");
     expect(retryable.retryable).toBe(true);
+    expect(quota.retryable).toBe(true);
     expect(terminal.retryable).toBe(false);
     expect(new Set(Object.keys(retryable))).toEqual(new Set(["name", "code", "retryable"]));
+    expect(Object.isFrozen(retryable)).toBe(true);
+    expect(isExportPortError(retryable)).toBe(true);
+    expect(isExportPortError(Object.create(ExportPortError.prototype))).toBe(false);
+    expect(new Set(EXPORT_PORT_ERROR_CODES).size).toBe(EXPORT_PORT_ERROR_CODES.length);
+    expect(() => new ExportPortError(
+      "FORGED" as never,
+      "safe",
+    )).toThrow(/code is invalid/);
+    expect(() => new ExportPortError("EXPORT_PROVIDER_FAILED", " ")).toThrow(
+      /message must be non-empty/,
+    );
   });
 });
