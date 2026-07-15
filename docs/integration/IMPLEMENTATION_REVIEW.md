@@ -958,9 +958,34 @@ los lotes que sí modifican producto.
 - **Evidencia:** 55/55 focales del pase independiente, typecheck, lint focal
   `--deny-warnings`, build y diff-check verdes. Revisión final: `accept`.
 
+## F7-05 — Deterministic ExportPort and bounded artifact writer
+
+- **Boundary:** `core/export/**` separa provider/codec, validación del artifact
+  y writer/destino. No importa DOM, URL, ProjectStore, JobStore ni commands; el
+  caller puede mapear sólo un éxito completado a `GeneratedArtifact`.
+- **Registry:** cada descriptor tiene provider ejecutable capturado. ExportPort
+  vuelve a snapshottear list→provider y exige igualdad completa de ID, label,
+  category, extension y MIME; duplicates, inert/drift y formatos ocultos fallan.
+- **Artifact:** request/artifact/project/revision y base name se capturan antes
+  del boundary async. Filename aplica NFKC y elimina traversal, device stems
+  Windows, controles, bidi y surrogates. MIME/size se leen desde slots Blob
+  nativos; cero bytes, falsificación, mismatch o >budget nunca llegan al writer.
+- **Writer:** recibe un artifact frozen y devuelve receipt exacto de request,
+  artifact, filename y bytes. El port añade writer ID capturado y timestamp ISO.
+  Default 512 MiB; hard max 2,147,483,647 bytes.
+- **Abort/errors:** slots y add/remove nativos de AbortSignal ignoran own
+  properties hostiles. Pre-abort, provider pending y writer pending rechazan sin
+  publicar late success. Provider/writer failures se redactan; errores
+  `ExportPortError` spoofed no atraviesan el boundary.
+- **Repairs:** review cerró AbortSignal sombreado, Windows `CON.txt`, controles
+  bidi/Cf/Cs, drift/hidden registry y accessor hostil dentro de `list()`.
+- **Evidencia:** 20/20 focales; gate acumulado F7 4 archivos/62 tests; typecheck,
+  lint focal `--deny-warnings`, build y diff-check verdes. Revisión final:
+  `accept`. Arquitectura: [ADR-007](../architecture/ADR-007-export-port-and-writers.md).
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F7-05: activo; debe congelar `ExportPort`, artifact writer y format registry
-  sin migrar todavía providers concretos ni editar el `package.json` del usuario.
+- F7-06: activo; debe inyectar quota, provider/worker crash, timeout y cancel
+  races sobre JobRunner + ExportPort sin late writes, receipts falsos ni leaks.

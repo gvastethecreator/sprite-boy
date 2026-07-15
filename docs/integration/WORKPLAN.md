@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-04 aceptados. Frontiers: F3-07 pendiente de browser; F7-05 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-05 aceptados. Frontiers: F3-07 pendiente de browser; F7-06 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -129,6 +129,15 @@ sólo runners propios y conserva runners inyectados. Chrome productivo probó
 1440x900 y 1024x768, foco atrapado/restaurado, Escape/cierre, page-fit y cero
 errores/excepciones. F7-05 puede congelar contratos de export sin migrar todavía
 los adapters concretos.
+F7-05 congeló `ExportPort`, un registry que sólo lista providers ejecutables y
+un writer de destino verificable. Request/artifact/project/revision se capturan
+antes del boundary async; descriptor, MIME, extensión, filename portable, Blob
+nativo, byte budget y receipt exacto se validan antes de publicar éxito. El
+port no conoce DOM, object URLs, stores ni downloads. Registry/list/provider
+drift, IDs ocultos, getters/mutaciones hostiles y errores spoofed quedan
+contenidos; AbortSignal usa slots/listeners nativos. La revisión aceptó 20/20 y
+el gate F7 acumulado 62/62. F7-06 puede inyectar quota/crash/timeout/cancel race
+sobre este seam sin migrar todavía codecs o writers reales.
 
 ## Reglas de ejecución
 
