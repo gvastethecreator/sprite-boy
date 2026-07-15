@@ -8,5 +8,13 @@
     "no-var": "error",
     "prefer-const": "warn"
   },
-  "ignorePatterns": ["dist/**", "node_modules/**", "logs/**", "coverage/**"]
+  "ignorePatterns": [
+    ".local/**",
+    ".scratch/**",
+    "artifacts/**",
+    "coverage/**",
+    "dist/**",
+    "logs/**",
+    "node_modules/**"
+  ]
 }

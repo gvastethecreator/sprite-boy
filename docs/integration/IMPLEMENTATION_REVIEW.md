@@ -1044,9 +1044,33 @@ los lotes que sí modifican producto.
   Package/locks staged cero; diff-check verde. Review final: `accept`. Record:
   [F8 reproducibility ownership](./F8_REPRODUCIBILITY_OWNERSHIP.md).
 
+## F8-02 — Stable local quality gates and production browser smoke
+
+- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Manifest:** `scripts/studio-gates.mjs` expone ocho gates data-only con argv
+  fijo, ejecución secuencial, `shell:false`, timeout por step, list/dry-run y
+  propagación exacta del primer failure. No usa ni modifica aliases del package.
+- **Ratchet:** lint acepta como máximo los 47 warnings heredados observados;
+  47 devuelve 0 y el fail deliberado con 46 devuelve 1. F8-05 debe reducir el
+  límite al retirar esa deuda, nunca aumentarlo para hacer verde una regresión.
+- **Browser:** el e2e construye y sirve `dist`, arranca sólo procesos propios y
+  usa Chrome/CDP con perfil temporal. Cada command está acotado; close/error
+  rechaza pendientes y finally cierra browser/preview y retira el perfil.
+- **Observabilidad:** el smoke exige Slice activa y visible a 1440x900, page-fit
+  y cero console errors, exceptions, log errors, `Network.loadingFailed` o
+  respuestas HTTP >=400. Los diagnostics no conservan URLs ni request IDs.
+- **Repairs:** revisión inicial encontró lint sin ratchet, comandos CDP que
+  podían quedar pendientes, red incompleta y flags duplicados last-wins. Las
+  cuatro reproducciones quedaron cerradas; segunda revisión sin P0-P3.
+- **Evidencia:** 12/12 focales; typecheck y lint focal `--deny-warnings` verdes;
+  parser adversarial exit 2; e2e productivo pass con todos los contadores de
+  error en cero. Gate `all`: unit 19/123, contract 42/462, integration 1/6,
+  build y browser-smoke; siete steps completos, exit 0.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F8-02: activo; debe añadir commands directos reproducibles y smoke tests sin
-  cambiar todavía aliases/dependencies del package user-owned.
+- F8-03: condicionado; frozen install requiere decisión explícita y patch
+  atómico del package/lock user-owned.
+- F8-04: activo; coverage canónica y política de retención fixture/golden.

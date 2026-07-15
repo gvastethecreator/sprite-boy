@@ -1,0 +1,469 @@
+/** Production build smoke using Chrome DevTools Protocol and no browser dependency. */
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join, posix, resolve, win32 } from "node:path";
+import { pathToFileURL } from "node:url";
+
+const HOST = "127.0.0.1";
+
+function delay(milliseconds) {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
+}
+
+async function withTimeout(promise, milliseconds, message) {
+  let handle;
+  const timeout = new Promise((_, reject) => {
+    handle = setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(handle);
+  }
+}
+
+export function chromeExecutableCandidates(platform = process.platform, env = process.env) {
+  if (platform === "win32") {
+    return [
+      env.STUDIO_CHROME_PATH,
+      env.PROGRAMFILES && win32.join(env.PROGRAMFILES, "Google", "Chrome", "Application", "chrome.exe"),
+      env["PROGRAMFILES(X86)"] && win32.join(env["PROGRAMFILES(X86)"], "Google", "Chrome", "Application", "chrome.exe"),
+      env.LOCALAPPDATA && win32.join(env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe"),
+    ].filter(Boolean);
+  }
+  if (platform === "darwin") {
+    return [
+      env.STUDIO_CHROME_PATH,
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    ].filter(Boolean);
+  }
+  return [
+    env.STUDIO_CHROME_PATH,
+    posix.join("/usr/bin", "google-chrome"),
+    posix.join("/usr/bin", "google-chrome-stable"),
+    posix.join("/usr/bin", "chromium"),
+    posix.join("/usr/bin", "chromium-browser"),
+  ].filter(Boolean);
+}
+
+export function resolveChromeExecutable(options = {}) {
+  const platform = options.platform ?? process.platform;
+  const env = options.env ?? process.env;
+  const exists = options.existsSync ?? existsSync;
+  const candidates = chromeExecutableCandidates(platform, env);
+  const direct = candidates.find((candidate) => exists(candidate));
+  if (direct) return direct;
+
+  const command = platform === "win32" ? "where" : "which";
+  const names = platform === "win32"
+    ? ["chrome.exe", "chrome"]
+    : ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"];
+  const lookup = options.spawnSync ?? spawnSync;
+  for (const name of names) {
+    const result = lookup(command, [name], {
+      encoding: "utf8",
+      shell: false,
+      windowsHide: true,
+    });
+    const candidate = result.status === 0
+      ? String(result.stdout).split(/\r?\n/u).map((value) => value.trim()).find(Boolean)
+      : undefined;
+    if (candidate && exists(candidate)) return candidate;
+  }
+  throw new Error("Chrome executable is unavailable.");
+}
+
+async function allocatePort() {
+  const server = createServer();
+  await new Promise((resolvePromise, reject) => {
+    server.once("error", reject);
+    server.listen(0, HOST, resolvePromise);
+  });
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : 0;
+  await new Promise((resolvePromise, reject) => server.close((error) => error ? reject(error) : resolvePromise()));
+  if (port === 0) throw new Error("Preview port allocation failed.");
+  return port;
+}
+
+async function waitForPreview(url, child, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error("Preview process exited before readiness.");
+    try {
+      const response = await fetch(url, { redirect: "manual" });
+      if (response.ok) return;
+    } catch {
+      // Preview is still starting.
+    }
+    await delay(80);
+  }
+  throw new Error("Preview readiness timed out.");
+}
+
+async function waitForDevToolsPort(profileDirectory, child, timeoutMs = 20_000) {
+  const filePath = join(profileDirectory, "DevToolsActivePort");
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error("Chrome exited before DevTools readiness.");
+    if (existsSync(filePath)) {
+      try {
+        const [portText] = readFileSync(filePath, "utf8").split(/\r?\n/u);
+        const port = Number(portText);
+        if (Number.isSafeInteger(port) && port > 0) return port;
+      } catch {
+        // Chrome can briefly hold the file while publishing the selected port.
+      }
+    }
+    await delay(50);
+  }
+  throw new Error("Chrome DevTools readiness timed out.");
+}
+
+export class CdpClient {
+  constructor(socket, commandTimeoutMs = 10_000) {
+    this.socket = socket;
+    this.commandTimeoutMs = commandTimeoutMs;
+    this.nextId = 0;
+    this.pending = new Map();
+    this.closed = false;
+    this.consoleErrorCount = 0;
+    this.exceptionCount = 0;
+    this.logErrorCount = 0;
+    this.logErrorKinds = [];
+    this.networkFailureCount = 0;
+    this.httpErrorCount = 0;
+    this.networkFailureKinds = [];
+    this.httpErrorKinds = [];
+    this.networkInFlight = new Set();
+    this.lastNetworkActivity = Date.now();
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data));
+      if (message.id !== undefined) {
+        const pending = this.pending.get(message.id);
+        if (!pending) return;
+        this.pending.delete(message.id);
+        clearTimeout(pending.timeoutHandle);
+        if (message.error) pending.reject(new Error(`Chrome command ${pending.method} failed.`));
+        else pending.resolve(message.result);
+      } else if (message.method === "Runtime.consoleAPICalled" && message.params?.type === "error") {
+        this.consoleErrorCount += 1;
+      } else if (message.method === "Runtime.exceptionThrown") {
+        this.exceptionCount += 1;
+      } else if (message.method === "Log.entryAdded" && message.params?.entry?.level === "error") {
+        this.logErrorCount += 1;
+        const entry = message.params.entry;
+        let path = null;
+        try {
+          path = entry.url ? new URL(entry.url).pathname : null;
+        } catch {
+          // Do not retain a malformed or potentially private URL.
+        }
+        this.logErrorKinds.push({ source: String(entry.source ?? "unknown"), path });
+      } else if (message.method === "Network.requestWillBeSent") {
+        this.lastNetworkActivity = Date.now();
+        this.networkInFlight.add(message.params.requestId);
+      } else if (message.method === "Network.loadingFinished") {
+        this.lastNetworkActivity = Date.now();
+        this.networkInFlight.delete(message.params.requestId);
+      } else if (message.method === "Network.loadingFailed") {
+        this.lastNetworkActivity = Date.now();
+        this.networkInFlight.delete(message.params.requestId);
+        this.networkFailureCount += 1;
+        this.networkFailureKinds.push({
+          type: String(message.params.type ?? "Other"),
+          canceled: message.params.canceled === true,
+          blocked: message.params.blockedReason !== undefined,
+        });
+      } else if (
+        message.method === "Network.responseReceived" &&
+        Number(message.params?.response?.status) >= 400
+      ) {
+        this.httpErrorCount += 1;
+        this.httpErrorKinds.push({
+          type: String(message.params.type ?? "Other"),
+          status: Number(message.params.response.status),
+        });
+      }
+    });
+    const disconnect = () => this.handleDisconnect();
+    socket.addEventListener("close", disconnect, { once: true });
+    socket.addEventListener("error", disconnect, { once: true });
+  }
+
+  send(method, params = {}) {
+    if (this.closed) return Promise.reject(new Error("Chrome connection closed."));
+    const id = ++this.nextId;
+    return new Promise((resolvePromise, reject) => {
+      const timeoutHandle = setTimeout(() => {
+        if (!this.pending.delete(id)) return;
+        reject(new Error(`Chrome command ${method} timed out.`));
+      }, this.commandTimeoutMs);
+      this.pending.set(id, { resolve: resolvePromise, reject, method, timeoutHandle });
+      try {
+        this.socket.send(JSON.stringify({ id, method, params }));
+      } catch {
+        clearTimeout(timeoutHandle);
+        this.pending.delete(id);
+        reject(new Error(`Chrome command ${method} could not be sent.`));
+      }
+    });
+  }
+
+  handleDisconnect() {
+    if (this.closed) return;
+    this.closed = true;
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timeoutHandle);
+      pending.reject(new Error("Chrome connection closed."));
+    }
+    this.pending.clear();
+  }
+
+  async evaluate(expression) {
+    const result = await this.send("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    if (result.exceptionDetails) throw new Error("Browser evaluation failed.");
+    return result.result.value;
+  }
+
+  async waitFor(expression, timeoutMs = 20_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (this.closed) throw new Error("Chrome connection closed.");
+      try {
+        if (await this.evaluate(expression)) return;
+      } catch {
+        if (this.closed) throw new Error("Chrome connection closed.");
+        // Navigation can destroy the prior execution context before the new
+        // document is ready to evaluate the predicate.
+      }
+      await delay(80);
+    }
+    throw new Error("Browser application readiness timed out.");
+  }
+
+  async waitForNetworkIdle(idleMs = 300, timeoutMs = 10_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (this.closed) throw new Error("Chrome connection closed.");
+      if (this.networkInFlight.size === 0 && Date.now() - this.lastNetworkActivity >= idleMs) return;
+      await delay(50);
+    }
+    throw new Error("Browser network idle timed out.");
+  }
+
+  close() {
+    const alreadyClosed = this.closed;
+    this.handleDisconnect();
+    if (!alreadyClosed) {
+      try {
+        this.socket.close();
+      } catch {
+        // The transport can already be gone after Chrome exits.
+      }
+    }
+  }
+}
+
+async function connectToPage(port) {
+  const targets = await fetch(`http://${HOST}:${port}/json/list`).then((response) => response.json());
+  const page = targets.find((candidate) => candidate.type === "page");
+  if (!page?.webSocketDebuggerUrl) throw new Error("Chrome page target is unavailable.");
+  const socket = new WebSocket(page.webSocketDebuggerUrl);
+  await withTimeout(
+    new Promise((resolvePromise, reject) => {
+      socket.addEventListener("open", resolvePromise, { once: true });
+      socket.addEventListener("error", () => reject(new Error("Chrome connection failed.")), { once: true });
+    }),
+    10_000,
+    "Chrome connection timed out.",
+  );
+  return new CdpClient(socket);
+}
+
+async function waitForExit(child, timeoutMs = 5_000) {
+  if (child.exitCode !== null) return;
+  await withTimeout(
+    new Promise((resolvePromise) => child.once("exit", resolvePromise)),
+    timeoutMs,
+    "Process exit timed out.",
+  ).catch(() => undefined);
+}
+
+function safeRemoveProfile(profileDirectory) {
+  if (!profileDirectory) return;
+  const temporaryRoot = resolve(tmpdir());
+  const resolvedProfile = resolve(profileDirectory);
+  if (!resolvedProfile.startsWith(`${temporaryRoot}${process.platform === "win32" ? "\\" : "/"}`)) {
+    throw new Error("Temporary Chrome profile path is invalid.");
+  }
+  rmSync(resolvedProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+}
+
+export async function runBrowserSmoke(options = {}) {
+  const cwd = resolve(options.cwd ?? process.cwd());
+  const chromePath = resolveChromeExecutable(options);
+  const port = await allocatePort();
+  const baseUrl = `http://${HOST}:${port}`;
+  const profileDirectory = mkdtempSync(join(tmpdir(), "sprite-boy-chrome-"));
+  let preview;
+  let chrome;
+  let client;
+
+  try {
+    preview = spawn(process.execPath, [
+      "x", "vite", "preview", "--host", HOST, "--port", String(port), "--strictPort",
+    ], {
+      cwd,
+      env: process.env,
+      shell: false,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    await waitForPreview(baseUrl, preview);
+
+    chrome = spawn(chromePath, [
+      "--headless=new",
+      "--disable-background-networking",
+      "--disable-component-update",
+      "--disable-default-apps",
+      "--disable-extensions",
+      "--disable-sync",
+      "--metrics-recording-only",
+      "--no-default-browser-check",
+      "--no-first-run",
+      "--remote-debugging-port=0",
+      `--user-data-dir=${profileDirectory}`,
+      "about:blank",
+    ], {
+      cwd,
+      env: process.env,
+      shell: false,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    const devToolsPort = await waitForDevToolsPort(profileDirectory, chrome);
+    client = await connectToPage(devToolsPort);
+    await Promise.all([
+      client.send("Page.enable"),
+      client.send("Runtime.enable"),
+      client.send("Log.enable"),
+      client.send("Network.enable"),
+      client.send("Emulation.setDeviceMetricsOverride", {
+        width: 1440,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: false,
+      }),
+    ]);
+    await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
+    try {
+      await client.waitFor(`(() => {
+        const shell = document.querySelector('[data-studio-workspace="slice"]');
+        const content = document.querySelector('[data-studio-workspace-content="slice"]');
+        const active = document.querySelector('[data-workspace-id="slice"][aria-current="page"]');
+        return document.readyState === 'complete' && Boolean(shell && content && active);
+      })()`);
+    } catch {
+      let readiness = { state: "unavailable" };
+      try {
+        readiness = await client.evaluate(`({
+          state: document.readyState,
+          hash: location.hash,
+          workspace: document.querySelector('[data-studio-workspace]')?.dataset.studioWorkspace ?? null,
+          hasContent: Boolean(document.querySelector('[data-studio-workspace-content]')),
+          hasActiveRoute: Boolean(document.querySelector('[data-workspace-id][aria-current="page"]')),
+        })`);
+      } catch {
+        // Keep the diagnostic structural when the page has no live context.
+      }
+      throw new Error(`Browser application readiness failed: ${JSON.stringify(readiness)}`);
+    }
+    await client.waitForNetworkIdle();
+    const page = await client.evaluate(`(() => {
+      const content = document.querySelector('[data-studio-workspace-content="slice"]');
+      const rect = content?.getBoundingClientRect();
+      return {
+        hash: location.hash,
+        workspace: document.querySelector('[data-studio-workspace]')?.dataset.studioWorkspace,
+        contentVisible: Boolean(rect && rect.width > 0 && rect.height > 0),
+        activeRoute: Boolean(document.querySelector('[data-workspace-id="slice"][aria-current="page"]')),
+        pageFits: document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight,
+      };
+    })()`);
+    const passed = page.hash === "#/studio/slice" &&
+      page.workspace === "slice" &&
+      page.contentVisible &&
+      page.activeRoute &&
+      page.pageFits &&
+      client.consoleErrorCount === 0 &&
+      client.exceptionCount === 0 &&
+      client.logErrorCount === 0 &&
+      client.networkFailureCount === 0 &&
+      client.httpErrorCount === 0;
+    if (!passed) {
+      throw new Error(`Production browser smoke assertions failed: ${JSON.stringify({
+        ...page,
+        consoleErrorCount: client.consoleErrorCount,
+        exceptionCount: client.exceptionCount,
+        logErrorCount: client.logErrorCount,
+        logErrorKinds: client.logErrorKinds,
+        networkFailureCount: client.networkFailureCount,
+        networkFailureKinds: client.networkFailureKinds,
+        httpErrorCount: client.httpErrorCount,
+        httpErrorKinds: client.httpErrorKinds,
+      })}`);
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      status: "pass",
+      route: page.hash,
+      workspace: page.workspace,
+      contentVisible: page.contentVisible,
+      activeRoute: page.activeRoute,
+      pageFits: page.pageFits,
+      consoleErrorCount: client.consoleErrorCount,
+      exceptionCount: client.exceptionCount,
+      logErrorCount: client.logErrorCount,
+      networkFailureCount: client.networkFailureCount,
+      httpErrorCount: client.httpErrorCount,
+    });
+  } finally {
+    if (client) {
+      try {
+        await client.send("Browser.close");
+      } catch {
+        // The browser may already be closing after a failed CDP operation.
+      }
+      client.close();
+    }
+    if (chrome && chrome.exitCode === null) chrome.kill();
+    if (chrome) await waitForExit(chrome);
+    if (preview && preview.exitCode === null) preview.kill();
+    if (preview) await waitForExit(preview);
+    safeRemoveProfile(profileDirectory);
+  }
+}
+
+export async function runBrowserSmokeCli(io = {}) {
+  const stdout = io.stdout ?? process.stdout;
+  const stderr = io.stderr ?? process.stderr;
+  try {
+    const result = await runBrowserSmoke();
+    stdout.write(`${JSON.stringify(result)}\n`);
+    return 0;
+  } catch {
+    stderr.write(`${JSON.stringify({ schemaVersion: 1, status: "fail", message: "Production browser smoke failed." })}\n`);
+    return 1;
+  }
+}
+
+const invokedScript = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : null;
+if (invokedScript === import.meta.url) process.exitCode = await runBrowserSmokeCli();
