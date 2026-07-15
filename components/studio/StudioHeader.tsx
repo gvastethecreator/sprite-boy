@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   CircleHelp,
@@ -60,6 +60,16 @@ interface CommandButtonProps {
   readonly menuItem?: boolean;
 }
 
+type OpenHeaderMenu = "project" | "workspace" | null;
+
+function getEnabledMenuItems(menu: HTMLElement): HTMLElement[] {
+  return Array.from(
+    menu.querySelectorAll<HTMLElement>(
+      '[role="menuitem"]:not([disabled]):not([aria-disabled="true"])',
+    ),
+  );
+}
+
 function CommandButton({
   commandId,
   registry,
@@ -77,6 +87,8 @@ function CommandButton({
   return (
     <button
       type="button"
+      role={menuItem ? "menuitem" : undefined}
+      tabIndex={menuItem ? -1 : undefined}
       data-command-id={commandId}
       disabled={disabled}
       aria-disabled={disabled}
@@ -104,14 +116,63 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   commandContext,
   onExecute,
 }) => {
-  const [isProjectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<OpenHeaderMenu>(null);
+  const projectTriggerRef = useRef<HTMLButtonElement>(null);
+  const workspaceTriggerRef = useRef<HTMLButtonElement>(null);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
+  const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const exportCommandId = "workspace.open.export" as const;
   const exportState = commandState(registry, exportCommandId, commandContext);
   const exportDisabled = !exportState.enabled;
 
+  const restoreMenuTrigger = (menu: Exclude<OpenHeaderMenu, null>) => {
+    const trigger = menu === "project" ? projectTriggerRef.current : workspaceTriggerRef.current;
+    window.requestAnimationFrame(() => trigger?.focus());
+  };
+
+  const closeMenu = (restoreFocus = false) => {
+    const menu = openMenu;
+    setOpenMenu(null);
+    if (restoreFocus && menu) restoreMenuTrigger(menu);
+  };
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const menu = openMenu === "project" ? projectMenuRef.current : workspaceMenuRef.current;
+    const frame = window.requestAnimationFrame(() => {
+      const firstItem = menu ? getEnabledMenuItems(menu)[0] : undefined;
+      firstItem?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [openMenu]);
+
+  const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu(true);
+      return;
+    }
+    if (event.key === "Tab") {
+      setOpenMenu(null);
+      return;
+    }
+
+    const items = getEnabledMenuItems(event.currentTarget);
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % items.length;
+    if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = items.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    items[nextIndex]?.focus();
+  };
+
   const executeProjectCommand = (commandId: StudioCommandId) => {
     onExecute(commandId);
-    setProjectMenuOpen(false);
+    closeMenu(true);
   };
 
   const executeWorkspace = (
@@ -131,40 +192,48 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   };
 
   return (
-    <header className="relative z-50 flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-panel px-4">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="relative z-50 flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-panel px-2 sm:px-4">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
         <div className="flex shrink-0 items-center gap-2.5 select-none" aria-label="SpriteBoy Studio">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-surface text-accent">
             <LayoutGrid size={18} strokeWidth={1.8} />
           </div>
-          <div className="flex flex-col justify-center">
+          <div className="hidden flex-col justify-center sm:flex">
             <span className="text-sm font-bold leading-none tracking-tight text-textMain">SpriteBoy</span>
             <span className="font-mono text-[10px] text-textMuted/70">Studio</span>
           </div>
         </div>
 
-        <div className="mx-1 h-6 w-px bg-white/10" />
+        <div className="mx-1 hidden h-6 w-px bg-white/10 sm:block" />
 
         <div className="relative">
           <button
+            ref={projectTriggerRef}
             type="button"
             aria-haspopup="menu"
-            aria-expanded={isProjectMenuOpen}
-            onClick={() => setProjectMenuOpen((open) => !open)}
-            className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-textMuted transition-colors hover:bg-white/5 hover:text-white"
+            aria-expanded={openMenu === "project"}
+            aria-controls="studio-project-menu"
+            onClick={() => setOpenMenu((current) => current === "project" ? null : "project")}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-textMuted transition-colors hover:bg-white/5 hover:text-white sm:px-3"
           >
             Project
-            <ChevronDown size={12} className={isProjectMenuOpen ? "rotate-180 opacity-70" : "opacity-60"} />
+            <ChevronDown size={12} className={openMenu === "project" ? "rotate-180 opacity-70" : "opacity-60"} />
           </button>
-          {isProjectMenuOpen && (
+          {openMenu === "project" && (
             <>
-              <button
-                type="button"
-                aria-label="Close project menu"
-                className="fixed inset-0 z-40 h-full w-full cursor-default"
-                onClick={() => setProjectMenuOpen(false)}
+              <div
+                aria-hidden="true"
+                className="fixed inset-0 z-40 cursor-default"
+                onPointerDown={() => closeMenu(true)}
               />
-              <div role="menu" aria-label="Project actions" className="absolute left-0 top-full z-50 mt-1 w-52 rounded-lg border border-border bg-panel py-1 shadow-xl">
+              <div
+                ref={projectMenuRef}
+                id="studio-project-menu"
+                role="menu"
+                aria-label="Project actions"
+                onKeyDown={handleMenuKeyDown}
+                className="absolute left-0 top-full z-50 mt-1 w-52 rounded-lg border border-border bg-panel py-1 shadow-xl"
+              >
                 <CommandButton
                   commandId="project.new"
                   registry={registry}
@@ -203,7 +272,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-0.5 rounded-md border border-white/5 bg-surface p-0.5" aria-label="Edit actions">
+        <div className="hidden items-center gap-0.5 rounded-md border border-white/5 bg-surface p-0.5 sm:flex" aria-label="Edit actions">
           <CommandButton
             commandId="edit.undo"
             registry={registry}
@@ -224,7 +293,73 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         </div>
       </div>
 
-      <nav aria-label="Studio workspaces" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-lg border border-white/5 bg-surface/50 p-1 backdrop-blur-sm lg:flex">
+      <div className="absolute left-1/2 -translate-x-1/2 xl:hidden">
+        <button
+          ref={workspaceTriggerRef}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={openMenu === "workspace"}
+          aria-controls="studio-workspace-menu"
+          onClick={() => setOpenMenu((current) => current === "workspace" ? null : "workspace")}
+          className="inline-flex max-w-[34vw] items-center gap-1.5 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain hover:bg-white/10"
+        >
+          <span className="truncate">{getStudioWorkspace(activeWorkspace).label}</span>
+          <ChevronDown size={12} className={openMenu === "workspace" ? "rotate-180 opacity-70" : "opacity-60"} />
+        </button>
+        {openMenu === "workspace" && (
+          <>
+            <div
+              aria-hidden="true"
+              className="fixed inset-0 z-40 cursor-default"
+              onPointerDown={() => closeMenu(true)}
+            />
+            <div
+              ref={workspaceMenuRef}
+              id="studio-workspace-menu"
+              role="menu"
+              aria-label="Studio workspaces"
+              onKeyDown={handleMenuKeyDown}
+              className="absolute left-1/2 top-full z-50 mt-2 w-56 -translate-x-1/2 rounded-lg border border-border bg-panel p-1 shadow-xl"
+            >
+              {STUDIO_WORKSPACES.map((workspace) => {
+                const Icon = WORKSPACE_ICONS[workspace.id];
+                const state = commandState(registry, workspace.commandId, commandContext);
+                const disabled = !state.enabled;
+                return (
+                  <a
+                    key={workspace.id}
+                    role="menuitem"
+                    tabIndex={-1}
+                    href={workspace.href}
+                    data-workspace-id={workspace.id}
+                    aria-current={activeWorkspace === workspace.id ? "page" : undefined}
+                    aria-disabled={disabled || undefined}
+                    title={disabled ? state.reason : workspace.description}
+                    onClick={(event) => {
+                      executeWorkspace(event, workspace.commandId);
+                      if (!disabled && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                        closeMenu(true);
+                      }
+                    }}
+                    className={[
+                      "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium",
+                      activeWorkspace === workspace.id
+                        ? "bg-accent text-white"
+                        : "text-textMuted hover:bg-white/5 hover:text-textMain",
+                      disabled ? "pointer-events-none opacity-35" : "",
+                    ].join(" ")}
+                  >
+                    <Icon size={14} strokeWidth={1.8} />
+                    <span>{workspace.label}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      <nav aria-label="Studio workspaces" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-lg border border-white/5 bg-surface/50 p-1 backdrop-blur-sm xl:flex">
         {STUDIO_WORKSPACES.map((workspace) => {
           const Icon = WORKSPACE_ICONS[workspace.id];
           const commandId = workspace.commandId;
@@ -254,7 +389,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         })}
       </nav>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <a
           href={getStudioWorkspace("export").href}
           data-command-id={exportCommandId}
@@ -263,14 +398,14 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           title={exportDisabled ? exportState.reason : registry.getCommand(exportCommandId).description}
           onClick={(event) => executeWorkspace(event, exportCommandId)}
           className={[
-            "inline-flex items-center gap-2 rounded-md border border-white/10 bg-surface px-3 py-1.5 text-xs font-medium text-textMain transition-colors hover:bg-white/10",
+            "inline-flex items-center gap-2 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain transition-colors hover:bg-white/10 sm:px-3",
             exportDisabled ? "pointer-events-none opacity-35" : "",
           ].join(" ")}
         >
           <Download size={14} strokeWidth={1.8} />
-          Export
+          <span className="hidden sm:inline">Export</span>
         </a>
-        <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+        <div className="hidden items-center gap-1 border-l border-white/10 pl-2 sm:flex">
           <CommandButton
             commandId="app.openHelp"
             registry={registry}

@@ -1,6 +1,6 @@
 import React from "react";
 import { X, Keyboard, Command } from "lucide-react";
-import { useModalEntrance } from "../../hooks/useGSAPAnimations";
+import { StudioDialog } from "../studio/StudioDialog";
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -24,25 +24,21 @@ const ShortcutRow = ({ keys, desc }: { keys: string[]; desc: string }) => (
 );
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
-  const modalRef = useModalEntrance();
-  if (!isOpen) return null;
-
   return (
-    <div
-      ref={modalRef}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+    <StudioDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy="studio-help-title"
+      backdropClassName="items-center pt-4"
+      panelClassName="max-w-md border-border"
     >
-      <div
-        data-modal-panel
-        className="bg-panel border border-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
-          <h2 className="text-lg font-semibold text-textMain flex items-center gap-2">
+          <h2 id="studio-help-title" className="text-lg font-semibold text-textMain flex items-center gap-2">
             <Keyboard size={20} className="text-accent" /> Keyboard Shortcuts
           </h2>
           <button
+            type="button"
+            aria-label="Close keyboard shortcuts"
             onClick={onClose}
             className="text-textMuted hover:text-textMain transition-colors p-1 hover:bg-white/10 rounded-full"
           >
@@ -92,8 +88,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         <div className="p-4 bg-panel border-t border-border flex justify-center text-[10px] text-textMuted">
           Press <kbd className="mx-1 px-1 bg-white/10 rounded">ESC</kbd> to close any modal
         </div>
-      </div>
-    </div>
+    </StudioDialog>
   );
 };
 

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
 import CanvasArea from "../canvas/CanvasArea";
@@ -19,7 +20,7 @@ import {
   type StudioCommandId,
   type StudioWorkspaceId,
 } from "../../core/studio";
-import { StudioHeader, useStudioNavigation } from "../studio";
+import { StudioDialog, StudioHeader, StudioPanel, useStudioNavigation } from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
 
 function legacyModeForWorkspace(workspaceId: StudioWorkspaceId): AppMode {
@@ -34,6 +35,31 @@ function legacyModeForWorkspace(workspaceId: StudioWorkspaceId): AppMode {
     case "export":
       return AppMode.TEMPLATE;
   }
+}
+
+const COMPACT_STUDIO_QUERY = "(max-width: 1279px)";
+
+function useCompactStudioLayout(): boolean {
+  const readMatch = () =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(COMPACT_STUDIO_QUERY).matches
+      : false;
+  const [isCompact, setCompact] = useState(readMatch);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia(COMPACT_STUDIO_QUERY);
+    const update = () => setCompact(query.matches);
+    update();
+    if (typeof query.addEventListener === "function") {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
+    }
+    query.addListener?.(update);
+    return () => query.removeListener?.(update);
+  }, []);
+
+  return isCompact;
 }
 
 const AppLayout: React.FC = () => {
@@ -84,6 +110,8 @@ const AppLayout: React.FC = () => {
   const assetInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
   const { activeWorkspace, navigate } = useStudioNavigation();
+  const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
+  const isCompactLayout = useCompactStudioLayout();
   const hasWorkspace = !!slicerImage || !!builderCanvas;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
 
@@ -91,6 +119,10 @@ const AppLayout: React.FC = () => {
     const legacyMode = legacyModeForWorkspace(activeWorkspace);
     if (currentMode !== legacyMode) handleSetMode(legacyMode);
   }, [activeWorkspace, currentMode, handleSetMode]);
+
+  useEffect(() => {
+    setCompactPanel(null);
+  }, [activeWorkspace, isCompactLayout]);
 
   const commandRegistry = useMemo(() => createStudioCommandRegistry({
     newProject: () => {
@@ -154,6 +186,7 @@ const AppLayout: React.FC = () => {
     toggleCommandPalette: () => setIsCommandPaletteOpen(!isCommandPaletteOpen),
     resetView: () => canvasRef.current?.resetView(),
     closeModals: () => {
+      setCompactPanel(null);
       controller.closeAllModals();
     },
     currentMode,
@@ -165,13 +198,14 @@ const AppLayout: React.FC = () => {
       exportModal.isOpen ||
       generationModal.isOpen ||
       isCommandPaletteOpen ||
+      compactPanel !== null ||
       !!analysisResult,
     activeAnimationId,
   });
 
   return (
     <div
-      className="h-screen w-screen flex flex-col bg-app text-textMain overflow-hidden p-2 gap-2 select-none"
+      className="h-dvh w-screen flex flex-col bg-app text-textMain overflow-hidden p-1 gap-1 select-none sm:p-2 sm:gap-2"
       data-studio-workspace={activeWorkspace}
     >
       <input
@@ -210,11 +244,47 @@ const AppLayout: React.FC = () => {
         onExecute={executeCommand}
       />
 
+      {hasWorkspace && isCompactLayout && (
+        <div
+          role="toolbar"
+          aria-label="Compact Studio panels"
+          className="flex h-9 shrink-0 items-center justify-between rounded-md border border-border/30 bg-panel px-2 xl:hidden"
+        >
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={compactPanel === "tools"}
+            onClick={() => setCompactPanel("tools")}
+            className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <PanelLeftOpen size={14} aria-hidden="true" />
+            Tools
+          </button>
+          <span className="truncate px-3 text-[10px] font-medium uppercase tracking-wider text-textMuted/70">
+            {activeWorkspaceDefinition.label} workspace
+          </span>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={compactPanel === "properties"}
+            onClick={() => setCompactPanel("properties")}
+            className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Properties
+            <PanelRightOpen size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex min-h-0 gap-2">
-        {hasWorkspace && (
-          <div className="w-[280px] bg-panel rounded-panel flex flex-col shrink-0 border border-border/20 overflow-hidden animate-fade-in">
+        {hasWorkspace && !isCompactLayout && (
+          <StudioPanel
+            label="Tools"
+            variant="sidebar"
+            className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
+          >
             <LeftSidebar />
-          </div>
+          </StudioPanel>
         )}
 
         <div className="flex-1 flex flex-col min-w-0 gap-2">
@@ -226,12 +296,44 @@ const AppLayout: React.FC = () => {
           )}
         </div>
 
-        {hasWorkspace && (
-          <div className="w-[280px] bg-panel rounded-panel flex flex-col shrink-0 border border-border/20 overflow-hidden animate-fade-in">
+        {hasWorkspace && !isCompactLayout && (
+          <StudioPanel
+            label="Properties"
+            variant="sidebar"
+            className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
+          >
             <RightSidebar />
-          </div>
+          </StudioPanel>
         )}
       </div>
+
+      <StudioDialog
+        isOpen={isCompactLayout && compactPanel !== null}
+        onClose={() => setCompactPanel(null)}
+        ariaLabel={compactPanel === "tools" ? "Tools panel" : "Properties panel"}
+        backdropClassName="!items-stretch !justify-start !p-0 !pt-0 bg-black/70"
+        panelClassName="!h-dvh !max-h-dvh !max-w-[360px] !rounded-none !border-y-0 !border-l-0"
+      >
+        {compactPanel === "tools" ? (
+          <StudioPanel
+            label="Tools"
+            variant="drawer"
+            onClose={() => setCompactPanel(null)}
+            className="h-full border-0"
+          >
+            <LeftSidebar />
+          </StudioPanel>
+        ) : compactPanel === "properties" ? (
+          <StudioPanel
+            label="Properties"
+            variant="drawer"
+            onClose={() => setCompactPanel(null)}
+            className="h-full border-0"
+          >
+            <RightSidebar />
+          </StudioPanel>
+        ) : null}
+      </StudioDialog>
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <CommandPalette
