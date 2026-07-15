@@ -79,6 +79,7 @@ describe("RenderScheduler", () => {
     expect(host.pendingCount).toBe(0);
     expect(scheduler.getSnapshot()).toEqual({
       disposed: false,
+      suspended: false,
       failed: false,
       scheduled: false,
       rendering: false,
@@ -87,6 +88,44 @@ describe("RenderScheduler", () => {
       continuous: [],
       changedIds: [],
     });
+  });
+
+  it("suspends pending and continuous work without losing it, then resumes once", async () => {
+    const host = new ManualFrameHost();
+    const frames: ScheduledRenderFrame[] = [];
+    const scheduler = createRenderScheduler({ host, render: (frame) => { frames.push(frame); } });
+    const lease = scheduler.beginContinuous("playback");
+    scheduler.invalidate({ reason: "resize", projectRevision: 4 });
+    expect(host.pendingCount).toBe(1);
+
+    scheduler.suspend();
+    expect(host.pendingCount).toBe(0);
+    expect(scheduler.getSnapshot()).toMatchObject({
+      suspended: true,
+      scheduled: false,
+      continuous: ["playback"],
+      pendingInvalidations: ["resize"],
+      projectRevision: 4,
+    });
+
+    scheduler.resume();
+    expect(host.pendingCount).toBe(1);
+    host.flushNext(8);
+    await flushSchedulerMicrotasks();
+    lease.release();
+
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({
+      invalidations: ["resize"],
+      continuous: ["playback"],
+      projectRevision: 4,
+    });
+    expect(scheduler.getSnapshot()).toMatchObject({
+      suspended: false,
+      scheduled: false,
+      rendering: false,
+    });
+    expect(host.pendingCount).toBe(0);
   });
 
   it("does not retain a stale handle if a host invokes a one-shot callback synchronously", async () => {

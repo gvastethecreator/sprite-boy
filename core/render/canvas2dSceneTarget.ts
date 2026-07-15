@@ -3,10 +3,34 @@ import type {
   SceneCompositorTarget,
   SceneDrawOperation,
 } from "./sceneCompositor";
+import {
+  IDENTITY_SCENE_MATRIX,
+  multiplySceneMatrices,
+  type SceneAffineMatrix,
+} from "./affine";
 
 export type SceneCanvas2DContext =
   | CanvasRenderingContext2D
   | OffscreenCanvasRenderingContext2D;
+
+export interface Canvas2DSceneTargetOptions {
+  readonly transform?: SceneAffineMatrix;
+}
+
+function copyTransform(transform: SceneAffineMatrix): SceneAffineMatrix {
+  const values = [transform.a, transform.b, transform.c, transform.d, transform.e, transform.f];
+  if (!values.every(Number.isFinite)) {
+    throw new TypeError("Canvas scene target transform must contain finite numbers.");
+  }
+  return Object.freeze({
+    a: transform.a,
+    b: transform.b,
+    c: transform.c,
+    d: transform.d,
+    e: transform.e,
+    f: transform.f,
+  });
+}
 
 /**
  * Canvas2D executor for a compiled scene plan. DPR/viewport base transforms are
@@ -15,7 +39,9 @@ export type SceneCanvas2DContext =
  */
 export function createCanvas2DSceneTarget(
   context: SceneCanvas2DContext,
+  options: Canvas2DSceneTargetOptions = {},
 ): SceneCompositorTarget<CanvasImageSource> {
+  const baseTransform = copyTransform(options.transform ?? IDENTITY_SCENE_MATRIX);
   let activeFrame: SceneCompositorFrame | null = null;
 
   function withSavedContext(action: () => void): void {
@@ -52,7 +78,14 @@ export function createCanvas2DSceneTarget(
       const background = frame.background;
       if (background !== null) {
         withSavedContext(() => {
-          context.setTransform(1, 0, 0, 1, 0, 0);
+          context.setTransform(
+            baseTransform.a,
+            baseTransform.b,
+            baseTransform.c,
+            baseTransform.d,
+            baseTransform.e,
+            baseTransform.f,
+          );
           normalizePaintState();
           context.fillStyle = background;
           context.fillRect(0, 0, frame.width, frame.height);
@@ -63,7 +96,8 @@ export function createCanvas2DSceneTarget(
     drawImage(image: CanvasImageSource, operation: SceneDrawOperation): void {
       const frame = activeFrame;
       if (frame === null) throw new Error("Canvas scene target has no active frame.");
-      const { sourceRect, matrix } = operation;
+      const { sourceRect } = operation;
+      const matrix = multiplySceneMatrices(baseTransform, operation.matrix);
       withSavedContext(() => {
         context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
         normalizePaintState();

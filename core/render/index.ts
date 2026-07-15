@@ -8,3 +8,5 @@ export * from "./browserSceneThumbnailSurface";
 export * from "./sceneEncoding";
 export * from "./sceneExport";
 export * from "./browserSceneExportSurface";
+export * from "./sceneViewport";
+export * from "./browserSceneViewport";
