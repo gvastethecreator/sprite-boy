@@ -67,6 +67,8 @@ describe("studio gate manifest", () => {
       "unit",
       "contract",
       "integration",
+      "coverage",
+      "fixtures",
       "build",
       "e2e",
       "all",
@@ -88,6 +90,8 @@ describe("studio gate manifest", () => {
       "unit",
       "contract",
       "integration",
+      "coverage",
+      "fixtures",
       "build",
       "browser-smoke",
     ]);

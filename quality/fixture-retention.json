@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "roots": [
+    "artifacts/quality/B0/2026-07-14",
+    "tests/contract/fixtures"
+  ],
+  "entries": [
+    {
+      "path": "artifacts/quality/B0/2026-07-14/baseline.json",
+      "kind": "quality-baseline",
+      "owner": "B0/F8",
+      "mode": "text-lf",
+      "bytes": 1280,
+      "sha256": "954f5dc9d366cf9c5ff7ffc61ebe2fe26834f3f87fbe1e93d8491f201dbdc2af"
+    },
+    {
+      "path": "artifacts/quality/B0/2026-07-14/coverage-bundle.json",
+      "kind": "coverage-bundle-baseline",
+      "owner": "B0/F8",
+      "mode": "text-lf",
+      "bytes": 1205,
+      "sha256": "1a22cf81db873ee04f281fe7f4c8e91d35b03a1d3f2967bdb50a533cd63242c4"
+    },
+    {
+      "path": "artifacts/quality/B0/2026-07-14/fixtures-journeys.json",
+      "kind": "fixture-journey-inventory",
+      "owner": "B0/F8",
+      "mode": "text-lf",
+      "bytes": 3075,
+      "sha256": "97c38cbafd213a7ecd27ec53874fffac67b197818106311463914ac352d5a4e0"
+    },
+    {
+      "path": "artifacts/quality/B0/2026-07-14/grid-donor-golden-manifest.json",
+      "kind": "donor-source-golden-manifest",
+      "owner": "B0/G1/G2",
+      "mode": "text-lf",
+      "bytes": 1828,
+      "sha256": "6ea892e5f4e219b08c649022a3b292fceb8a3c61e1edf6e6ddd557c569bc9cd8"
+    },
+    {
+      "path": "tests/contract/fixtures/legacyProjectV0.ts",
+      "kind": "sanitized-legacy-project",
+      "owner": "F0/F3",
+      "mode": "text-lf",
+      "bytes": 2833,
+      "sha256": "f789eef1a0184b5c78be9e3611bd56d17b119bf114b256687796ffb5aeb132a4"
+    },
+    {
+      "path": "tests/contract/fixtures/sceneCompositorV1.ts",
+      "kind": "scene-pixel-golden-fixture",
+      "owner": "F5",
+      "mode": "text-lf",
+      "bytes": 5081,
+      "sha256": "fde7b5ce11bb88d98405656252ee9294ae5f2aecdea36697ce3850264ccd4cdf"
+    },
+    {
+      "path": "tests/contract/fixtures/studioProjectV1.ts",
+      "kind": "representative-canonical-project",
+      "owner": "F0/F3",
+      "mode": "text-lf",
+      "bytes": 8413,
+      "sha256": "e2445d3b8b80159d0ccfb52580fcc36b58f884285a83db14287508b2410bf604"
+    }
+  ]
+}

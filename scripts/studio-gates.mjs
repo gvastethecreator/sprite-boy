@@ -41,6 +41,18 @@ const STEPS = Object.freeze({
   integration: processStep("integration", "Integration tests", [
     "x", "vitest", "run", "tests/integration", "--pool=threads", "--maxWorkers=2",
   ], 180_000),
+  coverage: processStep(
+    "coverage",
+    "Canonical coverage ratchet",
+    ["scripts/studio-quality-policy.mjs", "coverage", "--profile", "ratchet"],
+    360_000,
+  ),
+  fixtures: processStep(
+    "fixtures",
+    "Fixture and golden retention",
+    ["scripts/studio-quality-policy.mjs", "fixtures"],
+    30_000,
+  ),
   build: processStep("build", "Production build", ["x", "vite", "build"], 180_000),
   browser: processStep(
     "browser-smoke",
@@ -62,6 +74,8 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
     unit: gate("unit", "Unit tests", [STEPS.unit]),
     contract: gate("contract", "Contract tests", [STEPS.contract]),
     integration: gate("integration", "Integration tests", [STEPS.integration]),
+    coverage: gate("coverage", "Canonical coverage ratchet", [STEPS.coverage]),
+    fixtures: gate("fixtures", "Fixture and golden retention", [STEPS.fixtures]),
     build: gate("build", "Production build", [STEPS.build]),
     e2e: gate("e2e", "Production browser smoke", [STEPS.build, STEPS.browser]),
     all: gate("all", "Complete local gate", [
@@ -70,6 +84,8 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
       STEPS.unit,
       STEPS.contract,
       STEPS.integration,
+      STEPS.coverage,
+      STEPS.fixtures,
       STEPS.build,
       STEPS.browser,
     ]),
