@@ -10,10 +10,7 @@ import {
   DEFAULT_PREFERENCES,
   OnionSkinConfig,
   SlotData,
-  BuilderAsset,
   BuilderCanvasSize,
-  DND_ASSET_TYPE,
-  FrameData,
   CommandPaletteItem,
 } from "../types";
 import { generateFramesFromGrid } from "../utils/algorithms";
@@ -35,7 +32,6 @@ import {
   HelpCircle,
   BrainCircuit,
   Wand2,
-  Scissors,
   Box,
   Layers,
 } from "lucide-react";
@@ -55,7 +51,7 @@ const loadPreferences = (): UserPreferences => {
   try {
     const stored = localStorage.getItem("spriteSlice_prefs");
     if (stored) return { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) };
-  } catch (e) {}
+  } catch {}
   return DEFAULT_PREFERENCES;
 };
 
@@ -63,7 +59,7 @@ const loadUIState = () => {
   try {
     const stored = localStorage.getItem("spriteSlice_ui");
     if (stored) return JSON.parse(stored);
-  } catch (e) {}
+  } catch {}
   return {
     mode: AppMode.BUILDER,
     slicerGrid: { rows: 2, cols: 2, marginX: 0, marginY: 0, paddingX: 0, paddingY: 0 },
@@ -315,9 +311,14 @@ export function useProjectController() {
       animLogic.setActiveAnimationId(null);
       animLogic.setIsPlaying(false);
     };
-    if ((document as any).startViewTransition)
-      (document as any).startViewTransition(() => update());
-    else update();
+    if (typeof document.startViewTransition === "function") {
+      const transition = document.startViewTransition(update);
+      // Rapid workspace changes may legitimately skip the previous visual transition.
+      // The state update still completes, so consume that presentation-only rejection.
+      void transition.ready.catch(() => undefined);
+    } else {
+      update();
+    }
   };
 
   const handleSyncGrid = () => {
@@ -346,7 +347,7 @@ export function useProjectController() {
         ui.setAnalysisResult(result);
       };
       reader.readAsDataURL(blob);
-    } catch (e) {
+    } catch {
       notify("Analysis failed", "error");
     } finally {
       ui.setIsLoading(false);
