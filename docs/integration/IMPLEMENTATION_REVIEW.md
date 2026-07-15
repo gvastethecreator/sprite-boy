@@ -862,9 +862,34 @@ los lotes que sí modifican producto.
   El primer server browser eligió un puerto ocupado y no contó; el harness final
   cerró verde con procesos/perfil propios.
 
+## F7-01 — Typed job lifecycle and retry identity
+
+- **Estado:** `accept` tras cuatro rondas independientes de `repair` y repro
+  directo de cada bypass. Ningún worker, timer, Job Center o exporter fue
+  adelantado desde F7-02..F7-05.
+- **Máquina:** `createQueuedJob`, `transitionJob` y `retryJob` producen snapshots
+  data-only/frozen para queued, running, succeeded, failed, cancelled y
+  timed-out. Cada evento lleva request ID; tiempo/progreso nunca retroceden y
+  un terminal ignora duplicados, conflictos, progreso o failures tardíos.
+- **Errores:** failure codes cubren input/support/worker/provider/export/storage/
+  quota/runtime. Cancel y timeout generan terminales estructurados retryable;
+  no se persiste cause, payload privado ni documento en JobStore.
+- **Retry:** un intento nuevo hereda kind/label/timeout, incrementa attempt y
+  enlaza root/previous. El source debe existir, ser terminal/retryable y sólo
+  puede consumirse una vez. IDs de job y request son single-use por sesión.
+- **Retention temporal:** remove/reset ocultan jobs pero retienen tombstones de
+  job/request y source consumido. Esto evita que una respuesta tardía coincida
+  con una lifecycle reencarnada; la poda atómica y política visible son F7-03.
+- **Repairs:** se cerraron retries huérfanos/branched, request duplicado,
+  cancel/timeout sin start con progreso inventado, reuso tras remove y reuso de
+  job/request tras reset. El pase final reprobó también una cadena fresca legal.
+- **Evidencia:** focal 29/29; suite contract completa 38/38 archivos y 405/405
+  tests; typecheck, lint focal `--deny-warnings`, build y diff-check verdes.
+  Revisión final independiente: `accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F7-01: activo; debe congelar lifecycle/progress/cancel/retry/timeout de jobs
-  sin adelantar workers, Job Center ni format providers.
+- F7-02: activo; debe montar runner/abort/timeout y late-write suppression sobre
+  F7-01 sin adelantar Job Center, retention final ni format providers.

@@ -4,6 +4,7 @@ import type {
 } from "../project/commands";
 import type { ProjectRevision } from "../project/graph";
 import type { EntityId, StudioProjectV1, WorkspaceId } from "../project/schema";
+import type { JobSnapshot } from "../processing";
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 
@@ -178,15 +179,18 @@ export type InteractionAction =
     }
   | { readonly type: "interaction.reset" };
 
-/** F7 extends this exact entry with concrete lifecycle fields. */
-export interface JobStoreEntry {
-  readonly id: EntityId;
-  readonly kind: string;
-}
+/** Canonical F7 lifecycle snapshot; job state remains ephemeral and history-free. */
+export type JobStoreEntry = JobSnapshot;
 
 export interface JobStoreState {
   readonly jobs: Readonly<Partial<Record<EntityId, DeepReadonly<JobStoreEntry>>>>;
   readonly order: readonly EntityId[];
+  /** Session tombstones prevent late messages from matching a recycled request identity. */
+  readonly retiredRequestIds: readonly EntityId[];
+  /** Job identities are single-use for the lifetime of a JobStore instance. */
+  readonly retiredJobIds: readonly EntityId[];
+  /** A terminal attempt can produce at most one retry, even after that child is removed. */
+  readonly consumedRetrySourceIds: readonly EntityId[];
 }
 
 export type JobStoreAction =

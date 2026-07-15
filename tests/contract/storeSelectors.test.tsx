@@ -1,5 +1,6 @@
 import { act, render, renderHook, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { createQueuedJob, transitionJob } from "../../core/processing";
 import {
   createInteractionStore,
   createJobSelector,
@@ -36,6 +37,15 @@ import {
   useWorkspaceStoreSelector,
 } from "../../hooks/useStudioStoreSelector";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
+
+const queuedJob = (id: string) => createQueuedJob({
+  id,
+  requestId: `${id}-request`,
+  kind: "export",
+  label: "Export spritesheet",
+  createdAt: "2026-07-14T12:00:00.000Z",
+  timeoutMs: 30_000,
+});
 
 const context = {
   nextId: () => "generated-id",
@@ -86,7 +96,7 @@ describe("Studio store selectors", () => {
       type: "interaction.setTransientSelection",
       entityIds: ["layer-project"],
     });
-    stores.jobs.dispatch({ type: "job.replace", job: { id: "job-1", kind: "export" } });
+    stores.jobs.dispatch({ type: "job.replace", job: queuedJob("job-1") });
     stores.playback.dispatch({ type: "playback.setSequence", sequenceId: "sequence-main" });
     stores.playback.dispatch({ type: "playback.setPlaying", playing: true });
     stores.playback.dispatch({ type: "playback.seek", cursorMs: 80, celIndex: 1 });
@@ -173,14 +183,19 @@ describe("Studio store selectors", () => {
 
     act(() => {
       stores.workspace.dispatch({ type: "workspace.setPreference", key: "grid", value: true });
-      stores.jobs.dispatch({ type: "job.replace", job: { id: "job-1", kind: "export" } });
+      stores.jobs.dispatch({ type: "job.replace", job: queuedJob("job-1") });
     });
     expect(screen.getByTestId("selection")).toHaveTextContent("220:1");
     expect(renders).toEqual([220, 220]);
 
     act(() => {
       stores.workspace.dispatch({ type: "workspace.setPanelSize", panelId: "timeline", size: 300 });
-      stores.jobs.dispatch({ type: "job.replace", job: { id: "job-1", kind: "export-retry" } });
+      const running = transitionJob(queuedJob("job-1"), {
+        type: "job.start",
+        requestId: "job-1-request",
+        at: "2026-07-14T12:00:01.000Z",
+      }).job;
+      stores.jobs.dispatch({ type: "job.replace", job: running });
     });
     expect(screen.getByTestId("selection")).toHaveTextContent("300:1");
     expect(renders).toEqual([220, 220, 300]);

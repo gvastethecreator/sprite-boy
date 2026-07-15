@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_STORE_CONTRACTS,
   STUDIO_STORE_KINDS,
+  type DeepReadonly,
   type InteractionState,
   type InteractionStore,
   type JobStore,
@@ -59,7 +60,7 @@ type _InteractionHasNoProject = Assert<"project" extends keyof InteractionState 
 type _JobHasNoProject = Assert<"project" extends keyof JobStoreState ? false : true>;
 type _PlaybackHasNoProject = Assert<"project" extends keyof PlaybackState ? false : true>;
 type _MissingJobIsExplicit = Assert<
-  Equal<JobStoreState["jobs"][string], Readonly<JobStoreEntry> | undefined>
+  Equal<JobStoreState["jobs"][string], DeepReadonly<JobStoreEntry> | undefined>
 >;
 
 void (0 as unknown as _ProjectApiIsExact);

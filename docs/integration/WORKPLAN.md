@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06 y F6-01..F6-06 aceptados. Frontiers: F3-07 pendiente de browser; F7-01 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01 aceptados. Frontiers: F3-07 pendiente de browser; F7-02 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -91,7 +91,15 @@ estado transitorio. Se retiraron Header y command array legacy —incluidos Open
 Analyze inertes—, Help se deriva del registry y Snapshot abre Export real.
 Chrome probó Ctrl+1..5, guards modal/editable, Help/Palette/Preferences, Reset
 Canvas y Snapshot con foco correcto y cero errores. La revisión detectó y cerró
-un stuck-pan al perder foco. F7-01 puede abrir el contrato de jobs tipados.
+un stuck-pan al perder foco.
+F7-01 congeló un lifecycle puro desde `queued` hacia `running` y los terminales
+`succeeded`, `failed`, `cancelled` o `timed-out`, con progreso global monotónico, errores estructurados y eventos
+ligados a request. Retry crea un nuevo job/request con root/previous/attempt y
+nunca reescribe el terminal. El JobStore valida el state machine y conserva
+tombstones efímeros de job/request y sources consumidos: remove/reset no pueden
+reabrir un parent ni reciclar una identidad para capturar respuestas tardías.
+Cuatro rondas adversariales cerraron linajes falsos, terminales imposibles y
+reuso tras remove/reset; F7-02 puede montar runner/abort sobre este contrato.
 
 ## Reglas de ejecución
 

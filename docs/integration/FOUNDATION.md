@@ -512,6 +512,20 @@ typecheck, lint estricto, build, static reachability y review `accept`. Chrome
 J9 probó cinco rutas, focus transfer, modal/editable guards, Ctrl+0 y Snapshot
 sin console errors/exceptions.
 
+F7-01 reemplaza el placeholder `{id, kind}` por snapshots tipados y frozen con
+`jobId`/`requestId` distintos, timestamps canónicos, progreso global monotónico,
+timeout y error seguro para display. `transitionJob` rechaza request viejo,
+tiempo atrasado, estado ilegal, regresión y toda escritura posterior a un
+terminal. `retryJob` conserva el terminal y crea un queued nuevo con root,
+previous y attempt consecutivo. El JobStore aplica el mismo límite: sólo acepta
+inserciones queued, lifecycle legal y linaje retenido/retryable; job IDs,
+request IDs y sources de retry son single-use durante la sesión incluso tras
+remove/reset. La compactación/retención visible queda deliberadamente en F7-03.
+Cuatro rondas independientes encontraron y cerraron ancestry huérfano, progreso
+imposible sin start y reciclaje de request/job/source. Gate final: 29/29 focales,
+38/38 archivos y 405/405 tests contract acumulados, typecheck, lint estricto,
+build, diff-check y review `accept`.
+
 ### F7 — Observabilidad, jobs y error taxonomy
 
 - **Owner:** `[gpt-5.6-sol | xhigh]`.
