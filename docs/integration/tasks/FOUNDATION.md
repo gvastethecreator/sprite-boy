@@ -70,8 +70,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F6-06 | J | F6-05 | W2 shell gate: keyboard, no unreachable mode, no inert command | J9 + REV | done |
 | F7-01 | J | F1-08,F4-06 | Typed Job lifecycle/progress/cancel/retry/timeout contracts | State-machine UT | done |
 | F7-02 | J | F7-01 | Worker/job runner con abort y late-write suppression | IT cancel/crash/timeout | done |
-| F7-03 | J | F7-02 | Job Center store/selectors and retention policy | UT state isolation | active |
-| F7-04 | E | F7-03,F6-04 | Job Center UI con progress/cancel/retry/errors | BR/A11Y + REV | todo |
+| F7-03 | J | F7-02 | Job Center store/selectors and retention policy | UT state isolation | done |
+| F7-04 | E | F7-03,F6-04 | Job Center UI con progress/cancel/retry/errors | BR/A11Y + REV | active |
 | F7-05 | J | F7-01 | `ExportPort`, artifact writer y format registry contracts | CT + ART fake writer | todo |
 | F7-06 | J | F7-02,F7-05 | Failure injection: quota, worker crash, timeout, cancel race | IT no late writes/leaks | todo |
 | F7-07 | J | F7-04,F7-06 | W2 job/export gate y diagnostics policy | SEC + REV | todo |

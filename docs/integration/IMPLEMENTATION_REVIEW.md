@@ -911,9 +911,33 @@ los lotes que sí modifican producto.
   `--deny-warnings`, build y diff-check verdes. Revisión independiente final:
   `accept`.
 
+## F7-03 — Atomic Job Center retention and selectors
+
+- **Ownership:** JobStore sigue siendo el único estado writable. La policy
+  inmutable conserva 50 familias terminales por defecto y nunca crea otro store,
+  history o persistencia. Animoto/Grid sólo aportan sus estados/toasts como
+  evidencia; no tenían una retención portable.
+- **Retention:** una familia se agrupa por `rootJobId`. Cualquier queued/running
+  pinnea toda la ancestry; sólo familias completamente terminales excedentes se
+  podan oldest-first en el mismo reducer commit. IDs de job/request pasan a
+  tombstones y consumed retry sources nunca se olvidan ni reciclan.
+- **Selectors:** factories memoizadas exponen entries active-first, familias y
+  summary exacto por status. `retryable` cuenta sólo terminales con error
+  retryable que aún no consumieron su único child.
+- **Reentrancia:** `LocalStoreDispatchBusyError` permite que JobRunner difiera
+  cancel/timeout cross-job hasta terminar el publish actual. First-terminal se
+  reserva antes del microtask; caller abort/dispose usan la misma ruta y progress
+  cross-notify devuelve false sin fallo estructural ni running huérfano.
+- **Repairs:** review cerró summary de retry engañoso, cancel cross-job orphan y
+  reemplazo de la primera razón terminal antes del flush. Reproducciones extra
+  caller abort, dispose, timeout y completion ya encolada quedaron verdes.
+- **Evidencia:** 43/43 focales locales y 52/52 del pase independiente; suite
+  contract completa 40/40 archivos y 434/434 tests; typecheck, lint focal
+  `--deny-warnings`, build y diff-check verdes. Revisión final: `accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F7-03: activo; debe definir Job Center selectors/retention sobre F7-01/F7-02
-  sin adelantar UI, format providers ni migración del worker concreto.
+- F7-04: activo; debe montar Job Center accesible sobre las proyecciones F7-03,
+  sin adelantar format providers ni migración del worker concreto.
