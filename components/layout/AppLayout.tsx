@@ -14,6 +14,13 @@ import AnalysisModal from "../overlays/AnalysisModal";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useProject } from "../../contexts/ProjectContext";
 import {
+  useJobStore,
+  useStudioJobRetryAction,
+  useStudioJobRunner,
+} from "../../contexts/StudioStoreContext";
+import { createJobCenterSummarySelector } from "../../core/stores";
+import { useJobStoreSelector } from "../../hooks/useStudioStoreSelector";
+import {
   createStudioCommandRegistry,
   getStudioWorkspace,
   resolveStudioWorkspaceState,
@@ -24,6 +31,7 @@ import {
 import {
   StudioDialog,
   StudioHeader,
+  JobCenter,
   StudioPanel,
   StudioWorkspaceStateView,
   useStudioNavigation,
@@ -127,8 +135,14 @@ const AppLayout: React.FC = () => {
   const projectInputRef = useRef<HTMLInputElement>(null);
   const { activeWorkspace, navigate } = useStudioNavigation();
   const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
+  const [isJobCenterOpen, setJobCenterOpen] = useState(false);
   const [studioError, setStudioError] = useState<StudioShellError | null>(null);
   const isCompactLayout = useCompactStudioLayout();
+  const jobStore = useJobStore();
+  const jobRunner = useStudioJobRunner();
+  const retryJob = useStudioJobRetryAction();
+  const selectJobSummary = useMemo(createJobCenterSummarySelector, []);
+  const jobSummary = useJobStoreSelector(jobStore, selectJobSummary);
   const hasWorkspace = !!slicerImage || !!builderCanvas;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
 
@@ -233,6 +247,7 @@ const AppLayout: React.FC = () => {
     stepFrame: handleStepFrame,
     closeModals: () => {
       setCompactPanel(null);
+      setJobCenterOpen(false);
       controller.closeAllModals();
     },
     isModalOpen:
@@ -242,6 +257,7 @@ const AppLayout: React.FC = () => {
       generationModal.isOpen ||
       isCommandPaletteOpen ||
       compactPanel !== null ||
+      isJobCenterOpen ||
       !!analysisResult,
     activeAnimationId,
   });
@@ -285,6 +301,9 @@ const AppLayout: React.FC = () => {
         registry={commandRegistry}
         commandContext={commandContext}
         onExecute={executeCommand}
+        onOpenJobCenter={() => setJobCenterOpen(true)}
+        isJobCenterOpen={isJobCenterOpen}
+        jobSummary={{ active: jobSummary.active, total: jobSummary.total }}
       />
 
       {hasWorkspace && isCompactLayout && (
@@ -392,6 +411,23 @@ const AppLayout: React.FC = () => {
             <RightSidebar />
           </StudioPanel>
         ) : null}
+      </StudioDialog>
+
+      <StudioDialog
+        isOpen={isJobCenterOpen}
+        onClose={() => setJobCenterOpen(false)}
+        ariaLabel="Job Center"
+        backdropClassName="!items-stretch !justify-end !p-0 bg-black/70"
+        panelClassName="!h-dvh !max-h-dvh !max-w-[420px] !rounded-none !border-y-0 !border-r-0"
+      >
+        <StudioPanel
+          label="Job Center"
+          variant="drawer"
+          onClose={() => setJobCenterOpen(false)}
+          className="h-full border-0"
+        >
+          <JobCenter store={jobStore} runner={jobRunner} retryJob={retryJob} />
+        </StudioPanel>
       </StudioDialog>
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />

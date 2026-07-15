@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Activity,
   ChevronDown,
   CircleHelp,
   Download,
@@ -32,6 +33,9 @@ export interface StudioHeaderProps {
   readonly registry: StudioCommandRegistry;
   readonly commandContext: StudioCommandContext;
   readonly onExecute: (commandId: StudioCommandId) => void;
+  readonly onOpenJobCenter?: () => void;
+  readonly isJobCenterOpen?: boolean;
+  readonly jobSummary?: { readonly active: number; readonly total: number };
 }
 
 const WORKSPACE_ICONS = {
@@ -115,6 +119,9 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   registry,
   commandContext,
   onExecute,
+  onOpenJobCenter,
+  isJobCenterOpen = false,
+  jobSummary = { active: 0, total: 0 },
 }) => {
   const [openMenu, setOpenMenu] = useState<OpenHeaderMenu>(null);
   const projectTriggerRef = useRef<HTMLButtonElement>(null);
@@ -390,6 +397,29 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
       </nav>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        {onOpenJobCenter ? (
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={isJobCenterOpen}
+            aria-label={`Open Job Center, ${jobSummary.active} active ${jobSummary.active === 1 ? "job" : "jobs"}, ${jobSummary.total} visible ${jobSummary.total === 1 ? "job" : "jobs"}`}
+            title={`${jobSummary.active} active · ${jobSummary.total} visible jobs`}
+            onClick={() => {
+              closeMenu(false);
+              onOpenJobCenter();
+            }}
+            className="relative inline-flex h-8 items-center gap-1.5 rounded-md border border-white/10 bg-surface px-2 text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <Activity size={15} strokeWidth={1.8} aria-hidden="true" />
+            <span className="hidden text-[11px] font-semibold md:inline">Jobs</span>
+            {jobSummary.total > 0 ? (
+              <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 font-mono text-[9px] font-bold leading-4 text-white">
+                {jobSummary.active > 99 ? "99+" : jobSummary.active}/
+                {jobSummary.total > 99 ? "99+" : jobSummary.total}
+              </span>
+            ) : null}
+          </button>
+        ) : null}
         <a
           href={getStudioWorkspace("export").href}
           data-command-id={exportCommandId}
