@@ -1028,9 +1028,25 @@ los lotes que sí modifican producto.
   writer/listeners/active cero. Revisión final: `accept`. Arquitectura:
   [ADR-008](../architecture/ADR-008-export-job-diagnostics.md).
 
+## F8-01 — Package and lock ownership reconciliation
+
+- **Estado real:** package tracked tiene doce dependency-range upgrades locales
+  propiedad del usuario. El único lock es `bun.lock`, ignorado por
+  `.gitignore:40`; su root conserva los ranges de HEAD. No hay workflows CI,
+  packageManager ni engines declarados.
+- **Decisión:** no se modifica, restaura, stagea ni regenera package/lock. Tests
+  verdes prueban el entorno instalado, no un checkout frozen reproducible.
+- **Writable:** F8-02 puede añadir scripts directos tracked; F8-04/F8-05 pueden
+  definir coverage/fixture/budgets sin deps. F8-03 espera decisión del owner y
+  patch atómico manifest+lock+failure injection.
+- **Evidencia:** diff exacto 12/12, lock root=HEAD, otros locks ausentes, scripts
+  tracked exactamente dos y `.github` sólo templates. Bun 1.3.14/Node 25.5.0.
+  Package/locks staged cero; diff-check verde. Review final: `accept`. Record:
+  [F8 reproducibility ownership](./F8_REPRODUCIBILITY_OWNERSHIP.md).
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F8-01: activo; debe reconciliar ownership real de `package.json` y lockfile
-  antes de cambiar scripts/dependencies o declarar install reproducible.
+- F8-02: activo; debe añadir commands directos reproducibles y smoke tests sin
+  cambiar todavía aliases/dependencies del package user-owned.

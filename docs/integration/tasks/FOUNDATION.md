@@ -75,8 +75,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F7-05 | J | F7-01 | `ExportPort`, artifact writer y format registry contracts | CT + ART fake writer | done |
 | F7-06 | J | F7-02,F7-05 | Failure injection: quota, worker crash, timeout, cancel race | IT no late writes/leaks | done |
 | F7-07 | J | F7-04,F7-06 | W2 job/export gate y diagnostics policy | SEC + REV | done |
-| F8-01 | J | B0-05,F7-07 | Reconciliar ownership de `package.json`/lock antes de editar | Explicit diff/owner record | active |
-| F8-02 | E | F8-01 | Scripts estables type/lint/unit/integration/e2e/build | Command smoke + REV | todo |
+| F8-01 | J | B0-05,F7-07 | Reconciliar ownership de `package.json`/lock antes de editar | Explicit diff/owner record | done |
+| F8-02 | E | F8-01 | Scripts estables type/lint/unit/integration/e2e/build | Command smoke + REV | active |
 | F8-03 | E | F8-02 | CI reproducible con lockfile e install congelado | CI failure injection + REV | todo |
 | F8-04 | J | F8-02 | Coverage thresholds y fixture/golden retention policy | Deliberate fail/pass proof | todo |
 | F8-05 | J | F8-02 | Bundle/performance/a11y budgets medidos y automatizados | PERF/A11Y artifact | todo |

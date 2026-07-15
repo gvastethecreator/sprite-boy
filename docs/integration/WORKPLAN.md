@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-07 aceptados. Frontiers: F3-07 pendiente de browser; F8-01 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07 y F8-01 aceptados. Frontiers: F3-07 pendiente de browser; F8-02 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -152,6 +152,12 @@ review reprodujo y cerró una fuga de registry por errores externos prototype/
 branded. El gate pasó 74/74 acumulados F7, 42 archivos/461 contract tests,
 61 archivos/579 tests completos, typecheck, lint estricto y build. F8-01 puede reconciliar reproducibilidad sin
 asumir ownership del `package.json` modificado por el usuario.
+F8-01 confirmó que `package.json` conserva doce upgrades user-owned mientras
+`bun.lock` está ignorado y su workspace root aún coincide con HEAD. No hay otro
+lock ni workflows CI, y package no declara manager/engines. El record aprobado
+prohíbe tocar/stagear/regenerar package+lock; F8-02 puede crear comandos directos
+tracked. F8-03 no podrá declarar frozen install hasta una decisión explícita del
+owner y reconciliación conjunta de manifest+lock.
 
 ## Reglas de ejecución
 
