@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useUndo } from "./useUndo";
 import { useUIController } from "./useUIController";
 import {
@@ -11,7 +11,6 @@ import {
   OnionSkinConfig,
   SlotData,
   BuilderCanvasSize,
-  CommandPaletteItem,
 } from "../types";
 import { generateFramesFromGrid } from "../utils/algorithms";
 import { useAnimationLogic } from "./domains/useAnimationLogic";
@@ -21,20 +20,6 @@ import { useExportLogic } from "./domains/useExportLogic";
 import { usePersistence } from "./domains/usePersistence";
 import { getAllAssets } from "../utils/db";
 import { analyzeImage } from "../utils/aiService";
-import {
-  Save,
-  FolderOpen,
-  FilePlus,
-  Undo2,
-  Redo2,
-  Download,
-  Settings,
-  HelpCircle,
-  BrainCircuit,
-  Wand2,
-  Box,
-  Layers,
-} from "lucide-react";
 
 const INITIAL_STATE: ProjectState = {
   imageMeta: null,
@@ -378,7 +363,7 @@ export function useProjectController() {
       ui.genPanel.prompt,
       contextImages,
       null,
-      () => {},
+      setSelectedIndex,
       ui.genPanel.model,
       ui.genPanel.mode,
     );
@@ -446,116 +431,6 @@ export function useProjectController() {
       ui.genPanel.mode,
     );
   };
-
-  // Command Palette Logic
-  const commands = useMemo<CommandPaletteItem[]>(
-    () => [
-      {
-        id: "new-proj",
-        label: "New Project",
-        icon: FilePlus,
-        category: "General",
-        action: handleNewProject,
-        shortcut: ["Ctrl", "N"],
-      },
-      {
-        id: "open-proj",
-        label: "Open Project",
-        icon: FolderOpen,
-        category: "General",
-        action: () => {
-          /* Trigger via ref or internal */
-        },
-        shortcut: ["Ctrl", "O"],
-      },
-      {
-        id: "save-proj",
-        label: "Save Project",
-        icon: Save,
-        category: "General",
-        action: persistence.handleSaveProject,
-        shortcut: ["Ctrl", "S"],
-      },
-      {
-        id: "undo",
-        label: "Undo Action",
-        icon: Undo2,
-        category: "Edit",
-        action: undo,
-        shortcut: ["Ctrl", "Z"],
-      },
-      {
-        id: "redo",
-        label: "Redo Action",
-        icon: Redo2,
-        category: "Edit",
-        action: redo,
-        shortcut: ["Ctrl", "Y"],
-      },
-      {
-        id: "export-png",
-        label: "Export as PNG",
-        icon: Download,
-        category: "General",
-        action: () => ui.setExportModal({ isOpen: true, type: "png" }),
-      },
-      {
-        id: "mode-build",
-        label: "Switch to Builder",
-        icon: Box,
-        category: "View",
-        action: () => handleSetMode(AppMode.BUILDER),
-      },
-      {
-        id: "mode-anim",
-        label: "Switch to Animation",
-        icon: Layers,
-        category: "View",
-        action: () => handleSetMode(AppMode.ANIMATION),
-      },
-      {
-        id: "auto-slice",
-        label: "Auto-Detect Sprites",
-        icon: Wand2,
-        category: "Tools",
-        action: slicerLogic.handleAutoSlice,
-      },
-      {
-        id: "ai-analyze",
-        label: "Analyze with Gemini",
-        icon: BrainCircuit,
-        category: "AI",
-        action: () => {
-          /* Trigger analysis */
-        },
-      },
-      {
-        id: "settings",
-        label: "Preferences",
-        icon: Settings,
-        category: "General",
-        action: () => ui.setIsSettingsOpen(true),
-        shortcut: [","],
-      },
-      {
-        id: "help",
-        label: "Help & Shortcuts",
-        icon: HelpCircle,
-        category: "General",
-        action: () => ui.setIsHelpOpen(true),
-        shortcut: ["?"],
-      },
-    ],
-    [
-      undo,
-      redo,
-      handleNewProject,
-      persistence.handleSaveProject,
-      handleSetMode,
-      ui,
-      slicerLogic.handleAutoSlice,
-    ],
-  );
 
   return {
     ...ui,
@@ -632,6 +507,5 @@ export function useProjectController() {
     handleDeleteSelection,
     handleGenerateCode: exportLogic.handleGenerateCode,
     handleGenerateSlot,
-    commands,
   };
 }

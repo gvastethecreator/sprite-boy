@@ -6,6 +6,7 @@ export { StudioPanel } from "./StudioPanel";
 export type { StudioPanelProps, StudioPanelVariant } from "./StudioPanel";
 export { StudioWorkspaceStateView } from "./StudioWorkspaceState";
 export type { StudioWorkspaceStateProps } from "./StudioWorkspaceState";
+export { studioShortcutTokens } from "./shortcutPresentation";
 export {
   navigateStudioWorkspace,
   useStudioNavigation,

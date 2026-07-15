@@ -157,15 +157,6 @@ export interface SnappingGuide {
   end: number;
 }
 
-export interface CommandPaletteItem {
-  id: string;
-  label: string;
-  icon?: any;
-  shortcut?: string[];
-  action: () => void;
-  category: "General" | "Edit" | "View" | "Tools" | "AI";
-}
-
 export interface ContextMenuItem {
   label: string;
   icon?: any;
