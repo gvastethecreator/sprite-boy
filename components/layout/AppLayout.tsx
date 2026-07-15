@@ -350,7 +350,7 @@ const AppLayout: React.FC = () => {
         )}
 
         <div className="flex-1 flex flex-col min-w-0 gap-2">
-          <div
+          <main
             ref={workspaceContentRef}
             tabIndex={-1}
             data-studio-workspace-content={activeWorkspace}
@@ -368,7 +368,7 @@ const AppLayout: React.FC = () => {
                 onDismissError={() => setStudioError(null)}
               />
             )}
-          </div>
+          </main>
           {hasWorkspace && activeWorkspaceDefinition.capabilities.timeline === "editable" && (
             <TimelinePanel />
           )}

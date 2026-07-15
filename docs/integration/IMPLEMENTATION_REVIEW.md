@@ -1088,10 +1088,41 @@ los lotes que sí modifican producto.
   coverage, fixtures, build y browser-smoke; nueve steps, exit 0.
   Policy: [F8 quality policy](./F8_QUALITY_POLICY.md).
 
+## F8-05 — Bundle, performance and accessibility budgets
+
+- **Estado:** `accept` después de dos tandas de repairs y revisión independiente
+  final sin P0-P3.
+- **Lint:** el ratchet heredado de 47 warnings pasa a cero con cleanup acotado;
+  `--deny-warnings` es ahora el gate estable.
+- **Bundle:** HTML productivo descubre sólo assets iniciales allowlisted y un
+  helper Node mide gzip level 9 sobre archivos físicos. Ratchet 245999 bytes
+  verde; target release 180000 bytes rojo deliberado.
+- **Browser:** perfil Chrome efímero, settle y Long Task API obligatoria; 5 s
+  idle, 3 recorridos/15 transiciones afirmadas y p95 recomputado. Resultado: 0
+  rAF, 46.4 ms p95, 0 long tasks y heap observado 4003712 bytes.
+- **A11y:** árbol AX nativo agregado sin labels/URLs: 65 nodos, 15 interactivos,
+  cero sin nombre y un `main`. El canvas dejó de anidar otro landmark.
+- **Límite declarado:** no sustituye Axe/WCAG completo ni los budgets de los
+  features G/A/R. Package/lock user-owned permanecen intactos.
+- **Repairs de review:** cada muestra ahora afirma hash/nav/content; roles AX
+  interactivos cubren option/search/menu/tree/scrollbar; `main` es exactamente
+  uno; Long Tasks conserva agregados sin cap y drena records pendientes. El
+  segundo pase añadió nodos AX focusable, rect visible positivo y parsing HTML
+  case-insensitive/token-list para no subcontar controles, rutas o preload.
+- **Coverage repair:** el primer `all` observó 76.74% branches frente a 76.75.
+  No se bajó el umbral: un contract test de IDs/timestamps cubrió límites
+  offset/calendario y elevó coverage a 82.31/76.81/91.79/86.17.
+- **Evidencia final:** 27/27 focales; 22/138 unit, 43/463 contract, 1/6
+  integration, 66/607 coverage, fixtures 7/7, typecheck, lint cero, build,
+  bundle y browser budget. `all` completó diez steps, exit 0; release bundle
+  real conserva exit 1. Policy:
+  [F8 budget policy](./F8_BUDGET_POLICY.md).
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
 - F8-03: condicionado; frozen install requiere decisión explícita y patch
   atómico del package/lock user-owned.
-- F8-05: activo; budgets bundle/performance/a11y y reducción del lint ratchet.
+- F8-05: `accept`; budgets y lint cero cerrados, release debt preservada.
+- F8-06: espera F8-03 y los release thresholds aún rojos.

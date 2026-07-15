@@ -334,3 +334,23 @@ Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
   untracked o symlink fallan.
 - Política y protocolo de actualización:
   [F8_QUALITY_POLICY.md](./F8_QUALITY_POLICY.md).
+
+## Enforcement F8-05 — 2026-07-15
+
+- El lint de repositorio pasa con cero warnings y `--deny-warnings`; se retiró
+  el ratchet heredado de 47 sin cambiar dependencias.
+- El bundle inicial mide 918655 bytes raw / 245999 bytes gzip level 9. El
+  ratchet de no-regresión pasa y el perfil release de 180000 falla
+  deliberadamente; code splitting sigue como deuda release obligatoria.
+- Chrome productivo fresco a 1440x900 DPR 1 midió 0 rAF en 5 segundos idle,
+  46.4 ms input-to-paint p95 sobre 15 transiciones calientes verificadas y 0
+  long tasks.
+- El árbol AX nativo expuso 15 interactivos, cero sin accessible name y un
+  landmark `main`. Labels y URLs no se guardan en artifacts.
+- Este gate Foundation no sustituye Axe/WCAG completo ni declara probados los
+  budgets de drag, large-project, Grid, codecs o AI; permanecen en sus slices.
+
+Política, método y límites: [F8_BUDGET_POLICY.md](./F8_BUDGET_POLICY.md).
+Artifact de ejecución:
+[`budgets.json`](../../artifacts/quality/F8/2026-07-15/budgets.json).
+Review independiente `accept`; `--gate all` completó sus diez steps con exit 0.

@@ -13,6 +13,10 @@ import { pathToFileURL } from "node:url";
 export const QUALITY_POLICY_SCHEMA_VERSION = 1;
 export const COVERAGE_SUMMARY_PATH = "coverage/coverage-summary.json";
 export const FIXTURE_RETENTION_MANIFEST_PATH = "quality/fixture-retention.json";
+export const BUNDLE_THRESHOLDS = Object.freeze({
+  ratchet: Object.freeze({ initialJsGzipBytes: 245_999 }),
+  release: Object.freeze({ initialJsGzipBytes: 180_000 }),
+});
 
 export const COVERAGE_TEST_PATHS = Object.freeze([
   "tests/components",
@@ -159,6 +163,99 @@ export function runCoverageCheck(profile = "ratchet", options = {}) {
       profile,
       status: "fail",
       reason: "invalid-summary",
+    });
+  }
+}
+
+function readHtmlAttribute(tag, name) {
+  const match = tag.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*["']([^"']+)["']`, "iu"));
+  return match?.[1] ?? null;
+}
+
+export function extractInitialJsPaths(indexHtml) {
+  if (typeof indexHtml !== "string") throw new TypeError("Production index HTML is invalid.");
+  const paths = [];
+  for (const match of indexHtml.matchAll(/<script\b[^>]*>/giu)) {
+    const tag = match[0];
+    if (readHtmlAttribute(tag, "type")?.trim().toLowerCase() !== "module") continue;
+    const source = readHtmlAttribute(tag, "src");
+    if (source) paths.push(source);
+  }
+  for (const match of indexHtml.matchAll(/<link\b[^>]*>/giu)) {
+    const tag = match[0];
+    const relations = readHtmlAttribute(tag, "rel")?.trim().toLowerCase().split(/\s+/u) ?? [];
+    if (!relations.includes("modulepreload")) continue;
+    const href = readHtmlAttribute(tag, "href");
+    if (href) paths.push(href);
+  }
+  const unique = [...new Set(paths)].sort();
+  if (
+    unique.length === 0 ||
+    unique.some((path) => !/^\/assets\/[A-Za-z0-9._-]+\.js$/u.test(path))
+  ) {
+    throw new TypeError("Initial JavaScript asset path is invalid.");
+  }
+  return Object.freeze(unique);
+}
+
+export function evaluateBundleEvidence(evidence, profile = "ratchet") {
+  if (!Object.hasOwn(BUNDLE_THRESHOLDS, profile)) throw new TypeError("Unknown bundle profile.");
+  if (
+    !isRecord(evidence) || !Number.isSafeInteger(evidence.initialChunkCount) || evidence.initialChunkCount <= 0 ||
+    !Number.isSafeInteger(evidence.initialJsBytes) || evidence.initialJsBytes <= 0 ||
+    !Number.isSafeInteger(evidence.initialJsGzipBytes) || evidence.initialJsGzipBytes <= 0
+  ) {
+    throw new TypeError("Bundle evidence is invalid.");
+  }
+  const thresholds = BUNDLE_THRESHOLDS[profile];
+  const exceeded = evidence.initialJsGzipBytes > thresholds.initialJsGzipBytes
+    ? ["initialJsGzipBytes"]
+    : [];
+  return Object.freeze({
+    schemaVersion: QUALITY_POLICY_SCHEMA_VERSION,
+    check: "bundle",
+    profile,
+    status: exceeded.length === 0 ? "pass" : "fail",
+    metrics: Object.freeze({ ...evidence }),
+    thresholds,
+    exceeded: Object.freeze(exceeded),
+  });
+}
+
+export function runBundleCheck(profile = "ratchet", options = {}) {
+  if (!Object.hasOwn(BUNDLE_THRESHOLDS, profile)) throw new TypeError("Unknown bundle profile.");
+  const cwd = resolve(options.cwd ?? process.cwd());
+  const read = options.readFileSync ?? readFileSync;
+  const spawn = options.spawnSync ?? spawnSync;
+  try {
+    const initialPaths = extractInitialJsPaths(read(resolve(cwd, "dist/index.html"), "utf8"));
+    const measurement = spawn("node", [
+      "scripts/studio-gzip-size.mjs",
+      ...initialPaths.map((path) => `dist${path}`),
+    ], {
+      cwd,
+      encoding: "utf8",
+      shell: false,
+      timeout: 30_000,
+      windowsHide: true,
+    });
+    if (measurement.error || measurement.status !== 0) throw new TypeError("Bundle measurement failed.");
+    const result = JSON.parse(String(measurement.stdout));
+    if (result?.schemaVersion !== 1 || result.initialChunkCount !== initialPaths.length) {
+      throw new TypeError("Bundle measurement result is inconsistent.");
+    }
+    return evaluateBundleEvidence({
+      initialChunkCount: result.initialChunkCount,
+      initialJsBytes: result.initialJsBytes,
+      initialJsGzipBytes: result.initialJsGzipBytes,
+    }, profile);
+  } catch {
+    return Object.freeze({
+      schemaVersion: QUALITY_POLICY_SCHEMA_VERSION,
+      check: "bundle",
+      profile,
+      status: "fail",
+      reason: "invalid-or-unavailable-build",
     });
   }
 }
@@ -325,10 +422,11 @@ export function parseQualityArguments(args) {
     if (rest.length !== 0) throw new TypeError("Fixtures check accepts no arguments.");
     return Object.freeze({ check, profile: null });
   }
-  if (check !== "coverage") throw new TypeError("Unknown quality policy check.");
+  if (check !== "coverage" && check !== "bundle") throw new TypeError("Unknown quality policy check.");
+  const profiles = check === "coverage" ? COVERAGE_THRESHOLDS : BUNDLE_THRESHOLDS;
   if (rest.length === 0) return Object.freeze({ check, profile: "ratchet" });
-  if (rest.length !== 2 || rest[0] !== "--profile" || !Object.hasOwn(COVERAGE_THRESHOLDS, rest[1])) {
-    throw new TypeError("Coverage profile is invalid.");
+  if (rest.length !== 2 || rest[0] !== "--profile" || !Object.hasOwn(profiles, rest[1])) {
+    throw new TypeError(`${check === "coverage" ? "Coverage" : "Bundle"} profile is invalid.`);
   }
   return Object.freeze({ check, profile: rest[1] });
 }
@@ -345,7 +443,9 @@ export function runQualityPolicyCli(args = process.argv.slice(2), io = {}, depen
   }
   const result = parsed.check === "coverage"
     ? runCoverageCheck(parsed.profile, dependencies)
-    : runFixtureRetentionCheck(dependencies);
+    : parsed.check === "bundle"
+      ? runBundleCheck(parsed.profile, dependencies)
+      : runFixtureRetentionCheck(dependencies);
   stdout.write(`${JSON.stringify(result)}\n`);
   return result.status === "pass" ? 0 : 1;
 }

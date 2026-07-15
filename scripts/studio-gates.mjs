@@ -26,8 +26,8 @@ const STEPS = Object.freeze({
   typecheck: processStep("typecheck", "TypeScript typecheck", ["x", "tsc", "--noEmit"], 120_000),
   lint: processStep(
     "lint",
-    "Repository lint (47-warning ratchet)",
-    ["x", "oxlint", ".", "--max-warnings=47"],
+    "Repository lint (zero warnings)",
+    ["x", "oxlint", ".", "--deny-warnings"],
     120_000,
   ),
   unit: processStep("unit", "Unit and component tests", [
@@ -54,6 +54,18 @@ const STEPS = Object.freeze({
     30_000,
   ),
   build: processStep("build", "Production build", ["x", "vite", "build"], 180_000),
+  bundle: processStep(
+    "bundle-budget",
+    "Initial JavaScript bundle budget",
+    ["scripts/studio-quality-policy.mjs", "bundle", "--profile", "ratchet"],
+    30_000,
+  ),
+  browserBudget: processStep(
+    "browser-budget",
+    "Production performance and accessibility budgets",
+    ["scripts/studio-browser-budget.mjs", "--profile", "ratchet"],
+    120_000,
+  ),
   browser: processStep(
     "browser-smoke",
     "Production Chrome smoke",
@@ -76,6 +88,11 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
     integration: gate("integration", "Integration tests", [STEPS.integration]),
     coverage: gate("coverage", "Canonical coverage ratchet", [STEPS.coverage]),
     fixtures: gate("fixtures", "Fixture and golden retention", [STEPS.fixtures]),
+    budgets: gate("budgets", "Bundle, performance and accessibility budgets", [
+      STEPS.build,
+      STEPS.bundle,
+      STEPS.browserBudget,
+    ]),
     build: gate("build", "Production build", [STEPS.build]),
     e2e: gate("e2e", "Production browser smoke", [STEPS.build, STEPS.browser]),
     all: gate("all", "Complete local gate", [
@@ -87,7 +104,8 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
       STEPS.coverage,
       STEPS.fixtures,
       STEPS.build,
-      STEPS.browser,
+      STEPS.bundle,
+      STEPS.browserBudget,
     ]),
   }),
 });

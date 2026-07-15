@@ -4,8 +4,6 @@ import {
   BrainCircuit,
   Target,
   Plus,
-  ArrowRight,
-  Maximize,
   X,
   Wand2,
   Paperclip,

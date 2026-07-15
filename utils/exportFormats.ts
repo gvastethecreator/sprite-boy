@@ -1,4 +1,4 @@
-import { FrameData, SpriteAnimation, GridConfig, HitboxData } from "../types";
+import { FrameData, SpriteAnimation, HitboxData } from "../types";
 import { calculateGeometry } from "./renderUtils";
 
 interface ExportFrameInfo {
@@ -74,8 +74,8 @@ export const generateGenericJSON = (
 /** Generates a Phaser 3–compatible JSON atlas (hash format). */
 export const generatePhaser3 = (
   anim: SpriteAnimation,
-  frames: FrameData[],
-  geometry: ReturnType<typeof calculateGeometry>,
+  _frames: FrameData[],
+  _geometry: ReturnType<typeof calculateGeometry>,
 ) => {
   // Phaser 3 Animation Config
   // Usually Phaser uses a texture atlas JSON + an anim config.

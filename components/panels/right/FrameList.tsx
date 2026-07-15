@@ -1,6 +1,6 @@
 import React from "react";
 import { FrameData, ImageMeta, DND_FRAME_TYPE, SlotData, BuilderAsset } from "../../../types";
-import { Layers, Target, Scissors, Trash2, Eye, EyeOff, Box } from "lucide-react";
+import { Layers, Trash2, Eye, EyeOff } from "lucide-react";
 
 interface FrameListProps {
   frames: FrameData[];
@@ -22,7 +22,6 @@ const FrameList: React.FC<FrameListProps> = ({
   builderAssets,
   onSelectFrame,
   onDeleteFrame,
-  onToAsset,
   onToggleVisibility,
 }) => {
   const handleDragStart = (e: React.DragEvent, frameId: number) => {

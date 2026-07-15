@@ -25,19 +25,8 @@ import {
 } from "lucide-react";
 import {
   AppMode,
-  BuilderCanvasSize,
-  BuilderAsset,
-  SpriteAnimation,
-  Keyframe,
-  TemplateConfig,
-  OnionSkinConfig,
-  GenerationPanelState,
   SlotData,
-  FrameData,
-  ImageMeta,
-  GridConfig,
   SlotAlignment,
-  HitboxType,
 } from "../../types";
 import NumberControl from "../common/NumberControl";
 import FrameProperties from "../panels/right/FrameProperties";
@@ -69,7 +58,6 @@ const RightSidebar: React.FC = () => {
     selectedIndex: selectedFrameIndex,
     setSelectedIndex: onSelectFrame,
     handleUpdateFrame: onUpdateFrame,
-    handleUpdateFrameEphemeral: onUpdateFrameEphemeral,
     handleDeleteFrame: onDeleteFrame,
     handleDuplicateFrame: onDuplicateFrame,
     handleToggleFrameVisibility: onToggleFrameVisibility,
@@ -345,7 +333,7 @@ const RightSidebar: React.FC = () => {
 
     const updateSlot = (patch: Partial<SlotData>) => {
       if (selectedSlotData) {
-        let newData = { ...selectedSlotData, ...patch };
+        const newData = { ...selectedSlotData, ...patch };
         if (patch.scaleX !== undefined && selectedSlotData.lockAspect)
           newData.scaleY = patch.scaleX;
         if (patch.scaleY !== undefined && selectedSlotData.lockAspect)

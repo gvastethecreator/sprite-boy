@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
 import {
-  Film,
   Grid,
   Play,
   Pause,
@@ -17,14 +16,7 @@ import {
   Scissors,
 } from "lucide-react";
 import {
-  FrameData,
-  ImageMeta,
-  AppMode,
   SlotData,
-  BuilderAsset,
-  BuilderCanvasSize,
-  SpriteAnimation,
-  Keyframe,
   DND_KEYFRAME_TYPE,
   DND_ASSET_TYPE,
   DND_FRAME_TYPE,
@@ -37,7 +29,6 @@ const Timeline: React.FC = () => {
     slicerImage: imageMeta,
     selectedIndex,
     setSelectedIndex,
-    currentMode,
     builderAssets,
     builderSlots,
     animations,

@@ -307,6 +307,210 @@ function safeRemoveProfile(profileDirectory) {
   rmSync(resolvedProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
 
+const BUDGET_INSTRUMENTATION_SOURCE = `(() => {
+  const state = {
+    rafRequests: 0,
+    longTaskCount: 0,
+    longTaskMaxMs: 0,
+    longTaskTotalMs: 0,
+    longTaskObserverAvailable: false,
+    longTaskObserver: null,
+  };
+  Object.defineProperty(globalThis, "__spriteBoyBudget", { value: state });
+  const nativeRequestAnimationFrame = globalThis.requestAnimationFrame.bind(globalThis);
+  globalThis.requestAnimationFrame = (callback) => {
+    state.rafRequests += 1;
+    return nativeRequestAnimationFrame(callback);
+  };
+  if (typeof PerformanceObserver === "function") {
+    try {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          state.longTaskCount += 1;
+          state.longTaskMaxMs = Math.max(state.longTaskMaxMs, entry.duration);
+          state.longTaskTotalMs += entry.duration;
+        }
+      });
+      observer.observe({ type: "longtask", buffered: true });
+      state.longTaskObserver = observer;
+      state.longTaskObserverAvailable = true;
+    } catch {
+      // Long Task API can be unavailable without invalidating other metrics.
+    }
+  }
+})()`;
+
+const INTERACTIVE_AX_ROLES = new Set([
+  "button",
+  "checkbox",
+  "combobox",
+  "gridcell",
+  "link",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "option",
+  "radio",
+  "scrollbar",
+  "searchbox",
+  "slider",
+  "spinbutton",
+  "switch",
+  "tab",
+  "textbox",
+  "treeitem",
+]);
+
+export function summarizeAccessibilityTree(nodes) {
+  const unlabeledRoles = {};
+  let exposedNodeCount = 0;
+  let interactiveNodeCount = 0;
+  let mainLandmarkCount = 0;
+  for (const node of Array.isArray(nodes) ? nodes : []) {
+    if (node?.ignored === true) continue;
+    exposedNodeCount += 1;
+    const role = typeof node?.role?.value === "string" ? node.role.value : "unknown";
+    if (role === "main") mainLandmarkCount += 1;
+    const focusable = Array.isArray(node?.properties) && node.properties.some(
+      (property) => property?.name === "focusable" && property?.value?.value === true,
+    );
+    if (!INTERACTIVE_AX_ROLES.has(role) && !focusable) continue;
+    interactiveNodeCount += 1;
+    const name = typeof node?.name?.value === "string" ? node.name.value.trim() : "";
+    if (name.length === 0) unlabeledRoles[role] = (unlabeledRoles[role] ?? 0) + 1;
+  }
+  return Object.freeze({
+    exposedNodeCount,
+    interactiveNodeCount,
+    unlabeledInteractiveCount: Object.values(unlabeledRoles).reduce((sum, count) => sum + count, 0),
+    unlabeledRoles: Object.freeze(unlabeledRoles),
+    mainLandmarkCount,
+  });
+}
+
+function percentile95(samples) {
+  if (!Array.isArray(samples) || samples.length === 0) return 0;
+  const sorted = samples.map(Number).filter(Number.isFinite).sort((left, right) => left - right);
+  if (sorted.length === 0) return 0;
+  return sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)];
+}
+
+async function collectBrowserBudgetEvidence(client, idleWindowMs, settleMs) {
+  await delay(settleMs);
+  const idleStart = await client.evaluate(`(() => {
+    const state = globalThis.__spriteBoyBudget;
+    if (!state) return -1;
+    state.longTaskObserver?.takeRecords();
+    state.longTaskCount = 0;
+    state.longTaskMaxMs = 0;
+    state.longTaskTotalMs = 0;
+    return state.rafRequests;
+  })()`);
+  if (!Number.isSafeInteger(idleStart) || idleStart < 0) throw new Error("Browser budget instrumentation is unavailable.");
+  await delay(idleWindowMs);
+  const idleEnd = await client.evaluate("globalThis.__spriteBoyBudget?.rafRequests ?? -1");
+  const interactionEvidence = await client.evaluate(`(async () => {
+    const samples = [];
+    const transitions = [];
+    const workspaceIds = ["compose", "animate", "collision", "export", "slice"];
+    for (let run = 0; run < 3; run += 1) {
+      for (const workspaceId of workspaceIds) {
+        const target = document.querySelector('[data-workspace-id="' + workspaceId + '"]');
+        if (!(target instanceof HTMLElement)) throw new Error("Workspace target is unavailable.");
+        const startedAt = performance.now();
+        target.click();
+        const transition = await new Promise((resolveTransition, rejectTransition) => {
+          const deadline = performance.now() + 2_000;
+          let paintedFrames = 0;
+          const observeTransition = () => {
+            paintedFrames += 1;
+            const activeTarget = document.querySelector(
+              '[data-workspace-id="' + workspaceId + '"][aria-current="page"]',
+            );
+            const content = document.querySelector(
+              '[data-studio-workspace-content="' + workspaceId + '"]',
+            );
+            const contentIsVisible = content instanceof HTMLElement && Array.from(content.getClientRects())
+              .some((rect) => rect.width > 0 && rect.height > 0);
+            if (
+              location.hash === "#/studio/" + workspaceId &&
+              activeTarget === target &&
+              contentIsVisible &&
+              paintedFrames >= 2
+            ) {
+              resolveTransition({
+                paintedAt: performance.now(),
+                finalHash: location.hash,
+                active: true,
+                contentActive: true,
+              });
+              return;
+            }
+            if (performance.now() >= deadline) {
+              rejectTransition(new Error("Workspace transition did not become active."));
+              return;
+            }
+            requestAnimationFrame(observeTransition);
+          };
+          requestAnimationFrame(observeTransition);
+        });
+        samples.push(transition.paintedAt - startedAt);
+        transitions.push({
+          run,
+          workspaceId,
+          finalHash: transition.finalHash,
+          active: transition.active,
+          contentActive: transition.contentActive,
+        });
+      }
+    }
+    return { samples, transitions };
+  })()`);
+  await client.waitForNetworkIdle();
+  const instrumentation = await client.evaluate(`(() => {
+    const state = globalThis.__spriteBoyBudget;
+    for (const entry of state?.longTaskObserver?.takeRecords?.() ?? []) {
+      state.longTaskCount += 1;
+      state.longTaskMaxMs = Math.max(state.longTaskMaxMs, entry.duration);
+      state.longTaskTotalMs += entry.duration;
+    }
+    return {
+      longTaskCount: state?.longTaskCount ?? -1,
+      longTaskMaxMs: state?.longTaskMaxMs ?? -1,
+      longTaskTotalMs: state?.longTaskTotalMs ?? -1,
+      longTaskObserverAvailable: state?.longTaskObserverAvailable === true,
+      route: location.hash,
+    };
+  })()`);
+  const [axTree, performanceMetrics] = await Promise.all([
+    client.send("Accessibility.getFullAXTree"),
+    client.send("Performance.getMetrics"),
+  ]);
+  const metrics = {};
+  for (const metric of performanceMetrics.metrics ?? []) {
+    if (["TaskDuration", "JSHeapUsedSize", "Nodes", "LayoutCount", "RecalcStyleCount"].includes(metric.name)) {
+      metrics[metric.name] = metric.value;
+    }
+  }
+  const interactionSamplesMs = interactionEvidence.samples;
+  return Object.freeze({
+    idleWindowMs,
+    idleRafRequests: idleEnd - idleStart,
+    interactionSamplesMs: Object.freeze(interactionSamplesMs.map((value) => Number(value))),
+    interactionTransitions: Object.freeze(interactionEvidence.transitions.map(
+      (transition) => Object.freeze({ ...transition }),
+    )),
+    inputToPaintP95Ms: percentile95(interactionSamplesMs),
+    longTaskCount: instrumentation.longTaskCount,
+    longTaskMaxMs: instrumentation.longTaskMaxMs,
+    longTaskTotalMs: instrumentation.longTaskTotalMs,
+    longTaskObserverAvailable: instrumentation.longTaskObserverAvailable,
+    finalRoute: instrumentation.route,
+    performanceMetrics: Object.freeze(metrics),
+    accessibility: summarizeAccessibilityTree(axTree.nodes),
+  });
+}
+
 export async function runBrowserSmoke(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const chromePath = resolveChromeExecutable(options);
@@ -351,11 +555,13 @@ export async function runBrowserSmoke(options = {}) {
     });
     const devToolsPort = await waitForDevToolsPort(profileDirectory, chrome);
     client = await connectToPage(devToolsPort);
+    const collectBudgets = options.collectBudgets === true;
     await Promise.all([
       client.send("Page.enable"),
       client.send("Runtime.enable"),
       client.send("Log.enable"),
       client.send("Network.enable"),
+      ...(collectBudgets ? [client.send("Performance.enable"), client.send("Accessibility.enable")] : []),
       client.send("Emulation.setDeviceMetricsOverride", {
         width: 1440,
         height: 900,
@@ -363,6 +569,11 @@ export async function runBrowserSmoke(options = {}) {
         mobile: false,
       }),
     ]);
+    if (collectBudgets) {
+      await client.send("Page.addScriptToEvaluateOnNewDocument", {
+        source: BUDGET_INSTRUMENTATION_SOURCE,
+      });
+    }
     await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
     try {
       await client.waitFor(`(() => {
@@ -387,6 +598,13 @@ export async function runBrowserSmoke(options = {}) {
       throw new Error(`Browser application readiness failed: ${JSON.stringify(readiness)}`);
     }
     await client.waitForNetworkIdle();
+    const budgets = collectBudgets
+      ? await collectBrowserBudgetEvidence(
+        client,
+        options.idleWindowMs ?? 5_000,
+        options.settleMs ?? 1_000,
+      )
+      : null;
     const page = await client.evaluate(`(() => {
       const content = document.querySelector('[data-studio-workspace-content="slice"]');
       const rect = content?.getBoundingClientRect();
@@ -434,6 +652,7 @@ export async function runBrowserSmoke(options = {}) {
       logErrorCount: client.logErrorCount,
       networkFailureCount: client.networkFailureCount,
       httpErrorCount: client.httpErrorCount,
+      ...(budgets ? { budgets } : {}),
     });
   } finally {
     if (client) {

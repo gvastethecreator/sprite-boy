@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  BUNDLE_THRESHOLDS,
   COVERAGE_SOURCE_PATTERNS,
   COVERAGE_TEST_PATHS,
   COVERAGE_THRESHOLDS,
@@ -9,11 +10,14 @@ import {
   captureFixtureInventory,
   coverageCommandArgs,
   evaluateCoverageSummary,
+  evaluateBundleEvidence,
   evaluateFixtureInventory,
+  extractInitialJsPaths,
   parseFixtureRetentionManifest,
   parseQualityArguments,
   retainedContentIdentity,
   runCoverageCheck,
+  runBundleCheck,
   runQualityPolicyCli,
 } from "../../scripts/studio-quality-policy.mjs";
 
@@ -134,6 +138,77 @@ describe("canonical coverage policy", () => {
   });
 });
 
+describe("initial bundle policy", () => {
+  it("extracts only local initial module assets and keeps release stricter than ratchet", () => {
+    expect(extractInitialJsPaths(`
+      <link rel="modulepreload" href="/assets/vendor-A.js">
+      <script src="/assets/index-B.js" type="module"></script>
+      <script src="/assets/legacy.js"></script>
+    `)).toEqual(["/assets/index-B.js", "/assets/vendor-A.js"]);
+    expect(BUNDLE_THRESHOLDS).toEqual({
+      ratchet: { initialJsGzipBytes: 245_999 },
+      release: { initialJsGzipBytes: 180_000 },
+    });
+    expect(evaluateBundleEvidence({
+      initialChunkCount: 1,
+      initialJsBytes: 918_701,
+      initialJsGzipBytes: 245_999,
+    }, "ratchet").status).toBe("pass");
+    expect(evaluateBundleEvidence({
+      initialChunkCount: 1,
+      initialJsBytes: 918_701,
+      initialJsGzipBytes: 245_999,
+    }, "release")).toMatchObject({ status: "fail", exceeded: ["initialJsGzipBytes"] });
+    expect(() => extractInitialJsPaths(
+      `<script type="module" src="https://private.invalid/app.js"></script>`,
+    )).toThrow(/invalid/);
+    expect(() => extractInitialJsPaths(
+      `<script data-type="module" data-src="/assets/private.js"></script>`,
+    )).toThrow(/invalid/);
+    expect(extractInitialJsPaths(`
+      <link rel="PREFETCH modulepreload" href="/assets/vendor-A.js">
+      <script type="MODULE" src="/assets/index-B.js"></script>
+    `)).toEqual(["/assets/index-B.js", "/assets/vendor-A.js"]);
+  });
+
+  it("measures fixed production assets with level-9 gzip and fails closed on stale builds", () => {
+    const read = vi.fn(() => `<script type="module" src="/assets/index-A.js"></script>`);
+    const spawn = vi.fn().mockReturnValue({
+      status: 0,
+      stdout: JSON.stringify({
+        schemaVersion: 1,
+        initialChunkCount: 1,
+        initialJsBytes: 15,
+        initialJsGzipBytes: 100,
+      }),
+    });
+    expect(runBundleCheck("ratchet", { readFileSync: read, spawnSync: spawn })).toMatchObject({
+      status: "pass",
+      metrics: { initialChunkCount: 1, initialJsBytes: 15, initialJsGzipBytes: 100 },
+    });
+    expect(spawn).toHaveBeenCalledWith(
+      "node",
+      ["scripts/studio-gzip-size.mjs", "dist/assets/index-A.js"],
+      expect.objectContaining({ shell: false, encoding: "utf8", timeout: 30_000 }),
+    );
+    expect(runBundleCheck("ratchet", {
+      readFileSync: () => { throw new Error("private build path"); },
+    })).toMatchObject({ status: "fail", reason: "invalid-or-unavailable-build" });
+    expect(runBundleCheck("ratchet", {
+      readFileSync: read,
+      spawnSync: () => ({
+        status: 0,
+        stdout: JSON.stringify({
+          schemaVersion: 1,
+          initialChunkCount: 2,
+          initialJsBytes: 15,
+          initialJsGzipBytes: 100,
+        }),
+      }),
+    })).toMatchObject({ status: "fail", reason: "invalid-or-unavailable-build" });
+  });
+});
+
 describe("fixture and golden retention", () => {
   it("accepts the exhaustive tracked inventory and detects hash or root drift", () => {
     const manifest = parseFixtureRetentionManifest(JSON.parse(readFileSync(
@@ -212,6 +287,8 @@ describe("quality policy CLI", () => {
     expect(parseQualityArguments(["coverage", "--profile", "release"]))
       .toEqual({ check: "coverage", profile: "release" });
     expect(parseQualityArguments(["fixtures"])).toEqual({ check: "fixtures", profile: null });
+    expect(parseQualityArguments(["bundle", "--profile", "release"]))
+      .toEqual({ check: "bundle", profile: "release" });
     expect(() => parseQualityArguments(["coverage", "--profile", "private"])).toThrow(/invalid/);
     expect(() => parseQualityArguments(["fixtures", "--profile", "release"])).toThrow(/no arguments/);
 
