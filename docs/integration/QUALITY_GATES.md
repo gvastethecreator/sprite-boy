@@ -320,3 +320,17 @@ evidencia; no permite relajar un gate para hacer verde una regresión:
 Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
 `fixtures-journeys.json`, `coverage-bundle.json` y
 `grid-donor-golden-manifest.json`.
+
+## Enforcement F8-04 — 2026-07-15
+
+- `bun scripts/studio-gates.mjs --gate coverage` ejecuta 63 archivos/598 tests
+  y mide 54/54 fuentes runtime `core/**` no-barrel, incluidas 13 de
+  `core/project`; el perfil ratchet pasa en 82.29/76.75/91.72/86.15.
+- `bun scripts/studio-quality-policy.mjs coverage --profile release` conserva
+  90/85/90/90 y falla deliberadamente en statements/branches/lines. Este rojo
+  es deuda release visible; no invalida el cierre instrumental de F8-04.
+- `bun scripts/studio-gates.mjs --gate fixtures` valida dos roots y siete
+  artifacts tracked por bytes/SHA-256 canónicos; missing, extra, drift,
+  untracked o symlink fallan.
+- Política y protocolo de actualización:
+  [F8_QUALITY_POLICY.md](./F8_QUALITY_POLICY.md).

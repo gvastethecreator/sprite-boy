@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07 y F8-01..F8-02 aceptados. Frontiers: F3-07 pendiente de browser; F8-03 condicionado por ownership de package/lock; F8-04 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04 aceptados. Frontiers: F3-07 pendiente de browser; F8-03 condicionado por ownership de package/lock; F8-05 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -166,6 +166,13 @@ diagnósticos redactados; exige ruta Slice visible, page-fit y cero errores de
 console/runtime/log/HTTP/red. La revisión cerró ratchet, desconexión CDP,
 observabilidad de red y flags duplicados. F8-04 puede fijar coverage y retención
 de fixtures sin modificar el package user-owned.
+F8-04 mide las 54 fuentes runtime canónicas bajo `core/**` —incluidas 13 de
+`core/project`— con el corpus completo. El ratchet actual queda en 82.29%
+statements, 76.75% branches, 91.72% functions y 86.15% lines; el target release
+90/85/90/90 permanece rojo y bloquea F8-06 hasta mejorar tests/código. Un
+manifest exhaustivo retiene siete fixtures/goldens tracked bajo dos roots con
+identidad SHA-256/bytes cross-platform, prohibición de symlinks y detección de
+missing/unmanifested/drift. F8-05 puede automatizar budgets y retirar warnings.
 
 ## Reglas de ejecución
 

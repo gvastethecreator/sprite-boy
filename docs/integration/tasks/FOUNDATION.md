@@ -78,6 +78,6 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F8-01 | J | B0-05,F7-07 | Reconciliar ownership de `package.json`/lock antes de editar | Explicit diff/owner record | done |
 | F8-02 | E | F8-01 | Scripts estables type/lint/unit/integration/e2e/build | Command smoke + REV | done |
 | F8-03 | E | F8-02 | CI reproducible con lockfile e install congelado | CI failure injection + REV | todo |
-| F8-04 | J | F8-02 | Coverage thresholds y fixture/golden retention policy | Deliberate fail/pass proof | active |
-| F8-05 | J | F8-02 | Bundle/performance/a11y budgets medidos y automatizados | PERF/A11Y artifact | todo |
+| F8-04 | J | F8-02 | Coverage thresholds y fixture/golden retention policy | Deliberate fail/pass proof | done |
+| F8-05 | J | F8-02 | Bundle/performance/a11y budgets medidos y automatizados | PERF/A11Y artifact | active |
 | F8-06 | J | F8-03,F8-04,F8-05 | Full Foundation manifest y autorización de streams paralelos | All F gates + REV | todo |

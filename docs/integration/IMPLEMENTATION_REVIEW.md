@@ -1067,10 +1067,31 @@ los lotes que sí modifican producto.
   error en cero. Gate `all`: unit 19/123, contract 42/462, integration 1/6,
   build y browser-smoke; siete steps completos, exit 0.
 
+## F8-04 — Canonical coverage and fixture/golden retention
+
+- **Estado:** `accept` después de revisión independiente `repair+repair+accept`.
+- **Scope:** el corpus completo mide 54/54 fuentes runtime `core/**/*.ts`
+  no-barrel, incluidas 13 de `core/project`. El summary anterior se elimina y
+  totals/pct/core-project se validan antes de aceptar resultado.
+- **Profiles:** ratchet verde 82.29 statements, 76.75 branches, 91.72 functions
+  y 86.15 lines. Release conserva 90/85/90/90 y falla explícitamente por
+  statements/branches/lines; F8-06 no puede declarar readiness mientras siga rojo.
+- **Retention:** manifest exhaustivo de dos roots/siete archivos tracked con
+  path/kind/owner/mode/bytes/SHA-256. `text-lf` estabiliza Windows/Linux; missing,
+  unmanifested, untracked, drift y cualquier root/descendant symlink fallan.
+- **Repairs:** root symlink podía seguirse antes del walk; coverage aceptaba
+  `skipped` imposible. Ambos límites se endurecieron y probaron junto con
+  stale summary, pct inconsistente, rm/spawn throw, traversal y hash drift.
+- **Evidencia:** 19/19 focales, fixtures 7/7 exit 0, coverage ratchet 63/598
+  exit 0, release real exit 1, typecheck y lint focal `--deny-warnings` verdes.
+  Gate `all` ampliado: 20/130 unit, 42/462 contract, 1/6 integration,
+  coverage, fixtures, build y browser-smoke; nueve steps, exit 0.
+  Policy: [F8 quality policy](./F8_QUALITY_POLICY.md).
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
 - F8-03: condicionado; frozen install requiere decisión explícita y patch
   atómico del package/lock user-owned.
-- F8-04: activo; coverage canónica y política de retención fixture/golden.
+- F8-05: activo; budgets bundle/performance/a11y y reducción del lint ratchet.
