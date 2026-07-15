@@ -887,9 +887,33 @@ los lotes que sí modifican producto.
   tests; typecheck, lint focal `--deny-warnings`, build y diff-check verdes.
   Revisión final independiente: `accept`.
 
+## F7-02 — Abortable JobRunner and late-write suppression
+
+- **Boundary:** `core/processing/jobRunner.ts` recibe un queued snapshot y una
+  tarea payload-agnostic. El runner reserva identidad antes del publish, toma el
+  snapshot canónico de JobStore y posee start/progress/terminal, timer,
+  AbortController, caller signal y cleanup. Worker/AI/export adapters reales
+  permanecen en G1/A7/F7-05.
+- **Semántica:** cancel, caller abort, dispose y timeout resuelven una sola vez.
+  Progress/result/error tardío devuelve false o se descarta; un terminal que ya
+  entró en commit no puede ser abortado falsamente por un subscriber reentrante.
+  Fallos desconocidos se redactan y un `JobTaskError` mutable/adulterado se
+  revalida o degrada a `runtime-failure` seguro.
+- **Timers:** delays superiores a `2_147_483_647` se dividen en tramos para no
+  sufrir el overflow de `setTimeout`; callbacks reentrantes, scheduling throw,
+  cancel intermedio y handle cleanup conservan un solo terminal.
+- **Repairs:** la revisión reprodujo y cerró dispose durante queued publish,
+  cancel durante terminal commit, caller input mutable, error tipado mutable y
+  timeout overflow. También se probó rechazo de identidad por JobStore sin fuga
+  de active map ni invocación de tarea.
+- **Evidencia:** 19/19 runner focal; 42/42 runner+lifecycle+store; suite contract
+  completa 39/39 archivos y 424/424 tests; typecheck, lint focal
+  `--deny-warnings`, build y diff-check verdes. Revisión independiente final:
+  `accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F7-02: activo; debe montar runner/abort/timeout y late-write suppression sobre
-  F7-01 sin adelantar Job Center, retention final ni format providers.
+- F7-03: activo; debe definir Job Center selectors/retention sobre F7-01/F7-02
+  sin adelantar UI, format providers ni migración del worker concreto.

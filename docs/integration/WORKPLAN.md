@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01 aceptados. Frontiers: F3-07 pendiente de browser; F7-02 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-02 aceptados. Frontiers: F3-07 pendiente de browser; F7-03 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -100,6 +100,17 @@ tombstones efímeros de job/request y sources consumidos: remove/reset no pueden
 reabrir un parent ni reciclar una identidad para capturar respuestas tardías.
 Cuatro rondas adversariales cerraron linajes falsos, terminales imposibles y
 reuso tras remove/reset; F7-02 puede montar runner/abort sobre este contrato.
+F7-02 añadió un único `JobRunner` genérico sobre lifecycle y JobStore. Reserva
+la identidad antes de publicar, arranca una tarea con AbortController propio y
+es el único owner de progress, success, failure, cancel y timeout. Cancelación,
+caller abort, dispose y timeouts suprimen cualquier completion tardía, limpian
+timer/listener/active map y nunca permiten que un terminal pierda una carrera.
+El runner vuelve a tomar el snapshot canónico clonado por JobStore después del
+publish, por lo que mutar el input del caller no cambia IDs, timeout ni estado.
+Timeouts mayores al máximo nativo se programan por tramos sin overflow; errores
+tipados adulterados degradan a un fallo seguro. La revisión independiente cerró
+cinco rondas de races/hostile input y aceptó 42/42 focales; F7-03 puede construir
+retención/selectores de Job Center sin migrar todavía workers concretos.
 
 ## Reglas de ejecución
 
