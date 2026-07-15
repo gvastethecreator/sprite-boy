@@ -144,6 +144,33 @@ describe("StudioHeader", () => {
     expect(onExecute).toHaveBeenCalledWith("workspace.open.export");
   });
 
+  it("exposes Job Center activity without changing command routing", () => {
+    const { registry } = makeRegistry();
+    const onOpenJobCenter = vi.fn();
+    render(
+      <StudioHeader
+        activeWorkspace="slice"
+        registry={registry}
+        commandContext={commandContext}
+        onExecute={vi.fn()}
+        onOpenJobCenter={onOpenJobCenter}
+        jobSummary={{ active: 3, total: 7 }}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: "Open Job Center, 3 active jobs, 7 visible jobs",
+    });
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+    expect(trigger).toHaveAttribute("title", "3 active · 7 visible jobs");
+    expect(trigger).toHaveTextContent("3/7");
+    fireEvent.click(screen.getByRole("button", { name: /Project/ }));
+    expect(screen.getByRole("menu", { name: "Project actions" })).toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("menu", { name: "Project actions" })).not.toBeInTheDocument();
+    expect(onOpenJobCenter).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps every workspace reachable from the compact menu and restores focus", async () => {
     const { onExecute } = renderHeader("compose");
     const trigger = screen.getByRole("button", { name: "Compose" });

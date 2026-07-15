@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { createQueuedJob, transitionJob } from "../../core/processing";
+import { createJobRunner, createQueuedJob, transitionJob } from "../../core/processing";
 import {
   createInteractionStore,
   createJobSelector,
@@ -28,6 +28,7 @@ import {
 import {
   StudioLocalStoresProvider,
   useJobStore,
+  useStudioJobRunner,
   useWorkspaceStore,
   type StudioLocalStores,
 } from "../../contexts/StudioStoreContext";
@@ -61,6 +62,14 @@ function createLocalStores(): StudioLocalStores {
     jobs: createJobStore(),
     playback: createPlaybackStore(),
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 describe("Studio store selectors", () => {
@@ -199,5 +208,45 @@ describe("Studio store selectors", () => {
     });
     expect(screen.getByTestId("selection")).toHaveTextContent("300:1");
     expect(renders).toEqual([220, 220, 300]);
+  });
+
+  it("owns the default job runner lifecycle but leaves an injected runner to its caller", async () => {
+    const ownedStores = createLocalStores();
+    const ownedWrapper = ({ children }: { readonly children: React.ReactNode }) => (
+      <StudioLocalStoresProvider stores={ownedStores}>
+        {children}
+      </StudioLocalStoresProvider>
+    );
+    const owned = renderHook(() => useStudioJobRunner(), { wrapper: ownedWrapper });
+    const ownedOutput = deferred<string>();
+    let ownedSignal!: AbortSignal;
+    const ownedHandle = owned.result.current.run(
+      queuedJob("owned-runner-job"),
+      ({ signal }) => {
+        ownedSignal = signal;
+        return ownedOutput.promise;
+      },
+    );
+
+    owned.unmount();
+    await expect(ownedHandle.result).resolves.toMatchObject({ status: "cancelled" });
+    expect(ownedSignal.aborted).toBe(true);
+    expect(() => owned.result.current.run(queuedJob("owned-runner-late"), () => "late"))
+      .toThrow(/disposed/);
+    ownedOutput.resolve("late");
+
+    const injectedStores = createLocalStores();
+    const injectedRunner = createJobRunner({ store: injectedStores.jobs });
+    const injectedWrapper = ({ children }: { readonly children: React.ReactNode }) => (
+      <StudioLocalStoresProvider stores={injectedStores} jobRunner={injectedRunner}>
+        {children}
+      </StudioLocalStoresProvider>
+    );
+    const injected = renderHook(() => useStudioJobRunner(), { wrapper: injectedWrapper });
+    expect(injected.result.current).toBe(injectedRunner);
+    injected.unmount();
+    expect(() => injectedRunner.run(queuedJob("injected-runner-job"), () => "ok"))
+      .not.toThrow();
+    injectedRunner.dispose();
   });
 });

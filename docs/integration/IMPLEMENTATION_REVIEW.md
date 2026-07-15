@@ -935,9 +935,32 @@ los lotes que sí modifican producto.
   contract completa 40/40 archivos y 434/434 tests; typecheck, lint focal
   `--deny-warnings`, build y diff-check verdes. Revisión final: `accept`.
 
+## F7-04 — Accessible global Job Center
+
+- **Ownership:** `AppLayout` monta un solo drawer global sobre
+  `StudioDialog`/`StudioPanel`; `StudioHeader` sólo expone el trigger y
+  badge active/total. Abrirlo cierra cualquier menú del header. JobStore conserva
+  todo el estado y los selectors F7-03; la UI no introdujo otro engine.
+- **Acciones reales:** cancel invoca el JobRunner compartido por el provider.
+  Retry sólo existe con un adapter inyectado y source retryable no consumido;
+  throws síncronos o async se contienen sin exponer detalles privados. El
+  provider cancela/dispose sólo su runner propio y nunca uno inyectado.
+- **A11Y:** progressbar expone ratio, cada status anuncia label/attempt sin
+  narrar cada tick y el resumen live distingue active/history con singular
+  correcto. Details, Cancel y Retry tienen nombres contextuales. El drawer
+  hereda trap, Escape, restore, backdrop y reduced-motion de los primitives.
+- **Repairs:** la revisión cerró retry síncrono escapado, controles ambiguos,
+  copy de historial incorrecto, transición queued→running silenciosa, badge sin
+  total accesible y menú persistente debajo del drawer.
+- **Browser:** build productivo en 1440x900 y 1024x768 confirmó drawer derecho de
+  420 px/full-height, foco inicial/trap/restore, Escape y close, empty state,
+  page-fit y cero console errors/exceptions.
+- **Evidencia:** 55/55 focales del pase independiente, typecheck, lint focal
+  `--deny-warnings`, build y diff-check verdes. Revisión final: `accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F7-04: activo; debe montar Job Center accesible sobre las proyecciones F7-03,
-  sin adelantar format providers ni migración del worker concreto.
+- F7-05: activo; debe congelar `ExportPort`, artifact writer y format registry
+  sin migrar todavía providers concretos ni editar el `package.json` del usuario.

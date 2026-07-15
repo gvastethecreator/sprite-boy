@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-03 aceptados. Frontiers: F3-07 pendiente de browser; F7-04 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-04 aceptados. Frontiers: F3-07 pendiente de browser; F7-05 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -120,7 +120,15 @@ cuentan parents que ya consumieron su único child. La revisión también cerró
 una carrera cross-job: cancel, caller abort, dispose y timeout solicitados desde
 un subscriber se difieren hasta salir del publish sin perder first-terminal,
 mientras progress reentrante devuelve false sin dejar un running huérfano.
-F7-04 puede montar UI accesible sobre estas proyecciones estables.
+F7-04 montó un único Job Center global en el shell: trigger con badge
+active/total, drawer desktop/compact, progress semántico, estados live por
+job/attempt y resumen de historial. Cancel usa el JobRunner compartido; retry
+sólo aparece cuando existe un adapter real y el source sigue accionable. Throws
+síncronos/async del adapter quedan contenidos y redactados. El provider dispone
+sólo runners propios y conserva runners inyectados. Chrome productivo probó
+1440x900 y 1024x768, foco atrapado/restaurado, Escape/cierre, page-fit y cero
+errores/excepciones. F7-05 puede congelar contratos de export sin migrar todavía
+los adapters concretos.
 
 ## Reglas de ejecución
 
