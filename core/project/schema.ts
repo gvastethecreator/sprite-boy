@@ -12,13 +12,21 @@ export type ISO8601Timestamp = string;
 
 export type VariantKey = "A" | "B" | "C" | "D";
 
-export type WorkspaceId =
-  | "assets"
-  | "slice"
-  | "compose"
-  | "animate"
-  | "collision"
-  | "export";
+/**
+ * Every durable workspace/render context understood by the canonical project.
+ * `assets` is a shared resource context; the Studio shell's navigable
+ * destinations are defined separately in `core/studio`.
+ */
+export const WORKSPACE_IDS = Object.freeze([
+  "assets",
+  "slice",
+  "compose",
+  "animate",
+  "collision",
+  "export",
+] as const);
+
+export type WorkspaceId = (typeof WORKSPACE_IDS)[number];
 
 export interface Dimensions {
   width: number;

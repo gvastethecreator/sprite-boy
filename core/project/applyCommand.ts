@@ -1,3 +1,4 @@
+import { WORKSPACE_IDS } from "./schema";
 import type {
   EntityId,
   Region,
@@ -536,15 +537,6 @@ const WORKSPACE_PATCH_FIELDS = [
   "selectedSequenceId",
   "selectedCelIds",
 ] as const;
-
-const WORKSPACE_IDS: readonly WorkspaceId[] = [
-  "assets",
-  "slice",
-  "compose",
-  "animate",
-  "collision",
-  "export",
-];
 
 type WorkspacePatchField = (typeof WORKSPACE_PATCH_FIELDS)[number];
 

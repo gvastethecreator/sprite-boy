@@ -1,4 +1,4 @@
-import { isEntityId, type WorkspaceId } from "../project";
+import { WORKSPACE_IDS, isEntityId, type WorkspaceId } from "../project";
 import {
   STUDIO_STORE_CONTRACTS,
   type DeepReadonly,
@@ -43,15 +43,6 @@ type LocalReducer<TKind extends LocalStoreKind> = (
   state: DeepReadonly<StudioStoreStateMap[TKind]>,
   action: DeepReadonly<StudioStoreActionMap[TKind]>,
 ) => DeepReadonly<StudioStoreStateMap[TKind]>;
-
-const WORKSPACE_IDS: readonly WorkspaceId[] = Object.freeze([
-  "assets",
-  "slice",
-  "compose",
-  "animate",
-  "collision",
-  "export",
-]);
 
 const DELETE_RECORD_VALUE = Symbol("delete-record-value");
 const LOCAL_INPUT_ERRORS = new WeakSet<object>();
