@@ -62,8 +62,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F5-04 | E | F5-02 | Thumbnail adapter sobre el compositor compartido | VIS parity + REV | done |
 | F5-05 | E | F5-02 | Export render adapter sobre el compositor compartido | ART/VIS parity + REV | done |
 | F5-06 | J | F5-03,F5-04,F5-05 | DPR/resize/context-loss/cleanup render gate | BR + PERF + REV | done |
-| F6-01 | J | F4-06,F5-06 | Workspace registry Slice/Compose/Animate/Collision/Export | CT exhaustive registry | active |
-| F6-02 | J | F6-01 | Command registry tipado, enablement y shortcut conflicts | UT no placeholder handler | todo |
+| F6-01 | J | F4-06,F5-06 | Workspace registry Slice/Compose/Animate/Collision/Export | CT exhaustive registry | done |
+| F6-02 | J | F6-01 | Command registry tipado, enablement y shortcut conflicts | UT no placeholder handler | active |
 | F6-03 | E | F6-01 | Shell layout/header/nav usando registry | BR navigation + REV | todo |
 | F6-04 | E | F6-03 | Panel/modal primitives, focus contract y compact layout | A11Y + viewport proof + REV | todo |
 | F6-05 | J | F6-02,F6-04 | Empty/error/loading states de cinco workspaces | BR + A11Y | todo |

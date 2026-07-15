@@ -1,3 +1,4 @@
+import { WORKSPACE_IDS } from "./schema";
 import type {
   Cel,
   CollisionSet,
@@ -10,6 +11,7 @@ import type {
   StudioProjectV1,
   VariantKey,
   VariantSet,
+  WorkspaceId,
 } from "./schema";
 import { isEntityId, isISO8601Timestamp } from "./primitives";
 
@@ -974,7 +976,10 @@ function validateWorkspace(
     path,
     diagnostics,
   );
-  if (value.activeWorkspace !== undefined && !["assets", "slice", "compose", "animate", "collision", "export"].includes(String(value.activeWorkspace))) {
+  if (
+    value.activeWorkspace !== undefined &&
+    !WORKSPACE_IDS.includes(String(value.activeWorkspace) as WorkspaceId)
+  ) {
     push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "activeWorkspace"), "Unknown workspace.");
   }
   const refs: readonly [string, unknown, Map<EntityId, UnknownRecord>][] = [

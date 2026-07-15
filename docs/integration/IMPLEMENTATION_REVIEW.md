@@ -729,9 +729,27 @@ los lotes que sí modifican producto.
   diff-check verdes. Ledger 198/198. Revisión final: `accept`; warning chunk
   >500 kB permanece como baseline.
 
+## F6-01 — Exhaustive Studio workspace registry
+
+- **Estado:** `accept` después de revisión independiente sin hallazgos.
+- **Vocabulario:** Slice, Compose, Animate, Collision y Export son los cinco
+  destinos navegables. `assets` conserva su semántica durable y de proyección,
+  pero se alcanza mediante Asset Library compartida. Contexto ausente/Assets se
+  resuelve a Slice hasta que F6-03 despache `workspace.update`.
+- **Contrato:** cada definición frozen enlaza ID, orden, label, descripción,
+  href `#/studio/<id>`, command ID y capacidades de source/interacción/timeline.
+  Rutas y command IDs se derivan del ID para impedir drift.
+- **Exhaustividad:** `WORKSPACE_IDS` es la única lista canónica consumida por
+  validator, command reducer y WorkspaceStore. Un tripwire TypeScript y la
+  partición runtime prueban cinco destinos + `assets` sin IDs omitidos.
+- **Evidencia:** 20/20 focales incluyendo regresiones de reducer/store; suite
+  acumulada 44/44 archivos y 435/435 tests; typecheck, lint focal
+  `--deny-warnings`, build y diff-check verdes. Revisión final: `accept`; warning
+  de chunk >500 kB permanece como baseline.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F6-01: activo; debe congelar el registry exhaustivo y rutas alcanzables de
-  Slice/Compose/Animate/Collision/Export sobre stores/render canónicos.
+- F6-02: activo; debe congelar command registry, enablement y detección de
+  conflictos sin handlers placeholder.

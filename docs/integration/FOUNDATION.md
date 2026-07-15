@@ -446,6 +446,14 @@ sigue pendiente sólo de la ejecución browser F3-07.
 - **Prueba:** keyboard navigation y E2E de entrada/empty-state para cinco workspaces; Collision visible.
 - **Retorno:** `done` con desktop 1440x900, compact desktop y reduced-motion verificados.
 
+F6-01 separa exhaustivamente los cinco destinos del shell del contexto global
+`assets`. Slice/Compose/Animate/Collision/Export publican orden, label,
+descripción, href hash, command ID y capacidades de render/interacción/timeline
+inmutables. La lista canónica única alimenta validación, command reducer y
+WorkspaceStore; un tripwire de tipos exige clasificar cualquier ID futuro. El
+contrato cerró con 6 tests focales, suite 44/44 archivos y 435/435 tests,
+typecheck, lint estricto, build y revisión independiente `accept`.
+
 ### F7 — Observabilidad, jobs y error taxonomy
 
 - **Owner:** `[gpt-5.6-sol | xhigh]`.
