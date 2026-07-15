@@ -983,9 +983,30 @@ los lotes que sí modifican producto.
   lint focal `--deny-warnings`, build y diff-check verdes. Revisión final:
   `accept`. Arquitectura: [ADR-007](../architecture/ADR-007-export-port-and-writers.md).
 
+## F7-06 — Deterministic JobRunner + ExportPort failure injection
+
+- **Harness:** un host manual controla clock/timers y adapters inyectables
+  cubren quota, provider crash, worker crash, provider pending y writers
+  cooperativos/hostiles sin depender de tiempo real ni filesystem.
+- **Terminales:** quota/provider desconocidos quedan redactados por el boundary
+  actual; worker crash conserva su `JobTaskError` tipado. F7-07 decidirá la
+  traducción final Export→Job sin debilitar esta contención.
+- **Races:** timeout durante encode nunca alcanza al writer. Cancel durante
+  write aborta al writer cooperativo; cancel en la misma frontera que un receipt
+  ya resuelto obliga a la Promise real de ExportPort a rechazar
+  `EXPORT_ABORTED`, con cero resultados publicados.
+- **Cleanup:** después de late resolve/reject, el snapshot completo de JobStore
+  conserva identidad, active count y listener inventory son cero, y cada timer
+  fue cleared o fired exactamente una vez.
+- **Repairs:** la revisión cerró tres falsos positivos: observar sólo el terminal
+  del runner, comparar sólo un job deep-equal y no auditar cardinalidad de
+  timers. También exigió exactamente dos listeners durante writer pending.
+- **Evidencia:** 6/6 focales; gate F7 acumulado 5 archivos/68 tests; typecheck,
+  lint focal `--deny-warnings` y build verdes. Revisión final: `accept`.
+
 ## Frontiers abiertos
 
 - F3-07: harness `ready-for-browser`; falta ejecución Chrome real de
   save-close-reload y export/import portable en storage limpio.
-- F7-06: activo; debe inyectar quota, provider/worker crash, timeout y cancel
-  races sobre JobRunner + ExportPort sin late writes, receipts falsos ni leaks.
+- F7-07: activo; debe congelar el adapter Job↔Export, códigos/mensajes/retry,
+  redacción y el manifest W2 con revisión de seguridad independiente.

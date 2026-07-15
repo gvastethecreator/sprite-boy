@@ -73,8 +73,8 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F7-03 | J | F7-02 | Job Center store/selectors and retention policy | UT state isolation | done |
 | F7-04 | E | F7-03,F6-04 | Job Center UI con progress/cancel/retry/errors | BR/A11Y + REV | done |
 | F7-05 | J | F7-01 | `ExportPort`, artifact writer y format registry contracts | CT + ART fake writer | done |
-| F7-06 | J | F7-02,F7-05 | Failure injection: quota, worker crash, timeout, cancel race | IT no late writes/leaks | active |
-| F7-07 | J | F7-04,F7-06 | W2 job/export gate y diagnostics policy | SEC + REV | todo |
+| F7-06 | J | F7-02,F7-05 | Failure injection: quota, worker crash, timeout, cancel race | IT no late writes/leaks | done |
+| F7-07 | J | F7-04,F7-06 | W2 job/export gate y diagnostics policy | SEC + REV | active |
 | F8-01 | J | B0-05,F7-07 | Reconciliar ownership de `package.json`/lock antes de editar | Explicit diff/owner record | todo |
 | F8-02 | E | F8-01 | Scripts estables type/lint/unit/integration/e2e/build | Command smoke + REV | todo |
 | F8-03 | E | F8-02 | CI reproducible con lockfile e install congelado | CI failure injection + REV | todo |

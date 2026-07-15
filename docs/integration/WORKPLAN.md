@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-05 aceptados. Frontiers: F3-07 pendiente de browser; F7-06 activo.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-06, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06 y F7-01..F7-06 aceptados. Frontiers: F3-07 pendiente de browser; F7-07 activo.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -136,8 +136,13 @@ nativo, byte budget y receipt exacto se validan antes de publicar éxito. El
 port no conoce DOM, object URLs, stores ni downloads. Registry/list/provider
 drift, IDs ocultos, getters/mutaciones hostiles y errores spoofed quedan
 contenidos; AbortSignal usa slots/listeners nativos. La revisión aceptó 20/20 y
-el gate F7 acumulado 62/62. F7-06 puede inyectar quota/crash/timeout/cancel race
-sobre este seam sin migrar todavía codecs o writers reales.
+el gate F7 acumulado 62/62. F7-06 inyectó quota, provider/worker crash,
+timeout y cancel races sobre JobRunner + ExportPort. La Promise real del port
+rechaza abort, nunca publica un receipt tardío y el snapshot completo de
+JobStore conserva identidad después de cada late settlement. Timers y listeners
+cierran con cardinalidad exacta; un writer cooperativo no completa side effects
+después de abort. La revisión aceptó 6/6 focales y 68/68 acumulados. F7-07 puede
+congelar el gate y la traducción diagnóstica sin migrar todavía codecs reales.
 
 ## Reglas de ejecución
 
