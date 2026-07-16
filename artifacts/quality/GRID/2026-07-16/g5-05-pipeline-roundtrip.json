@@ -86,6 +86,6 @@
     "lint": "pass",
     "diffCheck": "pass",
     "visual": "pass (static golden-derived browser representation inspected; real Worker covered by pipeline smoke)",
-    "independentReview": "repair requested P2; follow-up pending"
+    "independentReview": "ACCEPT (P0-P2=0)"
   }
 }

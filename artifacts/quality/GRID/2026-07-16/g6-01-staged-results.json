@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "check": "staged-grid-results-contract",
+  "status": "pass",
+  "task": "G6-01",
+  "scope": "Fail-closed staged result snapshot with owned pixel buffers, process progress, summary, selection, terminal errors and explicit release.",
+  "evidence": {
+    "testFile": "tests/contract/stagedGridResults.test.ts",
+    "tests": 4,
+    "clonesWorkerBuffers": true,
+    "freezesRecipeAndMetadata": true,
+    "summaryIncludesEmptyOutputs": true,
+    "rejectsSummaryDrift": true,
+    "monotonicProgress": true,
+    "terminalErrors": ["failed", "cancelled"],
+    "selectionBounds": true,
+    "explicitBufferRelease": true
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Worker buffer aliasing: completion clones every RGBA ArrayBuffer before exposing staged output.",
+      "Summary drift: output count, pixel count and warning union are checked against the cloned outputs.",
+      "Progress regression: stage index, ratio and completed counters cannot move backwards.",
+      "Selection escape: selected output indices are bounded to the staged set.",
+      "Memory retention: disposal zeroes owned buffers and returns an idle snapshot without URLs or Blobs."
+    ],
+    "boundary": "The model is feature-local and ephemeral; process orchestration/UI are G6-02 and durable commit is G6-03."
+  },
+  "verification": {
+    "contract": "pass (4/4)",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass",
+    "independentReview": "pending"
+  }
+}
