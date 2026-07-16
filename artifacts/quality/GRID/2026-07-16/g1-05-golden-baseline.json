@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-processing-golden-baseline",
+  "status": "pass",
+  "baseline": {
+    "algorithm": "grid-splitter-port-v1",
+    "normalization": "rgba8-srgb-row-major-v1",
+    "fixtureCount": 8,
+    "outputCount": 59,
+    "manifest": "tests/contract/fixtures/gridProcessingGoldenManifestV1.ts",
+    "donorReferencesReadOnly": [
+      "D:/DEV/grid-splitter/src/workers/gridSplitter.worker.ts",
+      "D:/DEV/grid-splitter/src/test/fixtures/README.md",
+      "D:/DEV/grid-splitter/scripts/generate-fixtures.mjs"
+    ]
+  },
+  "fixtures": {
+    "single-pixel-1x1": true,
+    "single-row-1xn": true,
+    "single-column-nx1": true,
+    "detected-grid-3x3": true,
+    "fully-transparent-grid": true,
+    "seeded-noisy-pipeline": true,
+    "non-divisible-3x3": true,
+    "large-safe-4x4-512x384": true
+  },
+  "capturedFields": {
+    "sourceDimensionsAndSha256": true,
+    "layoutOriginRowsCols": true,
+    "rowMajorCellAndContentBounds": true,
+    "outputDimensions": true,
+    "perOutputAndSummaryReduction": true,
+    "normalizedRgbaSha256": true,
+    "operationsAndWarnings": true,
+    "timingExcluded": true
+  },
+  "closedValidation": {
+    "unknownKeysRejected": true,
+    "accessorsRejectedWithoutInvocation": true,
+    "sparseArraysRejected": true,
+    "duplicateFixturesRejected": true,
+    "nonCanonicalHashesRejected": true,
+    "detachedAndWrongSizedRgbaRejected": true,
+    "fixtureByteTamperDetected": true,
+    "validHashDriftDetected": true,
+    "validGeometryDriftDetected": true
+  },
+  "realWorker": {
+    "status": "pass",
+    "fixtureCount": 8,
+    "outputCount": 59,
+    "sourceAndOutputHashesMatch": true,
+    "geometryAndReductionMatch": true,
+    "timingAssertions": 0
+  },
+  "tests": {
+    "filesPassed": 2,
+    "testsPassed": 7,
+    "failed": 0,
+    "typecheck": "pass",
+    "focusedLint": "pass"
+  },
+  "commands": [
+    "bun x vitest run tests/contract/gridProcessingGolden.test.ts tests/integration/gridProcessingGoldenWorker.test.ts",
+    "bun scripts/grid-processing-golden-verify.ts",
+    "bun x tsc --noEmit",
+    "bun x oxlint core/processing/gridProcessingGolden.ts core/processing/index.ts scripts/grid-processing-golden-verify.ts tests/contract/gridProcessingGolden.test.ts tests/contract/fixtures/gridProcessingGoldenInputs.ts tests/contract/fixtures/gridProcessingGoldenManifestV1.ts tests/integration/gridProcessingGoldenWorker.test.ts"
+  ],
+  "adversarialAutopsy": {
+    "strongestObjection": "A baseline is worthless if a routine verification command can silently regenerate it after drift.",
+    "location": "scripts/grid-processing-golden-verify.ts and tests/contract/fixtures/gridProcessingGoldenManifestV1.ts",
+    "harm": "An algorithm regression could otherwise replace its own expected evidence.",
+    "resolution": "Default execution is compare-only; --capture writes only to stdout, never to the manifest. Expected hashes and geometry remain reviewed literals and the runtime object is deeply frozen.",
+    "closingProof": "The hostile tests mutate valid hashes, valid geometry and fixture bytes independently, while the real Worker gate compares all 59 outputs.",
+    "unresolvedSeverity": "none"
+  },
+  "independentReview": {
+    "decision": "ACCEPT",
+    "severityCounts": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "notes": [
+      "Eight required deterministic fixtures and all 59 outputs match reviewed deep-frozen literals.",
+      "Closed schema validation, Worker capture, hash and geometry drift, byte tamper and compare-only CLI were accepted."
+    ]
+  }
+}
