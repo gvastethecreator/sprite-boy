@@ -2,9 +2,9 @@
 
 import {
   applyAdvancedChromaKey,
-  findLocalTrimBounds,
   quantizeColors,
 } from "../../../core/processing/gridProcessingAlgorithms";
+import { trimGridCell } from "../../../core/processing/gridProcessingCrop";
 import { inferAutoGridLayout } from "../../../core/processing/gridProcessingDetection";
 import {
   buildManualGrid,
@@ -219,18 +219,20 @@ async function applyCropStage(
   request: GridProcessingProcessRequestV1,
   outputs: WorkingOutput[],
 ): Promise<boolean> {
+  // GridSplitRecipeV1 retains the donor-compatible zero sentinel for crop disabled.
   if (request.recipe.crop.threshold === 0) return true;
   for (let index = 0; index < outputs.length; index += 1) {
     const output = outputs[index]!;
-    const bounds = findLocalTrimBounds(
+    const trimmed = trimGridCell(
       output.pixels,
       output.width,
       output.height,
-      request.recipe.crop.threshold,
-      request.recipe.crop.padding,
+      { x: 0, y: 0, width: output.width, height: output.height },
+      request.recipe.crop,
+      () => process.cancelled || process.terminalSent,
     );
     output.operations.push("crop");
-    if (bounds === null) {
+    if (trimmed === null) {
       output.contentBounds = null;
       output.width = 1;
       output.height = 1;
@@ -241,20 +243,18 @@ async function applyCropStage(
       output.cropReductionRatio = calculateReductionRatio(
         output.cellBounds.width,
         output.cellBounds.height,
-        bounds.width,
-        bounds.height,
+        trimmed.localBounds.width,
+        trimmed.localBounds.height,
       );
       output.contentBounds = {
-        x: output.cellBounds.x + bounds.x,
-        y: output.cellBounds.y + bounds.y,
-        width: bounds.width,
-        height: bounds.height,
+        x: output.cellBounds.x + trimmed.localBounds.x,
+        y: output.cellBounds.y + trimmed.localBounds.y,
+        width: trimmed.localBounds.width,
+        height: trimmed.localBounds.height,
       };
-      if (bounds.x !== 0 || bounds.y !== 0 || bounds.width !== output.width || bounds.height !== output.height) {
-        output.pixels = copyRect(output.pixels, output.width, bounds);
-        output.width = bounds.width;
-        output.height = bounds.height;
-      }
+      output.pixels = trimmed.pixels;
+      output.width = trimmed.localBounds.width;
+      output.height = trimmed.localBounds.height;
     }
     if (!await reportProgress(process, "crop", index + 1, outputs.length)) return false;
   }
