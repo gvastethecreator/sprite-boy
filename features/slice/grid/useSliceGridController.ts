@@ -33,6 +33,7 @@ import {
   updateSliceGridRecipeLayout,
   updateSliceGridRecipeCrop,
   updateSliceGridRecipeChroma,
+  updateSliceGridRecipePixel,
   type SliceGridRecipeStateV1,
 } from "./gridRecipeState";
 
@@ -83,6 +84,7 @@ export interface SliceGridController {
     cellCount: number;
   }>;
   readonly chroma: GridSplitRecipeV1["chroma"];
+  readonly pixel: GridSplitRecipeV1["pixel"];
   readonly setMode: (mode: GridLayoutMode) => void;
   readonly setManualRowsInput: (value: string) => void;
   readonly setManualColsInput: (value: string) => void;
@@ -95,6 +97,14 @@ export interface SliceGridController {
   readonly setChromaSmoothness: (value: number) => boolean;
   readonly setChromaSpill: (value: number) => boolean;
   readonly resetChroma: () => boolean;
+  readonly setPixelEnabled: (value: boolean) => boolean;
+  readonly setPixelSize: (value: number) => boolean;
+  readonly setPixelQuantize: (value: boolean) => boolean;
+  readonly setPixelColors: (value: number) => boolean;
+  readonly setPixelPalette: (value: readonly string[] | undefined) => boolean;
+  readonly setPixelAutoPalette: () => boolean;
+  readonly setPixelFixedPalette: (value: readonly string[]) => boolean;
+  readonly resetPixel: () => boolean;
   readonly retry: () => void;
 }
 
@@ -391,6 +401,28 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     return true;
   }, [options.onCommitState]);
 
+  const commitPixel = useCallback((pixel: GridSplitRecipeV1["pixel"]): boolean => {
+    if (!sourceRef.current) return false;
+    const currentPixel = recipeStateRef.current.recipe.pixel;
+    if (currentPixel.enabled === pixel.enabled && currentPixel.size === pixel.size &&
+      currentPixel.quantize === pixel.quantize && currentPixel.colors === pixel.colors &&
+      JSON.stringify(currentPixel.palette) === JSON.stringify(pixel.palette)) return true;
+    let nextState: SliceGridRecipeStateV1;
+    try {
+      nextState = updateSliceGridRecipePixel(recipeStateRef.current, pixel);
+    } catch {
+      return false;
+    }
+    try {
+      options.onCommitState?.(nextState);
+    } catch {
+      return false;
+    }
+    recipeStateRef.current = nextState;
+    setRecipeState(nextState);
+    return true;
+  }, [options.onCommitState]);
+
   const setMode = useCallback((mode: GridLayoutMode): void => {
     const currentSource = sourceRef.current;
     if (!currentSource) return;
@@ -475,6 +507,51 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
       spill: 0,
     });
   }, [commitChroma]);
+  const setPixelEnabled = useCallback((value: boolean): boolean => {
+    return commitPixel({ ...recipeStateRef.current.recipe.pixel, enabled: value });
+  }, [commitPixel]);
+  const setPixelSize = useCallback((value: number): boolean => {
+    return commitPixel({ ...recipeStateRef.current.recipe.pixel, size: value });
+  }, [commitPixel]);
+  const setPixelQuantize = useCallback((value: boolean): boolean => {
+    return commitPixel({ ...recipeStateRef.current.recipe.pixel, quantize: value });
+  }, [commitPixel]);
+  const setPixelColors = useCallback((value: number): boolean => {
+    return commitPixel({ ...recipeStateRef.current.recipe.pixel, colors: value });
+  }, [commitPixel]);
+  const setPixelPalette = useCallback((value: readonly string[] | undefined): boolean => {
+    const current = recipeStateRef.current.recipe.pixel;
+    const next: GridSplitRecipeV1["pixel"] = {
+      enabled: current.enabled,
+      size: current.size,
+      quantize: current.quantize,
+      colors: current.colors,
+      ...(value ? { palette: [...value] } : {}),
+    };
+    return commitPixel(next);
+  }, [commitPixel]);
+  const setPixelAutoPalette = useCallback((): boolean => {
+    const current = recipeStateRef.current.recipe.pixel;
+    return commitPixel({
+      enabled: current.enabled,
+      size: current.size,
+      quantize: true,
+      colors: current.colors,
+    });
+  }, [commitPixel]);
+  const setPixelFixedPalette = useCallback((value: readonly string[]): boolean => {
+    const current = recipeStateRef.current.recipe.pixel;
+    return commitPixel({
+      enabled: current.enabled,
+      size: current.size,
+      quantize: false,
+      colors: current.colors,
+      palette: [...value],
+    });
+  }, [commitPixel]);
+  const resetPixel = useCallback((): boolean => {
+    return commitPixel({ enabled: false, size: 16, quantize: false, colors: 16 });
+  }, [commitPixel]);
   const cropPreview = useMemo(() => Object.freeze({
     enabled: recipeState.recipe.crop.threshold > 0,
     threshold: recipeState.recipe.crop.threshold,
@@ -496,6 +573,7 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     errorMessage,
     cropPreview,
     chroma: recipeState.recipe.chroma,
+    pixel: recipeState.recipe.pixel,
     setMode,
     setManualRowsInput: updateRows,
     setManualColsInput: updateCols,
@@ -508,6 +586,14 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     setChromaSmoothness,
     setChromaSpill,
     resetChroma,
+    setPixelEnabled,
+    setPixelSize,
+    setPixelQuantize,
+    setPixelColors,
+    setPixelPalette,
+    setPixelAutoPalette,
+    setPixelFixedPalette,
+    resetPixel,
     retry,
   }), [
     cropPreview,
@@ -516,7 +602,15 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     setChromaSmoothness,
     setChromaSpill,
     setChromaTolerance,
+    setPixelColors,
+    setPixelAutoPalette,
+    setPixelEnabled,
+    setPixelFixedPalette,
+    setPixelPalette,
+    setPixelQuantize,
+    setPixelSize,
     resetChroma,
+    resetPixel,
     detectedLayout,
     draft,
     effectiveLayout,

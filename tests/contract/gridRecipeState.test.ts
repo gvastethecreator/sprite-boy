@@ -8,6 +8,7 @@ import {
   updateSliceGridRecipeLayout,
   updateSliceGridRecipeCrop,
   updateSliceGridRecipeChroma,
+  updateSliceGridRecipePixel,
 } from "../../features/slice/grid/gridRecipeState";
 
 const SOURCE = Object.freeze({ width: 12, height: 8 });
@@ -130,6 +131,39 @@ describe("Slice grid recipe state (G2-05)", () => {
     expect(() => updateSliceGridRecipeChroma(initial, {
       ...initial.recipe.chroma,
       tolerance: Number.NaN,
+    })).toThrow(TypeError);
+  });
+
+  it("updates pixel stage and fixed palette canonically with strict boundaries", () => {
+    const initial = createDefaultSliceGridRecipeState("asset-sheet", SOURCE);
+    const pixel = updateSliceGridRecipePixel(initial, {
+      enabled: true,
+      size: 64,
+      quantize: false,
+      colors: 8,
+      palette: ["#FF0000", "#0000FF"],
+    });
+
+    expect(pixel.recipe.pixel).toEqual({
+      enabled: true,
+      size: 64,
+      quantize: false,
+      colors: 8,
+      palette: ["#ff0000", "#0000ff"],
+    });
+    expect(Object.isFrozen(pixel.recipe.pixel)).toBe(true);
+    expect(Object.isFrozen(pixel.recipe.pixel.palette)).toBe(true);
+    expect(pixel.recipe.crop).toBe(initial.recipe.crop);
+    expect(pixel.recipe.chroma).toBe(initial.recipe.chroma);
+    expect(hydrateSliceGridRecipeState(JSON.parse(serializeSliceGridRecipeState(pixel)), SOURCE))
+      .toEqual(pixel);
+    expect(() => updateSliceGridRecipePixel(initial, {
+      ...initial.recipe.pixel,
+      size: 4097,
+    })).toThrow(TypeError);
+    expect(() => updateSliceGridRecipePixel(initial, {
+      ...initial.recipe.pixel,
+      palette: ["#bad"],
     })).toThrow(TypeError);
   });
 });

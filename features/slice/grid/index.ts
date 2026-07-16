@@ -5,4 +5,6 @@ export * from "./gridRecipeState";
 export * from "./SliceGridOverlay";
 export * from "./SliceGridInspector";
 export * from "./SliceChromaControls";
+export * from "./SlicePixelControls";
+export * from "./palettePresets";
 export * from "./useSliceGridController";
