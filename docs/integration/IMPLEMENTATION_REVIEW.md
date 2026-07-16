@@ -1287,8 +1287,26 @@ layout/inference G2 antes de abrir sus superficies UI y overlay.
   `artifacts/quality/GRID/2026-07-16/g2-02-detection-inference.json`.
 
 **Siguiente frontera:** G2-03 controls/detected feedback está activo; G2-04
-overlay puede avanzar después del mismo contrato aceptado. S1-01 sigue en gate
-de evidencia independiente y no se considera cerrado todavía.
+overlay puede avanzar desde el mismo contrato aceptado. El checkpoint siguiente
+cierra el adapter irregular independiente S1-01.
+
+### S1-01 — Connected-component irregular detection
+
+- **Contrato:** detección RGBA pura con alpha threshold estricto, conectividad
+  4/8 explícita, mínimos configurables, ausencia de merge y bounds source-space
+  congelados en orden de descubrimiento row-major.
+- **Límites:** working set acotado a 16,777,216 pixels y 4096 regiones; inputs
+  typed-array/detached/shared/cross-realm y options con accessors tienen matriz
+  hostil. Empty, transparent, edge, single-pixel y noise están congelados.
+- **Cancelación:** checks antes de trabajo, por fila y cada 4096 pixels del flood.
+  El review rechazó el primer test porque abortaba antes del flood; la reparación
+  separa 1×2 row-boundary y 8193×1 que cancela exactamente en `head=4096`.
+- **Evidencia:** 10/10 focales, property 80 samples, flood 1MP bajo 2500 ms,
+  typecheck/lint/diff-check verdes. Revisión final `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/s1-01-connected-components.json`.
+
+**Siguiente frontera irregular:** S1-02 wand selection/add-remove está activo;
+S1-03 puede avanzar en paralelo sobre commands manuales sin tocar este adapter.
 
 ## Frontiers abiertos
 
