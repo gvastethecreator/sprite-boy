@@ -46,6 +46,7 @@ type ImpactCommandType = ProjectCommand["type"] | "command.batch";
 
 const IMPACT_COMMAND_KEYS: Partial<Record<ImpactCommandType, readonly string[]>> = {
   "composition.update": ["type", "compositionId", "patch"],
+  "region.create": ["type", "region", "atIndex"],
   "asset.remove": ["type", "assetId", "policy"],
   "region.remove": ["type", "regionId", "policy"],
   "processingRecipe.remove": ["type", "recipeId", "policy"],
@@ -68,6 +69,10 @@ const IMPACT_COMMAND_KEYS: Partial<Record<ImpactCommandType, readonly string[]>>
   ],
   "collisionSet.remove": ["type", "collisionSetId"],
   "command.batch": ["type", "commands"],
+};
+
+const IMPACT_COMMAND_OPTIONAL_KEYS: Partial<Record<ImpactCommandType, readonly string[]>> = {
+  "region.create": ["atIndex"],
 };
 
 function reference(collection: ProjectRecordCollection, id: EntityId): EntityReference {
@@ -371,7 +376,7 @@ function validateImpactCommandShape(command: unknown, type: ImpactCommandType): 
     }
   }
   for (const key of allowed) {
-    if (key.startsWith("owned")) continue;
+    if (key.startsWith("owned") || IMPACT_COMMAND_OPTIONAL_KEYS[type]?.includes(key)) continue;
     if (!hasOwn(record, key)) return invalidImpact(`Field ${key} is required by ${type}.`, `$.${key}`);
   }
   return undefined;
@@ -822,6 +827,33 @@ export function analyzeProjectCommandImpact(
       return entityExists(project, direct)
         ? { direct: [direct], referencedBy: [], cascades: [], blockers: [] }
         : { direct: [direct], referencedBy: [], cascades: [], blockers: [missingTargetBlocker(direct)] };
+    }
+
+    if (impactType === "region.create") {
+      const region = dataRecord(record.region);
+      if (!region || !isEntityId(region.id) || !isEntityId(region.assetId)) {
+        return invalidImpact("region.create requires a data-only Region with valid id and assetId.", "$.region");
+      }
+      if (
+        record.atIndex !== undefined
+        && (!Number.isSafeInteger(record.atIndex) || (record.atIndex as number) < 0 || (record.atIndex as number) > project.rootOrder.regionIds.length)
+      ) return invalidImpact("region.create atIndex is outside the Region order.", "$.atIndex");
+      const direct = reference("regions", region.id);
+      if (entityExists(project, direct)) {
+        return {
+          direct: [direct], referencedBy: [], cascades: [],
+          blockers: [commandDiagnostic(
+            "ENTITY_ALREADY_EXISTS",
+            `Entity ${region.id} already exists in regions.`,
+            "$.region.id",
+            direct,
+          )],
+        };
+      }
+      const source = reference("assets", region.assetId);
+      return entityExists(project, source)
+        ? { direct: [direct], referencedBy: [], cascades: [], blockers: [] }
+        : { direct: [direct], referencedBy: [], cascades: [], blockers: [missingTargetBlocker(source)] };
     }
 
     const { target, policy } = removeTarget(impactType, record);

@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "taskId": "S1-03",
+  "generatedAt": "2026-07-16T12:13:52-03:00",
+  "status": "verified-and-independently-accepted",
+  "reviewRepair": {
+    "priorVerdict": "REJECT (first review)",
+    "repairedFinding": "P2 adapter collection lookups now resolve only own enumerable data descriptors; inherited Object.prototype IDs cannot become source/target records.",
+    "reviewState": "accepted on independent second review"
+  },
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "evidence": "Independent review reran 9/9, typecheck, strict lint and diff-check; accepted own-only special-ID semantics and revalidated region.create, update/remove, undo, selection, persistence and hostile contracts."
+  },
+  "mission": {
+    "mode": "change",
+    "outcome": "Manual create, move, resize and delete Region mutations use canonical project commands with one undo boundary and durable reload semantics.",
+    "inScope": [
+      "minimal canonical region.create command",
+      "feature-local manual Region command adapter",
+      "contract and integration proof",
+      "quality artifact"
+    ],
+    "outOfScope": [
+      "manual tool UI",
+      "duplicate/hide controls",
+      "Region-to-Asset conversion",
+      "documentation and commits"
+    ],
+    "acceptance": "Source-space integer positive in-bounds geometry, stable Region identity, exact own-data boundaries, one command/undo, selection resilience, no-op stability, missing-target and hostile containment, ProjectStore/history/reload, limits and determinism."
+  },
+  "coreSeam": {
+    "need": "Canonical project exposed region.update/remove/reorder and recipe-bound regions.commitRecipe, but no recipe-free manual create command.",
+    "approval": "Parent approved the minimal region.create seam before core mutation.",
+    "command": "region.create { region, atIndex? }",
+    "invariants": [
+      "exact own enumerable data-only Region payload",
+      "canonical Region keys and required identity/source/bounds/timestamps",
+      "unique Region identity",
+      "existing source Asset ownership",
+      "safe-integer non-negative x/y and positive width/height",
+      "bounds fully inside source Asset",
+      "atIndex in [0, regionIds.length]",
+      "minimal direct impact and inverse region.remove/reject"
+    ],
+    "recipePolicy": "No ProcessingRecipe or provenance is invented for a manual Region."
+  },
+  "implementation": {
+    "adapter": "features/slice/irregular/manualRegionCommands.ts",
+    "coreCommands": "core/project/commands.ts",
+    "coreReducer": "core/project/applyCommand.ts",
+    "coreImpact": "core/project/impact.ts",
+    "publicSeam": "features/slice/irregular/index.ts",
+    "intentMapping": {
+      "create": "region.create preserving caller-supplied stable regionId",
+      "move": "region.update bounds patch preserving width/height and Region identity",
+      "resize": "region.update bounds patch; never remove+recreate",
+      "delete": "region.remove with reject policy and canonical impact analysis"
+    },
+    "noOp": "Unchanged move/resize returns null before ProjectStore dispatch, preserving revision and history.",
+    "limit": {
+      "maxManualRegions": 4096,
+      "maxEntityIdLength": 4096
+    }
+  },
+  "coverage": {
+    "coreTest": "tests/contract/regionCreateCommand.test.ts",
+    "integrationTest": "tests/contract/manualRegionCommands.test.ts",
+    "focalTests": 9,
+    "accumulatedRegionRegressionTests": 118,
+    "cases": [
+      "create at explicit order index with direct impact and exact undo",
+      "duplicate identity, missing source, invalid order and out-of-source bounds",
+      "accessor/extra-field/revoked Region payload containment",
+      "deterministic create command without recipe/provenance",
+      "move/resize preserve identity and selected Region",
+      "geometry no-op preserves store revision and history",
+      "ProjectCodec save/reload preserves manual geometry",
+      "successful selected delete clears selection and undo restores Region/selection",
+      "referenced delete fails with REFERENCE_BLOCKED and preserves selection/project",
+      "missing target, fractional/zero/out-of-source geometry and invalid atIndex",
+      "hostile project/intent getters and throwing/revoked proxies are redacted",
+      "inherited toString/constructor/__proto__ source IDs reject as missing",
+      "inherited toString/constructor/__proto__ Region IDs reject for delete/move/resize without producing a command",
+      "exact own canonical Asset/Region records named toString/constructor/__proto__ remain usable",
+      "4096 Region limit rejects the next create deterministically"
+    ]
+  },
+  "verification": [
+    {
+      "gate": "focal",
+      "command": "bunx vitest run tests/contract/regionCreateCommand.test.ts tests/contract/manualRegionCommands.test.ts",
+      "result": "passed",
+      "details": "2 files, 9 tests"
+    },
+    {
+      "gate": "accumulated-region-regression",
+      "command": "bunx vitest run 13 region/project/store/history/codec/wand contract files",
+      "result": "passed",
+      "details": "13 files, 118 tests"
+    },
+    {
+      "gate": "typecheck",
+      "command": "bunx tsc --noEmit",
+      "result": "passed",
+      "details": "exit 0 after repairing both attributed test diagnostics"
+    },
+    {
+      "gate": "lint",
+      "command": "bunx oxlint core/project/commands.ts core/project/applyCommand.ts core/project/impact.ts features/slice/irregular/manualRegionCommands.ts features/slice/irregular/index.ts tests/contract/regionCreateCommand.test.ts tests/contract/manualRegionCommands.test.ts",
+      "result": "passed",
+      "details": "exit 0"
+    },
+    {
+      "gate": "scope-integrity",
+      "command": "JSON parse, scoped tracked/untracked diff-check and forbidden recipe/provenance scan",
+      "result": "passed",
+      "details": "artifact parsed; scoped diff-check passed; manual adapter contains no recipe/provenance path or direct dynamic assets/regions lookup"
+    },
+    {
+      "gate": "browser-visual",
+      "result": "N/A",
+      "details": "S1-03 explicitly has no UI; runtime proof uses canonical reducer, ProjectStore/history and ProjectCodec."
+    }
+  ],
+  "pressure": {
+    "independentReview": "accepted; first review rejected inherited Object.prototype collection lookups, and the second review accepted descriptor-own resolution plus inherited/own special-ID matrix with P0-P3=0",
+    "strongestObjection": "Delete could damage selection when graph references block removal, or geometry editing could replace Region identity.",
+    "repair": "Added referenced-delete preservation proof and successful selected-delete undo proof; source inspection/test asserts move and resize emit only region.update.",
+    "remainingSeverity": "P3",
+    "remainingRisk": "The adapter clones and validates the complete canonical project per committed mutation; S1-04 should call it once per completed gesture, not on every pointermove."
+  },
+  "scope": {
+    "changed": [
+      "core/project/commands.ts",
+      "core/project/applyCommand.ts",
+      "core/project/impact.ts",
+      "features/slice/irregular/manualRegionCommands.ts",
+      "features/slice/irregular/index.ts",
+      "tests/contract/regionCreateCommand.test.ts",
+      "tests/contract/manualRegionCommands.test.ts",
+      "artifacts/quality/GRID/2026-07-16/s1-03-manual-region-commands.json"
+    ],
+    "preserved": [
+      "G2-05 and A1 concurrent files",
+      "wand implementation beyond one public barrel export",
+      "all UI and integration documentation"
+    ]
+  }
+}
