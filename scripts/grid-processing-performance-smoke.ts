@@ -105,12 +105,19 @@ async function runFullSample(index: number) {
   });
   const elapsedMs = performance.now() - startedAt;
   const memoryAfter = process.memoryUsage();
+  const allOutputsValid = result.outputs.every((output) =>
+    output.surface.width === TARGET_SIZE && output.surface.height === TARGET_SIZE &&
+    output.surface.pixels.byteLength === TARGET_SIZE * TARGET_SIZE * 4 &&
+    JSON.stringify(output.operations) === JSON.stringify(EXPECTED_OPERATIONS) &&
+    output.warnings.length === 0,
+  );
   const sample = {
     elapsedMs: Number(elapsedMs.toFixed(2)),
     outputCount: result.outputs.length,
     outputPixelCount: result.summary.outputPixelCount,
     firstDimensions: [result.outputs[0]!.surface.width, result.outputs[0]!.surface.height],
     firstOperations: result.outputs[0]!.operations,
+    allOutputsValid,
     warnings: result.summary.warnings,
     progressStages: [...new Set(progress)],
     progressEventCount: progress.length,
@@ -188,6 +195,7 @@ const everyFullSampleValid = fullSamples.every((sample) =>
   sample.outputPixelCount === ROWS * COLS * TARGET_SIZE * TARGET_SIZE &&
   sample.firstDimensions[0] === TARGET_SIZE && sample.firstDimensions[1] === TARGET_SIZE &&
   JSON.stringify(sample.firstOperations) === JSON.stringify(EXPECTED_OPERATIONS) &&
+  sample.allOutputsValid &&
   sample.warnings.length === 0 &&
   JSON.stringify(sample.progressStages) === JSON.stringify([...EXPECTED_PROGRESS_STAGES]) &&
   sample.sourceDetached,

@@ -22,9 +22,16 @@ const RESET_OPERATIONS = ["chroma", "crop"] as const;
 function sourcePixels(): Uint8ClampedArray {
   const pixels = new Uint8ClampedArray(SOURCE.width * SOURCE.height * 4);
   for (let offset = 0; offset < pixels.length; offset += 4) {
-    pixels[offset] = 255;
-    pixels[offset + 1] = 0;
+    pixels[offset] = 0;
+    pixels[offset + 1] = 255;
     pixels[offset + 2] = 0;
+    pixels[offset + 3] = 255;
+  }
+  for (const [x, y] of [[1, 1], [2, 1], [1, 2], [2, 2]] as const) {
+    const offset = (y * SOURCE.width + x) * 4;
+    pixels[offset] = 220;
+    pixels[offset + 1] = 20;
+    pixels[offset + 2] = 30;
     pixels[offset + 3] = 255;
   }
   return pixels;
@@ -40,13 +47,13 @@ function createRecipeState() {
   const keyed = updateSliceGridRecipeChroma(cropped, {
     enabled: true,
     color: "#00FF00",
-    tolerance: 0,
+    tolerance: 5,
     smoothness: 0,
     spill: 0,
   });
   return updateSliceGridRecipePixel(keyed, {
     enabled: true,
-    size: 2,
+    size: 4,
     quantize: false,
     colors: 2,
     palette: ["#FF0000", "#000000"],
@@ -95,18 +102,43 @@ if (!resetHydrated || resetHydrated.recipe.pixel.enabled ||
   throw new Error("Pixel reset retained stale canonical state.");
 }
 
+const baselineRecipe = {
+  ...hydrated.recipe,
+  crop: { threshold: 0, padding: 0 },
+  chroma: { ...hydrated.recipe.chroma, enabled: false },
+  pixel: { enabled: false, size: 16, quantize: false, colors: 16 },
+};
+const chromaRecipe = {
+  ...baselineRecipe,
+  chroma: hydrated.recipe.chroma,
+};
+
+const baselineRequest = requestFor("grid-pipeline-baseline", baselineRecipe);
+const baselineResult = await createGridProcessingClient().process({ request: baselineRequest });
+const chromaRequest = requestFor("grid-pipeline-chroma", chromaRecipe);
+const chromaResult = await createGridProcessingClient().process({ request: chromaRequest });
 const fullRequest = requestFor("grid-pipeline-full", hydrated.recipe);
 const fullSourceBuffer = fullRequest.source.pixels;
 const fullResult = await createGridProcessingClient().process({ request: fullRequest });
 const repeatResult = await createGridProcessingClient().process({
   request: requestFor("grid-pipeline-repeat", hydrated.recipe),
 });
+const cropResult = await createGridProcessingClient().process({
+  request: requestFor("grid-pipeline-crop", resetHydrated.recipe),
+});
 const resetRequest = requestFor("grid-pipeline-reset", resetHydrated.recipe);
 const resetResult = await createGridProcessingClient().process({ request: resetRequest });
 
 const first = fullResult.outputs[0]!;
 const repeated = repeatResult.outputs[0]!;
+const crop = cropResult.outputs[0]!;
 const reset = resetResult.outputs[0]!;
+const baseline = baselineResult.outputs[0]!;
+const chroma = chromaResult.outputs[0]!;
+const baselinePixels = [...new Uint8ClampedArray(baseline.surface.pixels)];
+const chromaPixels = [...new Uint8ClampedArray(chroma.surface.pixels)];
+const cropPixels = [...new Uint8ClampedArray(crop.surface.pixels)];
+const resetPixels = [...new Uint8ClampedArray(reset.surface.pixels)];
 const firstPixels = [...new Uint8ClampedArray(first.surface.pixels)];
 const repeatedPixels = [...new Uint8ClampedArray(repeated.surface.pixels)];
 const evidence = {
@@ -124,10 +156,16 @@ const evidence = {
   full: {
     outputCount: fullResult.outputs.length,
     dimensions: [first.surface.width, first.surface.height],
+    contentBounds: first.contentBounds,
     operations: first.operations,
     expectedOperations: FULL_OPERATIONS,
     pixels: firstPixels,
     sourceDetached: fullSourceBuffer.byteLength === 0,
+  },
+  stageEffects: {
+    chromaChangedPixels: JSON.stringify(chromaPixels) !== JSON.stringify(baselinePixels),
+    cropChangedBounds: JSON.stringify(chroma.contentBounds) !== JSON.stringify(crop.contentBounds),
+    quantizeChangedPixels: JSON.stringify(firstPixels) !== JSON.stringify(cropPixels),
   },
   repeat: {
     operations: repeated.operations,
@@ -143,6 +181,9 @@ const evidence = {
     operations: reset.operations,
     expectedOperations: RESET_OPERATIONS,
     dimensions: [reset.surface.width, reset.surface.height],
+    contentBounds: reset.contentBounds,
+    pixels: resetPixels,
+    pixelsIdenticalToCrop: JSON.stringify(resetPixels) === JSON.stringify(cropPixels),
   },
 };
 
@@ -152,9 +193,12 @@ if (
   JSON.stringify(evidence.repeat.operations) !== JSON.stringify(FULL_OPERATIONS) ||
   !evidence.repeat.pixelsIdentical || !evidence.repeat.operationsIdentical ||
   !evidence.full.sourceDetached ||
+  !evidence.stageEffects.chromaChangedPixels ||
+  !evidence.stageEffects.cropChangedBounds ||
+  !evidence.stageEffects.quantizeChangedPixels ||
   JSON.stringify(evidence.reset.operations) !== JSON.stringify(RESET_OPERATIONS) ||
   evidence.reset.enabled || evidence.reset.size !== 16 || evidence.reset.quantize ||
-  evidence.reset.colors !== 16 || evidence.reset.hasPalette
+  evidence.reset.colors !== 16 || evidence.reset.hasPalette || !evidence.reset.pixelsIdenticalToCrop
 ) {
   evidence.status = "fail";
   throw new Error(`Grid pipeline round-trip gate failed: ${JSON.stringify(evidence)}`);

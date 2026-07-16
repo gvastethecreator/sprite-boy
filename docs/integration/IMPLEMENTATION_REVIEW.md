@@ -1803,14 +1803,14 @@ para ejecutar el journey completo con undo/save/export.
   contiene 256 superficies `64x64`, `1,048,576` pixels y conserva el orden de
   operaciones `chroma → crop → resize → quantize`.
 - **Budget observado:** después de un warmup se ejecutaron tres corridas calientes;
-  el p95 fue `6132.67ms` (gate `≤10s`) con muestras `6132.67/5462.22/5073.92ms`.
-  Tres cancelaciones solicitadas en el primer evento `chroma` dieron p95 `3.64ms`
+  el p95 fue `5049.14ms` (gate `≤10s`) con muestras `4913.63/4960.96/5049.14ms`.
+  Tres cancelaciones solicitadas en el primer evento `chroma` dieron p95 `5.37ms`
   (gate `≤200ms`), siempre con error canónico `cancelled`. Cada muestra verificó
-  256 outputs, `1,048,576` pixels, warnings vacíos, progreso completo y la fuente
-  transferida detached.
+  los 256 outputs individualmente (64×64, operación completa, warnings vacíos),
+  `1,048,576` pixels, progreso completo y la fuente transferida detached.
 - **Memoria/cleanup:** se registran RSS, heap JS y ArrayBuffer por muestra. El
-  máximo observado de heap JS fue `288,171` bytes y, tras liberar resultados,
-  `Bun.gc(true)` y un turno de event loop, el máximo quedó en `8,709,911` bytes.
+  máximo observado de heap JS fue `288,995` bytes y, tras liberar resultados,
+  `Bun.gc(true)` y un turno de event loop, el máximo quedó en `8,715,493` bytes.
   El smoke declara explícitamente que el heap nativo interno del Worker no está
   expuesto por Bun; por eso no se presenta RSS como heap JS ni se sobreafirma una
   medición directa del Worker.
@@ -1836,6 +1836,9 @@ para ejecutar el journey completo con undo/save/export.
 - **Evidencia:** `tests/integration/gridProcessingPipelineSmoke.test.ts` y el
   artifact `artifacts/quality/GRID/2026-07-16/g5-05-pipeline-roundtrip.json`.
   El lote enfocado suma `36/36` tests, typecheck, oxlint y diff-check verdes.
+  El browser probe `tests/browser/gridPipelineVisualBrowserRunner.mjs` captura e
+  inspecciona `g5-05-pipeline-visual.png` con cero errores y muestra source,
+  chroma, crop/reset y output final en el mismo orden visual.
 - **Límite honesto:** el smoke cubre la receta/Worker y el reset canónico; la
   presentación de resultados y exportación siguen G6/G7.
 

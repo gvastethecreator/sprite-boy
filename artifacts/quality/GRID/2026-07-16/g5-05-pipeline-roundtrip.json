@@ -1,24 +1,35 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "check": "grid-processing-pipeline-roundtrip",
   "status": "pass",
   "task": "G5-05",
-  "scope": "Canonical recipe persistence, stage ordering, pixel reset and deterministic repeated Worker output.",
+  "scope": "Canonical recipe persistence, stage ordering, reset and deterministic repeated Worker output with effective stage fixtures.",
   "evidence": {
     "recipe": {
       "serializedStable": true,
       "sourceAssetId": "asset-pipeline-smoke",
       "layout": { "mode": "manual", "rows": 1, "cols": 1 },
       "crop": { "threshold": 1, "padding": 0 },
-      "chroma": { "enabled": true, "color": "#00ff00", "tolerance": 0, "smoothness": 0, "spill": 0 },
-      "pixel": { "enabled": true, "size": 2, "quantize": false, "colors": 2, "palette": ["#ff0000", "#000000"] }
+      "chroma": { "enabled": true, "color": "#00ff00", "tolerance": 5, "smoothness": 0, "spill": 0 },
+      "pixel": { "enabled": true, "size": 4, "quantize": false, "colors": 2, "palette": ["#ff0000", "#000000"] }
+    },
+    "stageEffects": {
+      "chromaChangedPixels": true,
+      "cropChangedBounds": true,
+      "quantizeChangedPixels": true
     },
     "full": {
       "outputCount": 1,
-      "dimensions": [2, 2],
+      "dimensions": [4, 4],
+      "contentBounds": { "x": 1, "y": 1, "width": 2, "height": 2 },
       "operations": ["chroma", "crop", "resize", "quantize"],
       "sourceDetached": true,
-      "pixels": [255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255]
+      "pixels": [
+        255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
+        255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
+        255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
+        255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255
+      ]
     },
     "repeat": {
       "operations": ["chroma", "crop", "resize", "quantize"],
@@ -32,15 +43,26 @@
       "colors": 16,
       "hasPalette": false,
       "operations": ["chroma", "crop"],
-      "dimensions": [4, 4]
+      "dimensions": [2, 2],
+      "contentBounds": { "x": 1, "y": 1, "width": 2, "height": 2 },
+      "pixels": [220, 20, 30, 255, 220, 20, 30, 255, 220, 20, 30, 255, 220, 20, 30, 255],
+      "pixelsIdenticalToCrop": true
+    },
+    "visual": {
+      "browserProbe": "pass",
+      "path": "artifacts/quality/GRID/2026-07-16/g5-05-pipeline-visual.png",
+      "bytes": 31063,
+      "sha256": "f15bd15cdeb46fa53322dd499c5b998053ded7d2a3e117317fcce81ad94b8129",
+      "errors": { "console": 0, "exception": 0, "log": 0, "network": 0, "http": 0 }
     }
   },
   "adversarialAutopsy": {
     "rejected": [
       "Recipe drift: JSON serialization followed by fail-closed hydration re-encodes byte-for-byte identically.",
+      "Stage no-op false positive: the green chroma border changes alpha, crop changes bounds to 2x2, and off-palette foreground quantizes to red; every effect is asserted.",
       "Stage reordering: the real Worker reports chroma, crop, resize, quantize in the canonical order.",
       "Nondeterministic repeat: a second real Worker run matches pixels and operation metadata.",
-      "Reset leakage: reset removes the fixed palette and disables resize/quantize while preserving earlier stages.",
+      "Reset leakage: reset removes the fixed palette and disables resize/quantize; reset pixels and bounds match the crop-only result exactly.",
       "Transfer omission: the full request source buffer is detached after Worker transfer."
     ],
     "boundary": "Results state and export packaging remain G6/G7; complete editor rollup remains G8."
@@ -52,6 +74,7 @@
     "typecheck": "pass",
     "lint": "pass",
     "diffCheck": "pass",
-    "independentReview": "pending"
+    "visual": "pass (browser probe inspected)",
+    "independentReview": "repair requested P2; follow-up pending"
   }
 }
