@@ -15,13 +15,13 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G1-02 | E | G1-01 | G2-G5 | Port mecánico de helpers algorítmicos donantes puros | Golden UT + REV | done |
 | G1-03 | J | G1-02 | G2-G5 | Worker real y adapter JobRunner | IT real worker | done |
 | G1-04 | J | G1-03 | G6.1-G6.3 | Concurrent/cancel/crash/timeout/late-response handling | IT hostile matrix | done |
-| G1-05 | J | G1-04 | G2-G5 | Manifest golden y baseline algorítmico congelado | Hash/geometry evidence + REV | active |
+| G1-05 | J | G1-04 | G2-G5 | Manifest golden y baseline algorítmico congelado | Hash/geometry evidence + REV | done |
 
 ## Pipeline Grid
 
 | ID | Tipo | Dep. | Behaviors | Resultado individual | Prueba de cierre | Estado |
 |---|---|---|---|---|---|---|
-| G2-01 | J | G0-05,G1-05 | G2.1-G2.3 | Parámetros auto/manual rows/cols y validation | UT boundary matrix | todo |
+| G2-01 | J | G0-05,G1-05 | G2.1-G2.3 | Parámetros auto/manual rows/cols y validation | UT boundary matrix | active |
 | G2-02 | J | G2-01 | G2.2-G2.5 | Energy profile, segment detection y grid inference | Golden/property UT | todo |
 | G2-03 | E | G2-02,F5-06 | G2.1-G2.5 | Grid controls y detected-feedback UI | BR+A11Y + REV | todo |
 | G2-04 | J | G2-02,F5-06 | G2.6 | Overlay geometry DPR/zoom/resize-safe | VIS + geometry UT | todo |
