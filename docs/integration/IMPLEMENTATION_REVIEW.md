@@ -1329,7 +1329,33 @@ S1-03 puede avanzar en paralelo sobre commands manuales sin tocar este adapter.
   `artifacts/quality/EDITOR/2026-07-16/a1-01-composition-entry.json`.
 
 **Siguiente frontera Editor:** A1-02 Project menu y Compose bootstrap UI está
-activo; A1-03 rename/save/reopen espera su integración.
+activo; A1-03 canvas dimensions/aspect/background espera el kernel
+`composition.update` (la descripción legacy del ledger se reconciliará con A1.4).
+
+### G2-03 — Native Grid controls and detected feedback
+
+- **Owner UI:** un controller feature-local vive una vez en `AppLayout` y se
+  comparte entre sidebar desktop y drawer compacto. Slice oculta el Grid/Sync
+  legacy; no adopta `activeGrid`, `slicerGrid` ni un segundo store.
+- **Draft/a11y:** radiogroup Auto/Manual conserva el último manual; intentos
+  inválidos permanecen visibles sin clamp con `aria-invalid/describedby`.
+  Detected, fallback 1×1 y error tienen feedback inline; Retry conserva foco a
+  través de detecting→detected/fallback.
+- **Off-main real:** main sólo clona un ImageBitmap owner y transfiere el clone,
+  o envía una URL same-origin; Worker posee decode, OffscreenCanvas, RGBA e
+  inferencia. Límites/producto se validan antes de asignar y el owner nunca se
+  transfiere/cierra.
+- **Boundary hostil:** requests/responses exact-own-data, warnings cerrados,
+  bounds/no-overlap/row-major y fallback coherence; el resultado se reconstruye
+  frozen. Cleanup es exhaustivo/no-throw ante abort, reentrancia y late messages.
+- **Evidencia:** 29/29 G2-03 + 54/54 support, lint/build/diff verdes. Chrome
+  productivo prueba Worker módulo real, 4/4 terminados, cancelación, desktop y
+  compact drawer, 2×4, page-fit y cinco contadores de error en cero. Revisión
+  final `ACCEPT`, P0-P3=0. Artifact y screenshot:
+  `artifacts/quality/GRID/2026-07-16/g2-03-grid-controls.{json,png}`.
+
+**Siguiente frontera Grid:** G2-04 overlay geometry está activo; G2-05 espera
+la aceptación conjunta de controls + overlay.
 
 ## Frontiers abiertos
 
