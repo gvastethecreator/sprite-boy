@@ -12,8 +12,8 @@
       "operations": ["resize", "quantize"],
       "warnings": [],
       "pixels": [
-        245, 25, 25, 255, 245, 25, 25, 255,
-        25, 25, 235, 255, 25, 25, 235, 255,
+        245, 25, 25, 255, 245, 25, 25, 128,
+        25, 25, 235, 255, 25, 25, 235, 200,
         10, 200, 10, 127, 9, 9, 9, 0
       ],
       "observedOpaquePalette": ["#f51919", "#1919eb"],
@@ -27,12 +27,19 @@
       "operations": ["resize", "quantize"],
       "warnings": [],
       "pixels": [
-        255, 0, 0, 255, 0, 0, 255, 255,
+        255, 0, 0, 255, 0, 0, 255, 128,
         250, 10, 10, 127, 0, 255, 0, 0
       ],
       "membership": true,
       "repeatPixelsIdentical": true,
       "repeatOperationsIdentical": true
+    },
+    "fewerSourceColors": {
+      "requestedColors": 4,
+      "eligibleColors": 1,
+      "operations": ["resize", "quantize"],
+      "warnings": ["palette-reduced"],
+      "pixels": [64, 128, 192, 255, 64, 128, 192, 128, 7, 8, 9, 127]
     },
     "alphaPolicy": "alpha < 128 is ignored by training/application and every alpha byte plus low-alpha RGB remains unchanged",
     "algorithmLimits": {
@@ -60,6 +67,6 @@
     "typecheck": "pass",
     "lint": "pass",
     "diffCheck": "pass",
-    "independentReview": "pending"
+    "independentReview": "ACCEPT (P0-P2=0)"
   }
 }
