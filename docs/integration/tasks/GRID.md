@@ -33,9 +33,9 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G4-01 | J | G1-05,G3-04 | G4.1-G4.4 | Chroma color/tolerance/smoothness/spill stage | VIS alpha/color goldens | done |
 | G4-02 | J | G4-01,F5-06 | G4.5 | DPR-correct eyedropper sampling | Pixel coordinate UT+BR | done |
 | G4-03 | E | G4-02 | G4.1-G4.6 | Chroma controls, swatch and eyedropper UI | A11Y+BR + REV | done |
-| G4-04 | J | G4-01,G3-04 | G4.7 | Chroma→crop ordering and recipe determinism | RT+VIS | todo |
-| G4-05 | J | G4-03,G4-04 | G4.1-G4.7 | Transparent/no-match/extreme tolerance gate | Hostile VIS+REV | todo |
-| G5-01 | J | G3-04,G4-05 | G5.1-G5.3 | Pixel resize/snapping stage | Pixel/hash UT | todo |
+| G4-04 | J | G4-01,G3-04 | G4.7 | Chroma→crop ordering and recipe determinism | RT+VIS | done |
+| G4-05 | J | G4-03,G4-04 | G4.1-G4.7 | Transparent/no-match/extreme tolerance gate | Hostile VIS+REV | done |
+| G5-01 | J | G3-04,G4-05 | G5.1-G5.3 | Pixel resize/snapping stage | Pixel/hash UT | done |
 | G5-02 | J | G5-01 | G5.4-G5.6 | Palette quantization count + auto/fixed modes | Determinism/membership UT | todo |
 | G5-03 | E | G5-02 | G1.7,G5.7-G5.8 | Palette extraction/presets/control UI | BR+A11Y + REV | todo |
 | G5-04 | J | G5-02 | G5.1-G5.8 | Large-image and palette performance budget | PERF artifact | todo |

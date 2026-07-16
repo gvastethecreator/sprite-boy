@@ -42,6 +42,24 @@ describe("grid processing real Worker integration", () => {
         ],
         [0, 0, 0, 0],
       ],
+      resizeGolden: {
+        enabledDimensions: [4, 4],
+        enabledOperations: ["resize"],
+        enabledPixels: [
+          255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 192, 0, 255, 0, 192,
+          255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 192, 0, 255, 0, 192,
+          0, 0, 255, 64, 0, 0, 255, 64, 255, 255, 0, 0, 255, 255, 0, 0,
+          0, 0, 255, 64, 0, 0, 255, 64, 255, 255, 0, 0, 255, 255, 0, 0,
+        ],
+        disabledDimensions: [2, 2],
+        disabledOperations: [],
+        disabledPixels: [
+          255, 0, 0, 255,
+          0, 255, 0, 192,
+          0, 0, 255, 64,
+          255, 255, 0, 0,
+        ],
+      },
       alphaCrop: {
         contentBounds: { x: 2, y: 0, width: 2, height: 1 },
         dimensions: { width: 2, height: 1 },
@@ -70,6 +88,39 @@ describe("grid processing real Worker integration", () => {
           0, 255, 0, 0,
         ],
         disabledOperations: [],
+      },
+      chromaOrder: {
+        operations: ["chroma", "crop"],
+        contentBounds: { x: 1, y: 0, width: 3, height: 1 },
+        dimensions: [3, 1],
+        pixels: [
+          220, 20, 30, 255,
+          0, 255, 0, 0,
+          30, 80, 220, 255,
+        ],
+        repeatContentBounds: { x: 1, y: 0, width: 3, height: 1 },
+        repeatDimensions: [3, 1],
+        repeatPixels: [
+          220, 20, 30, 255,
+          0, 255, 0, 0,
+          30, 80, 220, 255,
+        ],
+        repeatOperations: ["chroma", "crop"],
+      },
+      chromaHostile: {
+        noMatch: {
+          pixels: [220, 20, 30, 255, 0, 255, 0, 0, 30, 80, 220, 255],
+          contentBounds: { x: 0, y: 0, width: 3, height: 1 },
+          operations: ["chroma", "crop"],
+          warnings: [],
+        },
+        extreme: {
+          pixels: [0, 0, 0, 0],
+          contentBounds: null,
+          dimensions: [1, 1],
+          operations: ["chroma", "crop"],
+          warnings: ["empty-output"],
+        },
       },
       reductionEdge: {
         recipeUnchanged: true,

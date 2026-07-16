@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-chroma-order-and-hostile-worker",
+  "status": "pass",
+  "tasks": ["G4-04", "G4-05"],
+  "command": "bun scripts/grid-processing-worker-smoke.ts",
+  "evidence": {
+    "realWorker": true,
+    "chromaOrder": {
+      "operations": ["chroma", "crop"],
+      "contentBounds": { "x": 1, "y": 0, "width": 3, "height": 1 },
+      "dimensions": [3, 1],
+      "pixels": [220, 20, 30, 255, 0, 255, 0, 0, 30, 80, 220, 255],
+      "repeatContentBounds": { "x": 1, "y": 0, "width": 3, "height": 1 },
+      "repeatDimensions": [3, 1],
+      "repeatPixels": [220, 20, 30, 255, 0, 255, 0, 0, 30, 80, 220, 255],
+      "repeatOperations": ["chroma", "crop"]
+    },
+    "hostile": {
+      "noMatch": {
+        "pixels": [220, 20, 30, 255, 0, 255, 0, 0, 30, 80, 220, 255],
+        "contentBounds": { "x": 0, "y": 0, "width": 3, "height": 1 },
+        "operations": ["chroma", "crop"],
+        "warnings": []
+      },
+      "extremeTolerance": {
+        "pixels": [0, 0, 0, 0],
+        "contentBounds": null,
+        "dimensions": [1, 1],
+        "operations": ["chroma", "crop"],
+        "warnings": ["empty-output"]
+      },
+      "transparentRgb": "fully transparent green RGB remains observable between opaque bounds after chroma and crop"
+    },
+    "existingWorkerMatrix": {
+      "progressStages": ["decode", "detect", "chroma", "chroma", "crop", "crop", "resize", "resize", "quantize", "quantize", "finalize"],
+      "sourceDetached": true,
+      "maxEmptyOutputs": 4096
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Crop-first implementation: the keyed pixels disappear before bounds are measured; operations and x=1 bounds prove chroma precedes crop.",
+      "Non-deterministic repeat: two real Worker runs produce identical pixels and operation order.",
+      "No-match over-removal: tolerance 0 with non-key colors keeps source RGB/alpha and full bounds.",
+      "Extreme tolerance crash/halo: opaque, semitransparent and transparent inputs yield explicit empty-output policy, bounded 1x1 surface and warning.",
+      "Transparent RGB loss: a transparent keyed-green pixel retains its RGB through chroma and is only removed by crop bounds policy."
+    ],
+    "boundary": "The worker gate covers processing order and hostile chroma/crop outputs. UI process/results/export journeys remain G6/G7 work."
+  },
+  "verification": {
+    "focusedWorkerIntegration": "pass (11/11 tests)",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass"
+  }
+}

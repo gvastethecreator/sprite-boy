@@ -1684,6 +1684,67 @@ para ejecutar el journey completo con undo/save/export.
 
 **Siguiente frontera Grid:** G4-04 orden chroma→crop y determinismo de recipe.
 
+### G4-04 — Chroma→crop ordering and recipe determinism
+
+- **Orden congelado:** el Worker ejecuta `decode → detect → chroma → crop →
+  resize → quantize → finalize`. Una fixture 4×1 con key pixels en ambos lados
+  del foreground produce `operations: ["chroma", "crop"]` y bounds `x=1,
+  width=3`; si crop corriera primero el borde izquierdo no desaparecería.
+- **Determinismo:** dos ejecuciones en Workers reales con la misma superficie y
+  recipe producen bytes, bounds, dimensions y operación idénticos. El source y
+  recipe se capturan antes de transferirse; no se muta el input.
+- **Evidencia:** la matriz real conserva 11 etapas de progreso, source detached,
+  y el artifact de orden/hostile incluye el golden RGBA exacto. Suite focal de
+  Worker, typecheck, oxlint, build y diff-check verdes; revisión independiente
+  `ACCEPT`, P0-P2=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g4-04-05-chroma-order-hostile.json`.
+- **Límite honesto:** esta prueba congela el pipeline de procesamiento, no finge
+  que el UI de process/results/export ya exista; esos journeys siguen G6/G7.
+
+**Siguiente frontera Grid:** G4-05 transparent/no-match/extreme tolerance gate.
+
+### G4-05 — Transparent, no-match and extreme-tolerance hostile gate
+
+- **No match:** chroma enabled con tolerance `0`, dos colores no-key opacos y
+  un verde totalmente transparente intermedio conserva exactamente RGB/alpha,
+  bounds completos y no genera warnings.
+- **Extreme:** tolerance/smoothness/spill `100` elimina key opaco y foreground
+  semitransparente sin inventar contenido desde el pixel transparente: output
+  queda `1×1`, `contentBounds:null`, `empty-output` y pixels `[0,0,0,0]` según
+  la política canónica.
+- **Alpha/RGB:** el RGB de un pixel transparente verde permanece observable
+  entre los dos extremos opacos después de chroma→crop; el caso totalmente
+  transparente, en cambio, cae en la política empty. Esto evita confundir
+  checkerboard/pixel RGB con contenido visible.
+- **Evidencia:** Worker real, repeat determinista y matriz de reducción/empty
+  outputs pasan; artifact `g4-04-05-chroma-order-hostile.json`. Las goldens
+  visuales son bytes RGBA y bounds exactos, más fuertes que una captura para este
+  stage puro. Revisión independiente pendiente de este lote; no se marca release.
+- **Límite honesto:** la tolerancia extrema está cerrada en el Worker; el
+  feedback de proceso, results tray y export de outputs quedan G6/G7.
+
+**Siguiente frontera Grid:** G5-01 pixel resize/snapping stage.
+
+### G5-01 — Pixel resize/snapping stage
+
+- **Nearest neighbor:** el Worker conserva el algoritmo de sampling entero del
+  donante. La fixture RGBA 2×2→4×4 produce cuatro bloques 2×2 exactos, sin
+  interpolación, y conserva todos los canales incluido alpha.
+- **Toggle/lossless:** `pixel.enabled=false` devuelve 2×2, bytes idénticos y
+  `operations: []`; enabled publica únicamente `resize` antes de cualquier
+  quantize/palette stage.
+- **Límites:** `getScaledDimensions` exige `maxSide` entero seguro dentro de
+  `maxPixelSize` y verifica `maxResultPixels`; el Worker conserva el límite de
+  salida y la política de empty output.
+- **Evidencia:** Worker smoke e integración real verdes, además de la matriz de
+  geometría existente. El artifact congela RGBA 4×4 y disabled byte-identical;
+  typecheck, oxlint, build y diff-check verdes. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g5-01-pixel-resize.json`.
+- **Límite honesto:** palette/quantization y su UI siguen G5-02/G5-03; process,
+  results y export siguen G6/G7.
+
+**Siguiente frontera Grid:** G5-02 palette quantization determinista.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
