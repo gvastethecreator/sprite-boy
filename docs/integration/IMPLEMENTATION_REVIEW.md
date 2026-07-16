@@ -1837,8 +1837,9 @@ para ejecutar el journey completo con undo/save/export.
   artifact `artifacts/quality/GRID/2026-07-16/g5-05-pipeline-roundtrip.json`.
   El lote enfocado suma `36/36` tests, typecheck, oxlint y diff-check verdes.
   El browser probe `tests/browser/gridPipelineVisualBrowserRunner.mjs` captura e
-  inspecciona `g5-05-pipeline-visual.png` con cero errores y muestra source,
-  chroma, crop/reset y output final en el mismo orden visual.
+  inspecciona `g5-05-pipeline-visual.png` con cero errores como representación
+  estática derivada del golden real; la ejecución Worker real queda probada por
+  el smoke JSON y no se presenta la captura como una segunda ejecución Worker.
 - **Límite honesto:** el smoke cubre la receta/Worker y el reset canónico; la
   presentación de resultados y exportación siguen G6/G7.
 

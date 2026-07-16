@@ -29,7 +29,7 @@
   <body>
     <main aria-labelledby="title">
       <h1 id="title">Canonical Grid pipeline</h1>
-      <p>Visual probe from the same recipe used by the real Worker round-trip gate.</p>
+      <p>Static representation derived from the real Worker golden; Worker execution is covered by the JSON smoke.</p>
       <section class="canvases" aria-label="Pipeline stages">
         <figure><figcaption>Source<span>4×4 · off-palette center</span></figcaption><canvas id="source" width="4" height="4"></canvas></figure>
         <figure><figcaption>Chroma<span>chroma · alpha border removed</span></figcaption><canvas id="chroma" width="4" height="4"></canvas></figure>
@@ -41,7 +41,7 @@
       </div>
       <dl>
         <div><dt>Recipe</dt><dd id="recipe">stable</dd></div><div><dt>Repeat</dt><dd id="repeat">identical</dd></div>
-        <div><dt>Reset</dt><dd id="reset">16px / auto</dd></div><div><dt>Runtime</dt><dd id="runtime">Worker</dd></div>
+        <div><dt>Reset</dt><dd id="reset">16px / auto</dd></div><div><dt>Runtime</dt><dd id="runtime">Golden-derived</dd></div>
       </dl>
     </main>
     <script type="module" src="./gridPipelineVisualJourney.ts"></script>

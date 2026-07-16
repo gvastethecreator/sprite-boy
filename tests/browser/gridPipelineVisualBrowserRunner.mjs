@@ -80,7 +80,13 @@ export async function runGridPipelineVisualBrowserGate(options = {}) {
     writeFileSync(visualPath, screenshot);
     const errors = { console: client.consoleErrorCount, exception: client.exceptionCount, log: client.logErrorCount, network: client.networkFailureCount, http: client.httpErrorCount };
     if (Object.values(errors).some((count) => count !== 0)) throw new Error("G5-05 visual browser errors: " + JSON.stringify({ errors, logKinds: client.logErrorKinds, httpKinds: client.httpErrorKinds }));
-    return { status: "pass", journey: value, errors, visual: { path: VISUAL_PATH, bytes: screenshot.byteLength, sha256: createHash("sha256").update(screenshot).digest("hex") } };
+    return {
+      status: "pass",
+      journey: value,
+      probeType: "static-golden",
+      errors,
+      visual: { path: VISUAL_PATH, bytes: screenshot.byteLength, sha256: createHash("sha256").update(screenshot).digest("hex") },
+    };
   } finally {
     await cleanupBrowserRuntime(client, chrome, null, profile, "G5-05 browser cleanup failed.");
   }
