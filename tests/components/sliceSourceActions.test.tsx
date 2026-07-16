@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SliceSourceActions } from "../../features/slice/source/SliceSourceActions";
@@ -53,6 +53,7 @@ describe("Slice source replace/reset controls (G0-04)", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(/current source was kept/i);
+    expect(screen.getByRole("button", { name: "Retry" })).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(onRetry).toHaveBeenCalledOnce();
 
@@ -65,6 +66,103 @@ describe("Slice source replace/reset controls (G0-04)", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace source" })).toHaveFocus();
+  });
+
+  it("contains rejected async retry callbacks and restores retry focus without rendering the rejection", async () => {
+    render(
+      <SliceSourceActions
+        error={{ code: "decode", message: "Replacement decode failed.", retryable: true }}
+        onReplace={vi.fn()}
+        onRequestReset={vi.fn()}
+        onRetry={() => Promise.reject(new Error("private adapter error"))}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/Retry could not start/i);
+    expect(screen.queryByText("private adapter error")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toHaveFocus();
+  });
+
+  it("contains async Replace rejection, keeps the source boundary intact and restores Replace focus", async () => {
+    const onRequestReset = vi.fn();
+    render(
+      <SliceSourceActions
+        onReplace={() => Promise.reject(new Error("private picker adapter error"))}
+        onRequestReset={onRequestReset}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Replace source" }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/source picker could not open/i);
+    expect(screen.queryByText("private picker adapter error")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace source" })).toHaveFocus();
+    expect(onRequestReset).not.toHaveBeenCalled();
+  });
+
+  it("keeps async boundary feedback armed after the StrictMode effect replay", async () => {
+    render(
+      <StrictMode>
+        <SliceSourceActions
+          onReplace={() => Promise.reject(new Error("private strict-mode rejection"))}
+          onRequestReset={vi.fn()}
+        />
+      </StrictMode>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Replace source" }));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/source picker could not open/i);
+    expect(screen.queryByText("private strict-mode rejection")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Replace source" })).toHaveFocus();
+  });
+
+  it("contains sync and async Reset rejection while leaving Reset usable during busy work", async () => {
+    const syncFailure = vi.fn(() => {
+      throw new Error("private reset failure");
+    });
+    const view = render(
+      <SliceSourceActions
+        busy
+        onReplace={vi.fn()}
+        onRequestReset={syncFailure}
+      />,
+    );
+
+    const reset = screen.getByRole("button", { name: "Reset source" });
+    expect(reset).toBeEnabled();
+    await act(async () => {
+      fireEvent.click(reset);
+      await Promise.resolve();
+    });
+    expect(syncFailure).toHaveBeenCalledOnce();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Reset could not start/i);
+    expect(screen.queryByText("private reset failure")).not.toBeInTheDocument();
+    expect(reset).toHaveFocus();
+
+    view.rerender(
+      <SliceSourceActions
+        onReplace={vi.fn()}
+        onRequestReset={() => Promise.reject({ private: "adapter reset rejection" })}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Reset source" }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/Reset could not start/i);
+    expect(screen.queryByText("adapter reset rejection")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset source" })).toHaveFocus();
   });
 
   it("requires an accessible confirmation and cancel restores the trigger", () => {

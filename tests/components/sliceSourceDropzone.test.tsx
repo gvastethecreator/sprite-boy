@@ -115,8 +115,28 @@ describe("SliceSourceDropzone", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent("Image source bytes could not be read.");
+    expect(screen.getByRole("button", { name: "Try again" })).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("returns focus to Browse for a non-retryable source error", () => {
+    const failed: SourceSessionSnapshot = Object.freeze({
+      status: "error",
+      generation: 3,
+      disposed: false,
+      metadata: null,
+      source: null,
+      error: Object.freeze({
+        code: "magic-mismatch",
+        message: "Image source bytes do not match its MIME type.",
+        retryable: false,
+      }),
+    });
+    render(<SliceSourceDropzone snapshot={failed} onBrowse={vi.fn()} onSelect={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Choose source image" })).toHaveFocus();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Choose another image to continue/i);
   });
 
   it("contains hostile drop boundaries and reports a recoverable selection error", () => {
@@ -151,5 +171,51 @@ describe("SliceSourceDropzone", () => {
       await Promise.resolve();
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/Choose the file again/i);
+    expect(screen.getByRole("button", { name: "Choose source image" })).toHaveFocus();
+  });
+
+  it("contains async browse and retry rejections without rendering hostile rejection values", async () => {
+    const retryable: SourceSessionSnapshot = Object.freeze({
+      status: "error",
+      generation: 4,
+      disposed: false,
+      metadata: null,
+      source: null,
+      error: Object.freeze({
+        code: "decode",
+        message: "Image source could not be decoded.",
+        retryable: true,
+      }),
+    });
+    const { rerender } = render(
+      <SliceSourceDropzone
+        snapshot={idle}
+        onBrowse={() => Promise.reject(new Error("private browse failure"))}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Choose source image" }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not be read/i);
+    expect(screen.queryByText("private browse failure")).not.toBeInTheDocument();
+
+    rerender(
+      <SliceSourceDropzone
+        snapshot={retryable}
+        onBrowse={vi.fn()}
+        onSelect={vi.fn()}
+        onRetry={() => Promise.reject({ private: "hostile retry failure" })}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not be read/i);
+    expect(screen.queryByText("hostile retry failure")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose source image" })).toHaveFocus();
   });
 });

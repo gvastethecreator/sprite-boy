@@ -433,4 +433,85 @@ describe("Slice source session (G0-01)", () => {
     }).decode(new Blob([PNG]))).rejects.toMatchObject({ code: "decode" });
     expect(getterCalls).toBe(0);
   });
+
+  it("contains hostile AbortSignal hosts and closes a bitmap that arrives after listener setup fails", async () => {
+    const pending = deferred<ImageBitmap>();
+    const lateClose = vi.fn();
+    let accessorCalls = 0;
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    const hostileListenerSignal = {
+      get aborted() {
+        accessorCalls += 1;
+        throw new Error("revoked aborted accessor");
+      },
+      addEventListener,
+      removeEventListener,
+    } as unknown as AbortSignal;
+    const decoder = createBrowserSourceDecoder({
+      createImageBitmap: vi.fn(() => pending.promise),
+    });
+
+    const run = decoder.decode(new Blob([PNG]), { signal: hostileListenerSignal });
+    await expect(run).rejects.toMatchObject({ code: "cancelled", retryable: true });
+    expect(accessorCalls).toBe(0);
+    expect(addEventListener).not.toHaveBeenCalled();
+    expect(removeEventListener).not.toHaveBeenCalled();
+    expect(decoder).toBeDefined();
+
+    const controller = new AbortController();
+    const nativeAdd = AbortSignal.prototype.addEventListener;
+    const addSpy = vi.spyOn(AbortSignal.prototype, "addEventListener").mockImplementation(function (
+      this: AbortSignal,
+      ...args: Parameters<AbortSignal["addEventListener"]>
+    ): void {
+      if (this === controller.signal && args[0] === "abort") {
+        throw new Error("native listener setup failed");
+      }
+      Reflect.apply(nativeAdd, this, args);
+    });
+    const nativeDecoder = createBrowserSourceDecoder({
+      createImageBitmap: vi.fn(() => pending.promise),
+    });
+    const nativeRun = nativeDecoder.decode(new Blob([PNG]), { signal: controller.signal });
+    await expect(nativeRun).rejects.toMatchObject({ code: "cancelled", retryable: true });
+    addSpy.mockRestore();
+    pending.resolve({ width: 4, height: 4, close: lateClose } as unknown as ImageBitmap);
+    await vi.waitFor(() => expect(lateClose).toHaveBeenCalledTimes(1));
+
+    const createImageBitmap = vi.fn(async () => (
+      { width: 2, height: 2, close: vi.fn() } as unknown as ImageBitmap
+    ));
+    const hostileAccessorSignal = Object.defineProperties({}, {
+      aborted: { get() { throw new Error("revoked aborted accessor"); } },
+      addEventListener: { value: vi.fn() },
+      removeEventListener: { value: vi.fn() },
+    }) as AbortSignal;
+    await expect(createBrowserSourceDecoder({ createImageBitmap }).decode(
+      new Blob([PNG]),
+      { signal: hostileAccessorSignal },
+    )).rejects.toMatchObject({ code: "cancelled" });
+    expect(createImageBitmap).not.toHaveBeenCalled();
+
+    const cleanupController = new AbortController();
+    const nativeRemove = AbortSignal.prototype.removeEventListener;
+    const removeSpy = vi.spyOn(AbortSignal.prototype, "removeEventListener").mockImplementation(function (
+      this: AbortSignal,
+      ...args: Parameters<AbortSignal["removeEventListener"]>
+    ): void {
+      if (this === cleanupController.signal && args[0] === "abort") {
+        throw new Error("listener cleanup failed");
+      }
+      Reflect.apply(nativeRemove, this, args);
+    });
+    await expect(createBrowserSourceDecoder({
+      createImageBitmap: vi.fn(async () => (
+        { width: 3, height: 2, close: vi.fn() } as unknown as ImageBitmap
+      )),
+    }).decode(new Blob([PNG]), { signal: cleanupController.signal })).resolves.toMatchObject({
+      width: 3,
+      height: 2,
+    });
+    removeSpy.mockRestore();
+  });
 });

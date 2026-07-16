@@ -8,7 +8,7 @@ export interface SliceSourceDropzoneProps {
   readonly disabled?: boolean;
   readonly committing?: boolean;
   readonly browseButtonRef?: RefObject<HTMLButtonElement | null>;
-  readonly onBrowse: () => void;
+  readonly onBrowse: () => void | Promise<void>;
   readonly onSelect: (input: SourceSelectionInput) => void | Promise<void>;
   readonly onRetry?: () => void | Promise<void>;
 }
@@ -23,7 +23,9 @@ function statusCopy(snapshot: SourceSessionSnapshot, committing: boolean): strin
     case "validating": return "Checking file type, signature and size…";
     case "decoding": return "Decoding source pixels safely…";
     case "ready": return "Source validated. Preparing the Slice workspace…";
-    case "error": return snapshot.error.message;
+    case "error": return `${snapshot.error.message} ${snapshot.error.retryable
+      ? "Try the same validated file again, or choose another image."
+      : "Choose another image to continue."}`;
     case "idle": return "PNG, JPEG or WebP · maximum 10 MiB";
   }
 }
@@ -40,6 +42,8 @@ export function SliceSourceDropzone({
   const [dragDepth, setDragDepth] = useState(0);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  const localBrowseButtonRef = useRef<HTMLButtonElement>(null);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
   const busy = isBusy(snapshot) || committing;
   const inactive = disabled || busy;
   const dragActive = dragDepth > 0 && !inactive;
@@ -53,6 +57,22 @@ export function SliceSourceDropzone({
     };
   }, []);
 
+  useEffect(() => {
+    if (inactive) setDragDepth(0);
+  }, [inactive]);
+
+  useEffect(() => {
+    if (boundaryError) {
+      localBrowseButtonRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    if (snapshot.status !== "error") return;
+    const target = snapshot.error.retryable && onRetry
+      ? retryButtonRef.current
+      : localBrowseButtonRef.current;
+    target?.focus({ preventScroll: true });
+  }, [boundaryError, onRetry, snapshot.generation, snapshot.status]);
+
   const containBoundaryFailure = (): void => {
     if (mountedRef.current) {
       setBoundaryError("The source selection could not be read. Choose the file again.");
@@ -61,7 +81,26 @@ export function SliceSourceDropzone({
   const invokeSelection = (input: SourceSelectionInput): void => {
     setBoundaryError(null);
     try {
-      Promise.resolve(onSelect(input)).catch(containBoundaryFailure);
+      // Never pass an arbitrary rejection value into state.  Browser adapters
+      // are allowed to reject with host objects (or Error instances), neither
+      // of which is a safe React child.
+      Promise.resolve(onSelect(input)).catch(() => containBoundaryFailure());
+    } catch {
+      containBoundaryFailure();
+    }
+  };
+  const invokeBrowse = (): void => {
+    setBoundaryError(null);
+    try {
+      Promise.resolve(onBrowse()).catch(() => containBoundaryFailure());
+    } catch {
+      containBoundaryFailure();
+    }
+  };
+  const invokeRetry = (): void => {
+    setBoundaryError(null);
+    try {
+      Promise.resolve(onRetry?.()).catch(() => containBoundaryFailure());
     } catch {
       containBoundaryFailure();
     }
@@ -136,17 +175,13 @@ export function SliceSourceDropzone({
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <button
-            ref={browseButtonRef}
+            ref={(node) => {
+              localBrowseButtonRef.current = node;
+              if (browseButtonRef) browseButtonRef.current = node;
+            }}
             type="button"
             disabled={inactive}
-            onClick={() => {
-              setBoundaryError(null);
-              try {
-                onBrowse();
-              } catch {
-                containBoundaryFailure();
-              }
-            }}
+            onClick={invokeBrowse}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-xs font-bold text-white shadow-glow hover:bg-accentHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
             <FileImage size={15} aria-hidden="true" />
@@ -154,16 +189,10 @@ export function SliceSourceDropzone({
           </button>
           {snapshot.status === "error" && snapshot.error.retryable && onRetry ? (
             <button
+              ref={retryButtonRef}
               type="button"
-              disabled={disabled}
-              onClick={() => {
-                setBoundaryError(null);
-                try {
-                  Promise.resolve(onRetry()).catch(containBoundaryFailure);
-                } catch {
-                  containBoundaryFailure();
-                }
-              }}
+              disabled={inactive}
+              onClick={invokeRetry}
               className="min-h-11 rounded-lg border border-white/10 bg-surface px-5 py-2.5 text-xs font-bold text-textMain hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-45"
             >
               Try again

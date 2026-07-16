@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "task": "G0-05",
+  "date": "2026-07-16",
+  "status": "pass",
+  "scope": "Slice source error, focus and retry hostile gate",
+  "commands": {
+    "focal": "bun x vitest run tests/components/sliceSourceDropzone.test.tsx tests/components/sliceSourceActions.test.tsx tests/contract/sliceSourceSession.test.ts tests/contract/studioSliceSourceBrowser.test.ts",
+    "typecheck": "bun x tsc --noEmit",
+    "lint": "bun x oxlint components/layout/AppLayout.tsx features/slice/source/SliceSourceActions.tsx features/slice/source/SliceSourceDropzone.tsx features/slice/source/browserSourceDecoder.ts tests/components/sliceSourceDropzone.test.tsx tests/components/sliceSourceActions.test.tsx tests/contract/sliceSourceSession.test.ts tests/contract/studioSliceSourceBrowser.test.ts scripts/studio-slice-source-browser.mjs",
+    "build": "bun run build",
+    "browser": "node scripts/studio-slice-source-browser.mjs"
+  },
+  "results": {
+    "focalTests": "54 passed",
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "browser": {
+      "status": "pass",
+      "pickerCancelFocusRestored": true,
+      "retryableErrorFocused": true,
+      "retryFailureFocusRestored": true,
+      "retryBusyBlocksDuplicateActions": true,
+      "retrySucceeded": true,
+      "retrySuccessFocusRestored": true,
+      "currentSourcePreserved": true,
+      "errors": {
+        "console": 0,
+        "exception": 0,
+        "log": 0,
+        "network": 0,
+        "http": 0
+      }
+    }
+  },
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "notes": "Async Replace/Reset/Retry containment and React StrictMode effect replay were independently rechecked after repair."
+  },
+  "screenshot": "g0-05-source-recovery.png",
+  "adversarialCoverage": [
+    "async browse/select/retry rejection containment",
+    "hostile AbortSignal accessor and listener containment",
+    "late ImageBitmap cleanup after listener registration failure",
+    "picker cancellation focus restoration",
+    "React StrictMode effect replay keeps async boundary feedback armed",
+    "retry failure and recovery focus paths"
+  ]
+}

@@ -1249,8 +1249,22 @@ verdes y review final `ACCEPT`. Ver el [artifact final](../../artifacts/quality/
   módulo y journey source con cinco contadores de error en cero. Commits de
   cierre: `178761e`, `17fdefe`, `321537a`, `922cf0c`.
 
-**Siguiente frontera:** G0-05 error/focus/retry y G2-01 layout draft están
-activos; ningún task posterior se considera cerrado por este checkpoint.
+### G0-05 — Error, focus and retry hostile gate
+
+- **Boundary:** picker, Replace, Reset y Retry contienen throws y rechazos
+  asíncronos sin renderizar payloads privados. La fuente vigente permanece
+  autoritativa y Reset sigue disponible para abortar trabajo busy.
+- **Focus/a11y:** cancelación, error retryable, fallo de retry, recuperación y
+  reset restauran foco al trigger alcanzable. El boundary se rearma durante el
+  replay de efectos de React StrictMode y tiene regresión dedicada.
+- **Browser:** Chrome productivo valida 23 métricas del journey completo, route
+  Slice y page-fit; console, exception, log, network y HTTP terminan en cero.
+- **Evidencia:** 54/54 focales, typecheck y lint scoped verdes. Revisión
+  independiente final `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g0-05-source-recovery.json`.
+
+**Siguiente frontera:** G2-02 energy/segments/inference está activo; G2-03 y
+G2-04 permanecen cerrados hasta su aceptación.
 
 ## Frontiers abiertos
 

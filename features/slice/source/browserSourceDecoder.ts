@@ -190,19 +190,93 @@ function getGlobalCreateImageBitmap(): BrowserSourceDecoderOptions["createImageB
   }
 }
 
+function nativeAbortSignalPrototype(): object | null {
+  try {
+    const candidate = globalThis.AbortSignal;
+    return typeof candidate === "function" && candidate.prototype
+      ? candidate.prototype
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The decoder accepts a native signal lease only.  Do not read properties or
+ * call methods from a caller-provided signal: a proxy/getter can throw, leak
+ * data or mutate state while a decode is in flight.  An untrusted signal is
+ * conservatively treated as already cancelled.
+ */
+function isTrustedNativeAbortSignal(signal: AbortSignal | undefined): signal is AbortSignal {
+  if (!signal) return false;
+  const prototype = nativeAbortSignalPrototype();
+  if (!prototype) return false;
+  try {
+    return Object.getPrototypeOf(signal) === prototype;
+  } catch {
+    return false;
+  }
+}
+
+function sourceSignalIsAborted(signal: AbortSignal | undefined): boolean {
+  if (!signal) return false;
+  if (!isTrustedNativeAbortSignal(signal)) return true;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(nativeAbortSignalPrototype()!, "aborted");
+    if (typeof descriptor?.get !== "function") return true;
+    return Reflect.apply(descriptor.get, signal, []) === true;
+  } catch {
+    return true;
+  }
+}
+
+function nativeAbortSignalMethod(name: "addEventListener" | "removeEventListener"): Function | null {
+  let prototype = nativeAbortSignalPrototype();
+  try {
+    while (prototype && prototype !== Object.prototype) {
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+      if (typeof descriptor?.value === "function") return descriptor.value;
+      prototype = Object.getPrototypeOf(prototype);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function addNativeAbortListener(signal: AbortSignal, listener: () => void): boolean {
+  try {
+    const add = nativeAbortSignalMethod("addEventListener");
+    if (!add) return false;
+    Reflect.apply(add, signal, ["abort", listener, { once: true }]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeNativeAbortListener(signal: AbortSignal, listener: () => void): void {
+  try {
+    const remove = nativeAbortSignalMethod("removeEventListener");
+    if (remove) Reflect.apply(remove, signal, ["abort", listener]);
+  } catch {
+    // Listener cleanup is terminal even if the host object was revoked.
+  }
+}
+
 async function awaitAbortableDecode<T>(
   work: PromiseLike<T>,
   signal: AbortSignal | undefined,
   onLateValue: (value: T) => void,
 ): Promise<T> {
   if (!signal) return Promise.resolve(work);
-  if (signal.aborted) {
+  if (sourceSignalIsAborted(signal)) {
     Promise.resolve(work).then(onLateValue, () => undefined);
     throw cancelledError();
   }
   return new Promise<T>((resolve, reject) => {
     let settled = false;
-    const cleanup = (): void => signal.removeEventListener("abort", onAbort);
+    const cleanup = (): void => removeNativeAbortListener(signal, onAbort);
     const finish = (callback: () => void): void => {
       if (settled) return;
       settled = true;
@@ -214,7 +288,12 @@ async function awaitAbortableDecode<T>(
       // then close a late ImageBitmap when its promise resolves.
       finish(() => reject(cancelledError()));
     };
-    signal.addEventListener("abort", onAbort, { once: true });
+    if (!addNativeAbortListener(signal, onAbort)) {
+      settled = true;
+      Promise.resolve(work).then(onLateValue, () => undefined);
+      reject(cancelledError());
+      return;
+    }
     Promise.resolve(work).then(
       (value) => {
         if (settled) {
@@ -225,7 +304,7 @@ async function awaitAbortableDecode<T>(
       },
       (error: unknown) => finish(() => reject(error)),
     );
-    if (signal.aborted) onAbort();
+    if (sourceSignalIsAborted(signal)) onAbort();
   });
 }
 
@@ -290,7 +369,7 @@ export class BrowserSourceDecoder implements SourceDecoder {
     if (!(blob instanceof Blob)) {
       throw makeError("invalid-input");
     }
-    if (options.signal?.aborted) throw cancelledError();
+    if (sourceSignalIsAborted(options.signal)) throw cancelledError();
     let rawDecoded: unknown;
     try {
       rawDecoded = await awaitAbortableDecode(
@@ -301,10 +380,10 @@ export class BrowserSourceDecoder implements SourceDecoder {
     } catch (error) {
       const captured = captureDecodeError(error);
       if (captured) throw captured;
-      if (options.signal?.aborted) throw cancelledError();
+      if (sourceSignalIsAborted(options.signal)) throw cancelledError();
       throw makeError("decode");
     }
-    if (options.signal?.aborted) {
+    if (sourceSignalIsAborted(options.signal)) {
       closeDecodedSourceImage(rawDecoded);
       throw cancelledError();
     }

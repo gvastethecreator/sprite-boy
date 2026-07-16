@@ -143,8 +143,11 @@ const AppLayout: React.FC = () => {
   const workspaceContentRef = useRef<HTMLDivElement>(null);
   const assetInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
+  const replaceSourceTriggerRef = useRef<HTMLButtonElement>(null);
+  const retrySourceTriggerRef = useRef<HTMLButtonElement>(null);
   const resetSourceTriggerRef = useRef<HTMLButtonElement>(null);
   const dropzoneBrowseButtonRef = useRef<HTMLButtonElement>(null);
+  const sourcePickerReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const focusDropzoneAfterResetRef = useRef(false);
   const { activeWorkspace, navigate } = useStudioNavigation();
   const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
@@ -191,6 +194,17 @@ const AppLayout: React.FC = () => {
     sourceCommitControllerRef.current?.abort();
     sourceCommitControllerRef.current = null;
     setSourceCommitting(false);
+  }, []);
+
+  const restoreSourcePickerFocus = useCallback((): void => {
+    const target = sourcePickerReturnFocusRef.current;
+    sourcePickerReturnFocusRef.current = null;
+    queueMicrotask(() => target?.focus({ preventScroll: true }));
+  }, []);
+
+  const openSourcePicker = useCallback((trigger: HTMLButtonElement | null): void => {
+    sourcePickerReturnFocusRef.current = trigger;
+    assetInputRef.current?.click();
   }, []);
 
   const clearSourceWorkflow = useCallback((): void => {
@@ -281,6 +295,15 @@ const AppLayout: React.FC = () => {
     sourceCommitControllerRef.current = null;
   }, []);
 
+  useEffect(() => {
+    const input = assetInputRef.current;
+    if (!input) return;
+    // React does not expose the native file-input `cancel` event.  Keep the
+    // keyboard return path explicit for every OS picker cancellation route.
+    input.addEventListener("cancel", restoreSourcePickerFocus);
+    return () => input.removeEventListener("cancel", restoreSourcePickerFocus);
+  }, [restoreSourcePickerFocus]);
+
   const executeCommand = useCallback((commandId: StudioCommandId) => {
     void commandRegistry.execute(commandId, commandContext)
       .then((result) => {
@@ -299,10 +322,10 @@ const AppLayout: React.FC = () => {
     snapshot: SourceSessionSnapshot,
     generation: number,
     replacing: boolean,
-  ): Promise<void> => {
-    if (snapshot.status !== "ready" || sourceImportGenerationRef.current !== generation) return;
+  ): Promise<boolean> => {
+    if (snapshot.status !== "ready" || sourceImportGenerationRef.current !== generation) return false;
     const blob = getSourceBlob();
-    if (!blob) return;
+    if (!blob) return false;
     cancelSourceCommit();
     const controller = new AbortController();
     sourceCommitControllerRef.current = controller;
@@ -313,11 +336,12 @@ const AppLayout: React.FC = () => {
         lastModified: snapshot.metadata.lastModified ?? 0,
       });
       await handleUpload(file, { signal: controller.signal });
-      if (sourceImportGenerationRef.current !== generation) return;
+      if (sourceImportGenerationRef.current !== generation) return false;
       setCommittedSourceMetadata(snapshot.metadata);
       setSourceActionError(null);
       setStudioError(null);
       navigate("slice");
+      return true;
     } catch {
       if (!isSliceSourceSignalAborted(controller.signal) &&
         sourceImportGenerationRef.current === generation) {
@@ -338,6 +362,7 @@ const AppLayout: React.FC = () => {
           });
         }
       }
+      return false;
     } finally {
       if (sourceCommitControllerRef.current === controller) {
         sourceCommitControllerRef.current = null;
@@ -355,7 +380,10 @@ const AppLayout: React.FC = () => {
     setStudioError(null);
     setSourceActionError(null);
     const snapshot = await selectSourceSession(input);
-    await commitReadySource(snapshot, generation, replacing);
+    const committed = await commitReadySource(snapshot, generation, replacing);
+    if (committed && sourceImportGenerationRef.current === generation) {
+      workspaceContentRef.current?.focus({ preventScroll: true });
+    }
   }, [cancelSourceCommit, commitReadySource, selectSourceSession, slicerImage]);
 
   const retrySliceSource = useCallback(async (): Promise<void> => {
@@ -365,7 +393,10 @@ const AppLayout: React.FC = () => {
     setStudioError(null);
     workspaceContentRef.current?.focus({ preventScroll: true });
     const snapshot = await retrySourceSession();
-    await commitReadySource(snapshot, generation, replacing);
+    const committed = await commitReadySource(snapshot, generation, replacing);
+    if (committed && sourceImportGenerationRef.current === generation) {
+      workspaceContentRef.current?.focus({ preventScroll: true });
+    }
   }, [cancelSourceCommit, commitReadySource, retrySourceSession, slicerImage]);
 
   const loadProjectFile = useCallback(async (file: File): Promise<void> => {
@@ -448,7 +479,11 @@ const AppLayout: React.FC = () => {
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           event.currentTarget.value = "";
-          if (!file) return;
+          if (!file) {
+            restoreSourcePickerFocus();
+            return;
+          }
+          sourcePickerReturnFocusRef.current = null;
           void selectSliceSource(file);
         }}
       />
@@ -539,7 +574,7 @@ const AppLayout: React.FC = () => {
                 disabled={isSourceCommitting}
                 committing={isSourceCommitting}
                 browseButtonRef={dropzoneBrowseButtonRef}
-                onBrowse={() => assetInputRef.current?.click()}
+                onBrowse={() => openSourcePicker(dropzoneBrowseButtonRef.current)}
                 onSelect={(input) => selectSliceSource(input as File | FileList)}
                 onRetry={retrySliceSource}
               />
@@ -553,10 +588,12 @@ const AppLayout: React.FC = () => {
                     <SliceSourceActions
                       busy={sourceSessionBusy}
                       error={visibleSourceError}
+                      replaceButtonRef={replaceSourceTriggerRef}
+                      retryButtonRef={retrySourceTriggerRef}
                       resetButtonRef={resetSourceTriggerRef}
                       onReplace={() => {
                         setSourceActionError(null);
-                        assetInputRef.current?.click();
+                        openSourcePicker(replaceSourceTriggerRef.current);
                       }}
                       onRequestReset={() => setResetSourceDialogOpen(true)}
                       onRetry={retrySliceSource}
