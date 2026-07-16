@@ -1471,6 +1471,29 @@ avanzar sobre Region-to-Asset y preservación de margins/gaps.
 
 **Siguiente frontera Grid:** G3-01 threshold/padding trim está activo.
 
+### S1-05 — Canonical Region-to-Asset
+
+- **Pixels/identity:** lee el source Blob canónico sin reimport, verifica
+  blobKey/hash/bytes/MIME, recorta PNG alpha exacto y genera ID Region+SHA.
+  Provenance v2 conserva sourceContentHash, bounds, margins y gaps.
+- **Transacción:** graph `asset.import` es autoritativo; throw-after-commit se
+  reconcilia contra snapshot descriptor-safe. Convert nunca elimina storage;
+  convert/retry serializan por assetId y sólo conditional cleanup puede borrar
+  tras fingerprint+Blob+graph rechecks.
+- **Carreras:** storage preexistente nunca se compensa. Metadata inaccesible,
+  cambiada u ownership adquirido preservan. Si el graph adquiere durante remove,
+  el exact record+Blob se restaura antes de retornar/deuda.
+- **Evidencia:** 18/18, typecheck/lint/build/diff. Chrome 4×3 conserva alpha 0
+  y 128, golden/hash reproducibles, visual inspeccionada y cinco errores en cero;
+  failure diagnostics son acotados/redactados. Revisión `ACCEPT`, P0-P3=0.
+  Artifact: `artifacts/quality/GRID/2026-07-16/s1-05-region-to-asset.json`.
+- **Límite honesto:** no existe transacción compartida Repository+ProjectStore;
+  el adapter ofrece graph atomicity + compensación serializada/deuda, sin claim
+  de cold-run (el harness usa prewarm explícito).
+
+**Siguiente frontera irregular:** S1-04 UI sigue activo; S1-06 espera su cierre
+para ejecutar el journey completo con undo/save/export.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
