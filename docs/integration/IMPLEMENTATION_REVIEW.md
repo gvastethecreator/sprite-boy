@@ -1586,6 +1586,27 @@ para ejecutar el journey completo con undo/save/export.
 
 **Siguiente frontera Grid:** G3-04 OOB/zero-size/huge-padding hostile gate.
 
+### G3-04 — OOB, zero-size and huge-padding hostile gate
+
+- **Paridad de fronteras:** el documento persistido, protocolo V1 y crop stage
+  aceptan exactamente threshold finito `0..100` y padding entero canónico
+  `0..16384`. Un proyecto ya no puede guardar un recipe que el Worker rechace.
+- **Geometría hostil:** zero-size, coordenadas negativas/fraccionarias, origins
+  fuera de source, right/bottom overflow y source dimensions fuera de budget se
+  rechazan antes de invocar cancelación o escanear pixels.
+- **Property gate:** 200 celdas deterministas seeded con contenido en posiciones
+  variables y padding máximo expanden exactamente a la celda, nunca al source
+  vecino, y siempre producen bounds positivos e in-bounds.
+- **Evidencia:** 44/44 en seis archivos de contrato, Worker real 1/1 con padding
+  `16384`, empty outputs, 4096 resultados y buffers transferidos; typecheck,
+  oxlint, build y diff-check verdes. Revisión independiente `ACCEPT`, P0-P2=0.
+  Artifact:
+  `artifacts/quality/GRID/2026-07-16/g3-04-hostile-crop-gate.json`.
+- **Límite honesto:** este gate cierra G3 y no implementa chroma. G4-01 conserva
+  ownership del stage color/tolerance/smoothness/spill y sus visual goldens.
+
+**Siguiente frontera Grid:** G4-01 chroma color/tolerance/smoothness/spill stage.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

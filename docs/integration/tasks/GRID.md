@@ -29,7 +29,7 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G3-01 | J | G2-05 | G3.1-G3.2 | Threshold/padding trim stage | Pixel golden UT | done |
 | G3-02 | J | G3-01 | G3.3-G3.4 | Reduction and empty/transparent cell policy | Edge fixture UT | done |
 | G3-03 | E | G3-02 | G3.1-G3.4 | Crop controls, preview summary y reset | BR+A11Y + REV | done |
-| G3-04 | J | G3-03 | G3.1-G3.4 | OOB/zero-size/huge-padding hostile gate | Property UT + REV | todo |
+| G3-04 | J | G3-03 | G3.1-G3.4 | OOB/zero-size/huge-padding hostile gate | Property UT + REV | done |
 | G4-01 | J | G1-05,G3-04 | G4.1-G4.4 | Chroma color/tolerance/smoothness/spill stage | VIS alpha/color goldens | todo |
 | G4-02 | J | G4-01,F5-06 | G4.5 | DPR-correct eyedropper sampling | Pixel coordinate UT+BR | todo |
 | G4-03 | E | G4-02 | G4.1-G4.6 | Chroma controls, swatch and eyedropper UI | A11Y+BR + REV | todo |

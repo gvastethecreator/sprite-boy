@@ -840,8 +840,34 @@ function validateRecipe(
     push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "crop"), "Recipe crop settings are required.", id);
   } else {
     validateAllowedKeys(crop, ["threshold", "padding"], pathFor(path, "crop"), diagnostics, id);
-    validateFiniteNumber(crop.threshold, `${path}.crop.threshold`, diagnostics);
-    validateFiniteNumber(crop.padding, `${path}.crop.padding`, diagnostics);
+    if (
+      typeof crop.threshold !== "number" ||
+      !Number.isFinite(crop.threshold) ||
+      crop.threshold < 0 ||
+      crop.threshold > 100
+    ) {
+      push(
+        diagnostics,
+        "INVALID_NUMBER",
+        `${path}.crop.threshold`,
+        "Crop threshold must be a finite number from 0 to 100.",
+        id,
+      );
+    }
+    if (
+      typeof crop.padding !== "number" ||
+      !Number.isSafeInteger(crop.padding) ||
+      crop.padding < 0 ||
+      crop.padding > GRID_PROCESSING_LIMITS.maxDimension
+    ) {
+      push(
+        diagnostics,
+        "INVALID_NUMBER",
+        `${path}.crop.padding`,
+        `Crop padding must be an integer from 0 to ${GRID_PROCESSING_LIMITS.maxDimension}.`,
+        id,
+      );
+    }
   }
   const chroma = item.chroma;
   if (!isRecord(chroma)) {

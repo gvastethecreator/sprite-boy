@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { GRID_PROCESSING_LIMITS } from "../../core/processing/gridProcessingLimits";
 import { validateStudioProject } from "../../core/project";
 import type { StudioProjectV1 } from "../../core/project/schema";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
@@ -307,6 +308,21 @@ describe("StudioProjectV1 hostile validation matrix", () => {
       "INVALID_NUMBER",
       "$.processingRecipes.recipe-grid.layout.rows",
     ]]);
+
+    for (const [key, value] of [
+      ["threshold", -1],
+      ["threshold", 100.01],
+      ["padding", -1],
+      ["padding", 1.5],
+      ["padding", GRID_PROCESSING_LIMITS.maxDimension + 1],
+    ] as const) {
+      const hostileCrop = cloneFixture();
+      record(record(hostileCrop.processingRecipes["recipe-grid"]).crop)[key] = value;
+      expectDiagnostics(hostileCrop, [[
+        "INVALID_NUMBER",
+        `$.processingRecipes.recipe-grid.crop.${key}`,
+      ]]);
+    }
   });
 
   it("validates artifact economics, references and provenance consistency", () => {
