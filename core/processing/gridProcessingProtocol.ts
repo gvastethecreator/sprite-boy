@@ -1,4 +1,8 @@
 import { isEntityId, type EntityId, type GridSplitRecipeV1 } from "../project";
+import { assertGridRecipeLayout } from "./gridLayoutValidation";
+import { GRID_PROCESSING_LIMITS } from "./gridProcessingLimits";
+
+export { GRID_PROCESSING_LIMITS } from "./gridProcessingLimits";
 
 export const GRID_PROCESSING_PROTOCOL_VERSION = 1 as const;
 
@@ -43,18 +47,6 @@ export const GRID_PROCESSING_ERROR_CODES = Object.freeze([
 ] as const);
 
 export type GridProcessingErrorCode = (typeof GRID_PROCESSING_ERROR_CODES)[number];
-
-export const GRID_PROCESSING_LIMITS = Object.freeze({
-  maxIdentifierLength: 256,
-  maxDimension: 16_384,
-  maxSourcePixels: 67_108_864,
-  maxResultCount: 4_096,
-  maxResultPixels: 67_108_864,
-  maxProgressTotal: 67_108_864,
-  maxPixelSize: 4_096,
-  maxPaletteColors: 256,
-  maxWarnings: 16,
-} as const);
 
 export interface GridProcessingSurfaceV1 {
   readonly width: number;
@@ -345,21 +337,9 @@ function assertRecipe(
   if (recipe.kind !== "grid-split" || recipe.version !== 1) throw protocolTypeError("request.recipe");
   requireIdentifier(recipe.sourceAssetId, "request.recipe.sourceAssetId");
 
-  const layout = readDataRecord(recipe.layout, "request.recipe.layout");
-  if (layout.mode === "auto") {
-    requireExactKeys(layout, ["mode"], [], "request.recipe.layout");
-  } else if (layout.mode === "manual") {
-    requireExactKeys(layout, ["mode", "rows", "cols"], [], "request.recipe.layout");
-    const rows = requireInteger(layout.rows, 1, GRID_PROCESSING_LIMITS.maxResultCount, "request.recipe.layout.rows");
-    const cols = requireInteger(layout.cols, 1, GRID_PROCESSING_LIMITS.maxResultCount, "request.recipe.layout.cols");
-    if (
-      rows * cols > GRID_PROCESSING_LIMITS.maxResultCount ||
-      rows > source.height ||
-      cols > source.width
-    ) {
-      throw protocolTypeError("request.recipe.layout");
-    }
-  } else {
+  try {
+    assertGridRecipeLayout(recipe.layout, { width: source.width, height: source.height });
+  } catch {
     throw protocolTypeError("request.recipe.layout");
   }
 

@@ -1,4 +1,5 @@
 import { WORKSPACE_IDS } from "./schema";
+import { GRID_PROCESSING_LIMITS } from "../processing/gridProcessingLimits";
 import type {
   Cel,
   CollisionSet,
@@ -802,11 +803,32 @@ function validateRecipe(
     push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "layout"), "Recipe layout is required.", id);
   } else if (item.layout.mode === "manual") {
     validateAllowedKeys(item.layout, ["mode", "rows", "cols"], pathFor(path, "layout"), diagnostics, id);
+    const counts: number[] = [];
     for (const key of ["rows", "cols"] as const) {
       const value = item.layout[key];
-      if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-        push(diagnostics, "INVALID_NUMBER", pathFor(pathFor(path, "layout"), key), "Grid counts must be positive integers.", id);
+      if (
+        typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0 ||
+        value > GRID_PROCESSING_LIMITS.maxResultCount
+      ) {
+        push(
+          diagnostics,
+          "INVALID_NUMBER",
+          pathFor(pathFor(path, "layout"), key),
+          `Grid counts must be positive integers up to ${GRID_PROCESSING_LIMITS.maxResultCount}.`,
+          id,
+        );
+      } else {
+        counts.push(value);
       }
+    }
+    if (counts.length === 2 && counts[0]! * counts[1]! > GRID_PROCESSING_LIMITS.maxResultCount) {
+      push(
+        diagnostics,
+        "INVALID_NUMBER",
+        pathFor(path, "layout"),
+        `Grid cells must not exceed ${GRID_PROCESSING_LIMITS.maxResultCount}.`,
+        id,
+      );
     }
   } else if (item.layout.mode !== "auto") {
     push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "layout"), "Recipe layout mode is unsupported.", id);

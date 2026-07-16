@@ -21,8 +21,8 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 
 | ID | Tipo | Dep. | Behaviors | Resultado individual | Prueba de cierre | Estado |
 |---|---|---|---|---|---|---|
-| G2-01 | J | G0-05,G1-05 | G2.1-G2.3 | Parámetros auto/manual rows/cols y validation | UT boundary matrix | active |
-| G2-02 | J | G2-01 | G2.2-G2.5 | Energy profile, segment detection y grid inference | Golden/property UT | todo |
+| G2-01 | J | G0-05,G1-05 | G2.1-G2.3 | Parámetros auto/manual rows/cols y validation | UT boundary matrix | done |
+| G2-02 | J | G2-01 | G2.2-G2.5 | Energy profile, segment detection y grid inference | Golden/property UT | active |
 | G2-03 | E | G2-02,F5-06 | G2.1-G2.5 | Grid controls y detected-feedback UI | BR+A11Y + REV | todo |
 | G2-04 | J | G2-02,F5-06 | G2.6 | Overlay geometry DPR/zoom/resize-safe | VIS + geometry UT | todo |
 | G2-05 | J | G2-03,G2-04 | G2.1-G2.6 | Manual/auto switching and deterministic recipe state | BR+RT | todo |
