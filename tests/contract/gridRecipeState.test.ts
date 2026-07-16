@@ -6,6 +6,7 @@ import {
   recipeStateToDraft,
   serializeSliceGridRecipeState,
   updateSliceGridRecipeLayout,
+  updateSliceGridRecipeCrop,
 } from "../../features/slice/grid/gridRecipeState";
 
 const SOURCE = Object.freeze({ width: 12, height: 8 });
@@ -81,5 +82,23 @@ describe("Slice grid recipe state (G2-05)", () => {
       ...state,
       recipe: { ...state.recipe, pixel: { ...state.recipe.pixel, palette: ["#bad"] } },
     }, SOURCE)).toBeNull();
+  });
+
+  it("updates only canonical crop settings and keeps the recipe round-trippable", () => {
+    const initial = createDefaultSliceGridRecipeState("asset-sheet", SOURCE);
+    const cropped = updateSliceGridRecipeCrop(initial, { threshold: 37, padding: 9 });
+
+    expect(cropped.recipe.crop).toEqual({ threshold: 37, padding: 9 });
+    expect(cropped.recipe.layout).toBe(initial.recipe.layout);
+    expect(cropped.recipe.chroma).toBe(initial.recipe.chroma);
+    expect(cropped.recipe.pixel).toBe(initial.recipe.pixel);
+    expect(cropped.manual).toBe(initial.manual);
+    expect(Object.isFrozen(cropped.recipe.crop)).toBe(true);
+    expect(hydrateSliceGridRecipeState(JSON.parse(serializeSliceGridRecipeState(cropped)), SOURCE))
+      .toEqual(cropped);
+    expect(() => updateSliceGridRecipeCrop(initial, { threshold: Number.NaN, padding: 0 }))
+      .toThrow(TypeError);
+    expect(() => updateSliceGridRecipeCrop(initial, { threshold: 1, padding: 1.5 }))
+      .toThrow(TypeError);
   });
 });

@@ -74,6 +74,7 @@ const BgRemovalTool: React.FC<BgRemovalToolProps> = (props) => {
           >
             <input
               type="color"
+              aria-label="Background removal target color"
               value={targetColor}
               onChange={(e) => setTargetColor(e.target.value)}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"

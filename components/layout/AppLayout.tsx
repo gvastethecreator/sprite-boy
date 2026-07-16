@@ -72,6 +72,28 @@ interface StudioShellError {
   readonly message: string;
 }
 
+function sliceSourceAssetIdentity(source: {
+  readonly src: string;
+  readonly width: number;
+  readonly height: number;
+  readonly fileSize: number;
+  readonly name: string;
+} | null): string | null {
+  if (!source) return null;
+  const seed = `${source.width}x${source.height}|${source.fileSize}|${source.name}|${source.src}`;
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < seed.length; index += 1) {
+    const code = seed.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  }
+  const fingerprint = `${(first >>> 0).toString(16).padStart(8, "0")}${
+    (second >>> 0).toString(16).padStart(8, "0")
+  }`;
+  return `slice-source:${fingerprint}`;
+}
+
 function useCompactStudioLayout(): boolean {
   const readMatch = () =>
     typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -186,12 +208,17 @@ const AppLayout: React.FC = () => {
     reset: resetSourceSession,
     getBlob: getSourceBlob,
   } = useSliceSourceSession();
+  const sliceGridSourceAssetId = useMemo(
+    () => sliceSourceAssetIdentity(slicerImage),
+    [slicerImage?.fileSize, slicerImage?.height, slicerImage?.name, slicerImage?.src, slicerImage?.width],
+  );
   const sliceGridController = useSliceGridController({
     generation: sliceGridSourceGeneration,
     committedMetadata: committedSourceMetadata,
     sessionSnapshot: sourceSessionSnapshot,
     legacyImage: slicerImage,
     persistedState: sliceGridState,
+    sourceAssetId: sliceGridSourceAssetId,
     onInitializeState: initializeSliceGridState,
     onCommitState: commitSliceGridState,
   });

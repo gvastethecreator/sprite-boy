@@ -31,6 +31,7 @@ import {
   hydrateSliceGridRecipeState,
   recipeStateToDraft,
   updateSliceGridRecipeLayout,
+  updateSliceGridRecipeCrop,
   type SliceGridRecipeStateV1,
 } from "./gridRecipeState";
 
@@ -74,9 +75,18 @@ export interface SliceGridController {
   readonly recipeState: SliceGridRecipeStateV1;
   readonly recipe: GridSplitRecipeV1;
   readonly errorMessage: string | null;
+  readonly cropPreview: Readonly<{
+    enabled: boolean;
+    threshold: number;
+    padding: number;
+    cellCount: number;
+  }>;
   readonly setMode: (mode: GridLayoutMode) => void;
   readonly setManualRowsInput: (value: string) => void;
   readonly setManualColsInput: (value: string) => void;
+  readonly setCropThreshold: (value: number) => boolean;
+  readonly setCropPadding: (value: number) => boolean;
+  readonly resetCrop: () => boolean;
   readonly retry: () => void;
 }
 
@@ -157,12 +167,27 @@ function migrationSourceAssetId(
   return `slice-source:${source.generation}:${source.dimensions.width}x${source.dimensions.height}`;
 }
 
+function compatiblePersistedState(
+  value: unknown,
+  source: ResolvedGridSource,
+  requestedSourceAssetId: string | null | undefined,
+): SliceGridRecipeStateV1 | null {
+  const hydrated = hydrateSliceGridRecipeState(value, source.dimensions);
+  if (!hydrated) return null;
+  if (typeof requestedSourceAssetId !== "string" || requestedSourceAssetId.trim().length === 0 ||
+    requestedSourceAssetId.length > 256) return hydrated;
+  return hydrated.recipe.sourceAssetId === requestedSourceAssetId ? hydrated : null;
+}
+
 function initialRecipeState(
   source: ResolvedGridSource | null,
   options: Pick<UseSliceGridControllerOptions, "persistedState" | "sourceAssetId">,
 ): SliceGridRecipeStateV1 {
   const dimensions = source?.dimensions ?? { width: 1, height: 1 };
-  return hydrateSliceGridRecipeState(options.persistedState, dimensions) ??
+  const hydrated = source
+    ? compatiblePersistedState(options.persistedState, source, options.sourceAssetId)
+    : hydrateSliceGridRecipeState(options.persistedState, dimensions);
+  return hydrated ??
     createDefaultSliceGridRecipeState(
       migrationSourceAssetId(source, options.sourceAssetId),
       dimensions,
@@ -213,7 +238,11 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     }
 
     if (draftSourceGenerationRef.current !== current.generation) {
-      const hydrated = hydrateSliceGridRecipeState(options.persistedState, current.dimensions);
+      const hydrated = compatiblePersistedState(
+        options.persistedState,
+        current,
+        options.sourceAssetId,
+      );
       const nextRecipeState = hydrated ?? createDefaultSliceGridRecipeState(
         migrationSourceAssetId(current, options.sourceAssetId),
         current.dimensions,
@@ -262,12 +291,16 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     });
 
     return () => controller.abort();
-  }, [retryGeneration, sourceKey]);
+  }, [options.sourceAssetId, retryGeneration, sourceKey]);
 
   useEffect(() => {
     const current = sourceRef.current;
     if (!current) return;
-    const hydrated = hydrateSliceGridRecipeState(options.persistedState, current.dimensions);
+    const hydrated = compatiblePersistedState(
+      options.persistedState,
+      current,
+      options.sourceAssetId,
+    );
     if (!hydrated || hydrated === recipeStateRef.current) return;
     const currentSerialized = JSON.stringify(recipeStateRef.current);
     const nextSerialized = JSON.stringify(hydrated);
@@ -282,7 +315,7 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     setRowsInput(String(nextDraft.manual.rows));
     setColsInput(String(nextDraft.manual.cols));
     setValidationIssues([]);
-  }, [options.persistedState, sourceKey]);
+  }, [options.persistedState, options.sourceAssetId, sourceKey]);
 
   useEffect(() => () => {
     operationRef.current += 1;
@@ -305,6 +338,26 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     draftRef.current = nextDraft;
     setRecipeState(nextState);
     setDraft(nextDraft);
+    return true;
+  }, [options.onCommitState]);
+
+  const commitCrop = useCallback((threshold: number, padding: number): boolean => {
+    if (!sourceRef.current) return false;
+    const currentCrop = recipeStateRef.current.recipe.crop;
+    if (currentCrop.threshold === threshold && currentCrop.padding === padding) return true;
+    let nextState: SliceGridRecipeStateV1;
+    try {
+      nextState = updateSliceGridRecipeCrop(recipeStateRef.current, { threshold, padding });
+    } catch {
+      return false;
+    }
+    try {
+      options.onCommitState?.(nextState);
+    } catch {
+      return false;
+    }
+    recipeStateRef.current = nextState;
+    setRecipeState(nextState);
     return true;
   }, [options.onCommitState]);
 
@@ -359,6 +412,21 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
   }, [detectedLayout, draft, source]);
 
   const retry = useCallback(() => setRetryGeneration((value) => value + 1), []);
+  const setCropThreshold = useCallback((value: number): boolean => {
+    return commitCrop(value, recipeStateRef.current.recipe.crop.padding);
+  }, [commitCrop]);
+  const setCropPadding = useCallback((value: number): boolean => {
+    return commitCrop(recipeStateRef.current.recipe.crop.threshold, value);
+  }, [commitCrop]);
+  const resetCrop = useCallback((): boolean => {
+    return commitCrop(0, 0);
+  }, [commitCrop]);
+  const cropPreview = useMemo(() => Object.freeze({
+    enabled: recipeState.recipe.crop.threshold > 0,
+    threshold: recipeState.recipe.crop.threshold,
+    padding: recipeState.recipe.crop.padding,
+    cellCount: effectiveLayout?.cells.length ?? 0,
+  }), [effectiveLayout?.cells.length, recipeState.recipe.crop]);
 
   return useMemo(() => ({
     sourceDimensions: source?.dimensions ?? null,
@@ -372,21 +440,29 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     recipeState,
     recipe: recipeState.recipe,
     errorMessage,
+    cropPreview,
     setMode,
     setManualRowsInput: updateRows,
     setManualColsInput: updateCols,
+    setCropThreshold,
+    setCropPadding,
+    resetCrop,
     retry,
   }), [
+    cropPreview,
     detectedLayout,
     draft,
     effectiveLayout,
     errorMessage,
     manualColsInput,
     manualRowsInput,
+    resetCrop,
     retry,
     recipeState,
     source?.dimensions,
     status,
+    setCropPadding,
+    setCropThreshold,
     updateCols,
     updateRows,
     validationIssues,

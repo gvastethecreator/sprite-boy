@@ -1,10 +1,12 @@
-import React, { useId, useLayoutEffect, useRef } from "react";
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   Grid3X3,
   LoaderCircle,
   RefreshCw,
+  RotateCcw,
+  Scissors,
 } from "lucide-react";
 
 import type { GridLayoutValidationIssue } from "./gridLayoutDraft";
@@ -28,6 +30,17 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
   const retryRef = useRef<HTMLButtonElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const restoreRetryFocusRef = useRef(false);
+  const [cropDraft, setCropDraft] = useState(() => ({
+    threshold: controller.cropPreview.threshold,
+    padding: controller.cropPreview.padding,
+  }));
+
+  useEffect(() => {
+    setCropDraft({
+      threshold: controller.cropPreview.threshold,
+      padding: controller.cropPreview.padding,
+    });
+  }, [controller.cropPreview.padding, controller.cropPreview.threshold]);
 
   useLayoutEffect(() => {
     if (controller.status === "error") {
@@ -43,6 +56,24 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
 
   const detected = controller.detectedLayout;
   const cells = detected ? detected.rows * detected.cols : 0;
+  const cropDisabled = controller.sourceDimensions === null;
+  const cropCanReset = cropDraft.threshold !== 0 || cropDraft.padding !== 0;
+  const commitCropThreshold = (value: number): void => {
+    setCropDraft(controller.setCropThreshold(value)
+      ? (current) => ({ ...current, threshold: value })
+      : {
+          threshold: controller.cropPreview.threshold,
+          padding: controller.cropPreview.padding,
+        });
+  };
+  const commitCropPadding = (value: number): void => {
+    setCropDraft(controller.setCropPadding(value)
+      ? (current) => ({ ...current, padding: value })
+      : {
+          threshold: controller.cropPreview.threshold,
+          padding: controller.cropPreview.padding,
+        });
+  };
 
   return (
     <aside
@@ -55,6 +86,9 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
       data-grid-recipe-layout={controller.recipe.layout.mode === "manual"
         ? `${controller.recipe.layout.rows}x${controller.recipe.layout.cols}`
         : "auto"}
+      data-grid-crop-threshold={cropDraft.threshold}
+      data-grid-crop-padding={cropDraft.padding}
+      data-grid-crop-enabled={cropDraft.threshold > 0 ? "true" : "false"}
     >
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-white/5 bg-white/5 px-4">
         <Grid3X3 size={17} className="text-accent" aria-hidden="true" />
@@ -159,9 +193,114 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
           </p>
         </div>
 
+        <fieldset className="space-y-4 border-t border-white/5 pt-4" disabled={cropDisabled}>
+          <legend className="sr-only">Crop</legend>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <Scissors size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+              <div>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-textMuted">
+                  Crop
+                </h3>
+                <p className="mt-1 text-[9px] leading-relaxed text-textMuted/70">
+                  Trim transparent borders inside each cell.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={cropDisabled || !cropCanReset}
+              onClick={() => {
+                setCropDraft(controller.resetCrop()
+                  ? { threshold: 0, padding: 0 }
+                  : {
+                      threshold: controller.cropPreview.threshold,
+                      padding: controller.cropPreview.padding,
+                    });
+              }}
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-[9px] font-bold text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <RotateCcw size={11} aria-hidden="true" /> Reset
+            </button>
+          </div>
+
+          <label className="block space-y-2 text-[10px] font-bold text-textMuted" htmlFor={`${id}-crop-threshold`}>
+            <span className="flex items-center justify-between gap-3">
+              <span>Alpha threshold</span>
+              <span className="font-mono text-textMain" aria-hidden="true">
+                {cropDraft.threshold === 0 ? "Off" : `${cropDraft.threshold}%`}
+              </span>
+            </span>
+            <input
+              id={`${id}-crop-threshold`}
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={cropDraft.threshold}
+              aria-valuetext={cropDraft.threshold === 0
+                ? "Off"
+                : `${cropDraft.threshold}%`}
+              aria-describedby={`${id}-crop-summary`}
+              onChange={(event) => {
+                const threshold = event.currentTarget.valueAsNumber;
+                setCropDraft((current) => ({ ...current, threshold }));
+              }}
+              onPointerUp={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
+              onPointerCancel={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
+              onKeyUp={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
+              onBlur={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
+              className="w-full accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+            />
+          </label>
+
+          <label className="block space-y-2 text-[10px] font-bold text-textMuted" htmlFor={`${id}-crop-padding`}>
+            <span className="flex items-center justify-between gap-3">
+              <span>Padding</span>
+              <span className="font-mono text-textMain" aria-hidden="true">
+                {cropDraft.padding}px
+              </span>
+            </span>
+            <input
+              id={`${id}-crop-padding`}
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={cropDraft.padding}
+              aria-valuetext={`${cropDraft.padding}px`}
+              aria-describedby={`${id}-crop-summary`}
+              onChange={(event) => {
+                const padding = event.currentTarget.valueAsNumber;
+                setCropDraft((current) => ({ ...current, padding }));
+              }}
+              onPointerUp={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
+              onPointerCancel={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
+              onKeyUp={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
+              onBlur={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
+              className="w-full accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+            />
+          </label>
+
+          <div
+            id={`${id}-crop-summary`}
+            aria-label="Crop preview summary"
+            aria-live="polite"
+            aria-atomic="true"
+            className="rounded-xl border border-white/5 bg-black/20 p-3 text-[10px] leading-relaxed text-textMuted"
+          >
+            {controller.cropPreview.cellCount === 0
+              ? "Crop preview is available when the source grid is ready."
+              : cropDraft.threshold > 0
+                ? `Preview: ${controller.cropPreview.cellCount} ${controller.cropPreview.cellCount === 1 ? "cell" : "cells"} use ${cropDraft.threshold}% alpha threshold and ${cropDraft.padding}px padding. Reduction is measured after processing.`
+                : `Auto crop is off. ${controller.cropPreview.cellCount} ${controller.cropPreview.cellCount === 1 ? "cell keeps" : "cells keep"} the original bounds.`}
+          </div>
+        </fieldset>
+
         <div
           ref={statusRef}
           role={controller.status === "error" ? "alert" : "status"}
+          aria-label={controller.status === "error" ? "Grid detection error" : "Grid detection status"}
           tabIndex={-1}
           aria-live={controller.status === "error" ? "assertive" : "polite"}
           aria-atomic="true"
