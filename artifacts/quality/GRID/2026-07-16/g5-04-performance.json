@@ -1,11 +1,11 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "check": "grid-processing-large-image-performance",
   "status": "pass",
   "task": "G5-04",
   "scope": "Real Worker performance, cancellation and cleanup evidence for the documented 4096x4096 grid budget.",
   "evidence": {
-    "runtime": { "platform": "win32", "runtime": "Bun", "releaseBuild": "local" },
+    "runtime": { "platform": "win32", "runtime": "Bun", "releaseBuild": "local source Worker smoke" },
     "fixture": {
       "source": "4096x4096 rgba8",
       "layout": "16x16",
@@ -14,31 +14,75 @@
       "targetSize": 64,
       "quantizeColors": 8
     },
+    "warmup": { "completed": true, "measuredSamples": 3, "p95Definition": "ceil(n*0.95) over sorted samples" },
     "full": {
-      "elapsedMs": 6020.95,
-      "outputCount": 256,
-      "outputPixelCount": 1048576,
-      "firstDimensions": [64, 64],
-      "firstOperations": ["chroma", "crop", "resize", "quantize"],
-      "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
-      "progressEventCount": 1027,
-      "warnings": [],
-      "sourceDetached": true
+      "p95Ms": 6132.67,
+      "elapsedMs": [6132.67, 5462.22, 5073.92],
+      "allSamplesValid": true,
+      "sampleChecks": {
+        "outputCount": 256,
+        "outputPixelCount": 1048576,
+        "firstDimensions": [64, 64],
+        "firstOperations": ["chroma", "crop", "resize", "quantize"],
+        "warnings": [],
+        "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
+        "progressEventCount": 1027,
+        "sourceDetached": true
+      },
+      "samples": [
+        {
+          "elapsedMs": 6132.67,
+          "outputCount": 256,
+          "outputPixelCount": 1048576,
+          "firstDimensions": [64, 64],
+          "firstOperations": ["chroma", "crop", "resize", "quantize"],
+          "warnings": [],
+          "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
+          "progressEventCount": 1027,
+          "sourceDetached": true,
+          "memory": { "rssDeltaBytes": 192872448, "heapUsedDeltaBytes": 288171, "arrayBufferDeltaBytes": -62886176, "cleanupRssDeltaBytes": 191332352, "cleanupHeapUsedDeltaBytes": 8709911, "cleanupArrayBufferDeltaBytes": -62886176 }
+        },
+        {
+          "elapsedMs": 5462.22,
+          "outputCount": 256,
+          "outputPixelCount": 1048576,
+          "firstDimensions": [64, 64],
+          "firstOperations": ["chroma", "crop", "resize", "quantize"],
+          "warnings": [],
+          "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
+          "progressEventCount": 1027,
+          "sourceDetached": true,
+          "memory": { "rssDeltaBytes": 29057024, "heapUsedDeltaBytes": -8401174, "arrayBufferDeltaBytes": -67108976, "cleanupRssDeltaBytes": 27824128, "cleanupHeapUsedDeltaBytes": 42998, "cleanupArrayBufferDeltaBytes": -67108976 }
+        },
+        {
+          "elapsedMs": 5073.92,
+          "outputCount": 256,
+          "outputPixelCount": 1048576,
+          "firstDimensions": [64, 64],
+          "firstOperations": ["chroma", "crop", "resize", "quantize"],
+          "warnings": [],
+          "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
+          "progressEventCount": 1027,
+          "sourceDetached": true,
+          "memory": { "rssDeltaBytes": 34611200, "heapUsedDeltaBytes": -8425644, "arrayBufferDeltaBytes": -67108976, "cleanupRssDeltaBytes": 33849344, "cleanupHeapUsedDeltaBytes": -90626, "cleanupArrayBufferDeltaBytes": -67108976 }
+        }
+      ]
     },
     "cancellation": {
-      "stage": "chroma",
-      "elapsedMs": 1.29,
-      "processSetupMs": 173.17,
-      "code": "cancelled",
-      "rejectedAsCancelled": true
+      "p95Ms": 3.64,
+      "allSamplesValid": true,
+      "samples": [
+        { "stage": "chroma", "elapsedMs": 1.16, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 173.98 },
+        { "stage": "chroma", "elapsedMs": 3.64, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 133.76 },
+        { "stage": "chroma", "elapsedMs": 0.18, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 134.56 }
+      ]
     },
     "memory": {
-      "rssDeltaBytes": 198881280,
-      "heapUsedDeltaBytes": 746467,
-      "arrayBufferDeltaBytes": -62885888,
-      "cleanupRssDeltaBytes": 198221824,
-      "cleanupHeapUsedDeltaBytes": 9273993,
-      "cleanupArrayBufferDeltaBytes": -62885888,
+      "observedRuntime": "Bun main process around real Worker client; Worker-native heap is not directly exposed by this runtime",
+      "maxRssDeltaBytes": 192872448,
+      "maxCleanupRssDeltaBytes": 191332352,
+      "maxHeapUsedDeltaBytes": 288171,
+      "maxCleanupHeapUsedDeltaBytes": 8709911,
       "cleanupMethod": "release result reference, Bun.gc(true), one event-loop turn"
     },
     "budgets": {
@@ -52,20 +96,21 @@
   },
   "adversarialAutopsy": {
     "rejected": [
-      "Wrong worker path: the smoke uses the default real Worker client and verifies every output operation order.",
-      "Silent cancellation: aborting on the first chroma progress event rejects with the canonical cancelled error in under the feedback budget.",
-      "Transfer regression: the 4096x4096 request source buffer is detached after transfer.",
-      "Unbounded memory: heap delta and post-result cleanup delta remain well below the documented 512 MB gate; cleanup is measured explicitly.",
-      "Partial result drift: all 256 cells are returned as 64x64 outputs with no warnings."
+      "Cold-start optimism: one warmup plus three measured real Worker runs are reported and p95, not a single sample, closes the 10s gate.",
+      "Wrong worker path: the smoke uses the default real Worker client and every sample verifies all output counts, warnings, progress stages and operation order.",
+      "Silent cancellation: every sample aborts on the first chroma progress event and rejects with the canonical cancelled error under the feedback budget.",
+      "Transfer regression: every 4096x4096 request source buffer is detached after transfer.",
+      "Cleanup overclaim: RSS and heap are reported separately; this Bun smoke only asserts observed main-runtime cleanup heap and explicitly does not claim direct Worker-native heap telemetry.",
+      "Partial result drift: all samples return 256 cells, 64x64 surfaces and 1,048,576 output pixels without warnings."
     ],
-    "boundary": "Pipeline round-trip/reset remains G5-05; staged results and export journeys remain G6/G7."
+    "boundary": "This is the release-source real-Worker smoke; Chrome p95 interaction telemetry and result/export journeys remain G6/G7."
   },
   "verification": {
-    "performanceSmoke": "pass",
+    "performanceSmoke": "pass (warmup + 3 samples, p95)",
     "realWorker": "pass",
     "typecheck": "pass",
     "lint": "pass",
     "diffCheck": "pass",
-    "independentReview": "pending"
+    "independentReview": "repair requested P2; follow-up pending"
   }
 }
