@@ -5,6 +5,7 @@ import type { SourceSessionSnapshot } from "../../features/slice/source/sourceSe
 import {
   createDefaultSliceGridRecipeState,
   updateSliceGridRecipeLayout,
+  updateSliceGridRecipePixel,
   type SliceGridRecipeStateV1,
 } from "../../features/slice/grid/gridRecipeState";
 import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
@@ -94,6 +95,13 @@ describe("useSliceGridController integration (G2-05)", () => {
       mode: "auto",
       manual: { rows: 3, cols: 4 },
     }, SOURCE);
+    const fixedPixel = updateSliceGridRecipePixel(automatic, {
+      enabled: true,
+      size: 64,
+      quantize: false,
+      colors: 8,
+      palette: ["#000000", "#ffffff"],
+    });
     const { result, rerender } = renderHook(
       ({ persistedState }) => useSliceGridController(options({ persistedState })),
       { initialProps: { persistedState: manual } },
@@ -109,6 +117,19 @@ describe("useSliceGridController integration (G2-05)", () => {
     expect(result.current.recipeState).toEqual(manual);
     expect(result.current.manualRowsInput).toBe("3");
     expect(result.current.manualColsInput).toBe("4");
+
+    rerender({ persistedState: fixedPixel });
+    expect(result.current.pixel).toEqual({
+      enabled: true,
+      size: 64,
+      quantize: false,
+      colors: 8,
+      palette: ["#000000", "#ffffff"],
+    });
+    rerender({ persistedState: automatic });
+    expect(result.current.pixel).toEqual({ enabled: false, size: 16, quantize: false, colors: 16 });
+    rerender({ persistedState: fixedPixel });
+    expect(result.current.pixel.palette).toEqual(["#000000", "#ffffff"]);
   });
 
   it("commits crop controls into the same recipe state and resets without a no-op history entry", async () => {

@@ -177,7 +177,23 @@ describe("useSliceGridController (G2-03)", () => {
       expect(result.current.resetPixel()).toBe(true);
     });
     expect(result.current.pixel).toEqual({ enabled: false, size: 16, quantize: false, colors: 16 });
+
+    const rejected = renderHook(() => useSliceGridController({
+      generation: 2,
+      committedMetadata: null,
+      sessionSnapshot: IDLE_SESSION,
+      legacyImage: legacy(),
+      inferPreview: vi.fn().mockResolvedValue(inference(1, 1)),
+      onCommitState: () => { throw new Error("host rejected pixel"); },
+    }));
+    await act(async () => Promise.resolve());
+    act(() => {
+      expect(rejected.result.current.setPixelEnabled(true)).toBe(false);
+      expect(rejected.result.current.setPixelFixedPalette(["#ff0000", "#0000ff"])).toBe(false);
+    });
+    expect(rejected.result.current.pixel).toEqual({ enabled: false, size: 16, quantize: false, colors: 16 });
     unmount();
+    rejected.unmount();
   });
 
   it("cancels StrictMode replay and source-generation races without late writes", async () => {

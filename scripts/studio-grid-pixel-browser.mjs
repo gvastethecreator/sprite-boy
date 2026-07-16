@@ -172,6 +172,10 @@ export async function runGridPixelBrowserGate(options = {}) {
     })()`);
     await client.evaluate(`document.querySelector("[data-slice-pixel-controls]")?.scrollIntoView({ block: "center", inline: "nearest" })`);
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 150));
+    await client.evaluate(`(() => {
+      window.scrollTo(0, 0);
+      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    })()`);
     const screenshot = await capture(client, screenshotPath);
 
     stage = "reset";
@@ -191,6 +195,7 @@ export async function runGridPixelBrowserGate(options = {}) {
       const root = document.querySelector("[data-studio-workspace]");
       const panel = document.querySelector('[data-studio-panel-variant="sidebar"]');
       const inspector = document.querySelector("[data-slice-grid-inspector]");
+      const rootRect = root?.getBoundingClientRect();
       const metrics = (element) => element ? {
         rect: (() => { const rect = element.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, height: rect.height }; })(),
         scrollHeight: element.scrollHeight,
@@ -200,6 +205,7 @@ export async function runGridPixelBrowserGate(options = {}) {
         horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
         verticalOverflow: document.body.scrollHeight > document.body.clientHeight ||
           (root ? root.getBoundingClientRect().bottom > window.innerHeight : true),
+        rootClipped: !rootRect || rootRect.top < -1 || rootRect.bottom < window.innerHeight - 1,
         document: { scrollHeight: document.documentElement.scrollHeight, clientHeight: document.documentElement.clientHeight },
         body: { scrollHeight: document.body.scrollHeight, clientHeight: document.body.clientHeight },
         topLevel: [...document.body.children].map((element) => ({ tag: element.tagName, id: element.id, className: element.className, rect: (() => { const rect = element.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, height: rect.height }; })() })),
@@ -214,7 +220,8 @@ export async function runGridPixelBrowserGate(options = {}) {
       && configuredPixel.swatches === 8 && configuredPixel.summary?.includes("PICO-8")
       && reset.enabled === "false" && reset.size === "16" && reset.mode === "auto"
       && accessibility.unlabeledInteractiveCount === 0 && layout.horizontalOverflow === false
-      && layout.verticalOverflow === false && Object.values(errors).every((value) => value === 0);
+      && layout.verticalOverflow === false && layout.rootClipped === false
+      && Object.values(errors).every((value) => value === 0);
     if (!passed) throw new Error(`G5-03 browser evidence failed closed: ${JSON.stringify({ initial, configuredPixel, reset, accessibility, layout, errors })}`);
     stage = "accepted";
     return { schemaVersion: 1, check: "grid-pixel-controls-browser", status: "pass", initial, configuredPixel, reset, accessibility, layout, screenshot: { path: screenshotPath, ...screenshot }, errors };
