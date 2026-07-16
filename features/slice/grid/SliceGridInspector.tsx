@@ -12,6 +12,7 @@ import {
 import type { GridLayoutValidationIssue } from "./gridLayoutDraft";
 import type { SliceGridController } from "./useSliceGridController";
 import SliceChromaControls from "./SliceChromaControls";
+import SlicePixelControls from "./SlicePixelControls";
 
 export interface SliceGridInspectorProps {
   readonly controller: SliceGridController;
@@ -299,6 +300,8 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
         </fieldset>
 
         <SliceChromaControls controller={controller} />
+
+        <SlicePixelControls controller={controller} />
 
         <div
           ref={statusRef}

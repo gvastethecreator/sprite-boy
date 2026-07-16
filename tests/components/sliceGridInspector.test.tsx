@@ -36,6 +36,7 @@ function controller(overrides: Partial<SliceGridController> = {}): SliceGridCont
     errorMessage: null,
     cropPreview: { enabled: false, threshold: 0, padding: 0, cellCount: 8 },
     chroma: recipeState.recipe.chroma,
+    pixel: recipeState.recipe.pixel,
     setMode: vi.fn(),
     setManualRowsInput: vi.fn(),
     setManualColsInput: vi.fn(),
@@ -48,6 +49,14 @@ function controller(overrides: Partial<SliceGridController> = {}): SliceGridCont
     setChromaSmoothness: vi.fn(() => true),
     setChromaSpill: vi.fn(() => true),
     resetChroma: vi.fn(() => true),
+    setPixelEnabled: vi.fn(() => true),
+    setPixelSize: vi.fn(() => true),
+    setPixelQuantize: vi.fn(() => true),
+    setPixelColors: vi.fn(() => true),
+    setPixelPalette: vi.fn(() => true),
+    setPixelAutoPalette: vi.fn(() => true),
+    setPixelFixedPalette: vi.fn(() => true),
+    resetPixel: vi.fn(() => true),
     retry: vi.fn(),
     ...overrides,
   };
@@ -241,6 +250,41 @@ describe("SliceGridInspector (G2-03)", () => {
     expect(resetChroma).toHaveBeenCalledOnce();
   });
 
+  it("edits pixel stage, auto/fixed palette mode and preset controls", () => {
+    const setPixelEnabled = vi.fn(() => true);
+    const setPixelSize = vi.fn(() => true);
+    const setPixelColors = vi.fn(() => true);
+    const setPixelAutoPalette = vi.fn(() => true);
+    const setPixelFixedPalette = vi.fn(() => true);
+    const resetPixel = vi.fn(() => true);
+    render(<SliceGridInspector controller={controller({
+      setPixelEnabled,
+      setPixelSize,
+      setPixelColors,
+      setPixelAutoPalette,
+      setPixelFixedPalette,
+      resetPixel,
+    })} />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Enable pixel stage" }));
+    expect(setPixelEnabled).toHaveBeenCalledWith(true);
+    fireEvent.change(screen.getByRole("combobox", { name: "Pixel target size" }), { target: { value: "64" } });
+    expect(setPixelSize).toHaveBeenCalledWith(64);
+    const customSize = screen.getByRole("spinbutton", { name: "Custom pixel target size" });
+    fireEvent.change(customSize, { target: { value: "37" } });
+    fireEvent.blur(customSize);
+    expect(setPixelSize).toHaveBeenCalledWith(37);
+    fireEvent.click(screen.getByRole("radio", { name: "Fixed palette" }));
+    expect(setPixelFixedPalette).toHaveBeenCalledWith(["#0f380f", "#306230", "#8bac0f", "#9bbc0f"]);
+    fireEvent.change(screen.getByRole("combobox", { name: "Fixed palette preset" }), { target: { value: "pico-8" } });
+    expect(setPixelFixedPalette).toHaveBeenCalledWith([
+      "#000000", "#1d2b53", "#7e2553", "#008751", "#ab5236", "#5f574f", "#c2c3c7", "#fff1e8",
+    ]);
+    expect(screen.getByLabelText("Pixel processing summary")).toHaveTextContent(/Fixed/);
+    fireEvent.click(screen.getByRole("button", { name: "Reset pixel settings" }));
+    expect(resetPixel).toHaveBeenCalledOnce();
+  });
+
   it("disables crop controls without a source and does not offer a no-op reset", () => {
     const view = render(<SliceGridInspector controller={controller({
       sourceDimensions: null,
@@ -253,6 +297,9 @@ describe("SliceGridInspector (G2-03)", () => {
     expect(screen.getByRole("checkbox", { name: "Enable chroma removal" })).toBeDisabled();
     expect(screen.getByRole("slider", { name: "Tolerance" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reset chroma settings" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Enable pixel stage" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Pixel target size" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reset pixel settings" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
     expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/source grid is ready/i);
 

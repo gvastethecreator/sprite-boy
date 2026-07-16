@@ -145,6 +145,41 @@ describe("useSliceGridController (G2-03)", () => {
     rejected.unmount();
   });
 
+  it("commits pixel snapping and palette mode through the canonical recipe host", async () => {
+    const onCommitState = vi.fn();
+    const { result, unmount } = renderHook(() => useSliceGridController({
+      generation: 1,
+      committedMetadata: null,
+      sessionSnapshot: IDLE_SESSION,
+      legacyImage: legacy(),
+      inferPreview: vi.fn().mockResolvedValue(inference(1, 1)),
+      onCommitState,
+    }));
+    await act(async () => Promise.resolve());
+
+    act(() => {
+      expect(result.current.setPixelEnabled(true)).toBe(true);
+      expect(result.current.setPixelSize(64)).toBe(true);
+      expect(result.current.setPixelAutoPalette()).toBe(true);
+      expect(result.current.setPixelColors(8)).toBe(true);
+      expect(result.current.setPixelFixedPalette(["#FF0000", "#0000FF"])).toBe(true);
+    });
+    expect(result.current.pixel).toEqual({
+      enabled: true,
+      size: 64,
+      quantize: false,
+      colors: 8,
+      palette: ["#ff0000", "#0000ff"],
+    });
+    expect(onCommitState).toHaveBeenCalledTimes(5);
+
+    act(() => {
+      expect(result.current.resetPixel()).toBe(true);
+    });
+    expect(result.current.pixel).toEqual({ enabled: false, size: 16, quantize: false, colors: 16 });
+    unmount();
+  });
+
   it("cancels StrictMode replay and source-generation races without late writes", async () => {
     const adapter = pendingAdapter();
     const { result, rerender, unmount } = renderHook(

@@ -38,6 +38,21 @@ function canonicalInteger(value: unknown, minimum: number, maximum: number): val
   return canonicalNumber(value, minimum, maximum) && Number.isSafeInteger(value);
 }
 
+function canonicalPalette(value: unknown): string[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length < 1 ||
+    value.length > GRID_PROCESSING_LIMITS.maxPaletteColors ||
+    Reflect.ownKeys(value).length !== value.length + 1) return null;
+  const colors: string[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor?.enumerable || !("value" in descriptor) ||
+      typeof descriptor.value !== "string" || !HEX_COLOR.test(descriptor.value)) return null;
+    colors.push(descriptor.value.toLowerCase());
+  }
+  return colors;
+}
+
 function copyRecipe(value: unknown, source: GridLayoutSourceDimensions): GridSplitRecipeV1 | null {
   const recipe = dataRecord(value, ["kind", "version", "sourceAssetId", "layout", "crop", "chroma", "pixel"]);
   if (!recipe || recipe.kind !== "grid-split" || recipe.version !== 1 ||
@@ -220,6 +235,38 @@ export function updateSliceGridRecipeChroma(
         smoothness: chroma.smoothness,
         spill: chroma.spill,
       }),
+    }),
+    manual: state.manual,
+  });
+}
+
+/** Updates pixel snapping, quantization count and optional fixed palette atomically. */
+export function updateSliceGridRecipePixel(
+  state: SliceGridRecipeStateV1,
+  pixel: GridSplitRecipeV1["pixel"],
+): SliceGridRecipeStateV1 {
+  if (typeof pixel.enabled !== "boolean" ||
+    !canonicalInteger(pixel.size, 1, GRID_PROCESSING_LIMITS.maxPixelSize) ||
+    typeof pixel.quantize !== "boolean" ||
+    !canonicalInteger(pixel.colors, 2, GRID_PROCESSING_LIMITS.maxPaletteColors)) {
+    throw new TypeError("Slice grid pixel settings are invalid.");
+  }
+  const palette = canonicalPalette(pixel.palette);
+  if (pixel.palette !== undefined && palette === null) {
+    throw new TypeError("Slice grid pixel palette is invalid.");
+  }
+  const nextPixel = Object.freeze({
+    enabled: pixel.enabled,
+    size: pixel.size,
+    quantize: pixel.quantize,
+    colors: pixel.colors,
+    ...(palette ? { palette: Object.freeze(palette.slice()) as unknown as string[] } : {}),
+  });
+  return Object.freeze({
+    version: 1 as const,
+    recipe: Object.freeze({
+      ...state.recipe,
+      pixel: nextPixel,
     }),
     manual: state.manual,
   });
