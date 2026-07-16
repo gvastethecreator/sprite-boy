@@ -1,7 +1,8 @@
 import { AlertTriangle, FileImage, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { SourceSessionSnapshot } from "./sourceSession";
+import type { SourceReadyMetadata, SourceSessionSnapshot } from "./sourceSession";
+import type { ImageMeta } from "../../../types";
 import type { SourcePreviewUrlLeaseOptions } from "./sourcePreviewUrlLease";
 import { useSourcePreviewUrl } from "./useSourcePreviewUrl";
 
@@ -15,6 +16,9 @@ export interface SliceSourcePreviewProps {
 export interface SliceSourceMetadataBarProps {
   readonly snapshot: SourceSessionSnapshot;
   readonly compact?: boolean;
+  readonly metadataOverride?: SourceReadyMetadata | null;
+  readonly legacyImageMeta?: ImageMeta | null;
+  readonly actions?: ReactNode;
 }
 
 export interface SliceSourceCanvasFrameProps extends SliceSourceMetadataBarProps {
@@ -28,6 +32,15 @@ export function formatSourceByteSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
+export interface SliceSourceDisplayMetadata {
+  readonly name: string;
+  readonly width: number;
+  readonly height: number;
+  readonly size: number;
+  readonly formatLabel: string;
+  readonly formatConfidence: "validated" | "inferred" | "unknown";
+}
+
 function formatSourceFormat(format: string): string {
   switch (format) {
     case "jpeg": return "JPEG";
@@ -37,13 +50,66 @@ function formatSourceFormat(format: string): string {
   }
 }
 
+function inferLegacyFormat(image: ImageMeta): Pick<
+  SliceSourceDisplayMetadata,
+  "formatLabel" | "formatConfidence"
+> {
+  let source = "";
+  let name = "";
+  try {
+    source = image.src.toLowerCase();
+    name = image.name.toLowerCase();
+  } catch {
+    return { formatLabel: "Unknown", formatConfidence: "unknown" };
+  }
+  const dataMime = /^data:image\/(png|jpeg|webp)(?:[;,])/u.exec(source)?.[1];
+  const extension = /\.([a-z0-9]+)$/u.exec(name)?.[1];
+  const inferred = dataMime ?? extension;
+  switch (inferred) {
+    case "png": return { formatLabel: "PNG · inferred", formatConfidence: "inferred" };
+    case "jpg":
+    case "jpeg": return { formatLabel: "JPEG · inferred", formatConfidence: "inferred" };
+    case "webp": return { formatLabel: "WebP · inferred", formatConfidence: "inferred" };
+    default: return { formatLabel: "Unknown", formatConfidence: "unknown" };
+  }
+}
+
+export function createSliceSourceDisplayMetadata(
+  validated: SourceReadyMetadata | null,
+  legacy: ImageMeta | null = null,
+): SliceSourceDisplayMetadata | null {
+  if (validated) {
+    return Object.freeze({
+      name: validated.name,
+      width: validated.width,
+      height: validated.height,
+      size: validated.size,
+      formatLabel: formatSourceFormat(validated.format),
+      formatConfidence: "validated" as const,
+    });
+  }
+  if (!legacy) return null;
+  const format = inferLegacyFormat(legacy);
+  return Object.freeze({
+    name: legacy.name,
+    width: legacy.width,
+    height: legacy.height,
+    size: legacy.fileSize,
+    ...format,
+  });
+}
+
 /** Metadata-only variant for composing around the existing interactive canvas. */
 export function SliceSourceMetadataBar({
   snapshot,
   compact = false,
+  metadataOverride,
+  legacyImageMeta = null,
+  actions,
 }: SliceSourceMetadataBarProps) {
-  const metadata = snapshot.metadata;
-  if (snapshot.source === null || metadata === null || snapshot.disposed) return null;
+  const validatedMetadata = metadataOverride === undefined ? snapshot.metadata : metadataOverride;
+  const metadata = createSliceSourceDisplayMetadata(validatedMetadata, legacyImageMeta);
+  if (snapshot.disposed || (metadata === null && !actions)) return null;
   return (
     <header
       aria-label="Slice source metadata"
@@ -57,22 +123,32 @@ export function SliceSourceMetadataBar({
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-textMuted">
           Source preview
         </p>
-        <p className="truncate text-sm font-bold text-textMain">{metadata.name}</p>
+        <p className="truncate text-sm font-bold text-textMain">{metadata?.name ?? "Slice source"}</p>
       </div>
-      <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-textMuted">
-        <div className="flex gap-1.5">
-          <dt>Dimensions</dt>
-          <dd className="font-bold text-textMain">{metadata.width} × {metadata.height}</dd>
-        </div>
-        <div className="flex gap-1.5">
-          <dt>Size</dt>
-          <dd className="font-bold text-textMain">{formatSourceByteSize(metadata.size)}</dd>
-        </div>
-        <div className="flex gap-1.5">
-          <dt>Format</dt>
-          <dd className="font-bold text-textMain">{formatSourceFormat(metadata.format)}</dd>
-        </div>
-      </dl>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-4">
+        {metadata ? (
+          <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-textMuted">
+            <div className="flex gap-1.5">
+              <dt>Dimensions</dt>
+              <dd className="font-bold text-textMain">{metadata.width} × {metadata.height}</dd>
+            </div>
+            <div className="flex gap-1.5">
+              <dt>Size</dt>
+              <dd className="font-bold text-textMain">{formatSourceByteSize(metadata.size)}</dd>
+            </div>
+            <div className="flex gap-1.5">
+              <dt>Format</dt>
+              <dd
+                className="font-bold text-textMain"
+                data-format-confidence={metadata.formatConfidence}
+              >
+                {metadata.formatLabel}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+        {actions}
+      </div>
     </header>
   );
 }
@@ -84,6 +160,9 @@ export function SliceSourceMetadataBar({
 export function SliceSourceCanvasFrame({
   snapshot,
   compact = true,
+  metadataOverride,
+  legacyImageMeta,
+  actions,
   children,
 }: SliceSourceCanvasFrameProps) {
   return (
@@ -92,7 +171,13 @@ export function SliceSourceCanvasFrame({
       data-slice-source-canvas-frame=""
       className="flex h-full min-h-0 flex-col"
     >
-      <SliceSourceMetadataBar snapshot={snapshot} compact={compact} />
+      <SliceSourceMetadataBar
+        snapshot={snapshot}
+        compact={compact}
+        metadataOverride={metadataOverride}
+        legacyImageMeta={legacyImageMeta}
+        actions={actions}
+      />
       <div className="min-h-0 flex-1">{children}</div>
     </section>
   );

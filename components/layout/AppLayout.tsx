@@ -37,12 +37,19 @@ import {
 } from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
 import SliceSourceDropzone from "../../features/slice/source/SliceSourceDropzone";
+import SliceSourceActions from "../../features/slice/source/SliceSourceActions";
+import SliceSourceResetDialog from "../../features/slice/source/SliceSourceResetDialog";
 import {
   SliceSourceCanvasFrame,
   SliceSourcePreview,
 } from "../../features/slice/source/SliceSourcePreview";
 import { useSliceSourceSession } from "../../features/slice/source/useSourceSession";
-import type { SourceSessionSnapshot } from "../../features/slice/source/sourceSession";
+import { isSliceSourceSignalAborted } from "../../hooks/useProjectController";
+import type {
+  SourceReadyMetadata,
+  SourceSessionError,
+  SourceSessionSnapshot,
+} from "../../features/slice/source/sourceSession";
 
 const LEGACY_MODE_BY_WORKSPACE = {
   slice: AppMode.BUILDER,
@@ -126,6 +133,7 @@ const AppLayout: React.FC = () => {
     handleLoadProject,
     handleSaveProject,
     handleNewProject,
+    handleResetSliceSource,
     isLoading,
     loadingMessage,
     animations,
@@ -135,11 +143,18 @@ const AppLayout: React.FC = () => {
   const workspaceContentRef = useRef<HTMLDivElement>(null);
   const assetInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
+  const resetSourceTriggerRef = useRef<HTMLButtonElement>(null);
+  const dropzoneBrowseButtonRef = useRef<HTMLButtonElement>(null);
+  const focusDropzoneAfterResetRef = useRef(false);
   const { activeWorkspace, navigate } = useStudioNavigation();
   const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
   const [isJobCenterOpen, setJobCenterOpen] = useState(false);
   const [studioError, setStudioError] = useState<StudioShellError | null>(null);
   const [isSourceCommitting, setSourceCommitting] = useState(false);
+  const [isResetSourceDialogOpen, setResetSourceDialogOpen] = useState(false);
+  const [committedSourceMetadata, setCommittedSourceMetadata] =
+    useState<SourceReadyMetadata | null>(null);
+  const [sourceActionError, setSourceActionError] = useState<SourceSessionError | null>(null);
   const sourceImportGenerationRef = useRef(0);
   const sourceCommitControllerRef = useRef<AbortController | null>(null);
   const {
@@ -182,10 +197,13 @@ const AppLayout: React.FC = () => {
     sourceImportGenerationRef.current += 1;
     cancelSourceCommit();
     resetSourceSession();
+    setCommittedSourceMetadata(null);
+    setSourceActionError(null);
   }, [cancelSourceCommit, resetSourceSession]);
 
   const commandRegistry = useMemo(() => createStudioCommandRegistry({
     newProject: () => {
+      setResetSourceDialogOpen(false);
       clearSourceWorkflow();
       handleNewProject();
       navigate("slice");
@@ -280,6 +298,7 @@ const AppLayout: React.FC = () => {
   const commitReadySource = useCallback(async (
     snapshot: SourceSessionSnapshot,
     generation: number,
+    replacing: boolean,
   ): Promise<void> => {
     if (snapshot.status !== "ready" || sourceImportGenerationRef.current !== generation) return;
     const blob = getSourceBlob();
@@ -295,16 +314,29 @@ const AppLayout: React.FC = () => {
       });
       await handleUpload(file, { signal: controller.signal });
       if (sourceImportGenerationRef.current !== generation) return;
+      setCommittedSourceMetadata(snapshot.metadata);
+      setSourceActionError(null);
       setStudioError(null);
       navigate("slice");
     } catch {
-      if (!controller.signal.aborted && sourceImportGenerationRef.current === generation) {
+      if (!isSliceSourceSignalAborted(controller.signal) &&
+        sourceImportGenerationRef.current === generation) {
         resetSourceSession();
-        setStudioError({
-          workspaceId: "slice",
-          commandId: "asset.import",
-          message: "The validated source could not be opened in Slice.",
-        });
+        if (replacing) {
+          const replacementError = Object.freeze({
+            code: "decode" as const,
+            message: "The validated replacement could not be opened in Slice.",
+            retryable: false,
+          });
+          setSourceActionError(replacementError);
+          showToast(`${replacementError.message} The current source was kept.`, "error");
+        } else {
+          setStudioError({
+            workspaceId: "slice",
+            commandId: "asset.import",
+            message: "The validated source could not be opened in Slice.",
+          });
+        }
       }
     } finally {
       if (sourceCommitControllerRef.current === controller) {
@@ -312,34 +344,62 @@ const AppLayout: React.FC = () => {
       }
       if (sourceImportGenerationRef.current === generation) setSourceCommitting(false);
     }
-  }, [cancelSourceCommit, getSourceBlob, handleUpload, navigate, resetSourceSession]);
+  }, [cancelSourceCommit, getSourceBlob, handleUpload, navigate, resetSourceSession, showToast]);
 
   const selectSliceSource = useCallback(async (
     input: File | FileList,
   ): Promise<void> => {
+    const replacing = !!slicerImage;
     cancelSourceCommit();
     const generation = ++sourceImportGenerationRef.current;
     setStudioError(null);
+    setSourceActionError(null);
     const snapshot = await selectSourceSession(input);
-    await commitReadySource(snapshot, generation);
-  }, [cancelSourceCommit, commitReadySource, selectSourceSession]);
+    await commitReadySource(snapshot, generation, replacing);
+  }, [cancelSourceCommit, commitReadySource, selectSourceSession, slicerImage]);
 
   const retrySliceSource = useCallback(async (): Promise<void> => {
+    const replacing = !!slicerImage;
     cancelSourceCommit();
     const generation = ++sourceImportGenerationRef.current;
     setStudioError(null);
     workspaceContentRef.current?.focus({ preventScroll: true });
     const snapshot = await retrySourceSession();
-    await commitReadySource(snapshot, generation);
-  }, [cancelSourceCommit, commitReadySource, retrySourceSession]);
+    await commitReadySource(snapshot, generation, replacing);
+  }, [cancelSourceCommit, commitReadySource, retrySourceSession, slicerImage]);
 
   const loadProjectFile = useCallback(async (file: File): Promise<void> => {
     const loaded = await handleLoadProject(file);
     if (!loaded) return;
     clearSourceWorkflow();
+    setResetSourceDialogOpen(false);
     setStudioError(null);
     workspaceContentRef.current?.focus({ preventScroll: true });
   }, [clearSourceWorkflow, handleLoadProject]);
+
+  const confirmResetSliceSource = useCallback((): void => {
+    focusDropzoneAfterResetRef.current = true;
+    setResetSourceDialogOpen(false);
+    clearSourceWorkflow();
+    handleResetSliceSource();
+    setStudioError(null);
+    navigate("slice");
+  }, [clearSourceWorkflow, handleResetSliceSource, navigate]);
+
+  useEffect(() => {
+    if (
+      !focusDropzoneAfterResetRef.current || slicerImage ||
+      sourceSessionSnapshot.status !== "idle"
+    ) return;
+    const target = dropzoneBrowseButtonRef.current;
+    if (!target) return;
+    focusDropzoneAfterResetRef.current = false;
+    target.focus({ preventScroll: true });
+  }, [slicerImage, sourceSessionSnapshot.status]);
+
+  const visibleSourceError = sourceActionError ?? (
+    sourceSessionSnapshot.status === "error" ? sourceSessionSnapshot.error : null
+  );
 
   useKeyboardShortcuts({
     registry: commandRegistry,
@@ -357,6 +417,7 @@ const AppLayout: React.FC = () => {
     closeModals: () => {
       setCompactPanel(null);
       setJobCenterOpen(false);
+      setResetSourceDialogOpen(false);
       controller.closeAllModals();
     },
     isModalOpen:
@@ -365,6 +426,7 @@ const AppLayout: React.FC = () => {
       exportModal.isOpen ||
       generationModal.isOpen ||
       isCommandPaletteOpen ||
+      isResetSourceDialogOpen ||
       compactPanel !== null ||
       isJobCenterOpen ||
       !!analysisResult,
@@ -476,13 +538,31 @@ const AppLayout: React.FC = () => {
                 snapshot={sourceSessionSnapshot}
                 disabled={isSourceCommitting}
                 committing={isSourceCommitting}
+                browseButtonRef={dropzoneBrowseButtonRef}
                 onBrowse={() => assetInputRef.current?.click()}
                 onSelect={(input) => selectSliceSource(input as File | FileList)}
                 onRetry={retrySliceSource}
               />
             ) : workspaceState.kind === "ready" ? (
-              activeWorkspace === "slice" && sourceSessionSnapshot.source ? (
-                <SliceSourceCanvasFrame snapshot={sourceSessionSnapshot}>
+              activeWorkspace === "slice" ? (
+                <SliceSourceCanvasFrame
+                  snapshot={sourceSessionSnapshot}
+                  metadataOverride={committedSourceMetadata}
+                  legacyImageMeta={slicerImage}
+                  actions={(
+                    <SliceSourceActions
+                      busy={sourceSessionBusy}
+                      error={visibleSourceError}
+                      resetButtonRef={resetSourceTriggerRef}
+                      onReplace={() => {
+                        setSourceActionError(null);
+                        assetInputRef.current?.click();
+                      }}
+                      onRequestReset={() => setResetSourceDialogOpen(true)}
+                      onRetry={retrySliceSource}
+                    />
+                  )}
+                >
                   <CanvasArea ref={canvasRef} />
                 </SliceSourceCanvasFrame>
               ) : (
@@ -541,6 +621,14 @@ const AppLayout: React.FC = () => {
           </StudioPanel>
         ) : null}
       </StudioDialog>
+
+      <SliceSourceResetDialog
+        isOpen={isResetSourceDialogOpen}
+        sourceName={committedSourceMetadata?.name ?? slicerImage?.name}
+        restoreFocusRef={resetSourceTriggerRef}
+        onCancel={() => setResetSourceDialogOpen(false)}
+        onConfirm={confirmResetSliceSource}
+      />
 
       <StudioDialog
         isOpen={isJobCenterOpen}
