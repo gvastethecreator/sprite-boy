@@ -11,6 +11,26 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const GATE_SCHEMA_VERSION = 1;
+export const REQUIRED_BUN_VERSION = "1.3.14";
+
+function executableName(value) {
+  return typeof value === "string" ? value.split(/[\\/]/u).pop() ?? "" : "";
+}
+
+/** Resolve the exact Bun runtime instead of a PATH-dependent `bun` shim. */
+export function resolveBunExecutable(options = {}) {
+  const runtimeVersion = Object.hasOwn(options, "runtimeVersion")
+    ? options.runtimeVersion
+    : globalThis.Bun?.version;
+  const execPath = Object.hasOwn(options, "execPath") ? options.execPath : process.execPath;
+  if (runtimeVersion !== REQUIRED_BUN_VERSION) {
+    throw new TypeError("Bun 1.3.14 is required to run studio gates.");
+  }
+  if (typeof execPath !== "string" || !/^bun(?:\.exe)?$/iu.test(executableName(execPath))) {
+    throw new TypeError("The active executable is not the pinned Bun runtime.");
+  }
+  return execPath;
+}
 
 function processStep(id, label, args, timeoutMs) {
   return Object.freeze({
@@ -23,6 +43,18 @@ function processStep(id, label, args, timeoutMs) {
 }
 
 const STEPS = Object.freeze({
+  reproducibility: processStep(
+    "reproducibility",
+    "Frozen install reproducibility",
+    ["scripts/studio-reproducibility.mjs"],
+    180_000,
+  ),
+  audit: processStep(
+    "audit",
+    "High-severity dependency audit",
+    ["audit", "--audit-level=high"],
+    120_000,
+  ),
   typecheck: processStep("typecheck", "TypeScript typecheck", ["x", "tsc", "--noEmit"], 120_000),
   lint: processStep(
     "lint",
@@ -93,6 +125,8 @@ function gate(id, label, steps) {
 export const STUDIO_GATE_MANIFEST = Object.freeze({
   schemaVersion: GATE_SCHEMA_VERSION,
   gates: Object.freeze({
+    reproducibility: gate("reproducibility", "Frozen install reproducibility", [STEPS.reproducibility]),
+    audit: gate("audit", "High-severity dependency audit", [STEPS.audit]),
     typecheck: gate("typecheck", "Typecheck", [STEPS.typecheck]),
     lint: gate("lint", "Lint", [STEPS.lint]),
     unit: gate("unit", "Unit tests", [STEPS.unit]),
@@ -110,6 +144,8 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
     build: gate("build", "Production build", [STEPS.build]),
     e2e: gate("e2e", "Production browser smoke", [STEPS.build, STEPS.browser]),
     all: gate("all", "Complete local gate", [
+      STEPS.reproducibility,
+      STEPS.audit,
       STEPS.typecheck,
       STEPS.lint,
       STEPS.unit,
@@ -189,9 +225,22 @@ export function runGatePlan(gateDefinition, options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const stdio = options.stdio ?? "inherit";
   const completed = [];
+  let bunExecutable;
+  try {
+    bunExecutable = resolveBunExecutable(options);
+  } catch {
+    return Object.freeze({
+      status: "failed",
+      gateId: gateDefinition.id,
+      completed: Object.freeze([]),
+      failedStep: gateDefinition.steps[0]?.id ?? null,
+      reason: "bun-runtime-mismatch",
+      exitCode: 1,
+    });
+  }
 
   for (const step of gateDefinition.steps) {
-    const result = spawn(step.command, [...step.args], {
+    const result = spawn(bunExecutable, [...step.args], {
       cwd,
       env: process.env,
       shell: false,

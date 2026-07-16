@@ -36,9 +36,6 @@ Thumbs.db
 # Testing
 coverage/
 
-# Bun
-bun.lock
-
 # Vite
 .vite/
 .vite-temp/

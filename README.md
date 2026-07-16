@@ -16,25 +16,25 @@ A web-based sprite sheet editor, animation sequencer, and sprite composition too
 
 | Layer           | Tool                                |
 | --------------- | ----------------------------------- |
-| Runtime         | React 19 + TypeScript 5.8           |
+| Runtime         | React 19 + TypeScript 6             |
 | Bundler         | Vite 8 (Rolldown)                   |
 | Styling         | Tailwind CSS 4 (design-token based) |
 | Animation       | GSAP 3, CSS keyframes               |
 | Testing         | Vitest 4 + Testing Library          |
 | Linting         | OXC (oxlint)                        |
-| Package Manager | Bun                                 |
+| Package Manager | Bun 1.3.14                          |
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (v1.1+)
-- Node.js 22+ (for Vite compatibility)
+- [Bun](https://bun.sh/) 1.3.14
+- Node.js 24+
 
 ### Install
 
 ```bash
-bun install
+bun install --frozen-lockfile --ignore-scripts
 ```
 
 ### Development
@@ -66,6 +66,17 @@ bun run lint:fix    # Auto-fix lint issues
 bun run typecheck   # TypeScript type check
 bun run check       # Both typecheck + lint
 ```
+
+### Studio quality gates
+
+```bash
+bun scripts/studio-gates.mjs --gate reproducibility
+bun scripts/studio-gates.mjs --gate all
+bun scripts/studio-gates.mjs --gate e2e
+```
+
+The tracked `bun.lock` is authoritative. CI rejects manifest/lock drift, high or
+critical dependency advisories, and any failing Studio gate.
 
 ### Logging
 

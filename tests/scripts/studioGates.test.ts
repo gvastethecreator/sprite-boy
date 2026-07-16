@@ -6,6 +6,7 @@ import {
   GATE_SCHEMA_VERSION,
   STUDIO_GATE_MANIFEST,
   parseGateArguments,
+  resolveBunExecutable,
   resolveGatePlan,
   runGateCli,
   runGatePlan,
@@ -22,6 +23,8 @@ import {
   terminateChildProcess,
   waitForExit,
 } from "../../scripts/studio-browser-smoke.mjs";
+
+const PINNED_BUN_RUNTIME = { runtimeVersion: "1.3.14", execPath: "C:/bun.exe" };
 
 function outputBuffer() {
   const stdout: string[] = [];
@@ -71,6 +74,8 @@ describe("studio gate manifest", () => {
     expect(Object.isFrozen(STUDIO_GATE_MANIFEST)).toBe(true);
     expect(Object.isFrozen(STUDIO_GATE_MANIFEST.gates)).toBe(true);
     expect(Object.keys(STUDIO_GATE_MANIFEST.gates)).toEqual([
+      "reproducibility",
+      "audit",
       "typecheck",
       "lint",
       "unit",
@@ -95,7 +100,16 @@ describe("studio gate manifest", () => {
       "build",
       "browser-smoke",
     ]);
+    expect(STUDIO_GATE_MANIFEST.gates.reproducibility.steps.map(({ id }) => id)).toEqual([
+      "reproducibility",
+    ]);
+    expect(STUDIO_GATE_MANIFEST.gates.audit.steps.map(({ id }) => id)).toEqual(["audit"]);
+    expect(STUDIO_GATE_MANIFEST.gates.audit.steps[0]?.args).toEqual([
+      "audit", "--audit-level=high",
+    ]);
     expect(STUDIO_GATE_MANIFEST.gates.all.steps.map(({ id }) => id)).toEqual([
+      "reproducibility",
+      "audit",
       "typecheck",
       "lint",
       "unit",
@@ -170,6 +184,19 @@ describe("studio gate manifest", () => {
 });
 
 describe("studio gate execution", () => {
+  it("pins child execution to Bun 1.3.14 and rejects runtime or executable drift", () => {
+    expect(resolveBunExecutable(PINNED_BUN_RUNTIME)).toBe("C:/bun.exe");
+    expect(() => resolveBunExecutable({ runtimeVersion: "1.3.9", execPath: "C:/bun.exe" })).toThrow(/1\.3\.14/);
+    expect(() => resolveBunExecutable({ runtimeVersion: "1.3.14", execPath: "C:/node.exe" })).toThrow(/executable/);
+    const spawn = vi.fn();
+    expect(runGatePlan(resolveGatePlan("typecheck"), {
+      spawnSync: spawn,
+      runtimeVersion: "1.3.9",
+      execPath: "C:/bun.exe",
+    })).toMatchObject({ status: "failed", reason: "bun-runtime-mismatch", failedStep: "typecheck" });
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it("spawns fixed argv sequentially with shell disabled and reports exact completion", () => {
     const calls: unknown[][] = [];
     const spawn = vi.fn((...args: unknown[]) => {
@@ -180,6 +207,7 @@ describe("studio gate execution", () => {
       cwd: "D:/workspace",
       spawnSync: spawn,
       stdio: "pipe",
+      ...PINNED_BUN_RUNTIME,
     });
 
     expect(result).toEqual({
@@ -191,7 +219,7 @@ describe("studio gate execution", () => {
       exitCode: 0,
     });
     expect(spawn).toHaveBeenCalledTimes(2);
-    expect(calls[0]?.[0]).toBe("bun");
+    expect(calls[0]?.[0]).toBe("C:/bun.exe");
     expect(calls[0]?.[1]).toEqual(["x", "vite", "build"]);
     expect(calls[0]?.[2]).toMatchObject({
       cwd: expect.stringMatching(/workspace$/),
@@ -208,7 +236,7 @@ describe("studio gate execution", () => {
     const nonZero = vi.fn()
       .mockReturnValueOnce({ status: 0 })
       .mockReturnValueOnce({ status: 7 });
-    expect(runGatePlan(resolveGatePlan("e2e"), { spawnSync: nonZero })).toMatchObject({
+    expect(runGatePlan(resolveGatePlan("e2e"), { spawnSync: nonZero, ...PINNED_BUN_RUNTIME })).toMatchObject({
       status: "failed",
       completed: ["build"],
       failedStep: "browser-smoke",
@@ -218,16 +246,45 @@ describe("studio gate execution", () => {
 
     const timeoutError = Object.assign(new Error("private process detail"), { code: "ETIMEDOUT" });
     const timeout = vi.fn().mockReturnValue({ status: null, error: timeoutError });
-    const result = runGatePlan(resolveGatePlan("all"), { spawnSync: timeout });
+    const result = runGatePlan(resolveGatePlan("all"), { spawnSync: timeout, ...PINNED_BUN_RUNTIME });
     expect(result).toMatchObject({
       status: "failed",
       completed: [],
-      failedStep: "typecheck",
+      failedStep: "reproducibility",
       reason: "timeout",
       exitCode: 1,
     });
     expect(JSON.stringify(result)).not.toContain("private process detail");
     expect(timeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates a non-zero result from every ordered all/e2e step", () => {
+    const expectedSteps = {
+      all: [
+        "reproducibility", "audit", "typecheck", "lint", "unit", "contract", "integration",
+        "coverage", "fixtures", "persistence-browser", "build", "bundle-budget", "browser-budget",
+        "deferred-feature-browser",
+      ],
+      e2e: ["build", "browser-smoke"],
+    } as const;
+    for (const [gateId, stepIds] of Object.entries(expectedSteps)) {
+      stepIds.forEach((stepId, index) => {
+        let callCount = 0;
+        const spawn = vi.fn((_: string, __: string[], _options: { cwd: string }) => {
+          callCount += 1;
+          return { status: callCount === index + 1 ? 9 : 0 };
+        });
+        const result = runGatePlan(resolveGatePlan(gateId), { spawnSync: spawn, ...PINNED_BUN_RUNTIME });
+        expect(result).toMatchObject({
+          status: "failed",
+          failedStep: stepId,
+          reason: "non-zero-exit",
+          exitCode: 9,
+          completed: stepIds.slice(0, index),
+        });
+        expect(spawn).toHaveBeenCalledTimes(index + 1);
+      });
+    }
   });
 
   it("lists and dry-runs without spawning and propagates CLI failure codes", () => {
@@ -251,7 +308,10 @@ describe("studio gate execution", () => {
 
     const execution = outputBuffer();
     const failureSpawn = vi.fn().mockReturnValue({ status: 3 });
-    expect(runGateCli(["--gate", "typecheck"], execution.io, { spawnSync: failureSpawn })).toBe(3);
+    expect(runGateCli(["--gate", "typecheck"], execution.io, {
+      spawnSync: failureSpawn,
+      ...PINNED_BUN_RUNTIME,
+    })).toBe(3);
     expect(JSON.parse(execution.stdout.join(""))).toMatchObject({
       status: "failed",
       failedStep: "typecheck",
