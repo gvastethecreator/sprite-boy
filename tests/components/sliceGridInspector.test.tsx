@@ -285,6 +285,56 @@ describe("SliceGridInspector (G2-03)", () => {
     expect(resetPixel).toHaveBeenCalledOnce();
   });
 
+  it("rolls pixel controls back when validation or the recipe host rejects a commit", () => {
+    const rejectEnabled = vi.fn(() => false);
+    const rejectSize = vi.fn(() => false);
+    const rejectFixed = vi.fn(() => false);
+    render(<SliceGridInspector controller={controller({
+      setPixelEnabled: rejectEnabled,
+      setPixelSize: rejectSize,
+      setPixelFixedPalette: rejectFixed,
+    })} />);
+
+    const enabled = screen.getByRole("checkbox", { name: "Enable pixel stage" });
+    fireEvent.click(enabled);
+    expect(rejectEnabled).toHaveBeenCalledWith(true);
+    expect(enabled).not.toBeChecked();
+    expect(screen.getByLabelText("Pixel processing summary")).toHaveTextContent(/Pixel stage off/i);
+
+    const customSize = screen.getByRole("spinbutton", { name: "Custom pixel target size" });
+    fireEvent.change(customSize, { target: { value: "4097" } });
+    fireEvent.blur(customSize);
+    expect(rejectSize).not.toHaveBeenCalled();
+    expect(customSize).toHaveValue(16);
+    fireEvent.change(customSize, { target: { value: "37" } });
+    fireEvent.blur(customSize);
+    expect(rejectSize).toHaveBeenCalledWith(37);
+    expect(customSize).toHaveValue(16);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Fixed palette" }));
+    expect(rejectFixed).toHaveBeenCalledOnce();
+    expect(screen.getByRole("radio", { name: "Auto palette" })).toBeChecked();
+  });
+
+  it("resynchronizes pixel controls when host undo/redo replaces persisted state", () => {
+    const fixedPixel = {
+      enabled: true,
+      size: 64,
+      quantize: false,
+      colors: 8,
+      palette: ["#000000", "#1d2b53", "#7e2553", "#008751", "#ab5236", "#5f574f", "#c2c3c7", "#fff1e8"],
+    };
+    const view = render(<SliceGridInspector controller={controller({ pixel: fixedPixel })} />);
+    expect(screen.getByRole("checkbox", { name: "Enable pixel stage" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Fixed palette" })).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "Fixed palette preset" })).toHaveValue("pico-8");
+
+    view.rerender(<SliceGridInspector controller={controller()} />);
+    expect(screen.getByRole("checkbox", { name: "Enable pixel stage" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "Auto palette" })).toBeChecked();
+    expect(screen.queryByRole("combobox", { name: "Fixed palette preset" })).not.toBeInTheDocument();
+  });
+
   it("disables crop controls without a source and does not offer a no-op reset", () => {
     const view = render(<SliceGridInspector controller={controller({
       sourceDimensions: null,
