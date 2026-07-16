@@ -13,6 +13,7 @@ import {
 
 const readyContext: StudioCommandContext = Object.freeze({
   projectAvailable: true,
+  projectOpenAvailable: true,
   busy: false,
   canUndo: true,
   canRedo: true,
@@ -160,6 +161,7 @@ describe("executable Studio command registry", () => {
     const registry = createStudioCommandRegistry(port);
     const unavailable: StudioCommandContext = {
       projectAvailable: false,
+      projectOpenAvailable: true,
       busy: false,
       canUndo: false,
       canRedo: false,
@@ -183,6 +185,19 @@ describe("executable Studio command registry", () => {
       code: "CANVAS_UNAVAILABLE",
     });
     expect(registry.getState("workspace.open.collision", unavailable)).toEqual({ enabled: true });
+
+    const composeWithoutPortableOpen = { ...readyContext, projectOpenAvailable: false };
+    expect(registry.getState("project.open", composeWithoutPortableOpen)).toEqual({
+      enabled: false,
+      code: "COMMAND_UNAVAILABLE",
+      reason: "Portable project opening is not available in Compose yet.",
+    });
+    await expect(registry.execute("project.open", composeWithoutPortableOpen)).resolves.toMatchObject({
+      status: "disabled",
+      commandId: "project.open",
+      state: { code: "COMMAND_UNAVAILABLE" },
+    });
+    expect(port.openProject).not.toHaveBeenCalled();
 
     await expect(registry.execute("project.save", unavailable)).resolves.toMatchObject({
       status: "disabled",

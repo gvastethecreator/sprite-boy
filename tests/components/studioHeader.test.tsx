@@ -9,6 +9,7 @@ import { StudioHeader } from "../../components/studio/StudioHeader";
 
 const commandContext: StudioCommandContext = {
   projectAvailable: true,
+  projectOpenAvailable: true,
   busy: false,
   canUndo: true,
   canRedo: true,
@@ -132,6 +133,56 @@ describe("StudioHeader", () => {
     fireEvent.click(save);
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(onExecute).not.toHaveBeenCalled();
+  });
+
+  it("renames inline with validation and preserves the Project menu keyboard flow", async () => {
+    const { registry } = makeRegistry();
+    const onRenameProject = vi.fn(() => null);
+    render(
+      <StudioHeader
+        activeWorkspace="compose"
+        registry={registry}
+        commandContext={commandContext}
+        onExecute={vi.fn()}
+        projectName="Nebula"
+        projectPersistenceState="saving"
+        onRenameProject={onRenameProject}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Project" });
+    expect(trigger).toHaveTextContent("Nebula");
+    fireEvent.click(trigger);
+    const menu = screen.getByRole("menu", { name: "Project actions" });
+    expect(within(menu).getByRole("status")).toHaveTextContent("Saving");
+    const rename = within(menu).getByRole("menuitem", { name: /Rename project/ });
+    await waitFor(() => expect(rename).toHaveFocus());
+    fireEvent.click(rename);
+
+    let input = within(menu).getByRole("textbox", { name: "Project name" });
+    await waitFor(() => expect(input).toHaveFocus());
+    for (const key of ["Home", "End", "ArrowUp", "ArrowDown"]) {
+      fireEvent.keyDown(input, { key });
+      expect(input).toHaveFocus();
+    }
+    fireEvent.keyDown(input, { key: "Tab" });
+    await waitFor(() => expect(screen.queryByRole("menu", { name: "Project actions" })).not.toBeInTheDocument());
+    fireEvent.click(trigger);
+    const reopenedMenu = screen.getByRole("menu", { name: "Project actions" });
+    const reopenedRename = within(reopenedMenu).getByRole("menuitem", { name: /Rename project/ });
+    await waitFor(() => expect(reopenedRename).toHaveFocus());
+    fireEvent.click(reopenedRename);
+    input = within(reopenedMenu).getByRole("textbox", { name: "Project name" });
+    await waitFor(() => expect(input).toHaveFocus());
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.submit(within(reopenedMenu).getByRole("form", { name: "Rename project" }));
+    expect(within(reopenedMenu).getByRole("alert")).toHaveTextContent("required");
+    expect(onRenameProject).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: "  Atlas Run  " } });
+    fireEvent.submit(within(reopenedMenu).getByRole("form", { name: "Rename project" }));
+    expect(onRenameProject).toHaveBeenCalledWith("Atlas Run");
+    expect(within(reopenedMenu).queryByRole("textbox", { name: "Project name" })).not.toBeInTheDocument();
   });
 
   it("keeps Export as a dedicated CTA with canonical routing", () => {

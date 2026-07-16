@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Layers3,
   LayoutGrid,
+  Pencil,
   Redo2,
   Save,
   Scissors,
@@ -36,6 +37,10 @@ export interface StudioHeaderProps {
   readonly onOpenJobCenter?: () => void;
   readonly isJobCenterOpen?: boolean;
   readonly jobSummary?: { readonly active: number; readonly total: number };
+  readonly projectName?: string;
+  readonly projectPersistenceState?: "loading" | "saved" | "saving" | "error";
+  readonly projectPersistenceMessage?: string | null;
+  readonly onRenameProject?: (name: string) => string | null;
 }
 
 const WORKSPACE_ICONS = {
@@ -72,6 +77,14 @@ function getEnabledMenuItems(menu: HTMLElement): HTMLElement[] {
       '[role="menuitem"]:not([disabled]):not([aria-disabled="true"])',
     ),
   );
+}
+
+function hasControlCharacters(value: string): boolean {
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
 }
 
 function CommandButton({
@@ -122,12 +135,20 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   onOpenJobCenter,
   isJobCenterOpen = false,
   jobSummary = { active: 0, total: 0 },
+  projectName = "Untitled project",
+  projectPersistenceState = "saved",
+  projectPersistenceMessage = null,
+  onRenameProject,
 }) => {
   const [openMenu, setOpenMenu] = useState<OpenHeaderMenu>(null);
   const projectTriggerRef = useRef<HTMLButtonElement>(null);
   const workspaceTriggerRef = useRef<HTMLButtonElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState(projectName);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const exportCommandId = "workspace.open.export" as const;
   const exportState = commandState(registry, exportCommandId, commandContext);
   const exportDisabled = !exportState.enabled;
@@ -153,6 +174,56 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
     return () => window.cancelAnimationFrame(frame);
   }, [openMenu]);
 
+  useEffect(() => {
+    if (!renaming) {
+      setRenameDraft(projectName);
+      setRenameError(null);
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    });
+  }, [projectName, renaming]);
+
+  useEffect(() => {
+    if (openMenu === "project" || !renaming) return;
+    setRenaming(false);
+    setRenameDraft(projectName);
+    setRenameError(null);
+  }, [openMenu, projectName, renaming]);
+
+  const cancelRename = () => {
+    setRenaming(false);
+    setRenameDraft(projectName);
+    setRenameError(null);
+    window.requestAnimationFrame(() => {
+      projectMenuRef.current?.querySelector<HTMLElement>('[data-project-rename-trigger]')?.focus();
+    });
+  };
+
+  const submitRename = () => {
+    const normalized = renameDraft.trim();
+    if (!normalized) {
+      setRenameError("Project name is required.");
+      renameInputRef.current?.focus();
+      return;
+    }
+    if (normalized.length > 120 || hasControlCharacters(normalized)) {
+      setRenameError("Use 120 characters or fewer without control characters.");
+      renameInputRef.current?.focus();
+      return;
+    }
+    const error = onRenameProject?.(normalized) ?? null;
+    if (error) {
+      setRenameError(error);
+      renameInputRef.current?.focus();
+      return;
+    }
+    setRenaming(false);
+    setRenameError(null);
+  };
+
   const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -160,7 +231,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
       return;
     }
     if (event.key === "Tab") {
-      setOpenMenu(null);
+      closeMenu(false);
       return;
     }
 
@@ -217,13 +288,15 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           <button
             ref={projectTriggerRef}
             type="button"
+            aria-label="Project"
+            title={`Current project: ${projectName}`}
             aria-haspopup="menu"
             aria-expanded={openMenu === "project"}
             aria-controls="studio-project-menu"
             onClick={() => setOpenMenu((current) => current === "project" ? null : "project")}
             className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-textMuted transition-colors hover:bg-white/5 hover:text-white sm:px-3"
           >
-            Project
+            <span className="max-w-32 truncate">{projectName}</span>
             <ChevronDown size={12} className={openMenu === "project" ? "rotate-180 opacity-70" : "opacity-60"} />
           </button>
           {openMenu === "project" && (
@@ -241,6 +314,84 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
                 onKeyDown={handleMenuKeyDown}
                 className="absolute left-0 top-full z-50 mt-1 w-52 rounded-lg border border-border bg-panel py-1 shadow-xl"
               >
+                <div className="border-b border-white/5 px-3 py-2.5">
+                  {renaming ? (
+                    <form
+                      aria-label="Rename project"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        submitRename();
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Escape") return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        cancelRename();
+                      }}
+                    >
+                      <label htmlFor="studio-project-name" className="text-[10px] font-bold uppercase tracking-wider text-textMuted">
+                        Project name
+                      </label>
+                      <div className="mt-1.5 flex gap-1.5">
+                        <input
+                          ref={renameInputRef}
+                          id="studio-project-name"
+                          value={renameDraft}
+                          maxLength={120}
+                          aria-invalid={Boolean(renameError)}
+                          aria-describedby={renameError ? "studio-project-name-error" : undefined}
+                          onChange={(event) => {
+                            setRenameDraft(event.target.value);
+                            setRenameError(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                              event.stopPropagation();
+                            }
+                          }}
+                          className="min-w-0 flex-1 rounded-md border border-white/10 bg-input px-2 py-1.5 text-xs text-textMain outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-md border border-accent/40 bg-accent/15 px-2 text-[10px] font-bold text-accent hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                          Save
+                        </button>
+                      </div>
+                      {renameError ? (
+                        <p id="studio-project-name-error" role="alert" className="mt-1.5 text-[10px] leading-4 text-red-300">
+                          {renameError}
+                        </p>
+                      ) : null}
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      tabIndex={-1}
+                      data-project-rename-trigger
+                      disabled={!onRenameProject}
+                      onClick={() => setRenaming(true)}
+                      className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs text-textMain hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-40"
+                    >
+                      <Pencil size={13} aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{projectName}</span>
+                      <span className="sr-only">Rename project</span>
+                    </button>
+                  )}
+                  <p
+                    role={projectPersistenceState === "error" ? "alert" : "status"}
+                    aria-live="polite"
+                    className={`mt-1.5 text-[9px] ${projectPersistenceState === "error" ? "text-red-300" : "text-textMuted"}`}
+                  >
+                    {projectPersistenceMessage ?? (
+                      projectPersistenceState === "loading" ? "Loading project…"
+                        : projectPersistenceState === "saving" ? "Saving…"
+                          : projectPersistenceState === "error" ? "Not saved"
+                            : "Saved locally"
+                    )}
+                  </p>
+                </div>
                 <CommandButton
                   commandId="project.new"
                   registry={registry}

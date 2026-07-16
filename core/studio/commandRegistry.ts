@@ -282,6 +282,8 @@ if (STATIC_AUDIT.length > 0) {
 
 export interface StudioCommandContext {
   readonly projectAvailable: boolean;
+  /** Temporary host capability while canonical portable open is not mounted. */
+  readonly projectOpenAvailable: boolean;
   readonly busy: boolean;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
@@ -290,6 +292,7 @@ export interface StudioCommandContext {
 
 export type StudioCommandDisabledCode =
   | "BUSY"
+  | "COMMAND_UNAVAILABLE"
   | "PROJECT_UNAVAILABLE"
   | "NOTHING_TO_UNDO"
   | "NOTHING_TO_REDO"
@@ -310,8 +313,12 @@ const disabled = (code: StudioCommandDisabledCode, reason: string): StudioComman
 function commandState(id: StudioCommandId, context: StudioCommandContext): StudioCommandState {
   switch (id) {
     case "project.new":
-    case "project.open":
       return context.busy ? disabled("BUSY", "Wait for the current operation to finish.") : ENABLED;
+    case "project.open":
+      if (context.busy) return disabled("BUSY", "Wait for the current operation to finish.");
+      return !context.projectOpenAvailable
+        ? disabled("COMMAND_UNAVAILABLE", "Portable project opening is not available in Compose yet.")
+        : ENABLED;
     case "project.save":
     case "asset.import":
       if (context.busy) return disabled("BUSY", "Wait for the current operation to finish.");

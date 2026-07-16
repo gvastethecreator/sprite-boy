@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
@@ -12,13 +12,14 @@ import GenerationModal from "../overlays/GenerationModal";
 import AnalysisModal from "../overlays/AnalysisModal";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useProject } from "../../contexts/ProjectContext";
+import { useCanonicalProject } from "../../contexts/CanonicalProjectContext";
 import {
   useJobStore,
   useStudioJobRetryAction,
   useStudioJobRunner,
 } from "../../contexts/StudioStoreContext";
 import { createJobCenterSummarySelector } from "../../core/stores";
-import { useJobStoreSelector } from "../../hooks/useStudioStoreSelector";
+import { useJobStoreSelector, useProjectStoreSelector } from "../../hooks/useStudioStoreSelector";
 import {
   createStudioCommandRegistry,
   getStudioWorkspace,
@@ -51,6 +52,8 @@ import type {
   SourceSessionSnapshot,
 } from "../../features/slice/source/sourceSession";
 import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
+import ComposeBootstrapWorkspace from "../../features/compose/project/ComposeBootstrapWorkspace";
+import CompositionCanvasSettingsInspector from "../../features/compose/canvasSettings/CompositionCanvasSettingsInspector";
 
 const LEGACY_MODE_BY_WORKSPACE = {
   slice: AppMode.BUILDER,
@@ -94,6 +97,13 @@ function useCompactStudioLayout(): boolean {
 
 const AppLayout: React.FC = () => {
   const controller = useProject();
+  const canonical = useCanonicalProject();
+  const canonicalProject = useProjectStoreSelector(canonical.store, (state) => state.project);
+  const canonicalHistory = useSyncExternalStore(
+    canonical.history.subscribe,
+    canonical.history.getSnapshot,
+    canonical.history.getSnapshot,
+  );
   const {
     preferences,
     setPreferences,
@@ -166,6 +176,9 @@ const AppLayout: React.FC = () => {
   const [sourceActionError, setSourceActionError] = useState<SourceSessionError | null>(null);
   const sourceImportGenerationRef = useRef(0);
   const sourceCommitControllerRef = useRef<AbortController | null>(null);
+  const canonicalNavigationProjectRef = useRef<string | null>(null);
+  const [composeImportRequestToken, setComposeImportRequestToken] = useState(0);
+  const [composeImportBusy, setComposeImportBusy] = useState(false);
   const {
     snapshot: sourceSessionSnapshot,
     select: selectSourceSession,
@@ -194,7 +207,34 @@ const AppLayout: React.FC = () => {
   const selectJobSummary = useMemo(createJobCenterSummarySelector, []);
   const jobSummary = useJobStoreSelector(jobStore, selectJobSummary);
   const hasWorkspace = !!slicerImage || !!builderCanvas;
+  const canonicalCompositionId = canonicalProject.workspace.selectedCompositionId;
+  const canonicalComposition = canonicalCompositionId
+    ? canonicalProject.compositions[canonicalCompositionId]
+    : undefined;
+  const showLegacyPanels = hasWorkspace && activeWorkspace !== "compose";
+  const showComposeProperties = activeWorkspace === "compose" && Boolean(canonicalComposition);
+  const hasStudioPanels = showLegacyPanels || showComposeProperties;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
+
+  useEffect(() => {
+    if (canonical.persistenceState === "loading") return;
+    if (canonicalNavigationProjectRef.current !== canonicalProject.id) {
+      canonicalNavigationProjectRef.current = canonicalProject.id;
+      const restored = canonicalProject.workspace.activeWorkspace;
+      if (restored && restored !== "assets" && restored !== activeWorkspace) navigate(restored);
+      return;
+    }
+    if (canonicalProject.workspace.activeWorkspace !== activeWorkspace) {
+      canonical.setActiveWorkspace(activeWorkspace);
+    }
+  }, [
+    activeWorkspace,
+    canonical,
+    canonical.persistenceState,
+    canonicalProject.id,
+    canonicalProject.workspace.activeWorkspace,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (canonicalCanvasOwnership) clearLegacyCanvasInteractionState();
@@ -241,22 +281,40 @@ const AppLayout: React.FC = () => {
   }, [cancelSourceCommit, resetSourceSession]);
 
   const commandRegistry = useMemo(() => createStudioCommandRegistry({
-    newProject: () => {
+    newProject: async () => {
       setResetSourceDialogOpen(false);
       clearSourceWorkflow();
+      await canonical.createProject();
       handleNewProject();
+      canonical.setActiveWorkspace("slice");
       navigate("slice");
     },
     openProject: () => projectInputRef.current?.click(),
-    saveProject: handleSaveProject,
-    importAsset: () => assetInputRef.current?.click(),
-    undo,
-    redo,
+    saveProject: async () => {
+      if (activeWorkspace !== "compose") handleSaveProject();
+      await canonical.saveProject();
+    },
+    importAsset: () => {
+      if (activeWorkspace === "compose") {
+        setComposeImportRequestToken((current) => current + 1);
+      } else {
+        assetInputRef.current?.click();
+      }
+    },
+    undo: () => {
+      if (activeWorkspace === "compose") canonical.history.undo();
+      else undo();
+    },
+    redo: () => {
+      if (activeWorkspace === "compose") canonical.history.redo();
+      else redo();
+    },
     openWorkspace: (workspaceId) => {
       const targetOwnsCanonicalCanvas = workspaceId === "slice" ||
         (workspaceId === "export" && canonicalSliceSourceAvailable);
       if (targetOwnsCanonicalCanvas) clearLegacyCanvasInteractionState();
       handleSetMode(LEGACY_MODE_BY_WORKSPACE[workspaceId]);
+      canonical.setActiveWorkspace(workspaceId);
       navigate(workspaceId);
     },
     resetCanvas: () => canvasRef.current?.resetView(),
@@ -264,6 +322,8 @@ const AppLayout: React.FC = () => {
     openPreferences: () => setIsSettingsOpen(true),
     openHelp: () => setIsHelpOpen(true),
   }), [
+    activeWorkspace,
+    canonical,
     handleNewProject,
     handleSaveProject,
     handleSetMode,
@@ -281,13 +341,31 @@ const AppLayout: React.FC = () => {
   const sourceSessionBusy = sourceSessionSnapshot.status === "validating" ||
     sourceSessionSnapshot.status === "decoding" || isSourceCommitting;
 
+  const canonicalCanUndo = canonicalHistory.undoEntries.length > 0;
+  const canonicalCanRedo = canonicalHistory.redoEntries.length > 0;
+
   const commandContext = useMemo<StudioCommandContext>(() => ({
     projectAvailable: true,
-    busy: isLoading || sourceSessionBusy,
-    canUndo,
+    projectOpenAvailable: activeWorkspace !== "compose",
+    busy: isLoading || sourceSessionBusy || composeImportBusy
+      || canonical.persistenceState === "loading"
+      || canonical.persistenceState === "saving",
+    canUndo: activeWorkspace === "compose" ? canonicalCanUndo : canUndo,
+    canRedo: activeWorkspace === "compose" ? canonicalCanRedo : canRedo,
+    canvasAvailable: activeWorkspace === "compose" ? Boolean(canonicalComposition) : hasWorkspace,
+  }), [
+    activeWorkspace,
     canRedo,
-    canvasAvailable: hasWorkspace,
-  }), [canRedo, canUndo, hasWorkspace, isLoading, sourceSessionBusy]);
+    canUndo,
+    canonical.persistenceState,
+    canonicalCanRedo,
+    canonicalCanUndo,
+    canonicalComposition,
+    composeImportBusy,
+    hasWorkspace,
+    isLoading,
+    sourceSessionBusy,
+  ]);
 
   const workspaceState = useMemo(() => resolveStudioWorkspaceState({
     workspaceId: activeWorkspace,
@@ -347,6 +425,15 @@ const AppLayout: React.FC = () => {
         showToast(message, "error");
       });
   }, [activeWorkspace, commandContext, commandRegistry, showToast]);
+
+  const renameCanonicalProject = useCallback((name: string): string | null => {
+    const result = canonical.renameProject(name);
+    if (!result.result.ok) {
+      return result.result.diagnostics[0]?.message ?? "Project could not be renamed.";
+    }
+    showToast(`Project renamed to ${name}.`, "success");
+    return null;
+  }, [canonical, showToast]);
 
   const commitReadySource = useCallback(async (
     snapshot: SourceSessionSnapshot,
@@ -542,24 +629,30 @@ const AppLayout: React.FC = () => {
         onOpenJobCenter={() => setJobCenterOpen(true)}
         isJobCenterOpen={isJobCenterOpen}
         jobSummary={{ active: jobSummary.active, total: jobSummary.total }}
+        projectName={canonicalProject.name}
+        projectPersistenceState={canonical.persistenceState}
+        projectPersistenceMessage={canonical.persistenceMessage}
+        onRenameProject={renameCanonicalProject}
       />
 
-      {hasWorkspace && isCompactLayout && (
+      {hasStudioPanels && isCompactLayout && (
         <div
           role="toolbar"
           aria-label="Compact Studio panels"
           className="flex h-9 shrink-0 items-center justify-between rounded-md border border-border/30 bg-panel px-2 xl:hidden"
         >
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={compactPanel === "tools"}
-            onClick={() => setCompactPanel("tools")}
-            className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            <PanelLeftOpen size={14} aria-hidden="true" />
-            Tools
-          </button>
+          {showLegacyPanels ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={compactPanel === "tools"}
+              onClick={() => setCompactPanel("tools")}
+              className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <PanelLeftOpen size={14} aria-hidden="true" />
+              Tools
+            </button>
+          ) : <span aria-hidden="true" />}
           <span className="truncate px-3 text-[10px] font-medium uppercase tracking-wider text-textMuted/70">
             {activeWorkspaceDefinition.label} workspace
           </span>
@@ -577,7 +670,7 @@ const AppLayout: React.FC = () => {
       )}
 
       <div className="flex-1 flex min-h-0 gap-2">
-        {hasWorkspace && !isCompactLayout && (
+        {showLegacyPanels && !isCompactLayout && (
           <StudioPanel
             label="Tools"
             variant="sidebar"
@@ -595,7 +688,18 @@ const AppLayout: React.FC = () => {
             aria-label={`${activeWorkspaceDefinition.label} workspace content`}
             className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            {activeWorkspace === "slice" && !slicerImage && sourceSessionSnapshot.status === "ready" ? (
+            {activeWorkspace === "compose" ? (
+              <ComposeBootstrapWorkspace
+                key={canonicalProject.id}
+                store={canonical.store}
+                assets={canonical.assets}
+                importRequestToken={composeImportRequestToken}
+                disabled={canonical.persistenceState === "loading"}
+                onBusyChange={setComposeImportBusy}
+                onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                onCompositionReady={() => navigate("compose")}
+              />
+            ) : activeWorkspace === "slice" && !slicerImage && sourceSessionSnapshot.status === "ready" ? (
               <SliceSourcePreview
                 snapshot={sourceSessionSnapshot}
                 getBlob={getSourceBlob}
@@ -658,21 +762,28 @@ const AppLayout: React.FC = () => {
               />
             )}
           </main>
-          {hasWorkspace && (
+          {hasWorkspace && activeWorkspace !== "compose" && (
             <TimelinePanel hidden={activeWorkspaceDefinition.capabilities.timeline !== "editable"} />
           )}
         </div>
 
-        {hasWorkspace && !isCompactLayout && (
+        {(showLegacyPanels || showComposeProperties) && !isCompactLayout && (
           <StudioPanel
             label="Properties"
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
-            <RightSidebar
-              isSliceWorkspace={activeWorkspace === "slice"}
-              sliceGridController={sliceGridController}
-            />
+            {showComposeProperties && canonicalCompositionId ? (
+              <CompositionCanvasSettingsInspector
+                store={canonical.store}
+                compositionId={canonicalCompositionId}
+              />
+            ) : (
+              <RightSidebar
+                isSliceWorkspace={activeWorkspace === "slice"}
+                sliceGridController={sliceGridController}
+              />
+            )}
           </StudioPanel>
         )}
       </div>
@@ -684,7 +795,7 @@ const AppLayout: React.FC = () => {
         backdropClassName="!items-stretch !justify-start !p-0 !pt-0 bg-black/70"
         panelClassName="!h-dvh !max-h-dvh !max-w-[360px] !rounded-none !border-y-0 !border-l-0"
       >
-        {compactPanel === "tools" ? (
+        {compactPanel === "tools" && showLegacyPanels ? (
           <StudioPanel
             label="Tools"
             variant="drawer"
@@ -700,10 +811,17 @@ const AppLayout: React.FC = () => {
             onClose={() => setCompactPanel(null)}
             className="h-full border-0"
           >
-            <RightSidebar
-              isSliceWorkspace={activeWorkspace === "slice"}
-              sliceGridController={sliceGridController}
-            />
+            {showComposeProperties && canonicalCompositionId ? (
+              <CompositionCanvasSettingsInspector
+                store={canonical.store}
+                compositionId={canonicalCompositionId}
+              />
+            ) : (
+              <RightSidebar
+                isSliceWorkspace={activeWorkspace === "slice"}
+                sliceGridController={sliceGridController}
+              />
+            )}
           </StudioPanel>
         ) : null}
       </StudioDialog>
