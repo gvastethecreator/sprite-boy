@@ -1691,8 +1691,8 @@ para ejecutar el journey completo con undo/save/export.
   del foreground produce `operations: ["chroma", "crop"]` y bounds `x=1,
   width=3`; si crop corriera primero el borde izquierdo no desaparecería.
 - **Determinismo:** dos ejecuciones en Workers reales con la misma superficie y
-  recipe producen bytes, bounds, dimensions y operación idénticos. El source y
-  recipe se capturan antes de transferirse; no se muta el input.
+  parámetros de procesamiento —variando sólo IDs de request/asset— producen
+  bytes, bounds, dimensions y operación idénticos.
 - **Evidencia:** la matriz real conserva 11 etapas de progreso, source detached,
   y el artifact de orden/hostile incluye el golden RGBA exacto. Suite focal de
   Worker, typecheck, oxlint, build y diff-check verdes; revisión independiente
@@ -1719,7 +1719,8 @@ para ejecutar el journey completo con undo/save/export.
 - **Evidencia:** Worker real, repeat determinista y matriz de reducción/empty
   outputs pasan; artifact `g4-04-05-chroma-order-hostile.json`. Las goldens
   visuales son bytes RGBA y bounds exactos, más fuertes que una captura para este
-  stage puro. Revisión independiente pendiente de este lote; no se marca release.
+  stage puro. Revisión independiente `ACCEPT`, P0-P2=0; no se marca release
+  global porque los journeys G6/G7 siguen abiertos.
 - **Límite honesto:** la tolerancia extrema está cerrada en el Worker; el
   feedback de proceso, results tray y export de outputs quedan G6/G7.
 
@@ -1734,8 +1735,9 @@ para ejecutar el journey completo con undo/save/export.
   `operations: []`; enabled publica únicamente `resize` antes de cualquier
   quantize/palette stage.
 - **Límites:** `getScaledDimensions` exige `maxSide` entero seguro dentro de
-  `maxPixelSize` y verifica `maxResultPixels`; el Worker conserva el límite de
-  salida y la política de empty output.
+  `maxPixelSize`; la matriz hostil congela el rechazo de `4097`. El presupuesto
+  agregado del Worker permanece como guard de implementación; su stress/perf
+  explícito corresponde a G5-04.
 - **Evidencia:** Worker smoke e integración real verdes, además de la matriz de
   geometría existente. El artifact congela RGBA 4×4 y disabled byte-identical;
   typecheck, oxlint, build y diff-check verdes. Artifact:
