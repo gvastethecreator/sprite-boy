@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "task": "G3-04",
+  "title": "OOB, zero-size and huge-padding hostile gate",
+  "date": "2026-07-16",
+  "status": "accepted",
+  "behaviors": ["G3.1", "G3.2", "G3.3", "G3.4"],
+  "contract": {
+    "threshold": "canonical finite number from 0 through 100 inclusive",
+    "padding": "canonical safe integer from 0 through 16384 inclusive",
+    "persistedParity": "StudioProjectV1 validation now rejects every crop value refused by the processing protocol and crop stage.",
+    "geometry": "Cells require positive integer dimensions and complete containment in a budgeted positive source.",
+    "rejectionOrder": "Invalid geometry is rejected before cancellation callbacks or pixel scans.",
+    "maximumPadding": "Padding 16384 clamps to the original cell and cannot read or emit pixels outside that cell."
+  },
+  "propertyGate": {
+    "seed": "0x47332d3034",
+    "iterations": 200,
+    "sourceRange": "2..64 on each axis",
+    "content": "one opaque pixel at a seeded position in each valid cell",
+    "expected": "local bounds equal the complete cell; source bounds remain positive and in-bounds; packed output length is exact"
+  },
+  "hostileMatrix": {
+    "cellBounds": [
+      "negative x or y",
+      "zero width or height",
+      "origin at source width or height",
+      "right or bottom overflow",
+      "fractional origin or dimension"
+    ],
+    "sourceDimensions": [
+      "zero axis",
+      "fractional axis",
+      "axis above 16384",
+      "pixel product above 67108864"
+    ],
+    "threshold": ["below 0", "negative zero", "above 100", "NaN", "Infinity"],
+    "padding": ["below 0", "negative zero", "fractional", "above 16384", "NaN", "Infinity"]
+  },
+  "verification": {
+    "contractSelection": { "passed": 44, "failed": 0, "files": 6 },
+    "realWorker": {
+      "passed": 1,
+      "failed": 0,
+      "covers": ["padding 16384", "all-empty", "4096 outputs", "transferred buffers"]
+    },
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "diffCheck": "pass",
+    "independentReview": {
+      "verdict": "ACCEPT",
+      "p0": 0,
+      "p1": 0,
+      "p2": 0,
+      "reviewerTests": { "passed": 11, "failed": 0 }
+    }
+  },
+  "commands": [
+    "VITEST_MAX_WORKERS=2 bunx vitest run tests/contract/gridCropHostileGate.test.ts tests/contract/gridProcessingCrop.test.ts tests/contract/gridProcessingGeometry.test.ts tests/contract/gridProcessingReduction.test.ts tests/contract/gridProcessingProtocol.test.ts tests/contract/projectValidationMatrix.test.ts --reporter=verbose",
+    "VITEST_MAX_WORKERS=1 bunx vitest run tests/integration/gridProcessingRealWorker.test.ts --reporter=verbose",
+    "bun run typecheck",
+    "bunx oxlint core/project/validation.ts tests/contract/projectValidationMatrix.test.ts tests/contract/gridCropHostileGate.test.ts",
+    "bun run build",
+    "git diff --check"
+  ],
+  "boundary": "G4-01 owns chroma color, tolerance, smoothness and spill processing plus visual goldens."
+}
