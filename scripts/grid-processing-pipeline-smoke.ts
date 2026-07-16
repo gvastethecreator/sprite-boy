@@ -112,6 +112,10 @@ const chromaRecipe = {
   ...baselineRecipe,
   chroma: hydrated.recipe.chroma,
 };
+const resizeOnlyRecipe = {
+  ...hydrated.recipe,
+  pixel: { enabled: true, size: 4, quantize: false, colors: 2 },
+};
 
 const baselineRequest = requestFor("grid-pipeline-baseline", baselineRecipe);
 const baselineResult = await createGridProcessingClient().process({ request: baselineRequest });
@@ -126,6 +130,9 @@ const repeatResult = await createGridProcessingClient().process({
 const cropResult = await createGridProcessingClient().process({
   request: requestFor("grid-pipeline-crop", resetHydrated.recipe),
 });
+const resizeOnlyResult = await createGridProcessingClient().process({
+  request: requestFor("grid-pipeline-resize-only", resizeOnlyRecipe),
+});
 const resetRequest = requestFor("grid-pipeline-reset", resetHydrated.recipe);
 const resetResult = await createGridProcessingClient().process({ request: resetRequest });
 
@@ -139,6 +146,8 @@ const baselinePixels = [...new Uint8ClampedArray(baseline.surface.pixels)];
 const chromaPixels = [...new Uint8ClampedArray(chroma.surface.pixels)];
 const cropPixels = [...new Uint8ClampedArray(crop.surface.pixels)];
 const resetPixels = [...new Uint8ClampedArray(reset.surface.pixels)];
+const resizeOnly = resizeOnlyResult.outputs[0]!;
+const resizeOnlyPixels = [...new Uint8ClampedArray(resizeOnly.surface.pixels)];
 const firstPixels = [...new Uint8ClampedArray(first.surface.pixels)];
 const repeatedPixels = [...new Uint8ClampedArray(repeated.surface.pixels)];
 const evidence = {
@@ -165,12 +174,17 @@ const evidence = {
   stageEffects: {
     chromaChangedPixels: JSON.stringify(chromaPixels) !== JSON.stringify(baselinePixels),
     cropChangedBounds: JSON.stringify(chroma.contentBounds) !== JSON.stringify(crop.contentBounds),
-    quantizeChangedPixels: JSON.stringify(firstPixels) !== JSON.stringify(cropPixels),
+    quantizeChangedPixels: JSON.stringify(firstPixels) !== JSON.stringify(resizeOnlyPixels),
   },
   repeat: {
     operations: repeated.operations,
     pixelsIdentical: JSON.stringify(repeatedPixels) === JSON.stringify(firstPixels),
     operationsIdentical: JSON.stringify(repeated.operations) === JSON.stringify(first.operations),
+  },
+  resizeOnly: {
+    dimensions: [resizeOnly.surface.width, resizeOnly.surface.height],
+    operations: resizeOnly.operations,
+    pixels: resizeOnlyPixels,
   },
   reset: {
     enabled: resetHydrated.recipe.pixel.enabled,
