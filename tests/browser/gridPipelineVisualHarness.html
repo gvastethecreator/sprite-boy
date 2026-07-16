@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>G5-05 pipeline visual probe</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #11141a; color: #f4f6fb; font: 14px/1.45 system-ui, sans-serif; }
+      main { width: min(1060px, calc(100vw - 40px)); padding: 28px; border: 1px solid #343b48; border-radius: 16px; background: #1a1f29; box-shadow: 0 18px 60px #0008; }
+      h1 { margin: 0 0 6px; font-size: 22px; }
+      p { margin: 0; color: #aeb7c7; }
+      .canvases { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 24px 0; }
+      figure { min-width: 0; margin: 0; padding: 14px; border-radius: 12px; background: #101319; }
+      figcaption { min-height: 40px; margin-bottom: 10px; color: #d7ddea; font-weight: 650; }
+      figcaption span { display: block; margin-top: 3px; color: #8f9aad; font: 11px ui-monospace, monospace; font-weight: 500; }
+      canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 7px; background: conic-gradient(#343944 25%, #202631 0 50%, #343944 0 75%, #202631 0) 0 0 / 24px 24px; image-rendering: pixelated; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+      .chip { padding: 6px 9px; border: 1px solid #343b48; border-radius: 999px; color: #d7ddea; font: 11px ui-monospace, monospace; }
+      .chip strong { color: #70e1bd; }
+      dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0; }
+      dl div { padding: 10px; border: 1px solid #343b48; border-radius: 8px; }
+      dt { color: #8f9aad; font-size: 11px; text-transform: uppercase; }
+      dd { margin: 3px 0 0; font: 600 15px ui-monospace, monospace; }
+      @media (max-width: 760px) { .canvases { grid-template-columns: repeat(2, 1fr); } dl { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="title">
+      <h1 id="title">Canonical Grid pipeline</h1>
+      <p>Visual probe from the same recipe used by the real Worker round-trip gate.</p>
+      <section class="canvases" aria-label="Pipeline stages">
+        <figure><figcaption>Source<span>4×4 · off-palette center</span></figcaption><canvas id="source" width="4" height="4"></canvas></figure>
+        <figure><figcaption>Chroma<span>chroma · alpha border removed</span></figcaption><canvas id="chroma" width="4" height="4"></canvas></figure>
+        <figure><figcaption>Crop/reset<span>chroma → crop · 2×2</span></figcaption><canvas id="crop" width="2" height="2"></canvas></figure>
+        <figure><figcaption>Processed<span>chroma → crop → resize → quantize</span></figcaption><canvas id="full" width="4" height="4"></canvas></figure>
+      </section>
+      <div class="chips" aria-label="Pipeline operation order">
+        <span class="chip"><strong>1</strong> chroma</span><span class="chip"><strong>2</strong> crop</span><span class="chip"><strong>3</strong> resize</span><span class="chip"><strong>4</strong> quantize</span>
+      </div>
+      <dl>
+        <div><dt>Recipe</dt><dd id="recipe">stable</dd></div><div><dt>Repeat</dt><dd id="repeat">identical</dd></div>
+        <div><dt>Reset</dt><dd id="reset">16px / auto</dd></div><div><dt>Runtime</dt><dd id="runtime">Worker</dd></div>
+      </dl>
+    </main>
+    <script type="module" src="./gridPipelineVisualJourney.ts"></script>
+  </body>
+</html>

@@ -16,14 +16,15 @@
     },
     "warmup": { "completed": true, "measuredSamples": 3, "p95Definition": "ceil(n*0.95) over sorted samples" },
     "full": {
-      "p95Ms": 6132.67,
-      "elapsedMs": [6132.67, 5462.22, 5073.92],
+      "p95Ms": 5049.14,
+      "elapsedMs": [4913.63, 4960.96, 5049.14],
       "allSamplesValid": true,
       "sampleChecks": {
         "outputCount": 256,
         "outputPixelCount": 1048576,
         "firstDimensions": [64, 64],
         "firstOperations": ["chroma", "crop", "resize", "quantize"],
+        "allOutputsValid": true,
         "warnings": [],
         "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
         "progressEventCount": 1027,
@@ -31,58 +32,61 @@
       },
       "samples": [
         {
-          "elapsedMs": 6132.67,
+          "elapsedMs": 4913.63,
           "outputCount": 256,
           "outputPixelCount": 1048576,
           "firstDimensions": [64, 64],
           "firstOperations": ["chroma", "crop", "resize", "quantize"],
+          "allOutputsValid": true,
           "warnings": [],
           "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
           "progressEventCount": 1027,
           "sourceDetached": true,
-          "memory": { "rssDeltaBytes": 192872448, "heapUsedDeltaBytes": 288171, "arrayBufferDeltaBytes": -62886176, "cleanupRssDeltaBytes": 191332352, "cleanupHeapUsedDeltaBytes": 8709911, "cleanupArrayBufferDeltaBytes": -62886176 }
+          "memory": { "rssDeltaBytes": 195805184, "heapUsedDeltaBytes": 288995, "arrayBufferDeltaBytes": -62886176, "cleanupRssDeltaBytes": 195067904, "cleanupHeapUsedDeltaBytes": 8715493, "cleanupArrayBufferDeltaBytes": -62886176 }
         },
         {
-          "elapsedMs": 5462.22,
+          "elapsedMs": 4960.96,
           "outputCount": 256,
           "outputPixelCount": 1048576,
           "firstDimensions": [64, 64],
           "firstOperations": ["chroma", "crop", "resize", "quantize"],
+          "allOutputsValid": true,
           "warnings": [],
           "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
           "progressEventCount": 1027,
           "sourceDetached": true,
-          "memory": { "rssDeltaBytes": 29057024, "heapUsedDeltaBytes": -8401174, "arrayBufferDeltaBytes": -67108976, "cleanupRssDeltaBytes": 27824128, "cleanupHeapUsedDeltaBytes": 42998, "cleanupArrayBufferDeltaBytes": -67108976 }
+          "memory": { "rssDeltaBytes": 49049600, "heapUsedDeltaBytes": -8377371, "arrayBufferDeltaBytes": -67108976, "cleanupRssDeltaBytes": 47718400, "cleanupHeapUsedDeltaBytes": 126596, "cleanupArrayBufferDeltaBytes": -67108976 }
         },
         {
-          "elapsedMs": 5073.92,
+          "elapsedMs": 5049.14,
           "outputCount": 256,
           "outputPixelCount": 1048576,
           "firstDimensions": [64, 64],
           "firstOperations": ["chroma", "crop", "resize", "quantize"],
+          "allOutputsValid": true,
           "warnings": [],
           "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
           "progressEventCount": 1027,
           "sourceDetached": true,
-          "memory": { "rssDeltaBytes": 34611200, "heapUsedDeltaBytes": -8425644, "arrayBufferDeltaBytes": -67108976, "cleanupRssDeltaBytes": 33849344, "cleanupHeapUsedDeltaBytes": -90626, "cleanupArrayBufferDeltaBytes": -67108976 }
+          "memory": { "rssDeltaBytes": 31686656, "heapUsedDeltaBytes": -8569788, "arrayBufferDeltaBytes": -67108976, "cleanupRssDeltaBytes": 31141888, "cleanupHeapUsedDeltaBytes": -176923, "cleanupArrayBufferDeltaBytes": -67108976 }
         }
       ]
     },
     "cancellation": {
-      "p95Ms": 3.64,
+      "p95Ms": 5.37,
       "allSamplesValid": true,
       "samples": [
-        { "stage": "chroma", "elapsedMs": 1.16, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 173.98 },
-        { "stage": "chroma", "elapsedMs": 3.64, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 133.76 },
-        { "stage": "chroma", "elapsedMs": 0.18, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 134.56 }
+        { "stage": "chroma", "elapsedMs": 1.76, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 197.77 },
+        { "stage": "chroma", "elapsedMs": 3.06, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 177.17 },
+        { "stage": "chroma", "elapsedMs": 5.37, "code": "cancelled", "rejectedAsCancelled": true, "processSetupMs": 155.16 }
       ]
     },
     "memory": {
       "observedRuntime": "Bun main process around real Worker client; Worker-native heap is not directly exposed by this runtime",
-      "maxRssDeltaBytes": 192872448,
-      "maxCleanupRssDeltaBytes": 191332352,
-      "maxHeapUsedDeltaBytes": 288171,
-      "maxCleanupHeapUsedDeltaBytes": 8709911,
+      "maxRssDeltaBytes": 195805184,
+      "maxCleanupRssDeltaBytes": 195067904,
+      "maxHeapUsedDeltaBytes": 288995,
+      "maxCleanupHeapUsedDeltaBytes": 8715493,
       "cleanupMethod": "release result reference, Bun.gc(true), one event-loop turn"
     },
     "budgets": {
