@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-processing-hostile-lifecycle",
+  "status": "pass",
+  "tests": {
+    "filesPassed": 4,
+    "testsPassed": 16,
+    "failed": 0,
+    "typecheck": "pass",
+    "lint": "pass"
+  },
+  "matrix": {
+    "concurrentIsolation": true,
+    "cancelBeforeStart": true,
+    "cancelDuringRun": true,
+    "cancelAfterSuccess": true,
+    "workerError": true,
+    "workerMessageError": true,
+    "jobRunnerTimeout": true,
+    "lateResultSuppressed": true,
+    "hostileCleanupContained": true,
+    "partialRegistrationCleaned": true,
+    "reentrantRegistrationClosed": true
+  },
+  "commands": [
+    "bun x vitest run tests/integration/gridProcessingFailureInjection.test.ts tests/contract/gridProcessingClient.test.ts tests/contract/gridProcessingJobTask.test.ts tests/integration/gridProcessingRealWorker.test.ts",
+    "bun x tsc --noEmit",
+    "bun x oxlint features/slice/processing/gridProcessingClient.ts tests/integration/gridProcessingFailureInjection.test.ts"
+  ],
+  "independentReview": {
+    "decision": "ACCEPT",
+    "severityCounts": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "notes": [
+      "Settled guards close synchronous terminal dispatch during listener registration.",
+      "The hostile matrix leaves no post-terminal message, listener or worker owner."
+    ]
+  }
+}

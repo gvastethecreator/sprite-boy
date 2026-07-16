@@ -136,6 +136,14 @@ function isAbortSignal(value: unknown): value is AbortSignal {
   }
 }
 
+function addAbortListener(signal: AbortSignal, listener: () => void): void {
+  Reflect.apply(AbortSignal.prototype.addEventListener, signal, ["abort", listener, { once: true }]);
+}
+
+function removeAbortListener(signal: AbortSignal, listener: () => void): void {
+  Reflect.apply(AbortSignal.prototype.removeEventListener, signal, ["abort", listener]);
+}
+
 class DefaultGridProcessingClient implements GridProcessingClient {
   private readonly workerFactory: () => GridProcessingWorkerPort;
 
@@ -186,11 +194,21 @@ class DefaultGridProcessingClient implements GridProcessingClient {
       let abortListener: (() => void) | null = null;
 
       const cleanup = (): void => {
-        if (abortListener && signal) signal.removeEventListener("abort", abortListener);
+        if (abortListener && signal) {
+          try {
+            removeAbortListener(signal, abortListener);
+          } catch {
+            // A terminal client result must not depend on host listener cleanup.
+          }
+        }
         abortListener = null;
-        worker.removeEventListener("message", onMessage);
-        worker.removeEventListener("error", onWorkerFailure);
-        worker.removeEventListener("messageerror", onWorkerFailure);
+        for (const type of ["message", "error", "messageerror"] as const) {
+          try {
+            worker.removeEventListener(type, type === "message" ? onMessage : onWorkerFailure);
+          } catch {
+            // Continue through every owned resource even when a hostile port throws.
+          }
+        }
         try {
           worker.terminate();
         } catch {
@@ -258,26 +276,30 @@ class DefaultGridProcessingClient implements GridProcessingClient {
         }
       };
 
-      worker.addEventListener("message", onMessage);
-      worker.addEventListener("error", onWorkerFailure);
-      worker.addEventListener("messageerror", onWorkerFailure);
-      if (signal) {
-        abortListener = () => {
-          if (settled) return;
-          try {
-            worker.postMessage({
-              version: GRID_PROCESSING_PROTOCOL_VERSION,
-              type: "cancel",
-              requestId: request.requestId,
-            }, []);
-          } catch {
-            // Termination below remains the deterministic cancellation boundary.
-          }
-          settleReject(cancelled());
-        };
-        signal.addEventListener("abort", abortListener, { once: true });
-      }
       try {
+        worker.addEventListener("message", onMessage);
+        if (settled) return;
+        worker.addEventListener("error", onWorkerFailure);
+        if (settled) return;
+        worker.addEventListener("messageerror", onWorkerFailure);
+        if (settled) return;
+        if (signal) {
+          abortListener = () => {
+            if (settled) return;
+            try {
+              worker.postMessage({
+                version: GRID_PROCESSING_PROTOCOL_VERSION,
+                type: "cancel",
+                requestId: request.requestId,
+              }, []);
+            } catch {
+              // Termination below remains the deterministic cancellation boundary.
+            }
+            settleReject(cancelled());
+          };
+          addAbortListener(signal, abortListener);
+          if (settled) return;
+        }
         if (signal?.aborted) {
           abortListener?.();
           return;
