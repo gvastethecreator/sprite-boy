@@ -99,6 +99,17 @@ body {
   font-size: 13px;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 0;
+}
+
+html {
+  overflow: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

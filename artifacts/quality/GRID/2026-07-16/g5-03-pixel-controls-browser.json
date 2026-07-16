@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-pixel-controls-browser",
+  "status": "pass",
+  "task": "G5-03",
+  "scope": "Canonical Slice inspector controls for pixel snapping, auto/fixed palettes, presets, reset and accessible feedback.",
+  "evidence": {
+    "viewport": { "width": 1440, "height": 900, "deviceScaleFactor": 2 },
+    "initial": {
+      "enabled": "false",
+      "size": "16",
+      "colors": "16",
+      "mode": "auto",
+      "summary": "Pixel stage off. Source dimensions and colors remain unchanged."
+    },
+    "configured": {
+      "enabled": "true",
+      "size": "64",
+      "colors": "16",
+      "mode": "fixed",
+      "preset": "pico-8",
+      "swatches": 8,
+      "summary": "Fixed PICO-8 palette: 8 colors at 64px."
+    },
+    "reset": { "enabled": "false", "size": "16", "mode": "auto" },
+    "accessibility": {
+      "exposedNodeCount": 348,
+      "interactiveNodeCount": 61,
+      "unlabeledInteractiveCount": 0,
+      "mainLandmarkCount": 1
+    },
+    "layout": {
+      "horizontalOverflow": false,
+      "verticalOverflow": false,
+      "bodyScrollHeight": 900,
+      "bodyClientHeight": 900,
+      "panelHeight": 820,
+      "inspectorHeight": 777,
+      "documentRootScrollExtent": 1457
+    },
+    "runtimeErrors": { "console": 0, "exception": 0, "log": 0, "network": 0, "http": 0 },
+    "screenshot": {
+      "path": "artifacts/quality/GRID/2026-07-16/g5-03-pixel-controls.png",
+      "bytes": 183375,
+      "sha256": "d4cde4a6ffd6519b0b922fa7993935677c90d4e8d1b5ff116483def2e7bb96e9"
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Parallel palette state: all pixel setters commit through SliceGridController and the existing onCommitState host boundary.",
+      "Preset drift: PICO-8 selection renders eight exact swatches and fixed mode remains visible in the canonical data attributes.",
+      "Reset drift: reset returns disabled, size 16 and auto palette with no stale fixed palette.",
+      "Invisible failure: source-less controls are semantically disabled and summaries remain actionable; invalid custom sizes roll back to the committed value.",
+      "Layout/a11y regression: production Chrome reports zero user-visible body overflow, zero unlabeled interactive nodes and zero runtime/network errors."
+    ],
+    "boundary": "Worker palette math is G5-02; large-image/performance budget is G5-04; process/results/export journeys are G6/G7."
+  },
+  "verification": {
+    "focusedComponents": "pass (12/12)",
+    "focusedHookAndRecipe": "pass (14/14)",
+    "browser": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass (known JSZip/chunk warnings)",
+    "diffCheck": "pass",
+    "independentReview": "pending"
+  }
+}
