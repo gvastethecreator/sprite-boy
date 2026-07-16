@@ -653,7 +653,11 @@ export function quantizeColors(
   return Object.freeze({ paletteSize: palette.length });
 }
 
-/** Donor-compatible luminance-change profile. Axis y yields rows; axis x yields columns. */
+/**
+ * Alpha-aware premultiplied change profile. Axis y yields rows; axis x yields columns.
+ * Hidden RGB must not invent a grid inside a transparent gutter, while alpha-only edges
+ * (for example black art over transparency) remain detectable.
+ */
 export function getEnergyProfile(
   pixels: Uint8ClampedArray,
   width: number,
@@ -669,10 +673,13 @@ export function getEnergyProfile(
       for (let x = 1; x < dimensions.width; x += 1) {
         const current = (y * dimensions.width + x) * 4;
         const previous = current - 4;
+        const currentAlpha = pixels[current + 3]!;
+        const previousAlpha = pixels[previous + 3]!;
         sum +=
-          Math.abs(pixels[current]! - pixels[previous]!) +
-          Math.abs(pixels[current + 1]! - pixels[previous + 1]!) +
-          Math.abs(pixels[current + 2]! - pixels[previous + 2]!);
+          Math.abs(pixels[current]! * currentAlpha - pixels[previous]! * previousAlpha) / 255 +
+          Math.abs(pixels[current + 1]! * currentAlpha - pixels[previous + 1]! * previousAlpha) / 255 +
+          Math.abs(pixels[current + 2]! * currentAlpha - pixels[previous + 2]! * previousAlpha) / 255 +
+          Math.abs(currentAlpha - previousAlpha) * 3;
       }
       profile[y] = sum;
     }
@@ -682,10 +689,13 @@ export function getEnergyProfile(
       for (let y = 1; y < dimensions.height; y += 1) {
         const current = (y * dimensions.width + x) * 4;
         const previous = ((y - 1) * dimensions.width + x) * 4;
+        const currentAlpha = pixels[current + 3]!;
+        const previousAlpha = pixels[previous + 3]!;
         sum +=
-          Math.abs(pixels[current]! - pixels[previous]!) +
-          Math.abs(pixels[current + 1]! - pixels[previous + 1]!) +
-          Math.abs(pixels[current + 2]! - pixels[previous + 2]!);
+          Math.abs(pixels[current]! * currentAlpha - pixels[previous]! * previousAlpha) / 255 +
+          Math.abs(pixels[current + 1]! * currentAlpha - pixels[previous + 1]! * previousAlpha) / 255 +
+          Math.abs(pixels[current + 2]! * currentAlpha - pixels[previous + 2]! * previousAlpha) / 255 +
+          Math.abs(currentAlpha - previousAlpha) * 3;
       }
       profile[x] = sum;
     }
@@ -779,6 +789,51 @@ function mapSegmentsToSource(
   }));
 }
 
+function refineSegmentsOnSource(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  coarseRows: readonly GridSegment[],
+  coarseCols: readonly GridSegment[],
+): DetectedGridSegments | null {
+  const rows = findSegments(getEnergyProfile(pixels, width, height, "y"));
+  const cols = findSegments(getEnergyProfile(pixels, width, height, "x"));
+  if (!rows || !cols) return null;
+
+  const refineAxis = (
+    refined: readonly GridSegment[],
+    coarse: readonly GridSegment[],
+  ): readonly GridSegment[] | null => {
+    if (refined.length === coarse.length) {
+      const corresponds = refined.every((segment, index) => {
+        const candidate = coarse[index]!;
+        return segment.start < candidate.end && candidate.start < segment.end;
+      });
+      return corresponds ? refined : null;
+    }
+
+    const owners = refined.map((segment) => coarse
+      .map((candidate, index) => ({ candidate, index }))
+      .filter(({ candidate }) => segment.start < candidate.end && candidate.start < segment.end));
+    if (owners.some((matches) => matches.length !== 1)) return null;
+    const grouped = coarse.map((_, index) => refined.filter((__, segmentIndex) => owners[segmentIndex]![0]!.index === index));
+    if (grouped.some((segments) => segments.length === 0)) return null;
+    return Object.freeze(grouped.map((segments, index) => {
+      const start = segments[0]!.start;
+      const end = segments[segments.length - 1]!.end;
+      const candidate = coarse[index]!;
+      if (candidate.start <= start && candidate.end >= end) return candidate;
+      const expandedStart = Math.min(candidate.start, start);
+      const expandedEnd = Math.max(candidate.end, end);
+      return Object.freeze({ start: expandedStart, end: expandedEnd, size: expandedEnd - expandedStart });
+    }));
+  };
+
+  const refinedRows = refineAxis(rows, coarseRows);
+  const refinedCols = refineAxis(cols, coarseCols);
+  return refinedRows && refinedCols ? Object.freeze({ rows: refinedRows, cols: refinedCols }) : null;
+}
+
 /** Detects source-space grid runs through a bounded, never-upscaled pure RGBA analysis surface. */
 export function detectGridSegments(
   pixels: Uint8ClampedArray,
@@ -798,8 +853,19 @@ export function detectGridSegments(
   const rows = findSegments(getEnergyProfile(analysis, geometry.width, geometry.height, "y"));
   const cols = findSegments(getEnergyProfile(analysis, geometry.width, geometry.height, "x"));
   if (!rows || !cols) return null;
-  return Object.freeze({
+  const coarse = Object.freeze({
     rows: mapSegmentsToSource(rows, geometry.height, dimensions.height),
     cols: mapSegmentsToSource(cols, geometry.width, dimensions.width),
   });
+  if (geometry.width === dimensions.width && geometry.height === dimensions.height) return coarse;
+
+  // Coarse detection keeps allocation/work tied to maxWidth. Only a credible coarse grid earns
+  // one source-pixel refinement pass; disagreement becomes fallback rather than a partial crop.
+  return refineSegmentsOnSource(
+    pixels,
+    dimensions.width,
+    dimensions.height,
+    coarse.rows,
+    coarse.cols,
+  );
 }

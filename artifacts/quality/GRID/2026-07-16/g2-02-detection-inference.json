@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-auto-detection-inference",
+  "status": "pass",
+  "scope": [
+    "alpha-aware energy profiles",
+    "bounded segment inference",
+    "source-pixel boundary refinement after coarse detection",
+    "shared worker/source-cell materialization",
+    "confidence-gated deterministic fallback"
+  ],
+  "fixtures": {
+    "transparentSpaced2x4": "pass",
+    "transparentSpaced3x3": "pass",
+    "alpha1Gutter4097x2049": "exact-2x4-cells-1023x1023-pass",
+    "hiddenRgbFullyTransparent": "fallback-1x1",
+    "rowMajorCellOrder": "pass",
+    "goldenBaseline": "unchanged-pass"
+  },
+  "hostile": {
+    "seededNoisyInputs": 80,
+    "seededOpaqueNoise32x32": "fallback-1x1-with-warning-pass",
+    "clearSingleAxisGrids": "1x4-and-4x1-detected-pass",
+    "finiteAndInBounds": "pass",
+    "deterministic": "pass",
+    "emptySourcePolicy": "fallback-1x1"
+  },
+  "sharedImplementation": {
+    "workerImports": "inferAutoGridLayout",
+    "workerCalls": "inferAutoGridLayout(sourcePixels, width, height)",
+    "algorithmOwner": "core/processing/gridProcessingDetection.ts"
+  },
+  "performance": {
+    "inputs": [
+      "4096x2048 RGBA detected 2x4",
+      "600x16384 RGBA detected 4x1"
+    ],
+    "maxAnalysisWidth": 600,
+    "combinedDetectionBudgetMs": 5000,
+    "outerTestTimeoutMs": 30000,
+    "lastRerun": {
+      "executedAt": "2026-07-16T09:41:54-03:00",
+      "command": "bun x vitest run tests/contract/gridProcessingAlgorithms.test.ts -t \"representative landscape\" --reporter=verbose",
+      "reportedTestDurationMs": 1961,
+      "result": "pass"
+    }
+  },
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "repeatPerformanceMs": [2116, 2667],
+    "notes": "Recheck covered exact source refinement, ambiguity fallback, single-axis grids, maxWidth validation, frozen outputs and real/golden Worker paths."
+  },
+  "commands": [
+    "bun x vitest run tests/contract/gridProcessingAlgorithms.test.ts tests/integration/gridProcessingRealWorker.test.ts tests/integration/gridProcessingGoldenWorker.test.ts",
+    "bun x vitest run tests/contract/gridProcessingAlgorithms.test.ts -t \"representative landscape\" --reporter=verbose",
+    "bun x tsc --noEmit",
+    "bun x oxlint core/processing/gridProcessingAlgorithms.ts core/processing/gridProcessingDetection.ts features/slice/processing/gridProcessing.worker.ts tests/contract/gridProcessingAlgorithms.test.ts",
+    "git diff --check"
+  ]
+}

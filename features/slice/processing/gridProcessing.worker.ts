@@ -2,10 +2,10 @@
 
 import {
   applyAdvancedChromaKey,
-  detectGridSegments,
   findLocalTrimBounds,
   quantizeColors,
 } from "../../../core/processing/gridProcessingAlgorithms";
+import { inferAutoGridLayout } from "../../../core/processing/gridProcessingDetection";
 import {
   buildManualGrid,
   calculateReductionRatio,
@@ -168,28 +168,7 @@ function createLayout(
       warnings: [],
     };
   }
-  const detected = detectGridSegments(sourcePixels, width, height);
-  if (!detected || detected.rows.length * detected.cols.length > GRID_PROCESSING_LIMITS.maxResultCount) {
-    return {
-      origin: "fallback",
-      rows: 1,
-      cols: 1,
-      cells: buildManualGrid(width, height, 1, 1),
-      warnings: ["grid-detection-fallback"],
-    };
-  }
-  return {
-    origin: "detected",
-    rows: detected.rows.length,
-    cols: detected.cols.length,
-    cells: detected.rows.flatMap((row) => detected.cols.map((column) => ({
-      x: column.start,
-      y: row.start,
-      width: column.size,
-      height: row.size,
-    }))),
-    warnings: [],
-  };
+  return inferAutoGridLayout(sourcePixels, width, height);
 }
 
 function createWorkingOutputs(
