@@ -1750,7 +1750,8 @@ para ejecutar el journey completo con undo/save/export.
 ### G5-02 — Palette quantization determinista auto/fixed
 
 - **Auto palette:** el Worker real procesa una fixture de seis pixels con dos
-  clusters opacos y conserva los colores alpha `<128`/transparentes sin tocar.
+  clusters elegibles (`alpha >=128`) y conserva los colores alpha
+  `<128`/transparentes sin tocar.
   Con `colors: 2` produce exactamente `#f51919` y `#1919eb`, `warnings: []` y
   `operations: ["resize", "quantize"]`; los bytes pertenecen a una paleta de
   cardinalidad `≤2`.
@@ -1761,7 +1762,8 @@ para ejecutar el journey completo con undo/save/export.
 - **Determinismo y límites:** dos ejecuciones reales por modo producen pixels y
   operations idénticos, sin `Math.random`. El entrenamiento exacto/histogramado
   y k-means están acotados (`16384/2048/12`); `colors` permanece `2..256` y un
-  input con menos colores puede emitir `palette-reduced` sin inventar RGB.
+  input Worker con un único color elegible y `colors:4` emite
+  `palette-reduced` sin inventar RGB ni alterar alpha bajo el umbral.
 - **Evidencia:** smoke e integración Worker real, contratos de algorithms y
   protocol, typecheck, oxlint y diff-check verdes. Artifact:
   `artifacts/quality/GRID/2026-07-16/g5-02-palette-quantization.json`.

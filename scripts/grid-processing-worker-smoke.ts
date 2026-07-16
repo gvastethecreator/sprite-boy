@@ -76,17 +76,22 @@ const resizeEnabledResult = await processResizeFixture(true, "grid-real-worker-r
 const resizeDisabledResult = await processResizeFixture(false, "grid-real-worker-resize-disabled");
 const quantizeAutoSource = [
   250, 20, 20, 255,
-  240, 30, 30, 255,
+  240, 30, 30, 128,
   20, 30, 240, 255,
-  30, 20, 230, 255,
+  30, 20, 230, 200,
   10, 200, 10, 127,
   9, 9, 9, 0,
 ] as const;
 const quantizeFixedSource = [
   240, 20, 20, 255,
-  10, 20, 240, 255,
+  10, 20, 240, 128,
   250, 10, 10, 127,
   0, 255, 0, 0,
+] as const;
+const quantizeReducedSource = [
+  64, 128, 192, 255,
+  64, 128, 192, 128,
+  7, 8, 9, 127,
 ] as const;
 const processQuantizeFixture = (
   source: readonly number[],
@@ -140,6 +145,11 @@ const quantizeFixedRepeat = await processQuantizeFixture(
   quantizeFixedSource,
   "grid-real-worker-quantize-fixed-repeat",
   { size: 4, quantize: false, colors: 2, palette: ["#ff0000", "#0000ff"] },
+);
+const quantizeReducedResult = await processQuantizeFixture(
+  quantizeReducedSource,
+  "grid-real-worker-quantize-reduced",
+  { size: 3, quantize: true, colors: 4 },
 );
 const alphaCropResult = await createGridProcessingClient().process({
   request: {
@@ -391,6 +401,9 @@ const evidence = Object.freeze({
     fixedPixels: Object.freeze([...new Uint8ClampedArray(quantizeFixedResult.outputs[0]!.surface.pixels)]),
     fixedRepeatPixels: Object.freeze([...new Uint8ClampedArray(quantizeFixedRepeat.outputs[0]!.surface.pixels)]),
     fixedRepeatOperations: quantizeFixedRepeat.outputs[0]!.operations,
+    reducedOperations: quantizeReducedResult.outputs[0]!.operations,
+    reducedWarnings: quantizeReducedResult.outputs[0]!.warnings,
+    reducedPixels: Object.freeze([...new Uint8ClampedArray(quantizeReducedResult.outputs[0]!.surface.pixels)]),
   }),
   alphaCrop: Object.freeze({
     contentBounds: alphaOutput.contentBounds,
@@ -517,17 +530,17 @@ if (
     autoWarnings: [],
     autoPixels: [
       245, 25, 25, 255,
-      245, 25, 25, 255,
+      245, 25, 25, 128,
       25, 25, 235, 255,
-      25, 25, 235, 255,
+      25, 25, 235, 200,
       10, 200, 10, 127,
       9, 9, 9, 0,
     ],
     autoRepeatPixels: [
       245, 25, 25, 255,
-      245, 25, 25, 255,
+      245, 25, 25, 128,
       25, 25, 235, 255,
-      25, 25, 235, 255,
+      25, 25, 235, 200,
       10, 200, 10, 127,
       9, 9, 9, 0,
     ],
@@ -536,17 +549,24 @@ if (
     fixedWarnings: [],
     fixedPixels: [
       255, 0, 0, 255,
-      0, 0, 255, 255,
+      0, 0, 255, 128,
       250, 10, 10, 127,
       0, 255, 0, 0,
     ],
     fixedRepeatPixels: [
       255, 0, 0, 255,
-      0, 0, 255, 255,
+      0, 0, 255, 128,
       250, 10, 10, 127,
       0, 255, 0, 0,
     ],
     fixedRepeatOperations: ["resize", "quantize"],
+    reducedOperations: ["resize", "quantize"],
+    reducedWarnings: ["palette-reduced"],
+    reducedPixels: [
+      64, 128, 192, 255,
+      64, 128, 192, 128,
+      7, 8, 9, 127,
+    ],
   }) ||
   JSON.stringify(evidence.alphaCrop) !== JSON.stringify({
     contentBounds: { x: 2, y: 0, width: 2, height: 1 },

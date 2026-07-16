@@ -36,7 +36,7 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G4-04 | J | G4-01,G3-04 | G4.7 | Chroma→crop ordering and recipe determinism | RT+VIS | done |
 | G4-05 | J | G4-03,G4-04 | G4.1-G4.7 | Transparent/no-match/extreme tolerance gate | Hostile VIS+REV | done |
 | G5-01 | J | G3-04,G4-05 | G5.1-G5.3 | Pixel resize/snapping stage | Pixel/hash UT | done |
-| G5-02 | J | G5-01 | G5.4-G5.6 | Palette quantization count + auto/fixed modes | Determinism/membership UT | active |
+| G5-02 | J | G5-01 | G5.4-G5.6 | Palette quantization count + auto/fixed modes | Determinism/membership UT | done |
 | G5-03 | E | G5-02 | G1.7,G5.7-G5.8 | Palette extraction/presets/control UI | BR+A11Y + REV | todo |
 | G5-04 | J | G5-02 | G5.1-G5.8 | Large-image and palette performance budget | PERF artifact | todo |
 | G5-05 | J | G5-03,G5-04 | G5.1-G5.8 | Pipeline ordering, reset and recipe round-trip | RT+VIS+REV | todo |
