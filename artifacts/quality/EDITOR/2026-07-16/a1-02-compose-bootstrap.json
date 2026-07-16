@@ -1,0 +1,66 @@
+{
+  "task": "A1-02",
+  "title": "Project menu and Compose bootstrap UI",
+  "date": "2026-07-16",
+  "status": "accepted",
+  "behaviors": ["A1.3", "A2.1", "A2.2"],
+  "implementation": {
+    "canonicalRuntime": "One ProjectStore, history controller and AssetRepository bundle owns the active Compose project.",
+    "bootstrap": "Validated PNG, JPEG or WebP import persists one Asset and opens the first canonical Composition and Layer through the A1-01 intent.",
+    "autosave": "Serialized checkpoints, startup recovery and generation guards prevent stale completion state.",
+    "cleanup": "Runtime debt is scoped by projectId and assetId; ASSET_NOT_FOUND is idempotent; global reconciliation runs only at safe lifecycle boundaries or with empty history.",
+    "boundary": "Portable package open and the complete first-composition acceptance journey remain owned by A1-04."
+  },
+  "verification": {
+    "focusedTests": { "passed": 17, "failed": 0 },
+    "integrationSelection": { "passed": 102, "failed": 0, "files": 13 },
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "diffCheck": "pass",
+    "browser": {
+      "status": "pass",
+      "viewports": ["1440x900", "900x700"],
+      "invalidImportFeedbackFocused": true,
+      "autosaveReload": true,
+      "durableAsset": {
+        "count": 1,
+        "name": "atlas-hero.png",
+        "width": 64,
+        "height": 32,
+        "mimeType": "image/png",
+        "byteSize": 229
+      },
+      "openProjectDisabledReason": "Portable project opening is not available in Compose yet.",
+      "accessibility": {
+        "interactiveNodes": 37,
+        "unlabeledInteractiveNodes": 0,
+        "mainLandmarks": 1
+      },
+      "overflow": { "desktop": false, "compact": false },
+      "runtimeErrors": {
+        "console": 0,
+        "exception": 0,
+        "log": 0,
+        "network": 0,
+        "http": 0
+      }
+    },
+    "screenshots": [
+      {
+        "path": "artifacts/quality/EDITOR/2026-07-16/a1-02-compose-bootstrap.png",
+        "sha256": "33b45d03101fef9dedb25325c245708b75093874dc20bcaa2d075fc56df6c888"
+      },
+      {
+        "path": "artifacts/quality/EDITOR/2026-07-16/a1-02-compose-bootstrap-compact.png",
+        "sha256": "41bd7a9222e6b9956dc42048197236b943fe1dc3a634572095bf390dcdc20fd6"
+      }
+    ],
+    "independentReview": {
+      "verdict": "ACCEPT",
+      "p0": 0,
+      "p1": 0,
+      "p2": 0
+    }
+  }
+}

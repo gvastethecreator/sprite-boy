@@ -10,6 +10,7 @@ import { StudioWorkspaceStateView } from "../../components/studio";
 
 const readyContext: StudioCommandContext = {
   projectAvailable: true,
+  projectOpenAvailable: true,
   busy: false,
   canUndo: false,
   canRedo: false,

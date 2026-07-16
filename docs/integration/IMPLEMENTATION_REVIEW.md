@@ -1526,6 +1526,37 @@ para ejecutar el journey completo con undo/save/export.
 
 **Siguiente frontera Grid:** G3-02 reduction y empty/transparent policy activo.
 
+### A1-02 — Project menu and Compose bootstrap UI
+
+- **Runtime canónico:** la ruta Compose monta un solo `ProjectStore`, history y
+  `AssetRepository` compartidos. New, rename, workspace y autosave operan sobre
+  ese bundle; recovery restaura proyecto y bytes desde IndexedDB sin introducir
+  un segundo modelo de documento.
+- **Bootstrap real:** el empty state importa PNG/JPEG/WebP validado, persiste un
+  Asset y abre su primera Composition/Layer con el intent A1-01 preflighted. El
+  primer undo retira Composition/Layer pero conserva Asset+Blob; fuentes ya
+  canónicas se reabren sin reimportar bytes.
+- **Persistencia y carreras:** checkpoints se serializan y descartan completions
+  de generaciones antiguas. New espera saves/cleanup en vuelo; import proyecta
+  busy al command boundary. Deuda de cleanup queda identificada por
+  `projectId+assetId`, `ASSET_NOT_FOUND` es idempotente y el scan global sólo se
+  repite con history vacío o en startup/New para no romper undo/redo.
+- **UX y accesibilidad:** Project menu ofrece New/Save/rename inline con flujo
+  teclado; Open queda deshabilitado con razón explícita hasta A1-04. Compose
+  muestra feedback enfocado, retry de cleanup, inspector Canvas desktop y
+  diálogo Properties compacto; toasts dismissibles tienen nombre accesible.
+- **Evidencia:** 17/17 focal y 102/102 acumulado, typecheck, oxlint, build y
+  diff-check verdes. Browser real cubre import inválido, drag/drop válido,
+  rename, autosave+reload, Blob 229 B 64×32, Open disabled, desktop/compact,
+  37 interactivos sin etiqueta faltante, sin overflow y cinco contadores de
+  error en cero. Capturas inspeccionadas; revisión independiente `ACCEPT`,
+  P0-P2=0. Artifact:
+  `artifacts/quality/EDITOR/2026-07-16/a1-02-compose-bootstrap.{json,png}`.
+- **Límite honesto:** A1-04 conserva ownership de package/open portable y del
+  journey de aceptación de primera composición; este slice no finge ese gate.
+
+**Siguiente frontera Editor:** A1-04 portable first-composition acceptance.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

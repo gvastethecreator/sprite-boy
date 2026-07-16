@@ -91,8 +91,12 @@ const ToastItem: React.FC<{ toast: ToastData; onRemove: (id: string) => void }> 
           </span>
         </div>
 
-        <button className="shrink-0 opacity-50 hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all self-center text-textMuted hover:text-white">
-          <X size={14} />
+        <button
+          type="button"
+          aria-label={`Dismiss notification: ${toast.msg}`}
+          className="shrink-0 opacity-50 hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all self-center text-textMuted hover:text-white"
+        >
+          <X size={14} aria-hidden="true" />
         </button>
       </div>
     </div>

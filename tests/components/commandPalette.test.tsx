@@ -25,6 +25,7 @@ function handlers(): StudioCommandHandlers {
 
 const ready: StudioCommandContext = {
   projectAvailable: true,
+  projectOpenAvailable: true,
   busy: false,
   canUndo: true,
   canRedo: true,
