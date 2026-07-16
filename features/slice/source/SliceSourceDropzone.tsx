@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type RefObject } from "react";
 import { AlertTriangle, FileImage, LoaderCircle, UploadCloud } from "lucide-react";
 
 import type { SourceSelectionInput, SourceSessionSnapshot } from "./sourceSession";
@@ -7,6 +7,7 @@ export interface SliceSourceDropzoneProps {
   readonly snapshot: SourceSessionSnapshot;
   readonly disabled?: boolean;
   readonly committing?: boolean;
+  readonly browseButtonRef?: RefObject<HTMLButtonElement | null>;
   readonly onBrowse: () => void;
   readonly onSelect: (input: SourceSelectionInput) => void | Promise<void>;
   readonly onRetry?: () => void | Promise<void>;
@@ -31,6 +32,7 @@ export function SliceSourceDropzone({
   snapshot,
   disabled = false,
   committing = false,
+  browseButtonRef,
   onBrowse,
   onSelect,
   onRetry,
@@ -134,6 +136,7 @@ export function SliceSourceDropzone({
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           <button
+            ref={browseButtonRef}
             type="button"
             disabled={inactive}
             onClick={() => {

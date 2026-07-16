@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   SliceSourceCanvasFrame,
   SliceSourcePreview,
+  createSliceSourceDisplayMetadata,
 } from "../../features/slice/source/SliceSourcePreview";
 import type { SourceSessionSnapshot } from "../../features/slice/source/sourceSession";
 
@@ -205,5 +206,66 @@ describe("SliceSourcePreview (G0-03)", () => {
     expect(container.querySelector("[data-slice-source-preview]"))
       .toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("status")).toHaveTextContent(/Opening the validated source/i);
+  });
+
+  it("builds an honest legacy fallback for a loaded project", () => {
+    const legacy = {
+      src: "blob:loaded-project-source",
+      width: 96,
+      height: 48,
+      name: "legacy-sheet.webp",
+      fileSize: 4_096,
+    };
+    expect(createSliceSourceDisplayMetadata(null, legacy)).toEqual({
+      name: "legacy-sheet.webp",
+      width: 96,
+      height: 48,
+      size: 4_096,
+      formatLabel: "WebP · inferred",
+      formatConfidence: "inferred",
+    });
+    render(
+      <SliceSourceCanvasFrame snapshot={idleSnapshot(8)} legacyImageMeta={legacy}>
+        <div>legacy canvas</div>
+      </SliceSourceCanvasFrame>,
+    );
+    const metadata = screen.getByLabelText("Slice source metadata");
+    expect(metadata).toHaveTextContent("legacy-sheet.webp");
+    expect(metadata).toHaveTextContent("96 × 48");
+    expect(metadata).toHaveTextContent("4.0 KiB");
+    expect(metadata).toHaveTextContent("WebP · inferred");
+    expect(metadata.querySelector("[data-format-confidence]"))
+      .toHaveAttribute("data-format-confidence", "inferred");
+  });
+
+  it("labels unknown legacy format honestly and prefers validated metadata", () => {
+    const legacy = {
+      src: "blob:opaque-source",
+      width: 20,
+      height: 10,
+      name: "source-without-extension",
+      fileSize: 200,
+    };
+    const view = render(
+      <SliceSourceCanvasFrame snapshot={idleSnapshot(9)} legacyImageMeta={legacy}>
+        <div>canvas</div>
+      </SliceSourceCanvasFrame>,
+    );
+    expect(screen.getByText("Unknown")).toHaveAttribute("data-format-confidence", "unknown");
+
+    const validated = readySnapshot(10, "validated.png", {});
+    if (validated.status !== "ready") throw new Error("ready fixture is invalid");
+    view.rerender(
+      <SliceSourceCanvasFrame
+        snapshot={validated}
+        metadataOverride={validated.metadata}
+        legacyImageMeta={legacy}
+      >
+        <div>canvas</div>
+      </SliceSourceCanvasFrame>,
+    );
+    expect(screen.getByText("validated.png")).toBeInTheDocument();
+    expect(screen.getByText("PNG")).toHaveAttribute("data-format-confidence", "validated");
+    expect(screen.queryByText("source-without-extension")).not.toBeInTheDocument();
   });
 });

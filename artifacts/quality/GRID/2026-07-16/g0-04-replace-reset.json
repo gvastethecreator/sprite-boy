@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "check": "slice-source-replace-reset-browser",
+  "status": "pass",
+  "tests": {
+    "focusedFilesPassed": 6,
+    "focusedTestsPassed": 47,
+    "failed": 0,
+    "lint": "pass",
+    "typecheck": "pass"
+  },
+  "build": "pass",
+  "metrics": {
+    "actionsVisible": true,
+    "pickerCancelPreserved": true,
+    "replaceKeptCurrentSource": true,
+    "resetConfirmationAccessible": true,
+    "resetCancelPreserved": true,
+    "resetCompleted": true,
+    "resetResourceReleased": true,
+    "resetFocusRestored": true,
+    "preferencesPreserved": true,
+    "sourceGraphClearedBeforeReplace": true,
+    "postCommitEffectsContained": true,
+    "assetUrlAliasesProtected": true,
+    "legacyMetadataFallback": true,
+    "hostileAbortAccessorContained": true,
+    "pageFits": true,
+    "errors": {
+      "console": 0,
+      "exception": 0,
+      "log": 0,
+      "network": 0,
+      "http": 0
+    }
+  },
+  "commands": [
+    "bun x vitest run tests/components/sliceSourceActions.test.tsx tests/contract/sliceSourceReset.test.ts tests/hooks/useProjectControllerSliceSource.test.tsx tests/contract/studioSliceSourceBrowser.test.ts tests/components/sliceSourcePreview.test.tsx tests/components/sliceSourceDropzone.test.tsx",
+    "bun x tsc --noEmit",
+    "bun x oxlint components/layout/AppLayout.tsx features/slice/source/SliceSourceDropzone.tsx features/slice/source/SliceSourcePreview.tsx features/slice/source/SliceSourceActions.tsx features/slice/source/SliceSourceResetDialog.tsx hooks/useProjectController.ts scripts/studio-slice-source-browser.mjs tests/contract/studioSliceSourceBrowser.test.ts tests/components/sliceSourceActions.test.tsx tests/components/sliceSourcePreview.test.tsx tests/contract/sliceSourceReset.test.ts tests/hooks/useProjectControllerSliceSource.test.tsx",
+    "bun run build",
+    "node scripts/studio-slice-source-browser.mjs"
+  ],
+  "screenshot": "artifacts/quality/GRID/2026-07-16/g0-04-replace-reset.png",
+  "independentReview": {
+    "decision": "ACCEPT",
+    "severityCounts": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "notes": [
+      "Replacement and reset use a terminal no-throw boundary and clear all source-derived graph and interaction state.",
+      "Preserved library assets protect aliased runtime URLs from revocation.",
+      "Loaded legacy sources retain honest display metadata and hostile AbortSignal accessors cannot leave pending work."
+    ]
+  }
+}

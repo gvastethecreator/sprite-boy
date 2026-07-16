@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useUndo } from "./useUndo";
 import { useUIController } from "./useUIController";
 import {
@@ -32,6 +32,123 @@ const INITIAL_STATE: ProjectState = {
   aspectRatio: "1:1",
 };
 
+/** Clear only the graph derived from the active Slice source. */
+export function resetSliceSourceProjectState(previous: ProjectState): ProjectState {
+  return {
+    ...previous,
+    imageMeta: null,
+    builderCanvas: null,
+    frames: [],
+    builderSlots: {},
+    builderFreeObjects: [],
+    animations: [],
+  };
+}
+
+export interface SliceSourceProjectReplacement {
+  readonly imageMeta: NonNullable<ProjectState["imageMeta"]>;
+  readonly builderCanvas: NonNullable<ProjectState["builderCanvas"]>;
+  readonly frames: ProjectState["frames"];
+}
+
+/** Atomically remove the old source graph and install only the new source graph. */
+export function replaceSliceSourceProjectState(
+  previous: ProjectState,
+  replacement: SliceSourceProjectReplacement,
+): ProjectState {
+  return {
+    ...resetSliceSourceProjectState(previous),
+    imageMeta: replacement.imageMeta,
+    builderCanvas: replacement.builderCanvas,
+    frames: replacement.frames,
+  };
+}
+
+export interface SliceRuntimeUrlHost {
+  revokeObjectURL(url: string): void;
+}
+
+export interface SliceOwnedRuntimeUrls {
+  readonly source?: string | null;
+  readonly backgroundPreview?: string | null;
+  readonly protectedAssetUrls?: readonly string[];
+}
+
+/** Revoke each Slice-owned Blob URL at most once; unrelated asset URLs are never accepted. */
+export function revokeSliceOwnedRuntimeUrls(
+  ownedUrls: SliceOwnedRuntimeUrls,
+  configuredHost?: SliceRuntimeUrlHost | null,
+): number {
+  let host: SliceRuntimeUrlHost | null = configuredHost ?? null;
+  if (configuredHost === undefined) {
+    try {
+      const owner = globalThis.URL;
+      const revoke = owner?.revokeObjectURL;
+      host = typeof revoke === "function"
+        ? { revokeObjectURL: (url: string) => Reflect.apply(revoke, owner, [url]) }
+        : null;
+    } catch {
+      host = null;
+    }
+  }
+  if (host === null) return 0;
+  const protectedUrls = new Set(ownedUrls.protectedAssetUrls ?? []);
+  const uniqueUrls = new Set([ownedUrls.source, ownedUrls.backgroundPreview].filter(
+    (url): url is string => typeof url === "string" && url.startsWith("blob:") &&
+      !protectedUrls.has(url),
+  ));
+  let released = 0;
+  for (const runtimeUrl of uniqueUrls) {
+    released += 1;
+    try {
+      host.revokeObjectURL(runtimeUrl);
+    } catch {
+      // Release remains terminal when a revoked/hostile browser object throws.
+    }
+  }
+  return released;
+}
+
+/** Run terminal effects independently so one hostile observer cannot block the rest. */
+export function runSliceTerminalEffects(actions: readonly (() => void)[]): void {
+  for (const action of actions) {
+    try {
+      action();
+    } catch {
+      // The project transaction already committed; terminal effects are best effort.
+    }
+  }
+}
+
+const ABORT_SIGNAL_ABORTED_GETTER = (() => {
+  try {
+    return Object.getOwnPropertyDescriptor(AbortSignal.prototype, "aborted")?.get ?? null;
+  } catch {
+    return null;
+  }
+})();
+
+/** Read cancellation without invoking caller-controlled `aborted` accessors. */
+export function isSliceSourceSignalAborted(signal: AbortSignal | undefined): boolean {
+  if (!signal) return false;
+  if (ABORT_SIGNAL_ABORTED_GETTER) {
+    try {
+      return Boolean(Reflect.apply(ABORT_SIGNAL_ABORTED_GETTER, signal, []));
+    } catch {
+      // A proxy/non-native object falls through to a data-descriptor capture.
+    }
+  }
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(signal, "aborted");
+    if (descriptor && "value" in descriptor && typeof descriptor.value === "boolean") {
+      return descriptor.value;
+    }
+  } catch {
+    // A revoked proxy is conservatively treated as cancelled.
+  }
+  return true;
+}
+
 const loadPreferences = (): UserPreferences => {
   try {
     const stored = localStorage.getItem("spriteSlice_prefs");
@@ -64,6 +181,10 @@ export function useProjectController() {
     canRedo,
   } = useUndo<ProjectState>(INITIAL_STATE);
   const ui = useUIController();
+  const projectRef = useRef(project);
+  const backgroundPreviewUrlRef = useRef(ui.bgPreviewBlobUrl);
+  projectRef.current = project;
+  backgroundPreviewUrlRef.current = ui.bgPreviewBlobUrl;
   const uiState = loadUIState();
   const defaultGrid: GridConfig = {
     rows: 2,
@@ -198,6 +319,15 @@ export function useProjectController() {
     if (rgb.length === 3) root.style.setProperty("--accent-rgb", preferences.accentColor);
   }, [preferences.theme, preferences.accentColor]);
 
+  const clearSliceDerivedInteractionState = (): void => {
+    runSliceTerminalEffects([
+      () => setSelectedIndex(null),
+      () => animLogic.setActiveAnimationId(null),
+      () => animLogic.setIsPlaying(false),
+      () => ui.setBgPreviewBlobUrl(null),
+    ]);
+  };
+
   const handleUpload = (
     file: File,
     options: { readonly signal?: AbortSignal } = {},
@@ -206,69 +336,93 @@ export function useProjectController() {
     const signal = options.signal;
     let image: HTMLImageElement | null = null;
     let settled = false;
+    let abortListenerAttached = false;
+    const cleanup = (): void => {
+      runSliceTerminalEffects([
+        () => {
+          const shouldRemove = signal !== undefined && abortListenerAttached;
+          abortListenerAttached = false;
+          if (shouldRemove) signal.removeEventListener("abort", onAbort);
+        },
+        () => { reader.onload = null; },
+        () => { reader.onerror = null; },
+        () => { reader.onabort = null; },
+        () => { if (image) image.onload = null; },
+        () => { if (image) image.onerror = null; },
+      ]);
+    };
+    const rejectOnce = (error: Error): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      runSliceTerminalEffects([
+        () => { if (image) image.src = ""; },
+        () => notify("The validated source could not be opened in Slice.", "error"),
+      ]);
+      reject(error);
+    };
     const onAbort = (): void => {
       if (settled) return;
       settled = true;
       cleanup();
-      try {
-        if (reader.readyState === FileReader.LOADING) reader.abort();
-      } catch {
-        // The settled flag remains authoritative if a browser abort primitive fails.
-      }
-      if (image) image.src = "";
+      runSliceTerminalEffects([
+        () => { if (reader.readyState === FileReader.LOADING) reader.abort(); },
+        () => { if (image) image.src = ""; },
+      ]);
       reject(new DOMException("Slice source import was cancelled.", "AbortError"));
     };
-    const cleanup = (): void => {
-      signal?.removeEventListener("abort", onAbort);
-      reader.onload = null;
-      reader.onerror = null;
-      reader.onabort = null;
-      if (image) {
-        image.onload = null;
-        image.onerror = null;
-      }
-    };
-    const fail = (): void => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (image) image.src = "";
-      try {
-        notify("The validated source could not be opened in Slice.", "error");
-      } finally {
-        reject(new Error("Validated Slice source import failed."));
-      }
-    };
-    reader.onerror = fail;
-    reader.onabort = fail;
-    reader.onload = () => {
-      const src = reader.result;
-      if (typeof src !== "string") {
-        fail();
-        return;
-      }
-      try {
-        image = new Image();
-        image.onerror = fail;
-        image.onload = () => {
+    const fail = (): void => rejectOnce(new Error("Validated Slice source import failed."));
+    try {
+      reader.onerror = fail;
+      reader.onabort = fail;
+      reader.onload = () => {
+        let src: string;
+        try {
+          const result = reader.result;
+          if (typeof result !== "string") {
+            fail();
+            return;
+          }
+          src = result;
+        } catch {
+          fail();
+          return;
+        }
+        try {
+          image = new Image();
+          image.onerror = fail;
+        } catch {
+          fail();
+          return;
+        }
+        const handleImageLoad = (): void => {
+          const abortedAtLoad = isSliceSourceSignalAborted(signal);
           if (
-            settled || signal?.aborted || image === null ||
+            settled || abortedAtLoad || image === null ||
             image.width <= 0 || image.height <= 0
           ) {
-            if (signal?.aborted) onAbort();
+            if (abortedAtLoad) onAbort();
             else fail();
             return;
           }
+
+          let nextProject: ProjectState;
+          let previousSourceRuntimeUrl: string | null | undefined;
+          let previousBackgroundPreviewUrl: string | null;
+          let protectedAssetUrls: string[];
           try {
             const width = image.width;
             const height = image.height;
             const newFrames = generateFramesFromGrid(width, height, defaultGrid);
-            if (signal?.aborted) {
+            if (isSliceSourceSignalAborted(signal)) {
               onAbort();
               return;
             }
-            setProject((prev) => ({
-              ...prev,
+            const currentProject = projectRef.current;
+            previousSourceRuntimeUrl = currentProject.imageMeta?.src;
+            previousBackgroundPreviewUrl = backgroundPreviewUrlRef.current;
+            protectedAssetUrls = currentProject.builderAssets.map((asset) => asset.src);
+            nextProject = replaceSliceSourceProjectState(currentProject, {
               imageMeta: {
                 src,
                 width,
@@ -278,32 +432,57 @@ export function useProjectController() {
               },
               builderCanvas: { width, height },
               frames: newFrames,
-              builderSlots: {},
-            }));
-            try {
-              ui.setBgPreviewBlobUrl(null);
-            } catch {
-              // Preview cleanup must not invalidate an already committed project.
-            }
-            settled = true;
-            cleanup();
-            resolve();
-            try {
-              notify(`Imported ${file.name}`, "success");
-            } catch {
-              // Feedback is best effort after the project transaction commits.
-            }
+            });
           } catch {
             fail();
+            return;
           }
+
+          try {
+            setProject(nextProject);
+          } catch {
+            fail();
+            return;
+          }
+
+          // Terminal boundary: the replacement is installed. Nothing below
+          // may call fail/reject or prevent the public promise from settling.
+          settled = true;
+          runSliceTerminalEffects([
+            () => { projectRef.current = nextProject; },
+            () => { backgroundPreviewUrlRef.current = null; },
+            clearSliceDerivedInteractionState,
+            () => revokeSliceOwnedRuntimeUrls({
+              backgroundPreview: previousBackgroundPreviewUrl,
+              source: previousSourceRuntimeUrl,
+              protectedAssetUrls,
+            }),
+            cleanup,
+            resolve,
+            () => notify(`Imported ${file.name}`, "success"),
+          ]);
         };
-        image.src = src;
-      } catch {
-        fail();
+        try {
+          image.onload = handleImageLoad;
+        } catch {
+          fail();
+          return;
+        }
+        try {
+          image.src = src;
+        } catch {
+          fail();
+        }
+      };
+      if (signal) {
+        abortListenerAttached = true;
+        signal.addEventListener("abort", onAbort, { once: true });
       }
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-    if (signal?.aborted) {
+    } catch {
+      fail();
+      return;
+    }
+    if (isSliceSourceSignalAborted(signal)) {
       onAbort();
       return;
     }
@@ -374,6 +553,38 @@ export function useProjectController() {
     setSlicerGrid(defaultGrid);
     setBuilderGrid(defaultGrid);
     notify("New project.", "info");
+  };
+
+  const handleResetSliceSource = () => {
+    let nextProject: ProjectState;
+    let sourceRuntimeUrl: string | null | undefined;
+    let backgroundPreviewUrl: string | null;
+    let protectedAssetUrls: string[];
+    try {
+      const currentProject = projectRef.current;
+      nextProject = resetSliceSourceProjectState(currentProject);
+      sourceRuntimeUrl = currentProject.imageMeta?.src;
+      backgroundPreviewUrl = backgroundPreviewUrlRef.current;
+      protectedAssetUrls = currentProject.builderAssets.map((asset) => asset.src);
+      setProject(nextProject);
+    } catch {
+      runSliceTerminalEffects([
+        () => notify("The Slice source could not be reset.", "error"),
+      ]);
+      return;
+    }
+
+    runSliceTerminalEffects([
+      () => { projectRef.current = nextProject; },
+      () => { backgroundPreviewUrlRef.current = null; },
+      clearSliceDerivedInteractionState,
+      () => revokeSliceOwnedRuntimeUrls({
+        backgroundPreview: backgroundPreviewUrl,
+        source: sourceRuntimeUrl,
+        protectedAssetUrls,
+      }),
+      () => notify("Slice source reset.", "info"),
+    ]);
   };
 
   const handleSetMode = (mode: AppMode) => {
@@ -546,6 +757,7 @@ export function useProjectController() {
     handleSaveProject: persistence.handleSaveProject,
     handleLoadProject: persistence.handleLoadProject,
     handleNewProject,
+    handleResetSliceSource,
     onionSkin,
     setOnionSkin,
     handleToggleFrameVisibility: (id: number) => {
