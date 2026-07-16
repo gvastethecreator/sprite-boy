@@ -1557,6 +1557,35 @@ para ejecutar el journey completo con undo/save/export.
 
 **Siguiente frontera Editor:** A1-04 portable first-composition acceptance.
 
+### G3-03 — Crop controls, preview summary and reset
+
+- **Estado canónico:** Alpha threshold y padding editan únicamente
+  `GridSplitRecipeV1.crop` dentro del mismo controller/ProjectState de Slice.
+  No existe store, recipe ni history paralelo; reset vuelve a `0/0` y los
+  no-op no crean entradas de undo.
+- **Interacción e historial:** los sliders mantienen un draft local durante el
+  gesto y confirman una sola transacción en pointer/keyboard/blur. Si el host
+  rechaza el commit, labels, summary y atributos vuelven inmediatamente al
+  recipe autoritativo, sin estado optimista huérfano.
+- **Identidad de fuente:** el host deriva una identidad transicional estable de
+  bytes+metadatos. Reemplazar por otra imagen con las mismas dimensiones no
+  hereda crop/layout de la fuente anterior; reload de la misma fuente sí puede
+  hidratar su recipe persistido.
+- **UX y accesibilidad:** threshold `0` se presenta como sentinel Off; preview
+  informa las 8 celdas y settings activos sin inventar una reducción todavía no
+  procesada. Controles sin fuente y reset no-op quedan deshabilitados; desktop y
+  Properties compacto no tienen overflow ni interactivos sin nombre.
+- **Evidencia:** 47/47 pruebas de Grid en siete archivos, typecheck, oxlint,
+  build y diff-check verdes. Browser productivo prueba 35%/4px, export exacto,
+  coalescing a dos undo/redo, reset+undo/redo, desktop/compact, 42 interactivos
+  etiquetados y cinco contadores de error en cero. Capturas inspeccionadas y
+  revisión independiente `ACCEPT`, P0-P2=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g3-03-crop-controls.{json,png}`.
+- **Límite honesto:** G3-04 conserva el gate hostile OOB/zero-size/huge-padding;
+  la reducción real y el results tray siguen siendo responsabilidad de G6.
+
+**Siguiente frontera Grid:** G3-04 OOB/zero-size/huge-padding hostile gate.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

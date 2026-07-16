@@ -181,6 +181,24 @@ export function updateSliceGridRecipeLayout(
   });
 }
 
+export function updateSliceGridRecipeCrop(
+  state: SliceGridRecipeStateV1,
+  crop: GridSplitRecipeV1["crop"],
+): SliceGridRecipeStateV1 {
+  if (!canonicalNumber(crop.threshold, 0, 100) ||
+    !canonicalInteger(crop.padding, 0, GRID_PROCESSING_LIMITS.maxDimension)) {
+    throw new TypeError("Slice grid crop settings are invalid.");
+  }
+  return Object.freeze({
+    version: 1 as const,
+    recipe: Object.freeze({
+      ...state.recipe,
+      crop: Object.freeze({ threshold: crop.threshold, padding: crop.padding }),
+    }),
+    manual: state.manual,
+  });
+}
+
 export function serializeSliceGridRecipeState(state: SliceGridRecipeStateV1): string {
   const hydrated = hydrateSliceGridRecipeState(state, {
     width: Math.max(state.manual.cols, state.recipe.layout.mode === "manual" ? state.recipe.layout.cols : 1),

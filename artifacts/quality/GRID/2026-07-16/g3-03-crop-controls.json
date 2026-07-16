@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "task": "G3-03",
+  "title": "Crop controls, preview summary and reset",
+  "date": "2026-07-16",
+  "status": "accepted",
+  "behaviors": ["G3.1", "G3.2", "G3.3", "G3.4"],
+  "implementation": {
+    "ownership": "Threshold and padding update only the canonical GridSplitRecipeV1.crop through the existing Slice controller and host transaction.",
+    "thresholdZero": "Zero is the explicit crop-disabled Off sentinel and preserves the G3-01 donor-compatible baseline.",
+    "history": "Slider changes stay in a local gesture draft and commit once on pointer, keyboard or blur completion; no-op commits do not create history.",
+    "hostRejection": "A rejected host transaction returns false and immediately restores the visual draft, labels, summary and attributes from the authoritative recipe.",
+    "sourceIdentity": "A stable transitional identity includes source bytes and metadata, so same-dimension replacements reset instead of hydrating the previous source recipe.",
+    "preview": "The summary reports cell count and active settings, while honestly deferring measured reduction until processing.",
+    "reset": "Reset commits threshold 0 and padding 0 together and is disabled when unavailable or already at defaults.",
+    "boundary": "G3-04 owns hostile OOB, zero-size and huge-padding gates; G6 owns processed reduction and results presentation."
+  },
+  "verification": {
+    "gridSelection": {
+      "passed": 47,
+      "failed": 0,
+      "files": 7
+    },
+    "focusedAfterRollbackRepair": {
+      "passed": 27,
+      "failed": 0,
+      "files": 4
+    },
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "diffCheck": "pass",
+    "browser": {
+      "status": "pass",
+      "viewports": ["1440x900", "900x700"],
+      "configuredCrop": { "threshold": 35, "padding": 4 },
+      "exportedCrop": { "threshold": 35, "padding": 4 },
+      "gestureCommits": 2,
+      "dragHistoryCoalesced": true,
+      "resetCrop": { "threshold": 0, "padding": 0 },
+      "resetUndoRedo": true,
+      "accessibility": {
+        "interactiveNodes": 42,
+        "unlabeledInteractiveNodes": 0,
+        "mainLandmarks": 1
+      },
+      "overflow": { "desktop": false, "compact": false },
+      "runtimeErrors": {
+        "console": 0,
+        "exception": 0,
+        "log": 0,
+        "network": 0,
+        "http": 0
+      }
+    },
+    "screenshots": [
+      {
+        "path": "artifacts/quality/GRID/2026-07-16/g3-03-crop-controls.png",
+        "sha256": "07adf3c24e74c20ec3500c26e3ccf203171f809e184030e3d4636339807ea829"
+      },
+      {
+        "path": "artifacts/quality/GRID/2026-07-16/g3-03-crop-controls-compact.png",
+        "sha256": "2198f20c177fbc478720e40e26c8667624be53cccb94336e260f444b8b67b8cf"
+      }
+    ],
+    "independentReview": {
+      "verdict": "ACCEPT",
+      "p0": 0,
+      "p1": 0,
+      "p2": 0,
+      "reviewerFocusedTests": { "passed": 21, "failed": 0 }
+    }
+  },
+  "commands": [
+    "VITEST_MAX_WORKERS=2 bunx vitest run tests/components/sliceGridInspector.test.tsx tests/hooks/useSliceGridIntegration.test.tsx tests/hooks/useSliceGridController.test.tsx tests/contract/gridRecipeState.test.ts tests/contract/gridProcessingCrop.test.ts tests/contract/gridProcessingGeometry.test.ts tests/contract/gridProcessingReduction.test.ts --reporter=verbose",
+    "bun run typecheck",
+    "bunx oxlint <G3-03 scoped files>",
+    "bun run build",
+    "node scripts/studio-grid-crop-browser.mjs",
+    "git diff --check"
+  ]
+}

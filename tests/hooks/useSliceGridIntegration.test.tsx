@@ -111,6 +111,76 @@ describe("useSliceGridController integration (G2-05)", () => {
     expect(result.current.manualColsInput).toBe("4");
   });
 
+  it("commits crop controls into the same recipe state and resets without a no-op history entry", async () => {
+    const commits: SliceGridRecipeStateV1[] = [];
+    const { result } = renderHook(() => useSliceGridController(options({
+      onCommitState: (state: SliceGridRecipeStateV1) => commits.push(state),
+    })));
+    await act(async () => Promise.resolve());
+
+    expect(result.current.cropPreview).toEqual({
+      enabled: false,
+      threshold: 0,
+      padding: 0,
+      cellCount: 6,
+    });
+    act(() => expect(result.current.resetCrop()).toBe(true));
+    expect(commits).toHaveLength(0);
+    act(() => expect(result.current.setCropThreshold(35)).toBe(true));
+    act(() => expect(result.current.setCropPadding(4)).toBe(true));
+    expect(result.current.recipe.crop).toEqual({ threshold: 35, padding: 4 });
+    expect(result.current.cropPreview).toEqual({
+      enabled: true,
+      threshold: 35,
+      padding: 4,
+      cellCount: 6,
+    });
+    expect(commits.at(-1)?.recipe.crop).toEqual({ threshold: 35, padding: 4 });
+
+    act(() => expect(result.current.resetCrop()).toBe(true));
+    expect(result.current.recipe.crop).toEqual({ threshold: 0, padding: 0 });
+    expect(commits.at(-1)?.recipe.crop).toEqual({ threshold: 0, padding: 0 });
+  });
+
+  it("resets a same-size replacement instead of adopting the previous source recipe", async () => {
+    const sourceA = createDefaultSliceGridRecipeState("asset-a", SOURCE);
+    const croppedA = {
+      ...sourceA,
+      recipe: {
+        ...sourceA.recipe,
+        crop: { threshold: 42, padding: 7 },
+      },
+    } satisfies SliceGridRecipeStateV1;
+    const initialize = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ generation, sourceAssetId, persistedState }) => useSliceGridController(options({
+        generation,
+        sourceAssetId,
+        persistedState,
+        onInitializeState: initialize,
+      })),
+      {
+        initialProps: {
+          generation: 1,
+          sourceAssetId: "asset-a",
+          persistedState: croppedA,
+        },
+      },
+    );
+    await act(async () => Promise.resolve());
+    expect(result.current.recipe.crop).toEqual({ threshold: 42, padding: 7 });
+
+    await act(async () => {
+      rerender({ generation: 2, sourceAssetId: "asset-b", persistedState: croppedA });
+      await Promise.resolve();
+    });
+    expect(result.current.recipe.sourceAssetId).toBe("asset-b");
+    expect(result.current.recipe.crop).toEqual({ threshold: 0, padding: 0 });
+    expect(initialize).toHaveBeenCalledWith(expect.objectContaining({
+      recipe: expect.objectContaining({ sourceAssetId: "asset-b", crop: { threshold: 0, padding: 0 } }),
+    }));
+  });
+
   it("initializes old hosts ephemerally and contains a rejected host transaction", async () => {
     const initialize = vi.fn();
     const rejectCommit = vi.fn(() => { throw new Error("host transaction rejected"); });

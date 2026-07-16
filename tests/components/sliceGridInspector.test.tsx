@@ -34,9 +34,13 @@ function controller(overrides: Partial<SliceGridController> = {}): SliceGridCont
     recipeState,
     recipe: recipeState.recipe,
     errorMessage: null,
+    cropPreview: { enabled: false, threshold: 0, padding: 0, cellCount: 8 },
     setMode: vi.fn(),
     setManualRowsInput: vi.fn(),
     setManualColsInput: vi.fn(),
+    setCropThreshold: vi.fn(() => true),
+    setCropPadding: vi.fn(() => true),
+    resetCrop: vi.fn(() => true),
     retry: vi.fn(),
     ...overrides,
   };
@@ -132,6 +136,76 @@ describe("SliceGridInspector (G2-03)", () => {
     expect(alert).not.toHaveTextContent(/stack|private|exception/i);
     fireEvent.click(screen.getByRole("button", { name: "Retry detection" }));
     expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it("edits crop settings, announces the preview policy and resets both values", () => {
+    const setCropThreshold = vi.fn(() => true);
+    const setCropPadding = vi.fn(() => true);
+    const resetCrop = vi.fn(() => true);
+    render(<SliceGridInspector controller={controller({
+      cropPreview: { enabled: true, threshold: 24, padding: 3, cellCount: 8 },
+      setCropThreshold,
+      setCropPadding,
+      resetCrop,
+    })} />);
+
+    const threshold = screen.getByRole("slider", { name: "Alpha threshold" });
+    const padding = screen.getByRole("slider", { name: "Padding" });
+    expect(threshold).toHaveValue("24");
+    expect(padding).toHaveValue("3");
+    expect(threshold).toHaveAccessibleDescription(/8 cells use 24% alpha threshold/i);
+    expect(screen.getByLabelText("Crop preview summary"))
+      .toHaveTextContent(/Reduction is measured after processing/i);
+
+    fireEvent.change(threshold, { target: { value: "30" } });
+    fireEvent.change(threshold, { target: { value: "35" } });
+    fireEvent.change(threshold, { target: { value: "40" } });
+    expect(setCropThreshold).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/40% alpha threshold/i);
+    fireEvent.pointerUp(threshold);
+    expect(setCropThreshold).toHaveBeenCalledWith(40);
+
+    fireEvent.change(padding, { target: { value: "5" } });
+    fireEvent.change(padding, { target: { value: "6" } });
+    expect(setCropPadding).not.toHaveBeenCalled();
+    fireEvent.keyUp(padding, { key: "ArrowRight", code: "ArrowRight" });
+    expect(setCropPadding).toHaveBeenCalledWith(6);
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(resetCrop).toHaveBeenCalledOnce();
+  });
+
+  it("rolls an optimistic crop preview back when the host rejects its commit", () => {
+    const rejectThreshold = vi.fn(() => false);
+    render(<SliceGridInspector controller={controller({
+      cropPreview: { enabled: false, threshold: 0, padding: 0, cellCount: 8 },
+      setCropThreshold: rejectThreshold,
+    })} />);
+    const threshold = screen.getByRole("slider", { name: "Alpha threshold" });
+
+    fireEvent.change(threshold, { target: { value: "65" } });
+    expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/65% alpha threshold/i);
+    fireEvent.pointerUp(threshold);
+
+    expect(rejectThreshold).toHaveBeenCalledOnce();
+    expect(threshold).toHaveValue("0");
+    expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/Auto crop is off/i);
+    expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
+  });
+
+  it("disables crop controls without a source and does not offer a no-op reset", () => {
+    const view = render(<SliceGridInspector controller={controller({
+      sourceDimensions: null,
+      detectedLayout: null,
+      effectiveLayout: null,
+      cropPreview: { enabled: false, threshold: 0, padding: 0, cellCount: 0 },
+    })} />);
+    expect(screen.getByRole("slider", { name: "Alpha threshold" })).toBeDisabled();
+    expect(screen.getByRole("slider", { name: "Padding" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
+    expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/source grid is ready/i);
+
+    view.rerender(<SliceGridInspector controller={controller()} />);
+    expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
   });
 
   it.each(["detected", "fallback"] as const)(
