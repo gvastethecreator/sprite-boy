@@ -12,31 +12,31 @@
       "dimensions": [4, 4],
       "operations": ["resize"],
       "pixels": [
-        255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
-        255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
-        0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255, 255, 0, 255,
-        0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255, 255, 0, 255
+        255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 192, 0, 255, 0, 192,
+        255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 192, 0, 255, 0, 192,
+        0, 0, 255, 64, 0, 0, 255, 64, 255, 255, 0, 0, 255, 255, 0, 0,
+        0, 0, 255, 64, 0, 0, 255, 64, 255, 255, 0, 0, 255, 255, 0, 0
       ]
     },
     "disabled": {
       "dimensions": [2, 2],
       "operations": [],
       "pixels": [
-        255, 0, 0, 255, 0, 255, 0, 255,
-        0, 0, 255, 255, 255, 255, 0, 255
+        255, 0, 0, 255, 0, 255, 0, 192,
+        0, 0, 255, 64, 255, 255, 0, 0
       ],
       "byteIdentical": true
     },
     "limits": {
-      "maxEmptyOutputs": 4096,
-      "geometryMatrix": "getScaledDimensions validates safe integer maxSide and result-pixel budget"
+      "maxSideBoundary": "getScaledDimensions rejects 4097 above maxPixelSize 4096",
+      "aggregateBudgetBoundary": "Worker guard present; explicit stress/perf evidence remains G5-04"
     }
   },
   "adversarialAutopsy": {
     "rejected": [
       "Smooth interpolation: every 2x2 source quadrant remains a crisp 2x2 block.",
       "Disabled toggle drift: disabled pixel stage returns original dimensions, bytes and no resize operation.",
-      "Dimension overflow: geometry/protocol limits reject hostile maxSide and result pixel budgets before allocation.",
+      "Dimension overflow: geometry/protocol limits reject hostile maxSide before resize allocation.",
       "Alpha loss: RGBA bytes, including alpha, are copied by nearest mapping."
     ],
     "boundary": "Palette quantization is intentionally not part of G5-01 and remains G5-02; process/results/export UI remains G6/G7."
