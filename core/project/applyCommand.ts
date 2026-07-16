@@ -71,6 +71,7 @@ const SUPPORTED_COMMAND_KEYS: Partial<Record<ProjectCommand["type"], readonly st
   "asset.rename": ["type", "assetId", "name", "updatedAt"],
   "asset.remove": ["type", "assetId", "policy"],
   "regions.commitRecipe": ["type", "recipe", "regions", "derivedAssets", "atIndex"],
+  "region.create": ["type", "region", "atIndex"],
   "region.update": ["type", "regionId", "patch"],
   "region.remove": ["type", "regionId", "policy"],
   "region.reorder": ["type", "regionId", "toIndex"],
@@ -125,6 +126,7 @@ const SUPPORTED_COMMAND_KEYS: Partial<Record<ProjectCommand["type"], readonly st
 const SUPPORTED_COMMAND_OPTIONAL_KEYS: Partial<Record<ProjectCommand["type"], readonly string[]>> = {
   "asset.import": ["atIndex"],
   "regions.commitRecipe": ["derivedAssets", "atIndex"],
+  "region.create": ["atIndex"],
   "composition.create": ["atIndex"],
   "layer.add": ["atIndex"],
   "layer.duplicate": ["atIndex"],
@@ -860,6 +862,89 @@ function applyRegionsCommitRecipe(
   );
 }
 
+const REGION_CREATE_FIELDS = [
+  "id",
+  "assetId",
+  "name",
+  "bounds",
+  "pivot",
+  "hidden",
+  "createdAt",
+  "updatedAt",
+  "provenance",
+] as const;
+
+function applyRegionCreate(
+  original: StudioProjectV1,
+  command: Extract<ProjectCommand, { type: "region.create" }>,
+  context: ProjectCommandContext,
+): ProjectCommandResult {
+  const cloned = cloneDataOnly(command.region);
+  if (!cloned.ok || !isPlainRecord(cloned.value)) {
+    return failure(original, [
+      diagnostic("INVALID_PATCH", "region.create requires an exact data-only Region record.", "$.region"),
+    ]);
+  }
+  const region = cloned.value as unknown as Region;
+  const keys = Object.keys(cloned.value);
+  if (
+    keys.some((key) => !(REGION_CREATE_FIELDS as readonly string[]).includes(key))
+    || !["id", "assetId", "bounds", "createdAt", "updatedAt"].every((key) => keys.includes(key))
+    || !isEntityId(region.id)
+    || !isEntityId(region.assetId)
+  ) {
+    return failure(original, [
+      diagnostic("INVALID_PATCH", "region.create requires one canonical Region shape.", "$.region"),
+    ]);
+  }
+  if (hasOwn(original.regions, region.id)) {
+    return failure(original, [duplicateIdDiagnostic("regions", region.id, "$.region.id")]);
+  }
+  if (!hasOwn(original.assets, region.assetId)) {
+    return failure(original, [missingEntityDiagnostic("assets", region.assetId, "$.region.assetId")]);
+  }
+  if (!isPlainRecord(region.bounds) || !["x", "y", "width", "height"].every((key) => hasOwn(region.bounds, key))) {
+    return failure(original, [
+      diagnostic("INVALID_PATCH", "Region bounds must be an exact source-space rectangle.", "$.region.bounds"),
+    ]);
+  }
+  const boundsKeys = Object.keys(region.bounds);
+  const { x, y, width, height } = region.bounds;
+  if (
+    boundsKeys.length !== 4
+    || boundsKeys.some((key) => !["x", "y", "width", "height"].includes(key))
+    || !Number.isSafeInteger(x) || x < 0
+    || !Number.isSafeInteger(y) || y < 0
+    || !Number.isSafeInteger(width) || width < 1
+    || !Number.isSafeInteger(height) || height < 1
+  ) {
+    return failure(original, [
+      diagnostic("INVALID_PATCH", "Region bounds must contain finite safe integers with positive dimensions.", "$.region.bounds"),
+    ]);
+  }
+  const source = original.assets[region.assetId];
+  if (x > source.width - width || y > source.height - height) {
+    return failure(original, [
+      diagnostic("PRECONDITION_FAILED", "Region bounds must stay inside the source Asset.", "$.region.bounds", reference("assets", region.assetId)),
+    ]);
+  }
+  const index = insertionIndex(command.atIndex, original.rootOrder.regionIds.length, "$.atIndex");
+  if (typeof index !== "number") return failure(original, [index]);
+
+  const prepared = prepareCandidate(original);
+  if (isResult(prepared)) return prepared;
+  setRecordValue(prepared.regions, region.id, clonePayload(region));
+  prepared.rootOrder.regionIds = insertOrderedId(prepared.rootOrder.regionIds, region.id, index);
+  prepared.updatedAt = context.now();
+  return finalize(
+    original,
+    prepared,
+    { regions: [region.id], rootOrder: [region.id] },
+    directImpact([reference("regions", region.id)]),
+    { type: "region.remove", regionId: region.id, policy: "reject" },
+  );
+}
+
 function applyRegionUpdate(
   original: StudioProjectV1,
   command: Extract<ProjectCommand, { type: "region.update" }>,
@@ -1004,6 +1089,8 @@ export function applyProjectCommand(
         return applyAssetRename(project, command, context);
       case "regions.commitRecipe":
         return applyRegionsCommitRecipe(project, command, context);
+      case "region.create":
+        return applyRegionCreate(project, command, context);
       case "region.update":
         return applyRegionUpdate(project, command, context);
       case "region.reorder":

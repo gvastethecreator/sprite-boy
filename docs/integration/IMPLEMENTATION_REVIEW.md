@@ -1428,6 +1428,26 @@ S1-04 espera el cierre conjunto de wand + manual tools.
 **Siguiente frontera Editor:** A1-02 Project menu/bootstrap Compose sigue
 activo; A1-04 portable first-composition acceptance espera ese cierre.
 
+### S1-03 — Manual Region command contract
+
+- **Core seam:** `region.create` exact-own-data, ID único, Asset owner existente,
+  bounds source-space safe/in-bounds, `atIndex`, impact mínimo e inverse
+  `region.remove/reject`; no inventa ProcessingRecipe/provenance.
+- **Adapter:** create/move/resize/delete; geometría usa `region.update` sin
+  recrear identidad, delete conserva policy/blockers, no-op no abre history.
+  ProjectStore/history/reload/selection y undo exacto están cubiertos.
+- **Hostile:** inputs/project se reconstruyen data-only y todos los lookups son
+  descriptor own-only. IDs heredados `toString|constructor|__proto__` fallan;
+  los mismos IDs como records own canónicos se comportan correctamente.
+- **Evidencia:** 9/9 focal, 118/118 acumulado, typecheck/lint/diff verdes y
+  segunda revisión `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/s1-03-manual-region-commands.json`.
+- **Riesgo acotado:** el command path valida/clona el proyecto completo; S1-04
+  debe invocarlo al confirmar el gesto, nunca durante cada `pointermove`.
+
+**Siguiente frontera irregular:** S1-04 UI wand/manual está activo; S1-05 puede
+avanzar sobre Region-to-Asset y preservación de margins/gaps.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

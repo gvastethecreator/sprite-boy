@@ -56,8 +56,8 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G7-04 | J | G7-02,G7-03 | G6.4-G6.9,G7.7 | Export shortcut, cancel/error and artifact gate | BR+ART+A11Y+REV | todo |
 | S1-01 | J | F1-08,F7-07,G0-05 | H4.1-H4.3 | Connected-components/irregular region detection adapter | Golden/property UT | done |
 | S1-02 | J | S1-01,F5-06 | H4.4 | Wand select and add/remove region semantics | BR+VIS | done |
-| S1-03 | J | S1-01 | H4.5-H4.6 | Manual create/move/resize/delete Region commands | UT+undo | active |
-| S1-04 | E | S1-02,S1-03 | H4.1-H4.6 | Irregular/manual Slice tools UI | BR+A11Y + REV | todo |
+| S1-03 | J | S1-01 | H4.5-H4.6 | Manual create/move/resize/delete Region commands | UT+undo | done |
+| S1-04 | E | S1-02,S1-03 | H4.1-H4.6 | Irregular/manual Slice tools UI | BR+A11Y + REV | active |
 | S1-05 | J | S1-03,F2-07 | H4.7-H4.8 | Region-to-asset and margins/gaps preservation | IT+VIS+RT | todo |
 | S1-06 | J | S1-04,S1-05 | H4.1-H4.8 | Irregular journey with undo/save/export | BR J2 irregular + REV | todo |
 | G8-01 | J | G0-05,G7-04,S1-06 | G7.1-G7.5 | Unified Slice keyboard/focus/toast/error boundary | A11Y+BR | todo |

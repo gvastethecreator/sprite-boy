@@ -26,6 +26,7 @@ export const PROJECT_COMMAND_TYPES = [
   "asset.rename",
   "asset.remove",
   "regions.commitRecipe",
+  "region.create",
   "region.update",
   "region.remove",
   "region.reorder",
@@ -193,6 +194,7 @@ export type ProjectCommand =
       derivedAssets?: AssetRecord[];
       atIndex?: number;
     }
+  | { type: "region.create"; region: Region; atIndex?: number }
   | { type: "region.update"; regionId: EntityId; patch: RegionPatch }
   | { type: "region.remove"; regionId: EntityId; policy: DestructivePolicy }
   | { type: "region.reorder"; regionId: EntityId; toIndex: number }
