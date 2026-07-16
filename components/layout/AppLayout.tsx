@@ -36,6 +36,9 @@ import {
   useStudioNavigation,
 } from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
+import SliceSourceDropzone from "../../features/slice/source/SliceSourceDropzone";
+import { useSliceSourceSession } from "../../features/slice/source/useSourceSession";
+import type { SourceSessionSnapshot } from "../../features/slice/source/sourceSession";
 
 const LEGACY_MODE_BY_WORKSPACE = {
   slice: AppMode.BUILDER,
@@ -132,6 +135,16 @@ const AppLayout: React.FC = () => {
   const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
   const [isJobCenterOpen, setJobCenterOpen] = useState(false);
   const [studioError, setStudioError] = useState<StudioShellError | null>(null);
+  const [isSourceCommitting, setSourceCommitting] = useState(false);
+  const sourceImportGenerationRef = useRef(0);
+  const sourceCommitControllerRef = useRef<AbortController | null>(null);
+  const {
+    snapshot: sourceSessionSnapshot,
+    select: selectSourceSession,
+    retry: retrySourceSession,
+    reset: resetSourceSession,
+    getBlob: getSourceBlob,
+  } = useSliceSourceSession();
   const isCompactLayout = useCompactStudioLayout();
   const jobStore = useJobStore();
   const jobRunner = useStudioJobRunner();
@@ -155,8 +168,21 @@ const AppLayout: React.FC = () => {
     workspaceContentRef.current?.focus({ preventScroll: true });
   }, [activeWorkspace]);
 
+  const cancelSourceCommit = useCallback((): void => {
+    sourceCommitControllerRef.current?.abort();
+    sourceCommitControllerRef.current = null;
+    setSourceCommitting(false);
+  }, []);
+
+  const clearSourceWorkflow = useCallback((): void => {
+    sourceImportGenerationRef.current += 1;
+    cancelSourceCommit();
+    resetSourceSession();
+  }, [cancelSourceCommit, resetSourceSession]);
+
   const commandRegistry = useMemo(() => createStudioCommandRegistry({
     newProject: () => {
+      clearSourceWorkflow();
       handleNewProject();
       navigate("slice");
     },
@@ -183,15 +209,19 @@ const AppLayout: React.FC = () => {
     setIsHelpOpen,
     setIsSettingsOpen,
     undo,
+    clearSourceWorkflow,
   ]);
+
+  const sourceSessionBusy = sourceSessionSnapshot.status === "validating" ||
+    sourceSessionSnapshot.status === "decoding" || isSourceCommitting;
 
   const commandContext = useMemo<StudioCommandContext>(() => ({
     projectAvailable: true,
-    busy: isLoading,
+    busy: isLoading || sourceSessionBusy,
     canUndo,
     canRedo,
     canvasAvailable: hasWorkspace,
-  }), [canRedo, canUndo, hasWorkspace, isLoading]);
+  }), [canRedo, canUndo, hasWorkspace, isLoading, sourceSessionBusy]);
 
   const workspaceState = useMemo(() => resolveStudioWorkspaceState({
     workspaceId: activeWorkspace,
@@ -217,6 +247,18 @@ const AppLayout: React.FC = () => {
     studioError,
   ]);
 
+  useEffect(() => {
+    if (workspaceState.kind === "ready") {
+      workspaceContentRef.current?.focus({ preventScroll: true });
+    }
+  }, [workspaceState.kind]);
+
+  useEffect(() => () => {
+    sourceImportGenerationRef.current += 1;
+    sourceCommitControllerRef.current?.abort();
+    sourceCommitControllerRef.current = null;
+  }, []);
+
   const executeCommand = useCallback((commandId: StudioCommandId) => {
     void commandRegistry.execute(commandId, commandContext)
       .then((result) => {
@@ -230,6 +272,70 @@ const AppLayout: React.FC = () => {
         showToast(message, "error");
       });
   }, [activeWorkspace, commandContext, commandRegistry, showToast]);
+
+  const commitReadySource = useCallback(async (
+    snapshot: SourceSessionSnapshot,
+    generation: number,
+  ): Promise<void> => {
+    if (snapshot.status !== "ready" || sourceImportGenerationRef.current !== generation) return;
+    const blob = getSourceBlob();
+    if (!blob) return;
+    cancelSourceCommit();
+    const controller = new AbortController();
+    sourceCommitControllerRef.current = controller;
+    setSourceCommitting(true);
+    try {
+      const file = new File([blob], snapshot.metadata.name, {
+        type: snapshot.metadata.mimeType,
+        lastModified: snapshot.metadata.lastModified ?? 0,
+      });
+      await handleUpload(file, { signal: controller.signal });
+      if (sourceImportGenerationRef.current !== generation) return;
+      setStudioError(null);
+      navigate("slice");
+    } catch {
+      if (!controller.signal.aborted && sourceImportGenerationRef.current === generation) {
+        resetSourceSession();
+        setStudioError({
+          workspaceId: "slice",
+          commandId: "asset.import",
+          message: "The validated source could not be opened in Slice.",
+        });
+      }
+    } finally {
+      if (sourceCommitControllerRef.current === controller) {
+        sourceCommitControllerRef.current = null;
+      }
+      if (sourceImportGenerationRef.current === generation) setSourceCommitting(false);
+    }
+  }, [cancelSourceCommit, getSourceBlob, handleUpload, navigate, resetSourceSession]);
+
+  const selectSliceSource = useCallback(async (
+    input: File | FileList,
+  ): Promise<void> => {
+    cancelSourceCommit();
+    const generation = ++sourceImportGenerationRef.current;
+    setStudioError(null);
+    const snapshot = await selectSourceSession(input);
+    await commitReadySource(snapshot, generation);
+  }, [cancelSourceCommit, commitReadySource, selectSourceSession]);
+
+  const retrySliceSource = useCallback(async (): Promise<void> => {
+    cancelSourceCommit();
+    const generation = ++sourceImportGenerationRef.current;
+    setStudioError(null);
+    workspaceContentRef.current?.focus({ preventScroll: true });
+    const snapshot = await retrySourceSession();
+    await commitReadySource(snapshot, generation);
+  }, [cancelSourceCommit, commitReadySource, retrySourceSession]);
+
+  const loadProjectFile = useCallback(async (file: File): Promise<void> => {
+    const loaded = await handleLoadProject(file);
+    if (!loaded) return;
+    clearSourceWorkflow();
+    setStudioError(null);
+    workspaceContentRef.current?.focus({ preventScroll: true });
+  }, [clearSourceWorkflow, handleLoadProject]);
 
   useKeyboardShortcuts({
     registry: commandRegistry,
@@ -277,8 +383,7 @@ const AppLayout: React.FC = () => {
           const file = event.currentTarget.files?.[0];
           event.currentTarget.value = "";
           if (!file) return;
-          handleUpload(file);
-          navigate("slice");
+          void selectSliceSource(file);
         }}
       />
       <input
@@ -291,7 +396,7 @@ const AppLayout: React.FC = () => {
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           event.currentTarget.value = "";
-          if (file) handleLoadProject(file);
+          if (file) void loadProjectFile(file);
         }}
       />
 
@@ -356,7 +461,16 @@ const AppLayout: React.FC = () => {
             aria-label={`${activeWorkspaceDefinition.label} workspace content`}
             className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            {workspaceState.kind === "ready" ? (
+            {activeWorkspace === "slice" && !slicerImage && workspaceState.kind === "empty" ? (
+              <SliceSourceDropzone
+                snapshot={sourceSessionSnapshot}
+                disabled={isSourceCommitting}
+                committing={isSourceCommitting}
+                onBrowse={() => assetInputRef.current?.click()}
+                onSelect={(input) => selectSliceSource(input as File | FileList)}
+                onRetry={retrySliceSource}
+              />
+            ) : workspaceState.kind === "ready" ? (
               <CanvasArea ref={canvasRef} />
             ) : (
               <StudioWorkspaceStateView
