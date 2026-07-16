@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-eyedropper-dpr-browser",
+  "status": "pass",
+  "task": "G4-02",
+  "scope": "Canonical Slice eyedropper coordinate mapping through zoom, pan and device pixel ratio.",
+  "evidence": {
+    "unit": {
+      "tests": "4/4 tests in tests/hooks/useCanvasMouseCanonical.test.tsx",
+      "assertions": [
+        "DPR + zoom + viewport offset map to the expected backing pixel",
+        "outside-source click does not publish a color",
+        "Escape cancels the active canonical picker"
+      ]
+    },
+    "browser": {
+      "command": "node scripts/studio-grid-eyedropper-browser.mjs",
+      "viewport": "1440x900",
+      "deviceScaleFactor": 2,
+      "initial": {
+        "dpr": 2,
+        "scale": "1",
+        "offset": "223,264.5",
+        "pickerLabel": "Pick color from canvas",
+        "pickerPressed": "false",
+        "chromaColor": "#00ff00"
+      },
+      "zoom": {
+        "scale": "1.1647381382139632",
+        "offset": "190.05237235720736,248.10855524771065"
+      },
+      "pan": {
+        "offset": "222.05237235720736,266.1085552477107"
+      },
+      "escape": {
+        "active": false,
+        "label": "Pick color from canvas"
+      },
+      "sample": {
+        "sourcePoint": { "x": 60, "y": 60 },
+        "color": "#123456",
+        "chromaColor": "#123456",
+        "activeAfterPick": false
+      },
+      "accessibility": {
+        "interactiveNodeCount": 48,
+        "unlabeledInteractiveCount": 0,
+        "mainLandmarkCount": 1
+      },
+      "layout": {
+        "horizontalOverflow": false,
+        "verticalOverflow": false
+      },
+      "runtimeErrors": {
+        "console": 0,
+        "exception": 0,
+        "log": 0,
+        "network": 0,
+        "http": 0
+      },
+      "screenshot": {
+        "path": "artifacts/quality/GRID/2026-07-16/g4-02-eyedropper-dpr.png",
+        "sha256": "3cef85e3b679172ca198db7e4eff7796c612671dc6f3c8d4e85b04a29b734b3f",
+        "bytes": 234999
+      }
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Legacy-only callback path: canonical Slice now supplies an explicit eyedropper seam and legacy interaction remains null.",
+      "CSS-only coordinate math: source mapping is validated with the existing hostile-safe wand coordinate primitive and backing-canvas pixel read.",
+      "Stuck tool state: successful pick and Escape both leave the picker inactive; outside-source clicks do not publish a color.",
+      "Silent layout/runtime regression: production Chrome reports zero errors, zero unlabeled interactives and no viewport overflow."
+    ],
+    "boundary": "The picker reads the rendered source canvas RGB. Transparent/checkerboard semantics and chroma control composition remain G4-03/G4-05 work; no alpha channel is persisted by the existing color-input contract."
+  },
+  "verification": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass (known JSZip dynamic-import and >500kB chunk warnings remain baseline)",
+    "diffCheck": "pending at artifact creation; run before commit"
+  }
+}

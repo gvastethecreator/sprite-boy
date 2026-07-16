@@ -12,6 +12,7 @@ import {
 } from "../../types";
 import { rgbToHex } from "../../utils/algorithms";
 import { getGridIndexFromPos } from "../../utils/canvasMath";
+import { mapWandClientPointToSource } from "../../features/slice/irregular/wandCoordinates";
 
 export interface LegacyCanvasInteraction {
   currentMode: AppMode;
@@ -32,6 +33,14 @@ export interface LegacyCanvasInteraction {
   onSwapSlots: ((a: number, b: number) => void) | undefined;
 }
 
+export interface CanonicalEyedropperInteraction {
+  readonly isActive: boolean;
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+  readonly onPickColor: (hex: string) => void;
+  readonly onCancel: () => void;
+}
+
 interface CanvasMouseDeps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -39,8 +48,55 @@ interface CanvasMouseDeps {
   viewport: ViewportState;
   setViewport: (vp: ViewportState) => void;
   isSpacePressed: boolean;
+  canonicalEyedropper: CanonicalEyedropperInteraction | null;
   /** Null in the canonical Slice workspace. Pan/zoom stay active; legacy editing is inert. */
   legacyInteraction: LegacyCanvasInteraction | null;
+}
+
+function sampleCanonicalCanvasColor(
+  canvas: HTMLCanvasElement,
+  event: { readonly clientX: number; readonly clientY: number },
+  viewport: ViewportState,
+  sourceWidth: number,
+  sourceHeight: number,
+): string | null {
+  const rect = canvas.getBoundingClientRect();
+  if (!Number.isFinite(rect.left) || !Number.isFinite(rect.top) || rect.width <= 0 || rect.height <= 0) {
+    return null;
+  }
+  const dpr = typeof window !== "undefined" && Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
+    ? window.devicePixelRatio
+    : 1;
+  const sourcePoint = mapWandClientPointToSource(
+    { clientX: event.clientX, clientY: event.clientY },
+    {
+      canvasClientLeft: rect.left,
+      canvasClientTop: rect.top,
+      devicePixelRatio: dpr,
+      zoom: viewport.scale,
+      sourceOriginCanvasX: viewport.offset.x * dpr,
+      sourceOriginCanvasY: viewport.offset.y * dpr,
+      sourceWidth,
+      sourceHeight,
+    },
+  );
+  if (!sourcePoint || canvas.width < 1 || canvas.height < 1) return null;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  const backingX = Math.max(
+    0,
+    Math.min(canvas.width - 1, Math.floor(((event.clientX - rect.left) / rect.width) * canvas.width)),
+  );
+  const backingY = Math.max(
+    0,
+    Math.min(canvas.height - 1, Math.floor(((event.clientY - rect.top) / rect.height) * canvas.height)),
+  );
+  try {
+    const pixel = context.getImageData(backingX, backingY, 1, 1).data;
+    return rgbToHex(pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0);
+  } catch {
+    return null;
+  }
 }
 
 /** All canvas mouse interaction: drag, pan, zoom, eyedropper, DnD, slot swap. */
@@ -52,6 +108,7 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
     viewport,
     setViewport,
     isSpacePressed,
+    canonicalEyedropper,
     legacyInteraction,
   } = deps;
 
@@ -76,6 +133,17 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
     setIsDragOverCanvas(false);
     setDragStartSlot(null);
   }, [legacyInteraction]);
+
+  useEffect(() => {
+    if (!canonicalEyedropper?.isActive) return;
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      canonicalEyedropper.onCancel();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [canonicalEyedropper]);
 
   const getRelMouse = useCallback(
     (cx: number, cy: number) => {
@@ -163,6 +231,24 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
 
       // Canonical Slice owns selection and mutations. Only viewport panning is shared.
       if (!legacyInteraction) {
+        if (canonicalEyedropper?.isActive && e.button === 0 && !isSpacePressed) {
+          e.stopPropagation();
+          e.preventDefault();
+          if (canvasRef.current) {
+            const color = sampleCanonicalCanvasColor(
+              canvasRef.current,
+              e,
+              viewport,
+              canonicalEyedropper.sourceWidth,
+              canonicalEyedropper.sourceHeight,
+            );
+            if (color !== null) {
+              canonicalEyedropper.onPickColor(color);
+              canonicalEyedropper.onCancel();
+            }
+          }
+          return;
+        }
         if (e.button === 1 || (isSpacePressed && e.button === 0)) {
           setDragMode(DragMode.PAN);
         }
@@ -225,6 +311,7 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
     [
       isEmpty,
       legacyInteraction,
+      canonicalEyedropper,
       isSpacePressed,
       canvasRef,
       getRelMouse,
@@ -340,11 +427,12 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
   const getCursor = useCallback(() => {
     if (isEmpty) return "default";
     if (dragMode === DragMode.PAN) return "grab";
+    if (canonicalEyedropper?.isActive) return "crosshair";
     if (legacyInteraction && dragMode === DragMode.MOVE_FRAME) return "move";
     if (legacyInteraction && dragMode === DragMode.SWAP_SLOTS) return "grabbing";
     if (legacyInteraction?.isEyedropperActive) return "crosshair";
     return "default";
-  }, [isEmpty, dragMode, legacyInteraction]);
+  }, [isEmpty, dragMode, legacyInteraction, canonicalEyedropper]);
 
   return {
     dragMode,

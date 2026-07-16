@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-chroma-controls-browser",
+  "status": "pass",
+  "task": "G4-03",
+  "scope": "Canonical chroma controls, swatch, hex validation, slider drafts, reset and eyedropper synchronization.",
+  "evidence": {
+    "contract": {
+      "tests": "1/1 chroma recipe-state contract",
+      "controller": "1/1 chroma commit/rejection hook test",
+      "ui": "1/1 SliceGridInspector chroma interaction test",
+      "assertions": [
+        "hex colors normalize to lowercase #RRGGBB",
+        "tolerance, smoothness and spill stay within canonical 0..100 bounds",
+        "host rejection rolls chroma state back without a second store",
+        "sliders commit once at gesture end and malformed hex remains local with feedback"
+      ]
+    },
+    "browser": {
+      "command": "node scripts/studio-grid-eyedropper-browser.mjs",
+      "viewport": "1440x900",
+      "deviceScaleFactor": 2,
+      "configured": {
+        "enabled": "true",
+        "color": "#ff00aa",
+        "tolerance": "35",
+        "smoothness": "20",
+        "spill": "15",
+        "summary": "Chroma key on: #ff00aa, tolerance 35%, smoothness 20%, spill 15%.",
+        "controlCount": 7
+      },
+      "reset": { "enabled": "false", "color": "#00ff00" },
+      "eyedropperSync": { "legacySwatch": "#123456", "canonicalRecipe": "#123456" },
+      "accessibility": {
+        "interactiveNodeCount": 48,
+        "unlabeledInteractiveCount": 0,
+        "mainLandmarkCount": 1
+      },
+      "layout": { "horizontalOverflow": false, "verticalOverflow": false },
+      "runtimeErrors": { "console": 0, "exception": 0, "log": 0, "network": 0, "http": 0 },
+      "screenshot": {
+        "path": "artifacts/quality/GRID/2026-07-16/g4-03-chroma-controls.png",
+        "sha256": "3ec69e13cb1878adffb7897c593f1fa1d046bd44c0181897583b1a50df7effb9",
+        "bytes": 235193
+      }
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Legacy-only chroma state: controls commit through SliceGridController and persisted sliceGrid recipe state.",
+      "Invalid hex leaking to the worker: text input stays draft-only until a strict six-digit color is supplied.",
+      "Slider history spam: local drafts commit on pointer/key boundary and no-op controller commits return true without publishing.",
+      "Eyedropper drift: canonical recipe and shared legacy swatch are both updated by the same successful sample.",
+      "Source-less affordances: fieldset and reset are semantically disabled; production AX tree reports no unlabeled interactive."
+    ],
+    "boundary": "This slice exposes the recipe controls and synchronization surface. Worker chroma math is frozen by G4-01; processing order and hostile transparent/no-match gates remain G4-04/G4-05."
+  },
+  "verification": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass (known JSZip dynamic-import and >500kB chunk warnings remain baseline)",
+    "diffCheck": "pass"
+  }
+}

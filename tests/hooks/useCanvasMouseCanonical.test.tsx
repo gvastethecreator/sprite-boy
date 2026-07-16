@@ -47,6 +47,7 @@ describe("useCanvasMouse canonical isolation (G2-05)", () => {
         viewport: { scale: 1, offset: { x: 0, y: 0 } },
         setViewport,
         isSpacePressed: space,
+        canonicalEyedropper: null,
         legacyInteraction: null,
       }),
       { initialProps: { space: false } },
@@ -100,6 +101,7 @@ describe("useCanvasMouse canonical isolation (G2-05)", () => {
       viewport: { scale: 1, offset: { x: 0, y: 0 } },
       setViewport: vi.fn(),
       isSpacePressed: false,
+      canonicalEyedropper: null,
       legacyInteraction,
     }));
 
@@ -134,6 +136,7 @@ describe("useCanvasMouse canonical isolation (G2-05)", () => {
         viewport: { scale: 1, offset: { x: 0, y: 0 } },
         setViewport: vi.fn(),
         isSpacePressed: false,
+        canonicalEyedropper: null,
         legacyInteraction: canonical ? null : legacyInteraction,
       }),
       { initialProps: { canonical: false } },
@@ -146,5 +149,71 @@ describe("useCanvasMouse canonical isolation (G2-05)", () => {
     expect(result.current.dragMode).toBe(DragMode.NONE);
     expect(result.current.dragStartSlot).toBeNull();
     expect(result.current.dragHoverSlot).toBeNull();
+  });
+
+  it("samples the canonical source through zoom and DPR, then cancels on pick or Escape", () => {
+    const originalDpr = window.devicePixelRatio;
+    const { containerRef, canvasRef } = refs();
+    const canvas = canvasRef.current!;
+    canvas.width = 800;
+    canvas.height = 400;
+    Object.defineProperty(canvas, "getBoundingClientRect", {
+      value: () => ({ left: 100, top: 50, width: 400, height: 200 }),
+    });
+    const getImageData = vi.fn(() => ({
+      data: new Uint8ClampedArray([12, 34, 56, 255]),
+    }));
+    vi.spyOn(canvas, "getContext").mockReturnValue({ getImageData } as never);
+    Object.defineProperty(window, "devicePixelRatio", { configurable: true, value: 2 });
+
+    try {
+      const onPickColor = vi.fn();
+      const onCancel = vi.fn();
+      const { result } = renderHook(() => useCanvasMouse({
+        containerRef,
+        canvasRef,
+        isEmpty: false,
+        viewport: { scale: 3, offset: { x: 10, y: 5 } },
+        setViewport: vi.fn(),
+        isSpacePressed: false,
+        canonicalEyedropper: {
+          isActive: true,
+          sourceWidth: 20,
+          sourceHeight: 10,
+          onPickColor,
+          onCancel,
+        },
+        legacyInteraction: null,
+      }));
+
+      const pick = mouseEvent({ clientX: 110, clientY: 55 });
+      act(() => result.current.handleMouseDown(pick as never));
+
+      expect(pick.preventDefault).toHaveBeenCalledOnce();
+      expect(pick.stopPropagation).toHaveBeenCalledOnce();
+      expect(getImageData).toHaveBeenCalledWith(20, 10, 1, 1);
+      expect(onPickColor).toHaveBeenCalledWith("#0c2238");
+      expect(onCancel).toHaveBeenCalledOnce();
+
+      const middlePan = mouseEvent({ button: 1 });
+      act(() => result.current.handleMouseDown(middlePan as never));
+      expect(result.current.dragMode).toBe(DragMode.PAN);
+      expect(result.current.getCursor()).toBe("grab");
+      expect(getImageData).toHaveBeenCalledOnce();
+      expect(onPickColor).toHaveBeenCalledOnce();
+      act(() => result.current.handleMouseUp());
+
+      const outside = mouseEvent({ clientX: 99, clientY: 55 });
+      act(() => result.current.handleMouseDown(outside as never));
+      expect(onPickColor).toHaveBeenCalledOnce();
+
+      act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+      expect(onCancel).toHaveBeenCalledTimes(2);
+    } finally {
+      Object.defineProperty(window, "devicePixelRatio", {
+        configurable: true,
+        value: originalDpr,
+      });
+    }
   });
 });

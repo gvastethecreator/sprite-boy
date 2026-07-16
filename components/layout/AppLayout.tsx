@@ -767,6 +767,7 @@ const AppLayout: React.FC = () => {
                   <CanvasArea
                     ref={canvasRef}
                     canonicalCanvasOwnership={canonicalCanvasOwnership}
+                    onCanonicalPickColor={sliceGridController.setChromaColor}
                     sliceGridOverlay={{
                       sourceDimensions: sliceGridController.sourceDimensions,
                       effectiveLayout: sliceGridController.effectiveLayout,
@@ -777,6 +778,7 @@ const AppLayout: React.FC = () => {
                 <CanvasArea
                   ref={canvasRef}
                   canonicalCanvasOwnership={canonicalCanvasOwnership}
+                  onCanonicalPickColor={sliceGridController.setChromaColor}
                 />
               )
             ) : (

@@ -35,12 +35,19 @@ function controller(overrides: Partial<SliceGridController> = {}): SliceGridCont
     recipe: recipeState.recipe,
     errorMessage: null,
     cropPreview: { enabled: false, threshold: 0, padding: 0, cellCount: 8 },
+    chroma: recipeState.recipe.chroma,
     setMode: vi.fn(),
     setManualRowsInput: vi.fn(),
     setManualColsInput: vi.fn(),
     setCropThreshold: vi.fn(() => true),
     setCropPadding: vi.fn(() => true),
     resetCrop: vi.fn(() => true),
+    setChromaEnabled: vi.fn(() => true),
+    setChromaColor: vi.fn(() => true),
+    setChromaTolerance: vi.fn(() => true),
+    setChromaSmoothness: vi.fn(() => true),
+    setChromaSpill: vi.fn(() => true),
+    resetChroma: vi.fn(() => true),
     retry: vi.fn(),
     ...overrides,
   };
@@ -192,6 +199,48 @@ describe("SliceGridInspector (G2-03)", () => {
     expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
   });
 
+  it("edits chroma controls, keeps slider commits coalesced and rejects malformed hex", () => {
+    const setChromaEnabled = vi.fn(() => true);
+    const setChromaColor = vi.fn(() => true);
+    const setChromaTolerance = vi.fn(() => true);
+    const setChromaSmoothness = vi.fn(() => true);
+    const setChromaSpill = vi.fn(() => true);
+    const resetChroma = vi.fn(() => true);
+    render(<SliceGridInspector controller={controller({
+      chroma: { enabled: true, color: "#00ff00", tolerance: 15, smoothness: 20, spill: 10 },
+      setChromaEnabled,
+      setChromaColor,
+      setChromaTolerance,
+      setChromaSmoothness,
+      setChromaSpill,
+      resetChroma,
+    })} />);
+
+    const enabled = screen.getByRole("checkbox", { name: "Enable chroma removal" });
+    expect(enabled).toBeChecked();
+
+    const tolerance = screen.getByRole("slider", { name: "Tolerance" });
+    fireEvent.change(tolerance, { target: { value: "30" } });
+    fireEvent.change(tolerance, { target: { value: "35" } });
+    expect(setChromaTolerance).not.toHaveBeenCalled();
+    fireEvent.pointerUp(tolerance);
+    expect(setChromaTolerance).toHaveBeenCalledWith(35);
+    expect(screen.getByLabelText("Chroma preview summary")).toHaveTextContent(/tolerance 35%/i);
+
+    const color = screen.getByRole("textbox", { name: "Chroma key hex color" });
+    fireEvent.change(color, { target: { value: "#bad" } });
+    fireEvent.blur(color);
+    expect(screen.getByText(/six-digit hex color/i)).toBeInTheDocument();
+    expect(setChromaColor).not.toHaveBeenCalled();
+    fireEvent.change(color, { target: { value: "#12ABEF" } });
+    fireEvent.blur(color);
+    expect(setChromaColor).toHaveBeenCalledWith("#12abef");
+    fireEvent.click(enabled);
+    expect(setChromaEnabled).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByRole("button", { name: "Reset chroma settings" }));
+    expect(resetChroma).toHaveBeenCalledOnce();
+  });
+
   it("disables crop controls without a source and does not offer a no-op reset", () => {
     const view = render(<SliceGridInspector controller={controller({
       sourceDimensions: null,
@@ -201,6 +250,9 @@ describe("SliceGridInspector (G2-03)", () => {
     })} />);
     expect(screen.getByRole("slider", { name: "Alpha threshold" })).toBeDisabled();
     expect(screen.getByRole("slider", { name: "Padding" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Enable chroma removal" })).toBeDisabled();
+    expect(screen.getByRole("slider", { name: "Tolerance" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reset chroma settings" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
     expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/source grid is ready/i);
 

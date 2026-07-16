@@ -100,6 +100,51 @@ describe("useSliceGridController (G2-03)", () => {
     });
   });
 
+  it("commits chroma controls through the same recipe host and contains rejected commits", async () => {
+    const onCommitState = vi.fn();
+    const { result, unmount } = renderHook(() => useSliceGridController({
+      generation: 1,
+      committedMetadata: null,
+      sessionSnapshot: IDLE_SESSION,
+      legacyImage: legacy(),
+      inferPreview: vi.fn().mockResolvedValue(inference(1, 1)),
+      onCommitState,
+    }));
+    await act(async () => Promise.resolve());
+
+    act(() => {
+      expect(result.current.setChromaEnabled(true)).toBe(true);
+      expect(result.current.setChromaColor("#12ABEF")).toBe(true);
+      expect(result.current.setChromaTolerance(35)).toBe(true);
+      expect(result.current.setChromaSmoothness(20)).toBe(true);
+      expect(result.current.setChromaSpill(15)).toBe(true);
+    });
+    expect(result.current.chroma).toEqual({
+      enabled: true,
+      color: "#12abef",
+      tolerance: 35,
+      smoothness: 20,
+      spill: 15,
+    });
+    expect(onCommitState).toHaveBeenCalledTimes(5);
+
+    const rejected = renderHook(() => useSliceGridController({
+      generation: 2,
+      committedMetadata: null,
+      sessionSnapshot: IDLE_SESSION,
+      legacyImage: legacy(),
+      inferPreview: vi.fn().mockResolvedValue(inference(1, 1)),
+      onCommitState: () => { throw new Error("host rejected chroma"); },
+    }));
+    await act(async () => Promise.resolve());
+    act(() => {
+      expect(rejected.result.current.setChromaEnabled(true)).toBe(false);
+    });
+    expect(rejected.result.current.chroma.enabled).toBe(false);
+    unmount();
+    rejected.unmount();
+  });
+
   it("cancels StrictMode replay and source-generation races without late writes", async () => {
     const adapter = pendingAdapter();
     const { result, rerender, unmount } = renderHook(

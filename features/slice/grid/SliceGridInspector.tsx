@@ -11,6 +11,7 @@ import {
 
 import type { GridLayoutValidationIssue } from "./gridLayoutDraft";
 import type { SliceGridController } from "./useSliceGridController";
+import SliceChromaControls from "./SliceChromaControls";
 
 export interface SliceGridInspectorProps {
   readonly controller: SliceGridController;
@@ -296,6 +297,8 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
                 : `Auto crop is off. ${controller.cropPreview.cellCount} ${controller.cropPreview.cellCount === 1 ? "cell keeps" : "cells keep"} the original bounds.`}
           </div>
         </fieldset>
+
+        <SliceChromaControls controller={controller} />
 
         <div
           ref={statusRef}

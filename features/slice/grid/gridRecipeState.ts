@@ -199,6 +199,32 @@ export function updateSliceGridRecipeCrop(
   });
 }
 
+/** Updates the canonical chroma stage without introducing a second UI/store state. */
+export function updateSliceGridRecipeChroma(
+  state: SliceGridRecipeStateV1,
+  chroma: GridSplitRecipeV1["chroma"],
+): SliceGridRecipeStateV1 {
+  if (typeof chroma.enabled !== "boolean" || typeof chroma.color !== "string" ||
+    !HEX_COLOR.test(chroma.color) || !canonicalNumber(chroma.tolerance, 0, 100) ||
+    !canonicalNumber(chroma.smoothness, 0, 100) || !canonicalNumber(chroma.spill, 0, 100)) {
+    throw new TypeError("Slice grid chroma settings are invalid.");
+  }
+  return Object.freeze({
+    version: 1 as const,
+    recipe: Object.freeze({
+      ...state.recipe,
+      chroma: Object.freeze({
+        enabled: chroma.enabled,
+        color: chroma.color.toLowerCase(),
+        tolerance: chroma.tolerance,
+        smoothness: chroma.smoothness,
+        spill: chroma.spill,
+      }),
+    }),
+    manual: state.manual,
+  });
+}
+
 export function serializeSliceGridRecipeState(state: SliceGridRecipeStateV1): string {
   const hydrated = hydrateSliceGridRecipeState(state, {
     width: Math.max(state.manual.cols, state.recipe.layout.mode === "manual" ? state.recipe.layout.cols : 1),
