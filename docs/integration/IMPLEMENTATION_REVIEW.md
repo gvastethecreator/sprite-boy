@@ -1784,14 +1784,40 @@ para ejecutar el journey completo con undo/save/export.
   summary live anuncia stage, target y palette; radio groups, select, checkbox,
   swatches y reset tienen nombres estables. CSS del shell mantiene el viewport
   sin overflow visible y el panel conserva scroll interno.
-- **Evidencia:** contratos de recipe, hook y inspector, typecheck, oxlint, build
-  y diff-check verdes. Chrome real `1440×900 DPR2` configura pixel stage,
-  `64px`, PICO-8, ocho swatches, inspecciona summary/reset, cero errores,
-  61 interactivos con cero sin nombre y captura inspeccionada. Artifact:
+- **Evidencia:** contratos de recipe, hook, integración y inspector, incluidos
+  rollback ante rechazo del host y resincronización de undo/redo, suman `35/35`
+  tests; typecheck, oxlint, build y diff-check están verdes. Chrome real
+  `1440×900 DPR2` configura pixel stage, `64px`, PICO-8, ocho swatches,
+  inspecciona summary/reset, mantiene el root en `0..900` sin clipping, cero
+  errores y 61 interactivos con cero sin nombre. Artifact:
   `artifacts/quality/GRID/2026-07-16/g5-03-pixel-controls-browser.json` y
-  `g5-03-pixel-controls.png`.
+  `g5-03-pixel-controls.png`; revisión independiente `ACCEPT (P0-P2=0)`.
 - **Límite honesto:** extracción desde pixels procesados y feedback de jobs
   siguen G6; stress/performance agregado sigue G5-04; export sigue G7.
+
+### G5-04 — Performance/cancellation de imagen grande
+
+- **Fixture y contrato:** `scripts/grid-processing-performance-smoke.ts` ejecuta el
+  cliente Worker real sobre `4096x4096 rgba8`, layout manual `16x16` (256 celdas),
+  chroma + crop + resize a `64px` + quantize a ocho colores. La salida completa
+  contiene 256 superficies `64x64`, `1,048,576` pixels y conserva el orden de
+  operaciones `chroma → crop → resize → quantize`.
+- **Budget observado:** una corrida caliente terminó en `6020.95ms` (gate `≤10s`),
+  y la cancelación solicitada en el primer evento `chroma` rechazó con el error
+  canónico `cancelled` en `1.29ms` (gate `≤200ms`). La fuente transferida quedó
+  detached y no hubo warnings.
+- **Memoria/cleanup:** el delta de heap durante la corrida fue `746,467` bytes y,
+  después de liberar el resultado, `Bun.gc(true)` y un turno de event loop, el
+  delta quedó en `9,273,993` bytes. Esto se registra junto al RSS y ArrayBuffer
+  para no confundir memoria nativa del Worker con heap JS; ambos deltas quedan
+  por debajo del umbral documentado de `512MB`.
+- **Evidencia:** artifact
+  `artifacts/quality/GRID/2026-07-16/g5-04-performance.json`, generado por el
+  smoke contra el Worker por defecto. El gate no se cierra hasta pasar typecheck,
+  oxlint, diff-check y revisión independiente.
+- **Límite honesto:** el perfil es una corrida local de release build con Bun; la
+  matriz Chrome/p95 de interacción y los journeys de resultados/export siguen
+  G6/G7.
 
 ## Frontiers abiertos
 

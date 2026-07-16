@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-processing-large-image-performance",
+  "status": "pass",
+  "task": "G5-04",
+  "scope": "Real Worker performance, cancellation and cleanup evidence for the documented 4096x4096 grid budget.",
+  "evidence": {
+    "runtime": { "platform": "win32", "runtime": "Bun", "releaseBuild": "local" },
+    "fixture": {
+      "source": "4096x4096 rgba8",
+      "layout": "16x16",
+      "cells": 256,
+      "stages": ["chroma", "crop", "resize", "quantize"],
+      "targetSize": 64,
+      "quantizeColors": 8
+    },
+    "full": {
+      "elapsedMs": 6020.95,
+      "outputCount": 256,
+      "outputPixelCount": 1048576,
+      "firstDimensions": [64, 64],
+      "firstOperations": ["chroma", "crop", "resize", "quantize"],
+      "progressStages": ["decode", "detect", "chroma", "crop", "resize", "quantize", "finalize"],
+      "progressEventCount": 1027,
+      "warnings": [],
+      "sourceDetached": true
+    },
+    "cancellation": {
+      "stage": "chroma",
+      "elapsedMs": 1.29,
+      "processSetupMs": 173.17,
+      "code": "cancelled",
+      "rejectedAsCancelled": true
+    },
+    "memory": {
+      "rssDeltaBytes": 198881280,
+      "heapUsedDeltaBytes": 746467,
+      "arrayBufferDeltaBytes": -62885888,
+      "cleanupRssDeltaBytes": 198221824,
+      "cleanupHeapUsedDeltaBytes": 9273993,
+      "cleanupArrayBufferDeltaBytes": -62885888,
+      "cleanupMethod": "release result reference, Bun.gc(true), one event-loop turn"
+    },
+    "budgets": {
+      "maxProcessingMs": 10000,
+      "maxCancelMs": 200,
+      "maxCleanupHeapDeltaBytes": 67108864,
+      "processingPass": true,
+      "cancellationPass": true,
+      "cleanupHeapPass": true
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Wrong worker path: the smoke uses the default real Worker client and verifies every output operation order.",
+      "Silent cancellation: aborting on the first chroma progress event rejects with the canonical cancelled error in under the feedback budget.",
+      "Transfer regression: the 4096x4096 request source buffer is detached after transfer.",
+      "Unbounded memory: heap delta and post-result cleanup delta remain well below the documented 512 MB gate; cleanup is measured explicitly.",
+      "Partial result drift: all 256 cells are returned as 64x64 outputs with no warnings."
+    ],
+    "boundary": "Pipeline round-trip/reset remains G5-05; staged results and export journeys remain G6/G7."
+  },
+  "verification": {
+    "performanceSmoke": "pass",
+    "realWorker": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass",
+    "independentReview": "pending"
+  }
+}
