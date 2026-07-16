@@ -42,6 +42,8 @@ export interface RenderContext {
   isDragOverCanvas?: boolean;
   draggingSlotIndex?: number | null;
   mousePos?: { x: number; y: number };
+  /** Canonical Slice owns all grid/region geometry; legacy builder/slicer consumers stay inert. */
+  canonicalSliceOverlayActive?: boolean;
 }
 
 /**
@@ -112,9 +114,13 @@ export class CanvasRenderer {
         } else {
           this.drawCheckerboard(ctx, width, height);
         }
-        this.renderBuilderMode(state);
-        if (state.currentMode === AppMode.BUILDER || state.currentMode === AppMode.ANIMATION) {
-          this.renderSlicerMode(state);
+        if (state.canonicalSliceOverlayActive) {
+          this.renderCanonicalSliceSource(state);
+        } else {
+          this.renderBuilderMode(state);
+          if (state.currentMode === AppMode.BUILDER || state.currentMode === AppMode.ANIMATION) {
+            this.renderSlicerMode(state);
+          }
         }
         if (isDragOverCanvas && currentMode === AppMode.BUILDER) {
           ctx.strokeStyle = "#3b82f6";
@@ -123,7 +129,7 @@ export class CanvasRenderer {
           ctx.fillStyle = "rgba(59, 130, 246, 0.1)";
           ctx.fillRect(0, 0, width, height);
         }
-        if (scale > 12) {
+        if (scale > 12 && !state.canonicalSliceOverlayActive) {
           this.drawPixelGrid(ctx, width, height, scale, offset, canvasWidth, canvasHeight);
         }
         ctx.restore();
@@ -137,6 +143,12 @@ export class CanvasRenderer {
       this.renderBuilderMode(state);
       ctx.restore();
     }
+  }
+
+  private static renderCanonicalSliceSource(state: RenderContext): void {
+    const { ctx, slicerImgObj, width, height } = state;
+    if (!slicerImgObj) return;
+    ctx.drawImage(slicerImgObj, 0, 0, width, height);
   }
 
   private static getAlignmentCoords(

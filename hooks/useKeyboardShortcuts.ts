@@ -15,6 +15,7 @@ interface ShortcutsConfig {
   closeModals: () => void;
   isModalOpen: boolean;
   activeAnimationId: string | null;
+  legacyCanvasKeyboardEnabled: boolean;
 }
 
 /** Dispatches registry commands first, then scoped editor/animation shortcuts. */
@@ -28,6 +29,7 @@ export const useKeyboardShortcuts = ({
   closeModals,
   isModalOpen,
   activeAnimationId,
+  legacyCanvasKeyboardEnabled,
 }: ShortcutsConfig) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,7 +58,7 @@ export const useKeyboardShortcuts = ({
       if (isModalOpen || editable) return;
 
       // Animation Mode Shortcuts
-      if (activeAnimationId) {
+      if (legacyCanvasKeyboardEnabled && activeAnimationId) {
         if (e.key === "ArrowLeft") {
           e.preventDefault();
           stepFrame(-1);
@@ -75,7 +77,7 @@ export const useKeyboardShortcuts = ({
       }
 
       // Editor Mode Shortcuts (Slicer/Collision/Builder)
-      if (!activeAnimationId) {
+      if (legacyCanvasKeyboardEnabled && !activeAnimationId) {
         const multiplier = e.shiftKey ? 10 : 1;
 
         // Nudge
@@ -112,5 +114,6 @@ export const useKeyboardShortcuts = ({
     closeModals,
     isModalOpen,
     activeAnimationId,
+    legacyCanvasKeyboardEnabled,
   ]);
 };

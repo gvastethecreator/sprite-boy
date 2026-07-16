@@ -130,6 +130,7 @@ const AppLayout: React.FC = () => {
     handleExportZip,
     handleExportGif,
     handleSetMode,
+    clearLegacyCanvasInteractionState,
     handleUpload,
     handleLoadProject,
     handleSaveProject,
@@ -138,6 +139,9 @@ const AppLayout: React.FC = () => {
     isLoading,
     loadingMessage,
     animations,
+    sliceGridState,
+    initializeSliceGridState,
+    commitSliceGridState,
   } = controller;
 
   const canvasRef = useRef<CanvasHandle>(null);
@@ -174,7 +178,15 @@ const AppLayout: React.FC = () => {
     committedMetadata: committedSourceMetadata,
     sessionSnapshot: sourceSessionSnapshot,
     legacyImage: slicerImage,
+    persistedState: sliceGridState,
+    onInitializeState: initializeSliceGridState,
+    onCommitState: commitSliceGridState,
   });
+  const canonicalSliceSourceAvailable = sliceGridController.sourceDimensions !== null;
+  const canonicalSliceExportSourceOnly =
+    activeWorkspace === "export" && canonicalSliceSourceAvailable;
+  const canonicalCanvasOwnership =
+    activeWorkspace === "slice" || canonicalSliceExportSourceOnly;
   const isCompactLayout = useCompactStudioLayout();
   const jobStore = useJobStore();
   const jobRunner = useStudioJobRunner();
@@ -183,6 +195,10 @@ const AppLayout: React.FC = () => {
   const jobSummary = useJobStoreSelector(jobStore, selectJobSummary);
   const hasWorkspace = !!slicerImage || !!builderCanvas;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
+
+  useEffect(() => {
+    if (canonicalCanvasOwnership) clearLegacyCanvasInteractionState();
+  }, [canonicalCanvasOwnership, clearLegacyCanvasInteractionState]);
 
   useEffect(() => {
     const legacyMode = LEGACY_MODE_BY_WORKSPACE[activeWorkspace];
@@ -237,6 +253,9 @@ const AppLayout: React.FC = () => {
     undo,
     redo,
     openWorkspace: (workspaceId) => {
+      const targetOwnsCanonicalCanvas = workspaceId === "slice" ||
+        (workspaceId === "export" && canonicalSliceSourceAvailable);
+      if (targetOwnsCanonicalCanvas) clearLegacyCanvasInteractionState();
       handleSetMode(LEGACY_MODE_BY_WORKSPACE[workspaceId]);
       navigate(workspaceId);
     },
@@ -255,6 +274,8 @@ const AppLayout: React.FC = () => {
     setIsSettingsOpen,
     undo,
     clearSourceWorkflow,
+    clearLegacyCanvasInteractionState,
+    canonicalSliceSourceAvailable,
   ]);
 
   const sourceSessionBusy = sourceSessionSnapshot.status === "validating" ||
@@ -413,6 +434,8 @@ const AppLayout: React.FC = () => {
     const loaded = await handleLoadProject(file);
     if (!loaded) return;
     clearSourceWorkflow();
+    setCommittedSourceMetadata(null);
+    setSliceGridSourceGeneration((current) => current + 1);
     setResetSourceDialogOpen(false);
     setStudioError(null);
     workspaceContentRef.current?.focus({ preventScroll: true });
@@ -441,10 +464,10 @@ const AppLayout: React.FC = () => {
   const visibleSourceError = sourceActionError ?? (
     sourceSessionSnapshot.status === "error" ? sourceSessionSnapshot.error : null
   );
-
   useKeyboardShortcuts({
     registry: commandRegistry,
     executeStudioCommand: executeCommand,
+    legacyCanvasKeyboardEnabled: !canonicalCanvasOwnership,
     deleteSelection: handleDeleteSelection,
     nudge: (dx: number, dy: number) => {
       if (selectedIndex !== null)
@@ -560,7 +583,7 @@ const AppLayout: React.FC = () => {
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
-            <LeftSidebar isSliceWorkspace={activeWorkspace === "slice"} />
+            <LeftSidebar key={`desktop-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} />
           </StudioPanel>
         )}
 
@@ -610,10 +633,20 @@ const AppLayout: React.FC = () => {
                     />
                   )}
                 >
-                  <CanvasArea ref={canvasRef} />
+                  <CanvasArea
+                    ref={canvasRef}
+                    canonicalCanvasOwnership={canonicalCanvasOwnership}
+                    sliceGridOverlay={{
+                      sourceDimensions: sliceGridController.sourceDimensions,
+                      effectiveLayout: sliceGridController.effectiveLayout,
+                    }}
+                  />
                 </SliceSourceCanvasFrame>
               ) : (
-                <CanvasArea ref={canvasRef} />
+                <CanvasArea
+                  ref={canvasRef}
+                  canonicalCanvasOwnership={canonicalCanvasOwnership}
+                />
               )
             ) : (
               <StudioWorkspaceStateView
@@ -658,7 +691,7 @@ const AppLayout: React.FC = () => {
             onClose={() => setCompactPanel(null)}
             className="h-full border-0"
           >
-            <LeftSidebar isSliceWorkspace={activeWorkspace === "slice"} />
+            <LeftSidebar key={`compact-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} />
           </StudioPanel>
         ) : compactPanel === "properties" ? (
           <StudioPanel

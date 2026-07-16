@@ -8,6 +8,7 @@ import type {
   EffectiveGridLayout,
   SliceGridController,
 } from "../../features/slice/grid/useSliceGridController";
+import { createDefaultSliceGridRecipeState } from "../../features/slice/grid/gridRecipeState";
 import { AppMode } from "../../types";
 
 const DETECTED: EffectiveGridLayout = Object.freeze({
@@ -20,6 +21,7 @@ const DETECTED: EffectiveGridLayout = Object.freeze({
 });
 
 function controller(overrides: Partial<SliceGridController> = {}): SliceGridController {
+  const recipeState = createDefaultSliceGridRecipeState("asset-grid", { width: 80, height: 40 });
   return {
     sourceDimensions: { width: 80, height: 40 },
     draft: { mode: "auto", manual: { rows: 3, cols: 5 } },
@@ -29,6 +31,8 @@ function controller(overrides: Partial<SliceGridController> = {}): SliceGridCont
     status: "detected",
     detectedLayout: DETECTED,
     effectiveLayout: DETECTED,
+    recipeState,
+    recipe: recipeState.recipe,
     errorMessage: null,
     setMode: vi.fn(),
     setManualRowsInput: vi.fn(),

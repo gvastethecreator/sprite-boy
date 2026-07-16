@@ -1448,6 +1448,29 @@ activo; A1-04 portable first-composition acceptance espera ese cierre.
 **Siguiente frontera irregular:** S1-04 UI wand/manual está activo; S1-05 puede
 avanzar sobre Region-to-Asset y preservación de margins/gaps.
 
+### G2-05 — Integrated canonical Grid ownership
+
+- **Estado:** una instancia del controller conserva Auto/Manual draft y emite
+  `GridSplitRecipeV1` determinista. El key transicional versionado usa el mismo
+  ProjectState/undo/save/load; hydrate es descriptor-safe y reemplaza payloads
+  inválidos antes del siguiente save.
+- **Ownership único:** Slice/Export desconectan renderer, mouse/drop/selection,
+  keyboard y offscreen export legacy. Otras workspaces mantienen su renderer.
+  Source dimensions son autoritativas sobre builderCanvas en render, viewport,
+  overlay y PNG source-only.
+- **Transición:** Compose→Slice limpia selection/playback/drag/eyedropper/wand
+  aunque comparten AppMode. Preview/apply de background usan AbortController;
+  canonical ownership aborta late writes y revoca URLs activas/tardías.
+- **Evidencia:** 44/44, typecheck/lint/build/diff verdes. Chrome productivo
+  prueba source 400×200 vs builder 1024², manual 3×2, invalid draft, undo/redo,
+  reload, DPR2, compact, project unchanged, export decodificado 400×200 y cero
+  canonical legacy strokes/errores. Revisión final `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g2-05-grid-integration.{json,png}`.
+- **Límite:** el recipe es draft transicional, no ProcessingRecipe falsa; G6
+  debe enlazar el AssetRecord canónico antes de `regions.commitRecipe`.
+
+**Siguiente frontera Grid:** G3-01 threshold/padding trim está activo.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

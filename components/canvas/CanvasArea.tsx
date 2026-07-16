@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useRef, useLayoutEffect, useEffect, forwardRef, useImperativeHandle } from "react";
 import { AppMode, CanvasHandle } from "../../types";
 import { Upload, Plus, Maximize2, Monitor } from "lucide-react";
 import { CanvasRenderer } from "../../utils/renderUtils";
@@ -14,9 +14,42 @@ import {
   useAutoResetView,
 } from "../../hooks/canvas/useCanvasRenderLoop";
 import { useCanvasMouse } from "../../hooks/canvas/useCanvasMouse";
+import { resolveCanvasContentDimensions } from "../../hooks/canvas/canvasOwnership";
 import { useCanvasKeyboard, useInitCanvasForm } from "../../hooks/canvas/useCanvasTools";
+import {
+  SliceGridOverlay,
+  type EffectiveGridLayout,
+  type GridLayoutSourceDimensions,
+} from "../../features/slice/grid";
 
-const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
+export interface CanvasAreaProps {
+  readonly canonicalCanvasOwnership?: boolean;
+  readonly sliceGridOverlay?: Readonly<{
+    sourceDimensions: GridLayoutSourceDimensions | null;
+    effectiveLayout: EffectiveGridLayout | null;
+  }> | null;
+}
+
+/**
+ * G2-05 canonical Slice export contract: export the source bitmap only.
+ * Grid-aware sheet/region export is owned by G7; legacy frames and builder grids
+ * must never leak into a canonical Slice snapshot.
+ */
+export function renderCanonicalSliceSourceSnapshot(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+): void {
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(source, 0, 0, width, height);
+}
+
+const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
+  canonicalCanvasOwnership = false,
+  sliceGridOverlay = null,
+}, ref) => {
   const {
     currentMode,
     slicerImage: imageMeta,
@@ -73,30 +106,57 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
   const propsRef = useRef<any>({});
   const stateRef = useRef<any>({});
 
+  const sourceIntrinsicDimensions = slicerImgObj
+    ? {
+        width: slicerImgObj.naturalWidth || slicerImgObj.width,
+        height: slicerImgObj.naturalHeight || slicerImgObj.height,
+      }
+    : null;
+  const contentDimensions = resolveCanvasContentDimensions({
+    canonicalCanvasOwnership,
+    imageMeta,
+    sourceIntrinsicDimensions,
+    builderCanvas,
+    fallback: { width: 100, height: 100 },
+  });
   const mouse = useCanvasMouse({
     containerRef,
     canvasRef,
     isEmpty,
     viewport,
     setViewport,
-    currentMode,
-    builderCanvas,
-    gridConfig,
-    imageMeta,
-    frames,
-    builderSlots,
-    selectedFrameIndex,
-    isEyedropperActive,
     isSpacePressed,
-    onPickColor,
-    onSelectFrame,
-    onUpload,
-    onUpdateSlot,
-    onUpdateSlotEphemeral,
-    onUpdateFrame,
-    onUpdateFrameEphemeral,
-    onSwapSlots,
+    legacyInteraction: canonicalCanvasOwnership
+      ? null
+      : {
+          currentMode,
+          builderCanvas,
+          gridConfig,
+          imageMeta,
+          frames,
+          builderSlots,
+          selectedFrameIndex,
+          isEyedropperActive,
+          onPickColor,
+          onSelectFrame,
+          onUpload,
+          onUpdateSlot,
+          onUpdateSlotEphemeral,
+          onUpdateFrame,
+          onUpdateFrameEphemeral,
+          onSwapSlots,
+        },
   });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onWheel = (event: WheelEvent): void => {
+      mouse.handleWheel(event as unknown as React.WheelEvent);
+    };
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => container.removeEventListener("wheel", onWheel);
+  }, [mouse.handleWheel]);
 
   // Keep refs in sync for the render loop (avoids stale closures in rAF)
   useLayoutEffect(() => {
@@ -118,6 +178,8 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
       loadingMessage,
       isEyedropperActive,
       labelConfig,
+      canonicalSliceOverlayActive: canonicalCanvasOwnership,
+      canvasContentDimensions: contentDimensions,
     };
     stateRef.current = {
       viewport,
@@ -134,8 +196,8 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
 
   const handleResetView = useAutoResetView(
     containerRef,
-    builderCanvas,
-    imageMeta,
+    contentDimensions,
+    imageMeta?.src ?? null,
     currentMode,
     activeAnimation ?? null,
     setViewport,
@@ -145,13 +207,18 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
   useImperativeHandle(ref, () => ({
     resetView: handleResetView,
     exportSnapshot: async (includeGrid: boolean) => {
-      const w = builderCanvas?.width || imageMeta?.width || 100,
-        h = builderCanvas?.height || imageMeta?.height || 100;
+      const { width: w, height: h } = contentDimensions;
       const off = document.createElement("canvas");
       off.width = w;
       off.height = h;
       const ctx = off.getContext("2d");
       if (!ctx) return null;
+      if (canonicalCanvasOwnership) {
+        if (!slicerImgObj) return null;
+        off.dataset.canonicalSliceExport = "source-only";
+        renderCanonicalSliceSourceSnapshot(ctx, slicerImgObj, w, h);
+        return new Promise<Blob | null>((resolve) => off.toBlob(resolve, "image/png"));
+      }
       CanvasRenderer.render({
         ctx,
         width: w,
@@ -184,6 +251,7 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
       return new Promise<Blob | null>((resolve) => off.toBlob(resolve, "image/png"));
     },
     exportFrame: async (frameId: number) => {
+      if (canonicalCanvasOwnership) return null;
       const frame = frames.find((f) => f.id === frameId);
       if (!frame) return null;
       const off = document.createElement("canvas");
@@ -233,7 +301,6 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
     <section
       aria-label="Canvas workspace"
       className="h-full bg-app relative flex flex-col select-none group/canvas"
-      onWheel={mouse.handleWheel}
       onDragOver={mouse.handleDragOver}
       onDragLeave={() => mouse.setIsDragOverCanvas(false)}
       onDrop={mouse.handleDrop}
@@ -378,8 +445,19 @@ const CanvasArea = forwardRef<CanvasHandle, {}>((props, ref) => {
         )}
         <canvas
           ref={canvasRef}
+          data-studio-source-canvas=""
+          data-canonical-canvas-ownership={canonicalCanvasOwnership ? "true" : "false"}
+          data-canvas-content-size={`${contentDimensions.width}x${contentDimensions.height}`}
+          data-legacy-selected-index={selectedFrameIndex === null ? "none" : String(selectedFrameIndex)}
           className={`block transition-opacity duration-500 ${isEmpty ? "opacity-0" : "opacity-100"}`}
         />
+        {sliceGridOverlay ? (
+          <SliceGridOverlay
+            sourceDimensions={sliceGridOverlay.sourceDimensions}
+            effectiveLayout={sliceGridOverlay.effectiveLayout}
+            transform={viewport}
+          />
+        ) : null}
       </div>
       {!isEmpty && (
         <CanvasStatusBar

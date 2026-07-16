@@ -177,6 +177,7 @@ const SliceGridOverlayCanvas: React.FC<SliceGridOverlayCanvasProps> = ({
     canvas.dataset.gridOverlayScale = String(projection.transform.scale);
     canvas.dataset.gridOverlayOffset = `${projection.transform.offset.x},${projection.transform.offset.y}`;
     canvas.dataset.gridOverlayDrawCount = String(drawCountRef.current);
+    canvas.dataset.gridOverlaySourceSize = `${sourceDimensions.width}x${sourceDimensions.height}`;
   }, [effectiveLayout, paintStyle, sourceDimensions, surface, transform]);
 
   useLayoutEffect(() => () => {

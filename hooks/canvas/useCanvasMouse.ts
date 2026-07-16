@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   AppMode,
   DragMode,
@@ -13,12 +13,7 @@ import {
 import { rgbToHex } from "../../utils/algorithms";
 import { getGridIndexFromPos } from "../../utils/canvasMath";
 
-interface CanvasMouseDeps {
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  isEmpty: boolean;
-  viewport: ViewportState;
-  setViewport: (vp: ViewportState) => void;
+export interface LegacyCanvasInteraction {
   currentMode: AppMode;
   builderCanvas: BuilderCanvasSize | null | undefined;
   gridConfig: GridConfig;
@@ -27,7 +22,6 @@ interface CanvasMouseDeps {
   builderSlots: Record<number, SlotData> | undefined;
   selectedFrameIndex: number | null;
   isEyedropperActive: boolean;
-  isSpacePressed: boolean;
   onPickColor: ((hex: string) => void) | undefined;
   onSelectFrame: (index: number) => void;
   onUpload: (file: File) => void;
@@ -38,6 +32,17 @@ interface CanvasMouseDeps {
   onSwapSlots: ((a: number, b: number) => void) | undefined;
 }
 
+interface CanvasMouseDeps {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  isEmpty: boolean;
+  viewport: ViewportState;
+  setViewport: (vp: ViewportState) => void;
+  isSpacePressed: boolean;
+  /** Null in the canonical Slice workspace. Pan/zoom stay active; legacy editing is inert. */
+  legacyInteraction: LegacyCanvasInteraction | null;
+}
+
 /** All canvas mouse interaction: drag, pan, zoom, eyedropper, DnD, slot swap. */
 export function useCanvasMouse(deps: CanvasMouseDeps) {
   const {
@@ -46,23 +51,8 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
     isEmpty,
     viewport,
     setViewport,
-    currentMode,
-    builderCanvas,
-    gridConfig,
-    imageMeta,
-    frames,
-    builderSlots,
-    selectedFrameIndex,
-    isEyedropperActive,
     isSpacePressed,
-    onPickColor,
-    onSelectFrame,
-    onUpload,
-    onUpdateSlot,
-    onUpdateSlotEphemeral,
-    onUpdateFrame,
-    onUpdateFrameEphemeral,
-    onSwapSlots,
+    legacyInteraction,
   } = deps;
 
   const [dragMode, setDragMode] = useState<DragMode>(DragMode.NONE);
@@ -77,6 +67,15 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
   const [dragHoverSlot, setDragHoverSlot] = useState<number | null>(null);
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
   const [dragStartSlot, setDragStartSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (legacyInteraction) return;
+    setDragMode(DragMode.NONE);
+    setDragSelectionRect(null);
+    setDragHoverSlot(null);
+    setIsDragOverCanvas(false);
+    setDragStartSlot(null);
+  }, [legacyInteraction]);
 
   const getRelMouse = useCallback(
     (cx: number, cy: number) => {
@@ -93,20 +92,25 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      if (!legacyInteraction) {
+        setIsDragOverCanvas(false);
+        setDragHoverSlot(null);
+        return;
+      }
       setIsDragOverCanvas(true);
-      if (currentMode === AppMode.BUILDER && builderCanvas) {
+      if (legacyInteraction.currentMode === AppMode.BUILDER && legacyInteraction.builderCanvas) {
         const { x, y } = getRelMouse(e.clientX, e.clientY);
         const idx = getGridIndexFromPos(
           x,
           y,
-          builderCanvas.width,
-          builderCanvas.height,
-          gridConfig,
+          legacyInteraction.builderCanvas.width,
+          legacyInteraction.builderCanvas.height,
+          legacyInteraction.gridConfig,
         );
         setDragHoverSlot(idx !== -1 ? idx : null);
       }
     },
-    [currentMode, builderCanvas, gridConfig, getRelMouse],
+    [legacyInteraction, getRelMouse],
   );
 
   const handleDrop = useCallback(
@@ -114,16 +118,23 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
       e.preventDefault();
       setIsDragOverCanvas(false);
       setDragHoverSlot(null);
+      if (!legacyInteraction) return;
       if (e.dataTransfer.files.length) {
-        onUpload(e.dataTransfer.files[0]);
+        legacyInteraction.onUpload(e.dataTransfer.files[0]);
         return;
       }
       const aid = e.dataTransfer.getData(DND_ASSET_TYPE);
-      if (!aid || currentMode !== AppMode.BUILDER || !builderCanvas) return;
+      if (!aid || legacyInteraction.currentMode !== AppMode.BUILDER || !legacyInteraction.builderCanvas) return;
       const { x, y } = getRelMouse(e.clientX, e.clientY);
-      const idx = getGridIndexFromPos(x, y, builderCanvas.width, builderCanvas.height, gridConfig);
+      const idx = getGridIndexFromPos(
+        x,
+        y,
+        legacyInteraction.builderCanvas.width,
+        legacyInteraction.builderCanvas.height,
+        legacyInteraction.gridConfig,
+      );
       if (idx !== -1) {
-        onUpdateSlot?.(idx, {
+        legacyInteraction.onUpdateSlot?.(idx, {
           gridIndex: idx,
           assetId: aid,
           fitMode: "fit",
@@ -140,15 +151,26 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
         });
       }
     },
-    [currentMode, builderCanvas, gridConfig, getRelMouse, onUpload, onUpdateSlot],
+    [legacyInteraction, getRelMouse],
   );
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (isEmpty) return;
 
+      const { x, y } = getRelMouse(e.clientX, e.clientY);
+      setLastMousePos({ x, y });
+
+      // Canonical Slice owns selection and mutations. Only viewport panning is shared.
+      if (!legacyInteraction) {
+        if (e.button === 1 || (isSpacePressed && e.button === 0)) {
+          setDragMode(DragMode.PAN);
+        }
+        return;
+      }
+
       // Eyedropper
-      if (isEyedropperActive && onPickColor && canvasRef.current) {
+      if (legacyInteraction.isEyedropperActive && legacyInteraction.onPickColor && canvasRef.current) {
         e.stopPropagation();
         e.preventDefault();
         const canvas = canvasRef.current;
@@ -162,7 +184,7 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
             const iy = Math.floor(Math.max(0, Math.min(y, canvas.height - 1)));
             const pixel = ctx.getImageData(ix, iy, 1, 1).data;
             const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
-            onPickColor(hex);
+            legacyInteraction.onPickColor(hex);
           } catch (err) {
             console.warn("Could not pick color:", err);
           }
@@ -170,53 +192,42 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
         return;
       }
 
-      const { x, y } = getRelMouse(e.clientX, e.clientY);
-      setLastMousePos({ x, y });
-
       if (e.button === 1 || (isSpacePressed && e.button === 0)) {
         setDragMode(DragMode.PAN);
         return;
       }
 
-      if (currentMode === AppMode.BUILDER && builderCanvas) {
+      if (legacyInteraction.currentMode === AppMode.BUILDER && legacyInteraction.builderCanvas) {
         const idx = getGridIndexFromPos(
           x,
           y,
-          builderCanvas.width,
-          builderCanvas.height,
-          gridConfig,
+          legacyInteraction.builderCanvas.width,
+          legacyInteraction.builderCanvas.height,
+          legacyInteraction.gridConfig,
         );
         if (idx !== -1) {
-          onSelectFrame(idx);
-          if (builderSlots?.[idx]) {
+          legacyInteraction.onSelectFrame(idx);
+          if (legacyInteraction.builderSlots?.[idx]) {
             setDragMode(DragMode.SWAP_SLOTS);
             setDragStartSlot(idx);
           }
         }
-      } else if (imageMeta) {
-        const idx = frames.findIndex(
+      } else if (legacyInteraction.imageMeta) {
+        const idx = legacyInteraction.frames.findIndex(
           (f) => x >= f.x && x <= f.x + f.w && y >= f.y && y <= f.y + f.h,
         );
         if (idx !== -1) {
-          onSelectFrame(idx);
+          legacyInteraction.onSelectFrame(idx);
           setDragMode(DragMode.MOVE_FRAME);
         }
       }
     },
     [
       isEmpty,
-      isEyedropperActive,
+      legacyInteraction,
       isSpacePressed,
-      onPickColor,
       canvasRef,
       getRelMouse,
-      currentMode,
-      builderCanvas,
-      gridConfig,
-      imageMeta,
-      frames,
-      builderSlots,
-      onSelectFrame,
     ],
   );
 
@@ -236,35 +247,37 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
         return;
       }
 
+      if (!legacyInteraction) return;
+
       const dx = x - lastMousePos.x;
       const dy = y - lastMousePos.y;
 
-      if (dragMode === DragMode.SWAP_SLOTS && builderCanvas) {
+      if (dragMode === DragMode.SWAP_SLOTS && legacyInteraction.builderCanvas) {
         const hoverIdx = getGridIndexFromPos(
           x,
           y,
-          builderCanvas.width,
-          builderCanvas.height,
-          gridConfig,
+          legacyInteraction.builderCanvas.width,
+          legacyInteraction.builderCanvas.height,
+          legacyInteraction.gridConfig,
         );
         setDragHoverSlot(hoverIdx !== -1 ? hoverIdx : null);
         return;
       }
 
       if (dragMode === DragMode.MOVE_FRAME) {
-        if (currentMode === AppMode.BUILDER && selectedFrameIndex !== null) {
-          const s = builderSlots?.[selectedFrameIndex];
+        if (legacyInteraction.currentMode === AppMode.BUILDER && legacyInteraction.selectedFrameIndex !== null) {
+          const s = legacyInteraction.builderSlots?.[legacyInteraction.selectedFrameIndex];
           if (s) {
-            onUpdateSlotEphemeral?.(selectedFrameIndex, {
+            legacyInteraction.onUpdateSlotEphemeral?.(legacyInteraction.selectedFrameIndex, {
               ...s,
               offsetX: s.offsetX + dx,
               offsetY: s.offsetY + dy,
             });
             setLastMousePos({ x, y });
           }
-        } else if (selectedFrameIndex !== null) {
-          const f = frames[selectedFrameIndex];
-          onUpdateFrameEphemeral?.(f.id, { x: f.x + dx, y: f.y + dy });
+        } else if (legacyInteraction.selectedFrameIndex !== null) {
+          const f = legacyInteraction.frames[legacyInteraction.selectedFrameIndex];
+          legacyInteraction.onUpdateFrameEphemeral?.(f.id, { x: f.x + dx, y: f.y + dy });
           setLastMousePos({ x, y });
         }
       }
@@ -275,28 +288,25 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
       viewport,
       setViewport,
       lastMousePos,
-      builderCanvas,
-      gridConfig,
-      currentMode,
-      selectedFrameIndex,
-      builderSlots,
-      frames,
-      onUpdateSlotEphemeral,
-      onUpdateFrameEphemeral,
+      legacyInteraction,
     ],
   );
 
   const handleMouseUp = useCallback(() => {
-    if (dragMode === DragMode.SWAP_SLOTS && dragStartSlot !== null && dragHoverSlot !== null) {
+    if (legacyInteraction && dragMode === DragMode.SWAP_SLOTS && dragStartSlot !== null && dragHoverSlot !== null) {
       if (dragStartSlot !== dragHoverSlot) {
-        onSwapSlots?.(dragStartSlot, dragHoverSlot);
-        onSelectFrame(dragHoverSlot);
+        legacyInteraction.onSwapSlots?.(dragStartSlot, dragHoverSlot);
+        legacyInteraction.onSelectFrame(dragHoverSlot);
       }
-    } else if (dragMode === DragMode.MOVE_FRAME) {
-      if (currentMode === AppMode.BUILDER && selectedFrameIndex !== null) {
-        onUpdateSlot?.(selectedFrameIndex, builderSlots?.[selectedFrameIndex]);
-      } else if (selectedFrameIndex !== null) {
-        onUpdateFrame?.(frames[selectedFrameIndex].id, frames[selectedFrameIndex]);
+    } else if (legacyInteraction && dragMode === DragMode.MOVE_FRAME) {
+      if (legacyInteraction.currentMode === AppMode.BUILDER && legacyInteraction.selectedFrameIndex !== null) {
+        legacyInteraction.onUpdateSlot?.(
+          legacyInteraction.selectedFrameIndex,
+          legacyInteraction.builderSlots?.[legacyInteraction.selectedFrameIndex],
+        );
+      } else if (legacyInteraction.selectedFrameIndex !== null) {
+        const frame = legacyInteraction.frames[legacyInteraction.selectedFrameIndex];
+        legacyInteraction.onUpdateFrame?.(frame.id, frame);
       }
     }
     setDragMode(DragMode.NONE);
@@ -307,14 +317,7 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
     dragMode,
     dragStartSlot,
     dragHoverSlot,
-    currentMode,
-    selectedFrameIndex,
-    builderSlots,
-    frames,
-    onSwapSlots,
-    onSelectFrame,
-    onUpdateSlot,
-    onUpdateFrame,
+    legacyInteraction,
   ]);
 
   const handleWheel = useCallback(
@@ -337,11 +340,11 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
   const getCursor = useCallback(() => {
     if (isEmpty) return "default";
     if (dragMode === DragMode.PAN) return "grab";
-    if (dragMode === DragMode.MOVE_FRAME) return "move";
-    if (dragMode === DragMode.SWAP_SLOTS) return "grabbing";
-    if (isEyedropperActive) return "crosshair";
+    if (legacyInteraction && dragMode === DragMode.MOVE_FRAME) return "move";
+    if (legacyInteraction && dragMode === DragMode.SWAP_SLOTS) return "grabbing";
+    if (legacyInteraction?.isEyedropperActive) return "crosshair";
     return "default";
-  }, [isEmpty, dragMode, isEyedropperActive]);
+  }, [isEmpty, dragMode, legacyInteraction]);
 
   return {
     dragMode,

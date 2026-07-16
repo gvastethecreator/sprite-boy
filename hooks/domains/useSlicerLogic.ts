@@ -83,29 +83,65 @@ export function useSlicerLogic(
     }, 0);
   };
 
-  const handleRemoveBackground = async (color: string, tolerance: number, softness: number) => {
-    if (!project.imageMeta) return;
+  const handleRemoveBackground = async (
+    color: string,
+    tolerance: number,
+    softness: number,
+    options: { readonly signal?: AbortSignal } = {},
+  ) => {
+    const signal = options.signal;
+    if (!project.imageMeta || signal?.aborted) return;
     setIsLoading(true);
     setLoadingMessage("Removing background...");
     try {
       const blob = await removeBackground(project.imageMeta.src, color, tolerance, softness);
-      if (blob) {
+      if (blob && !signal?.aborted) {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64data = reader.result as string;
-          setProject((prev) => ({
-            ...prev,
-            imageMeta: prev.imageMeta ? { ...prev.imageMeta, src: base64data } : null,
-          }));
-          showToast("Background removed successfully", "success");
-        };
-        reader.readAsDataURL(blob);
+        await new Promise<void>((resolve, reject) => {
+          const finish = (): void => {
+            signal?.removeEventListener("abort", onAbort);
+            reader.onloadend = null;
+            reader.onerror = null;
+            reader.onabort = null;
+          };
+          const onAbort = (): void => {
+            try { reader.abort(); } catch {}
+            finish();
+            resolve();
+          };
+          reader.onloadend = () => {
+            const base64data = reader.result;
+            finish();
+            if (!signal?.aborted && typeof base64data === "string") {
+              setProject((prev) => ({
+                ...prev,
+                imageMeta: prev.imageMeta ? { ...prev.imageMeta, src: base64data } : null,
+              }));
+              showToast("Background removed successfully", "success");
+            }
+            resolve();
+          };
+          reader.onerror = () => {
+            const error = reader.error ?? new Error("Background reader failed.");
+            finish();
+            reject(error);
+          };
+          reader.onabort = () => {
+            finish();
+            resolve();
+          };
+          signal?.addEventListener("abort", onAbort, { once: true });
+          if (signal?.aborted) onAbort();
+          else reader.readAsDataURL(blob);
+        });
       }
     } catch {
-      showToast("Failed to remove background", "error");
+      if (!signal?.aborted) showToast("Failed to remove background", "error");
     } finally {
-      setIsLoading(false);
-      setLoadingMessage("");
+      if (!signal?.aborted) {
+        setIsLoading(false);
+        setLoadingMessage("");
+      }
     }
   };
 
@@ -114,16 +150,19 @@ export function useSlicerLogic(
     tolerance: number,
     softness: number,
     setPreviewUrl: (url: string | null) => void,
+    options: { readonly signal?: AbortSignal } = {},
   ) => {
-    if (!project.imageMeta) return;
+    const signal = options.signal;
+    if (!project.imageMeta || signal?.aborted) return;
     try {
       const blob = await removeBackground(project.imageMeta.src, color, tolerance, softness);
-      if (blob) {
+      if (blob && !signal?.aborted) {
         const url = URL.createObjectURL(blob);
-        setPreviewUrl(url);
+        if (signal?.aborted) URL.revokeObjectURL(url);
+        else setPreviewUrl(url);
       }
-    } catch (e) {
-      console.error("Preview failed", e);
+    } catch {
+      // Preview failures are intentionally silent and never expose provider payloads.
     }
   };
 
