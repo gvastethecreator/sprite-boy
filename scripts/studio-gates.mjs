@@ -66,6 +66,12 @@ const STEPS = Object.freeze({
     ["scripts/studio-browser-budget.mjs", "--profile", "ratchet"],
     120_000,
   ),
+  deferredBrowser: processStep(
+    "deferred-feature-browser",
+    "Production deferred AI, GIF and ZIP journeys",
+    ["scripts/studio-deferred-features-browser.mjs"],
+    120_000,
+  ),
   persistenceBrowser: processStep(
     "persistence-browser",
     "Durable reload and portable package browser journey",
@@ -94,10 +100,11 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
     integration: gate("integration", "Integration tests", [STEPS.integration]),
     coverage: gate("coverage", "Canonical coverage ratchet", [STEPS.coverage]),
     fixtures: gate("fixtures", "Fixture and golden retention", [STEPS.fixtures]),
-    budgets: gate("budgets", "Bundle, performance and accessibility budgets", [
+    budgets: gate("budgets", "Bundle, performance, accessibility and deferred-feature budgets", [
       STEPS.build,
       STEPS.bundle,
       STEPS.browserBudget,
+      STEPS.deferredBrowser,
     ]),
     persistence: gate("persistence", "Durable persistence browser journey", [STEPS.persistenceBrowser]),
     build: gate("build", "Production build", [STEPS.build]),
@@ -114,6 +121,7 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
       STEPS.build,
       STEPS.bundle,
       STEPS.browserBudget,
+      STEPS.deferredBrowser,
     ]),
   }),
 });

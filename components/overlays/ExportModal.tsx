@@ -38,18 +38,21 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const [codeFormat, setCodeFormat] = useState<CodeFormat>("json_generic");
   const [generatedSnippet, setGeneratedSnippet] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const resolvedAnimationId = animations.some(({ id }) => id === selectedAnimId)
+    ? selectedAnimId
+    : animations[0]?.id || "";
 
   useEffect(() => {
-    if (type === "code" && selectedAnimId) {
-      setGeneratedSnippet(onGenerateCode(selectedAnimId, codeScale, codeFormat));
+    if (type === "code" && resolvedAnimationId) {
+      setGeneratedSnippet(onGenerateCode(resolvedAnimationId, codeScale, codeFormat));
     }
-  }, [type, selectedAnimId, codeScale, codeFormat, onGenerateCode]);
+  }, [type, resolvedAnimationId, codeScale, codeFormat, onGenerateCode]);
 
   const handleExportGifAction = async () => {
-    if (!selectedAnimId) return;
+    if (!resolvedAnimationId) return;
     setIsProcessing(true);
     try {
-      await onExportGif(selectedAnimId);
+      await onExportGif(resolvedAnimationId);
       onClose();
     } catch (e) {
       console.error(e);
@@ -184,7 +187,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
                   Sequence to Encode
                 </label>
                 <select
-                  value={selectedAnimId}
+                  value={resolvedAnimationId}
                   onChange={(e) => setSelectedAnimId(e.target.value)}
                   className="w-full bg-input border border-border rounded-lg text-sm p-3 text-textMain outline-none focus:border-accent"
                 >
@@ -215,7 +218,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
                 </button>
                 <button
                   onClick={handleExportGifAction}
-                  disabled={isProcessing || !selectedAnimId}
+                  disabled={isProcessing || !resolvedAnimationId}
                   className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-glow-sm active:scale-95 disabled:opacity-50"
                 >
                   {isProcessing ? (
@@ -238,7 +241,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
                     Animation
                   </label>
                   <select
-                    value={selectedAnimId}
+                    value={resolvedAnimationId}
                     onChange={(e) => setSelectedAnimId(e.target.value)}
                     className="w-full bg-input border border-border rounded-lg text-xs p-2 text-textMain outline-none focus:border-accent"
                   >

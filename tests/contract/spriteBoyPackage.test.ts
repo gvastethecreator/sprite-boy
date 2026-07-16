@@ -140,6 +140,52 @@ async function duplicatePhysicalEntry(original: Blob, targetPath: string): Promi
   return new Blob([blobPart(output)], { type: SPRITEBOY_PACKAGE_MIME });
 }
 
+interface PhysicalArchiveView {
+  bytes: Uint8Array;
+  view: DataView;
+  endOffset: number;
+  centralOffset: number;
+  localOffset: number;
+}
+
+async function patchPhysicalArchive(
+  original: Blob,
+  patch: (archive: PhysicalArchiveView) => void,
+): Promise<Blob> {
+  const bytes = (await packageBytes(original)).slice();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let endOffset = -1;
+  for (let offset = bytes.byteLength - 22; offset >= 0; offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) {
+      endOffset = offset;
+      break;
+    }
+  }
+  if (endOffset < 0) throw new Error("Fixture ZIP end record missing.");
+  const centralOffset = view.getUint32(endOffset + 16, true);
+  const localOffset = view.getUint32(centralOffset + 42, true);
+  patch({ bytes, view, endOffset, centralOffset, localOffset });
+  return new Blob([blobPart(bytes)], { type: SPRITEBOY_PACKAGE_MIME });
+}
+
+async function repackManifest(
+  original: Blob,
+  mutate: (manifest: Record<string, unknown>, zip: JSZip) => void | Promise<void>,
+): Promise<Blob> {
+  return repack(original, async (zip) => {
+    const manifest = JSON.parse(
+      await zip.file("manifest.json")!.async("string"),
+    ) as Record<string, unknown>;
+    await mutate(manifest, zip);
+    zip.file("manifest.json", JSON.stringify(manifest));
+  });
+}
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 describe("portable .spriteboy package (F3-04)", () => {
   it("exports and imports a fully verified clean-profile package", async () => {
     const project = packageProject();
@@ -419,5 +465,178 @@ describe("portable .spriteboy package (F3-04)", () => {
     const imported = await importSpriteBoyPackage(portable);
     expect(imported.project.id).toBe("package-project");
     expect(blobMethodReads).toBe(0);
+  });
+
+  it("closes invalid option, source, project and input boundaries", async () => {
+    const invalidExportOptions: unknown[] = [
+      null,
+      [],
+      new Date(),
+      { unsupported: true },
+      { compressionLevel: -1 },
+      { compressionLevel: 1.5 },
+      { compressionLevel: 10 },
+      { signal: {} },
+    ];
+    const hiddenOption = {};
+    Object.defineProperty(hiddenOption, "compressionLevel", { enumerable: false, value: 6 });
+    invalidExportOptions.push(hiddenOption);
+
+    for (const options of invalidExportOptions) {
+      await expect(captureError(() => exportSpriteBoyPackage(
+        packageProject(),
+        packageSource(),
+        options as SpriteBoyPackageExportOptions,
+      ))).resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INVALID_INPUT" });
+    }
+
+    for (const options of [
+      { maxPackageBytes: 0 },
+      { maxEntries: 1.5 },
+      { maxUncompressedBytes: Number.MAX_SAFE_INTEGER + 1 },
+    ]) {
+      await expect(captureError(() => importSpriteBoyPackage(
+        new Blob(),
+        options,
+      ))).resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INVALID_INPUT" });
+    }
+
+    for (const source of [null, {}, { getBlob: true }]) {
+      await expect(captureError(() => exportSpriteBoyPackage(
+        packageProject(),
+        source as unknown as SpriteBoyPackageAssetSource,
+      ))).resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INVALID_INPUT" });
+    }
+
+    await expect(captureError(() => exportSpriteBoyPackage(
+      {} as StudioProjectV1,
+      packageSource(),
+    ))).resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_PROJECT_INVALID" });
+
+    const nonBlobSource = {
+      getBlob: vi.fn(async () => ({ bytes: "not-a-blob" }) as unknown as Promise<Blob>),
+    };
+    await expect(captureError(() => exportSpriteBoyPackage(packageProject(), nonBlobSource)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INTEGRITY_MISMATCH" });
+
+    await expect(captureError(() => importSpriteBoyPackage({} as Blob)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INVALID_INPUT" });
+  });
+
+  it("rejects every malformed manifest shape before project persistence", async () => {
+    const portable = await exportSpriteBoyPackage(packageProject(), packageSource());
+    const mutations: Array<(manifest: Record<string, unknown>) => void> = [
+      (manifest) => { manifest.extra = true; },
+      (manifest) => { manifest.project = null; },
+      (manifest) => { (manifest.project as Record<string, unknown>).sha256 = ""; },
+      (manifest) => { (manifest.project as Record<string, unknown>).path = "other.json"; },
+      (manifest) => { manifest.blobs = {}; },
+      (manifest) => { (manifest.blobs as unknown[])[0] = null; },
+      (manifest) => { (manifest.blobs as Array<Record<string, unknown>>)[0].contentHash = "bad"; },
+      (manifest) => { (manifest.blobs as Array<Record<string, unknown>>)[0].assetIds = []; },
+      (manifest) => {
+        (manifest.blobs as Array<Record<string, unknown>>)[0].assetIds = ["beta", "alpha"];
+      },
+      (manifest) => { (manifest.blobs as Array<Record<string, unknown>>)[0].byteSize = -1; },
+    ];
+
+    for (const mutate of mutations) {
+      const malformed = await repackManifest(portable, mutate);
+      await expect(captureError(() => importSpriteBoyPackage(malformed)))
+        .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_MANIFEST_INVALID" });
+    }
+
+    const nullManifest = await repack(portable, (zip) => {
+      zip.file("manifest.json", "null");
+    });
+    await expect(captureError(() => importSpriteBoyPackage(nullManifest)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_MANIFEST_INVALID" });
+  });
+
+  it("preflights malformed physical ZIP structures before inflation", async () => {
+    const portable = await exportSpriteBoyPackage(packageProject(), packageSource());
+    const malformedArchives: Blob[] = [
+      new Blob([new Uint8Array(8)], { type: SPRITEBOY_PACKAGE_MIME }),
+      await patchPhysicalArchive(portable, ({ view, endOffset }) => {
+        view.setUint32(endOffset, 0, true);
+      }),
+      await patchPhysicalArchive(portable, ({ view, endOffset }) => {
+        view.setUint16(endOffset + 4, 1, true);
+      }),
+      await patchPhysicalArchive(portable, ({ view, centralOffset }) => {
+        view.setUint32(centralOffset, 0, true);
+      }),
+      await patchPhysicalArchive(portable, ({ view, centralOffset }) => {
+        view.setUint16(centralOffset + 8, 1, true);
+      }),
+      await patchPhysicalArchive(portable, ({ bytes, centralOffset }) => {
+        bytes[centralOffset + 46] = 0x80;
+      }),
+      await patchPhysicalArchive(portable, ({ view, localOffset }) => {
+        view.setUint32(localOffset, 0, true);
+      }),
+      await patchPhysicalArchive(portable, ({ bytes, view, localOffset }) => {
+        const nameLength = view.getUint16(localOffset + 26, true);
+        bytes[localOffset + 30 + nameLength - 1] ^= 1;
+      }),
+    ];
+
+    for (const malformed of malformedArchives) {
+      await expect(captureError(() => importSpriteBoyPackage(malformed)))
+        .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INVALID_ARCHIVE" });
+    }
+  });
+
+  it("reports malformed content and lower-level ZIP generation failures", async () => {
+    const portable = await exportSpriteBoyPackage(packageProject(), packageSource());
+    const missingManifest = await repack(portable, (zip) => {
+      zip.remove("manifest.json");
+    });
+    await expect(captureError(() => importSpriteBoyPackage(missingManifest)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_ASSET_MISSING" });
+
+    const invalidUtf8 = await repack(portable, (zip) => {
+      zip.file("manifest.json", new Uint8Array([0xff, 0xfe]), { binary: true });
+    });
+    await expect(captureError(() => importSpriteBoyPackage(invalidUtf8)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INVALID_ARCHIVE" });
+
+    const invalidJson = await repack(portable, (zip) => {
+      zip.file("manifest.json", "{");
+    });
+    await expect(captureError(() => importSpriteBoyPackage(invalidJson)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_MANIFEST_INVALID" });
+
+    const invalidProjectText = "{}";
+    const invalidProject = await repackManifest(portable, async (manifest, zip) => {
+      const project = manifest.project as Record<string, unknown>;
+      project.byteSize = invalidProjectText.length;
+      project.sha256 = await sha256(invalidProjectText);
+      zip.file("project.json", invalidProjectText);
+    });
+    await expect(captureError(() => importSpriteBoyPackage(invalidProject)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_PROJECT_INVALID" });
+
+    const wrongBlobSize = await repack(portable, (zip) => {
+      zip.file(`assets/${ALPHA_HASH}.png`, "alpha!", { createFolders: false });
+    });
+    await expect(captureError(() => importSpriteBoyPackage(wrongBlobSize)))
+      .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INTEGRITY_MISMATCH" });
+
+    const excessiveManifestClaim = await repackManifest(portable, (manifest) => {
+      (manifest.blobs as Array<Record<string, unknown>>)[0].byteSize = 100_000;
+    });
+    await expect(captureError(() => importSpriteBoyPackage(excessiveManifestClaim, {
+      maxUncompressedBytes: 10_000,
+    }))).resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_LIMIT_EXCEEDED" });
+
+    const generate = vi.spyOn(JSZip.prototype, "generateAsync")
+      .mockRejectedValueOnce(new Error("fixture generation failed"));
+    try {
+      await expect(captureError(() => exportSpriteBoyPackage(packageProject(), packageSource())))
+        .resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_INVALID_ARCHIVE" });
+    } finally {
+      generate.mockRestore();
+    }
   });
 });

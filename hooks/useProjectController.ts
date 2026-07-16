@@ -19,7 +19,7 @@ import { useBuilderLogic, DEFAULT_SLOT_DATA, RATIO_PRESETS } from "./domains/use
 import { useExportLogic } from "./domains/useExportLogic";
 import { usePersistence } from "./domains/usePersistence";
 import { getAllAssets } from "../utils/db";
-import { analyzeImage } from "../utils/aiService";
+import { analyzeImageBlob } from "../utils/lazyFeatureModules";
 
 const INITIAL_STATE: ProjectState = {
   imageMeta: null,
@@ -325,13 +325,7 @@ export function useProjectController() {
     ui.setIsLoading(true);
     ui.setLoadingMessage("Gemini analysis...");
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        const result = await analyzeImage(base64);
-        ui.setAnalysisResult(result);
-      };
-      reader.readAsDataURL(blob);
+      ui.setAnalysisResult(await analyzeImageBlob(blob));
     } catch {
       notify("Analysis failed", "error");
     } finally {

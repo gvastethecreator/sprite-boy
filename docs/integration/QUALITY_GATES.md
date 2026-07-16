@@ -323,12 +323,11 @@ Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
 
 ## Enforcement F8-04 — 2026-07-15
 
-- `bun scripts/studio-gates.mjs --gate coverage` ejecuta 63 archivos/598 tests
-  y mide 54/54 fuentes runtime `core/**` no-barrel, incluidas 13 de
-  `core/project`; el perfil ratchet pasa en 82.29/76.75/91.72/86.15.
-- `bun scripts/studio-quality-policy.mjs coverage --profile release` conserva
-  90/85/90/90 y falla deliberadamente en statements/branches/lines. Este rojo
-  es deuda release visible; no invalida el cierre instrumental de F8-04.
+- `bun scripts/studio-quality-policy.mjs coverage --profile release` ejecutó
+  81 archivos/684 tests y midió 54/54 fuentes runtime `core/**` no-barrel,
+  incluidas 13 de `core/project`; release pasa 90.01/86.08/94.83/92.65.
+- El perfil ratchet se elevó al mismo resultado medido; no conserva el floor
+  anterior 82.29/76.75 capaz de ocultar una regresión.
 - `bun scripts/studio-gates.mjs --gate fixtures` valida dos roots y siete
   artifacts tracked por bytes/SHA-256 canónicos; missing, extra, drift,
   untracked o symlink fallan.
@@ -339,23 +338,30 @@ Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
 
 - El lint de repositorio pasa con cero warnings y `--deny-warnings`; se retiró
   el ratchet heredado de 47 sin cambiar dependencias.
-- El bundle inicial mide 918631 bytes raw / 245999 bytes gzip level 9. El
-  ratchet de no-regresión pasa y el perfil release de 180000 falla
-  deliberadamente; code splitting sigue como deuda release obligatoria.
+- El bundle inicial mide 522217 bytes raw / 155472 bytes gzip level 9. Ratchet
+  156500 y release 180000 pasan; AI, GIF, ZIP y Export modal están fuera del
+  arranque.
 - Chrome productivo fresco a 1440x900 DPR 1 midió 0 rAF en 5 segundos idle,
-  38 ms input-to-paint p95 sobre 20 transiciones calientes verificadas y 0
+  34 ms input-to-paint p95 sobre 20 transiciones calientes verificadas y 0
   long tasks. Cuatro recorridos hacen que nearest-rank p95 deje de colapsar al
   máximo; Timeline permanece hidden/montado y Chrome headless no aplica
   throttling de background/occlusion.
+- El rerun post-review del gate afectado volvió a pasar con 41.1 ms p95; el
+  artifact separa ese resultado del valor de 34 ms del `all` final.
 - El árbol AX nativo expuso 15 interactivos, cero sin accessible name y un
   landmark `main`. Labels y URLs no se guardan en artifacts.
+- Chrome productivo carga proyecto, ejecuta ZIP/GIF e invoca AI con fallo
+  contenido: modal Export y cada chunk provider/codec pasan de 0 eager a
+  exactamente 1 action request,
+  con page-fit, modal visible y cero console/runtime/log/network/HTTP errors.
 - Este gate Foundation no sustituye Axe/WCAG completo ni declara probados los
-  budgets de drag, large-project, Grid, codecs o AI; permanecen en sus slices.
+  budgets de drag, large-project o Grid; permanecen en sus slices.
 
 Política, método y límites: [F8_BUDGET_POLICY.md](./F8_BUDGET_POLICY.md).
 Artifact de ejecución:
 [`budgets.json`](../../artifacts/quality/F8/2026-07-15/budgets.json).
-Repair de estabilidad browser pendiente de revisión independiente incremental.
+Closeout release aceptado por revisión independiente con cero P0-P3 restantes;
+F8-03/package-lock sigue siendo una decisión separada del owner.
 
 ## Enforcement F3-07 — 2026-07-15
 

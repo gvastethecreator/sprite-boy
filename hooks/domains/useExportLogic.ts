@@ -6,8 +6,6 @@ import {
   generateGodotSpriteFrames,
 } from "../../utils/exportFormats";
 import { calculateGeometry } from "../../utils/renderUtils";
-import JSZip from "jszip";
-import gifshot from "gifshot";
 
 interface ExportDeps {
   project: ProjectState;
@@ -30,6 +28,7 @@ export function useExportLogic(deps: ExportDeps) {
       setIsLoading(true);
       setLoadingMessage("Packaging...");
       try {
+        const { default: JSZip } = await import("jszip");
         const zip = new JSZip();
         const folder = zip.folder("sprites");
         for (const frame of project.frames) {
@@ -64,6 +63,7 @@ export function useExportLogic(deps: ExportDeps) {
       setIsLoading(true);
       setLoadingMessage("Encoding GIF...");
       try {
+        const { default: gifshot } = await import("gifshot");
         const frameImages: string[] = [];
         for (const kf of anim.keyframes) {
           const dataUrl = await canvasHandle.exportFrame(kf.sourceIndex);

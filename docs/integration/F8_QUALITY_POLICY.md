@@ -15,14 +15,15 @@ Two profiles are intentionally distinct:
 
 | Profile | Statements | Branches | Functions | Lines | Meaning |
 |---|---:|---:|---:|---:|---|
-| `ratchet` | 82.29 | 76.75 | 91.72 | 86.15 | Current non-regression floor |
+| `ratchet` | 90.01 | 86.08 | 94.83 | 92.65 | Raised measured non-regression floor |
 | `release` | 90 | 85 | 90 | 90 | Required release target |
 
-The ratchet is green. The release profile is deliberately red on statements,
-branches and lines; this is recorded debt, not a relaxed target. A future
-change may raise ratchet values after measured improvement. Lowering a ratchet
-requires an owner, an explanation and comparative coverage evidence. F8-06
-cannot accept release readiness until the `release` profile passes.
+Both profiles are green. The release run on 2026-07-15 measured 90.01%
+statements, 86.08% branches, 94.83% functions and 92.65% lines over 9,170
+statements and 6,753 branches; the final full corpus was 81 files/684 tests.
+The ratchet was raised to that measured result,
+so the former 82.29/76.75 floor can no longer mask a regression. Lowering a
+ratchet requires an owner, an explanation and comparative coverage evidence.
 
 Commands:
 
@@ -35,6 +36,12 @@ The runner deletes the previous JSON summary, launches Vitest with fixed argv
 and `shell:false`, validates totals and their reported percentages, requires a
 `core/project/**` entry and emits one machine-readable result. A stale, absent,
 malformed or inconsistent summary fails closed.
+
+The closing corpus added hostile boundary matrices for project validation,
+commands, impact analysis, migrations, durable storage, package archives and
+asset identity. It also repaired one runtime inconsistency: a
+`regions.commitRecipe` command with `derivedAssets: null` is now rejected rather
+than silently treated as an empty array.
 
 ## Fixture and golden retention
 

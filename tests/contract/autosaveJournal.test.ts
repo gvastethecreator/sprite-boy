@@ -257,7 +257,18 @@ function createFakeIdbHarness(): FakeIdbHarness {
       return request as unknown as IDBOpenDBRequest;
     },
     deleteDatabase() {
-      throw new Error("not used by focused transaction proof");
+      const request = {
+        onsuccess: null as (() => void) | null,
+        onerror: null as (() => void) | null,
+        onblocked: null as (() => void) | null,
+        error: null,
+      };
+      queueMicrotask(() => {
+        harness.checkpoints.clear();
+        harness.journals.clear();
+        request.onsuccess?.();
+      });
+      return request as unknown as IDBOpenDBRequest;
     },
   } as unknown as IDBFactory;
   return harness;
@@ -363,6 +374,10 @@ describe("ProjectAutosaveJournal (F3-05)", () => {
       stores: [AUTOSAVE_CHECKPOINT_STORE, AUTOSAVE_JOURNAL_STORE],
       mode: "readwrite",
     });
+    await autosave.discard(changed.id, journal.journalId);
+    expect(idb.journals.has(changed.id)).toBe(false);
+    await storage.destroy();
+    expect(idb.checkpoints.size).toBe(0);
   });
 
   it("preserves an unresolved recovery candidate instead of overwriting it", async () => {

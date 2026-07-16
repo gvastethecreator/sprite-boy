@@ -4,7 +4,6 @@ import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
 import CanvasArea from "../canvas/CanvasArea";
 import TimelinePanel from "./TimelinePanel";
-import ExportModal from "../overlays/ExportModal";
 import SettingsModal from "../overlays/SettingsModal";
 import HelpModal from "../overlays/HelpModal";
 import ToastContainer from "../overlays/ToastContainer";
@@ -47,6 +46,7 @@ const LEGACY_MODE_BY_WORKSPACE = {
 } as const satisfies Record<StudioWorkspaceId, AppMode>;
 
 const COMPACT_STUDIO_QUERY = "(max-width: 1279px)";
+const ExportModal = React.lazy(() => import("../overlays/ExportModal"));
 
 interface StudioShellError {
   readonly workspaceId: StudioWorkspaceId;
@@ -97,6 +97,7 @@ const AppLayout: React.FC = () => {
     isPlaying,
     setIsPlaying,
     exportModal,
+    setExportModal,
     selectedIndex,
     builderCanvas,
     undo,
@@ -436,26 +437,42 @@ const AppLayout: React.FC = () => {
         context={commandContext}
         onExecute={executeCommand}
       />
-      <ExportModal
-        onGenerateCode={handleGenerateCode}
-        onExportPng={async (g) => {
-          const b = await canvasRef.current?.exportSnapshot(g);
-          if (b) {
-            const u = URL.createObjectURL(b);
-            const l = document.createElement("a");
-            l.href = u;
-            l.download = "export.png";
-            l.click();
-            URL.revokeObjectURL(u);
-          }
-        }}
-        onExportZip={() => handleExportZip(canvasRef.current)}
-        onExportGif={(aid) => handleExportGif(aid, canvasRef.current)}
-        onCopyCode={(c) => {
-          navigator.clipboard.writeText(c);
-          showToast("Copied!", "success");
-        }}
-      />
+      {exportModal.isOpen ? (
+        <React.Suspense
+          fallback={(
+            <StudioDialog
+              isOpen
+              onClose={() => setExportModal({ ...exportModal, isOpen: false })}
+              ariaLabel="Preparing export tools"
+            >
+              <div role="status" className="p-6 text-sm text-textMuted">
+                Preparing export tools…
+              </div>
+            </StudioDialog>
+          )}
+        >
+          <ExportModal
+            onGenerateCode={handleGenerateCode}
+            onExportPng={async (g) => {
+              const b = await canvasRef.current?.exportSnapshot(g);
+              if (b) {
+                const u = URL.createObjectURL(b);
+                const l = document.createElement("a");
+                l.href = u;
+                l.download = "export.png";
+                l.click();
+                URL.revokeObjectURL(u);
+              }
+            }}
+            onExportZip={() => handleExportZip(canvasRef.current)}
+            onExportGif={(aid) => handleExportGif(aid, canvasRef.current)}
+            onCopyCode={(c) => {
+              navigator.clipboard.writeText(c);
+              showToast("Copied!", "success");
+            }}
+          />
+        </React.Suspense>
+      ) : null}
       <GenerationModal />
       <SettingsModal
         isOpen={isSettingsOpen}

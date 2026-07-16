@@ -4,7 +4,7 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-07, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 aceptados. Frontiers: F8-03 condicionado por ownership de package/lock; F8-06 espera esa dependencia y los release thresholds rojos. W1/W2 están cerrados.**
+**Wave 0 (F0+B0), F1, F2, F3-01..F3-07, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 aceptados. Coverage y bundle release están verdes. Frontier bloqueante: F8-03 requiere la decisión owner de package/lock; F8-06 espera únicamente esa dependencia. W1/W2 están cerrados.**
 
 No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
 
@@ -169,21 +169,25 @@ console/runtime/log/HTTP/red. La revisión cerró ratchet, desconexión CDP,
 observabilidad de red y flags duplicados. F8-04 puede fijar coverage y retención
 de fixtures sin modificar el package user-owned.
 F8-04 mide las 54 fuentes runtime canónicas bajo `core/**` —incluidas 13 de
-`core/project`— con el corpus completo. El ratchet actual queda en 82.29%
-statements, 76.75% branches, 91.72% functions y 86.15% lines; el target release
-90/85/90/90 permanece rojo y bloquea F8-06 hasta mejorar tests/código. Un
+`core/project`— con el corpus completo. Matrices de boundary/hostile input
+elevaron el resultado a 90.01% statements, 86.08% branches, 94.83% functions y
+92.65% lines; ratchet y target release 90/85/90/90 están verdes. Un
 manifest exhaustivo retiene siete fixtures/goldens tracked bajo dos roots con
 identidad SHA-256/bytes cross-platform, prohibición de symlinks y detección de
 missing/unmanifested/drift. F8-05 automatizó budgets y retiró warnings.
 F8-05 retiró el ratchet de 47 warnings y automatizó un gate productivo único de
-bundle, idle, interacción, long tasks y árbol AX. El bundle actual queda en
-245999 bytes gzip dentro del ratchet, mientras el target release de 180000 permanece
-deliberadamente rojo. Chrome fresco pasa 0 rAF idle y tres repeticiones de 20
+bundle, idle, interacción, long tasks, árbol AX y features diferidas. El bundle
+inicial queda en 155472 bytes gzip: ratchet 156500 y target release 180000
+verdes. Chrome fresco pasa 0 rAF idle y tres repeticiones de 20
 transiciones en 34.5/34.7/49.8 ms p95, sin long tasks, sin interactivos sin
-nombre y con un `main`; el `all` final midió 38 ms. La revisión aceptó cold
+nombre y con un `main`; el `all` final midió 34 ms y el rerun post-review 41.1
+ms. La revisión aceptó cold
 mount, p95 nearest-rank, throttling, deadlines internos y cleanup Windows sin
 P0-P3; los budgets específicos de
-features y Axe completo conservan ownership posterior.
+features y Axe completo conservan ownership posterior. Un segundo journey
+productivo prueba el modal Export y AI/GIF/ZIP con requests 0→1, fallos AI contenidos y export
+ZIP/GIF real sin errores; el Export modal también se difiere y conserva estado
+accesible durante Suspense.
 
 ## Reglas de ejecución
 

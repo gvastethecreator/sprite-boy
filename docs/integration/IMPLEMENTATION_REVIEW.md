@@ -1073,9 +1073,9 @@ los lotes que sí modifican producto.
 - **Scope:** el corpus completo mide 54/54 fuentes runtime `core/**/*.ts`
   no-barrel, incluidas 13 de `core/project`. El summary anterior se elimina y
   totals/pct/core-project se validan antes de aceptar resultado.
-- **Profiles:** ratchet verde 82.29 statements, 76.75 branches, 91.72 functions
-  y 86.15 lines. Release conserva 90/85/90/90 y falla explícitamente por
-  statements/branches/lines; F8-06 no puede declarar readiness mientras siga rojo.
+- **Profiles:** el cierre release elevó el resultado a 90.01 statements, 86.08
+  branches, 94.83 functions y 92.65 lines. Release 90/85/90/90 y el ratchet
+  elevado al resultado medido están verdes.
 - **Retention:** manifest exhaustivo de dos roots/siete archivos tracked con
   path/kind/owner/mode/bytes/SHA-256. `text-lf` estabiliza Windows/Linux; missing,
   unmanifested, untracked, drift y cualquier root/descendant symlink fallan.
@@ -1095,12 +1095,13 @@ los lotes que sí modifican producto.
 - **Lint:** el ratchet heredado de 47 warnings pasa a cero con cleanup acotado;
   `--deny-warnings` es ahora el gate estable.
 - **Bundle:** HTML productivo descubre sólo assets iniciales allowlisted y un
-  helper Node mide gzip level 9 sobre archivos físicos. Ratchet 245999 bytes
-  verde con 245999 bytes; target release 180000 bytes rojo deliberado.
+  helper Node mide gzip level 9 sobre archivos físicos. AI, GIF, ZIP y el modal
+  Export se cargan por acción; 155472 bytes pasan ratchet 156500 y release
+  180000 sin modificar dependencias.
 - **Browser:** perfil Chrome efímero, settle y Long Task API obligatoria; 5 s
   idle, 4 recorridos/20 transiciones afirmadas y p95 recomputado. Resultado
   estable en tres repeticiones: 0 rAF, 34.5/34.7/49.8 ms p95 y 0 long tasks;
-  el `all` final midió 38 ms.
+  el `all` final midió 34 ms.
 - **A11y:** árbol AX nativo agregado sin labels/URLs: 65 nodos, 15 interactivos,
   cero sin nombre y un `main`. El canvas dejó de anidar otro landmark.
 - **Límite declarado:** no sustituye Axe/WCAG completo ni los budgets de los
@@ -1120,9 +1121,44 @@ los lotes que sí modifican producto.
   offset/calendario y elevó coverage a 82.31/76.81/91.79/86.17.
 - **Evidencia final:** 30/30 focales; 23/150 unit, 43/464 contract, 1/6
   integration, 67/620 coverage, fixtures 7/7, typecheck, lint cero, build,
-  bundle 245999/245999 y browser budget. `all` completó 11 steps, exit 0; release bundle
-  real conserva exit 1. Policy:
+  bundle/browser budget. El closeout release y el journey diferido posterior se
+  detallan debajo. Policy:
   [F8 budget policy](./F8_BUDGET_POLICY.md).
+
+## F8 release thresholds and deferred-feature closeout
+
+- **Estado:** `accept`; los gates técnicos y la revisión independiente están
+  verdes. F8-06 queda bloqueado sólo por F8-03/package-lock ownership.
+- **Coverage:** 81 archivos/684 tests en el gate final; 8254/9170 statements
+  (90.01%), 5813/6753 branches (86.08%), 1249/1317 functions (94.83%) y
+  7548/8146 lines (92.65%). Se elevó el ratchet al resultado medido.
+- **Matrices:** validación, animation/composition/destructive commands,
+  `applyCommand`, impact, V0 migration, project migration, local stores,
+  IndexedDB asset lifecycle, asset identity, autosave journal y package ZIP.
+  `derivedAssets: null` ya falla como patch inválido en vez de normalizarse.
+- **Carga diferida:** AI, gifshot y JSZip salen del entry; `ExportModal` tiene
+  su propio boundary con fallback accesible. Initial 522217 raw / 155472 gzip;
+  ambos perfiles pasan y el policy exige exactamente cuatro chunks diferidos:
+  modal Export, AI, GIF y ZIP.
+- **Browser:** proyecto cargado por input real, ZIP y GIF exitosos y AI con
+  fallo determinista contenido. Cada chunk diferido pasa de 0 requests eager a
+  exactamente 1 al invocarlo; página, modal y cinco contadores de error quedan
+  verdes. La revisión visual rechazó una captura tomada durante Suspense y el
+  journey ahora exige título/rect real y settle antes del screenshot.
+- **Repair visible:** un proyecto cargado después del primer render ya habilita
+  GIF seleccionando una animación válida; regresión cubierta por componente y
+  Chrome productivo.
+- **Evidencia:** `bun scripts/studio-quality-policy.mjs coverage --profile
+  release`, `bun scripts/studio-quality-policy.mjs bundle --profile release`,
+  `bun scripts/studio-gates.mjs --gate budgets`, typecheck y lint estricto.
+  `--gate all` pasó 12 steps en 563.7 s: unit 26/157, contract 54/521,
+  integration 1/6, coverage 81/684, fixtures 7/7, persistence, build y ambos
+  journeys Chrome. Tras la reparación final, `--gate budgets` volvió a pasar
+  build, bundle y ambos journeys con p95 41.1 ms y cuatro boundaries 0→1.
+- **Revisión independiente:** `repair` por un P3 de métricas documentales y un P2
+  que no hacía contractual el boundary de `ExportModal`; ambos cerrados. Recheck:
+  18 archivos/110 tests, reparación 2/11, typecheck, lint, bundle release y Chrome
+  verdes. Veredicto `accept`; P0/P1/P2/P3 restantes: 0/0/0/0.
 
 ## F3-07 — Durable reload and clean portable import
 
@@ -1167,5 +1203,5 @@ los lotes que sí modifican producto.
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
 - F8-03: condicionado; frozen install requiere decisión explícita y patch
   atómico del package/lock user-owned.
-- F8-05: `accept`; budgets y cleanup browser cerrados.
-- F8-06: espera F8-03 y los release thresholds aún rojos.
+- F8-05: `accept`; budgets, lazy boundaries y cleanup browser cerrados.
+- F8-06: coverage/bundle release verdes; espera únicamente F8-03.

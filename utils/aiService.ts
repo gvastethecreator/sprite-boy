@@ -175,7 +175,6 @@ export async function generateSprite(
       throw new Error("No image was generated. Please try a different prompt.");
     }
   } catch (error: any) {
-    console.error("AI Generation Error:", error);
     throw new Error(error.message || "Failed to generate asset.");
   }
 }

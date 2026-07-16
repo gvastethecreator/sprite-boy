@@ -8,7 +8,6 @@ import {
 } from "../../types";
 import { cropImage } from "../../utils/algorithms";
 import { uiFeedback } from "../../utils/uiFeedback";
-import { generateSprite } from "../../utils/aiService";
 import { addAsset, deleteAsset, dataURIToBlob } from "../../utils/db";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -181,6 +180,7 @@ export function useBuilderLogic(
     setIsLoading(true);
     setLoadingMessage("AI Generating...");
     try {
+      const { generateSprite } = await import("../../utils/aiService");
       const newDataUrl = await generateSprite(contextImages, prompt, model, mode);
       const blob = dataURIToBlob(newDataUrl);
       const newId = generateId();

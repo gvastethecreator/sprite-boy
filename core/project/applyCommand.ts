@@ -785,7 +785,7 @@ function applyRegionsCommitRecipe(
   context: ProjectCommandContext,
 ): ProjectCommandResult {
   const regions = command.regions;
-  const derivedAssets = command.derivedAssets ?? [];
+  const derivedAssets = command.derivedAssets === undefined ? [] : command.derivedAssets;
   if (!Array.isArray(regions)) {
     return failure(original, [diagnostic("INVALID_PATCH", "regions.commitRecipe requires a regions array.", "$.regions")]);
   }
