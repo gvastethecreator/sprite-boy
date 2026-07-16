@@ -1222,6 +1222,36 @@ verdes y review final `ACCEPT`. Ver el [artifact final](../../artifacts/quality/
   82.31/76.82/91.79/86.17; build/bundle/browser verdes y 0 huérfanos. Policy:
   [F3 persistence browser](./F3_PERSISTENCE_BROWSER.md).
 
+## Grid checkpoint — G0-01..G0-04 y G1-01..G1-05
+
+- **Source session:** selección/drag, validación, decode y preview tienen owner
+  local, generaciones contra carreras y leases URL idempotentes. Replace/reset
+  limpia graph e interacción derivados sin tocar assets, preferencias o aspect;
+  aliases Blob de la librería quedan protegidos. Metadata validada prevalece y
+  proyectos legacy muestran inferencia explícita o `Unknown`.
+- **Frontera terminal:** después del commit no existe retorno a failure. Setters,
+  cleanup, revoke, resolve y feedback hostiles se aíslan; AbortSignal/accessors
+  externos no dejan promises pendientes. El review G0-04 cerró tres rondas de
+  repairs con `ACCEPT`, P0-P3=0.
+- **Worker:** protocolo V1 exacto con requestId/progress/result/error/cancel,
+  transferencia de ownership, Worker módulo Vite real y adapter JobRunner
+  one-shot. Diagnósticos conservan etapa pública sin filtrar error privado.
+- **Lifecycle hostil:** workers concurrentes quedan aislados; cancel antes,
+  durante y después, crash, messageerror, timeout y respuesta tardía tienen un
+  solo terminal. Registro/retiro reentrante u hostil no reabre listeners ni
+  publica mensajes post-terminal. Review G1-04: `ACCEPT`, P0-P3=0.
+- **Baseline:** ocho fixtures deterministas y 59 outputs congelan layout, bounds,
+  dimensiones, reduction, operations/warnings y SHA-256 RGBA row-major. CLI
+  normal sólo compara; `--capture` explícito escribe stdout. Worker real, drift,
+  tamper y schema cerrado pasan. Review G1-05: `ACCEPT`, P0-P3=0.
+- **Evidencia:** artifacts versionados en
+  `artifacts/quality/GRID/2026-07-16/`; Chromium productivo confirma Worker
+  módulo y journey source con cinco contadores de error en cero. Commits de
+  cierre: `178761e`, `17fdefe`, `321537a`, `922cf0c`.
+
+**Siguiente frontera:** G0-05 error/focus/retry y G2-01 layout draft están
+activos; ningún task posterior se considera cerrado por este checkpoint.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
