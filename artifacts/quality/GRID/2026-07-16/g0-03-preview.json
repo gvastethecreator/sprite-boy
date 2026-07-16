@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "check": "slice-source-preview-browser",
+  "status": "pass",
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 }
+  },
+  "metrics": {
+    "metadataVisible": true,
+    "previewLeaseReleased": true,
+    "canvasVisible": true,
+    "interactiveCanvasPreserved": true,
+    "pageFits": true,
+    "errors": {
+      "console": 0,
+      "exception": 0,
+      "log": 0,
+      "network": 0,
+      "http": 0
+    }
+  },
+  "tests": { "passed": 19, "failed": 0 },
+  "build": "pass",
+  "command": "node scripts/studio-slice-source-browser.mjs",
+  "screenshot": "artifacts/quality/GRID/2026-07-16/g0-03-preview.png"
+}

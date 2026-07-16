@@ -5,6 +5,8 @@ import { evaluateSliceSourceEvidence } from "../../scripts/studio-slice-source-b
 const passingEvidence = {
   busyAnnounced: true,
   replacementRaceRecovered: true,
+  metadataVisible: true,
+  previewLeaseReleased: true,
   canvasVisible: true,
   dropzoneRemoved: true,
   focusRestored: true,
@@ -28,10 +30,13 @@ describe("Slice source browser evidence", () => {
   it.each([
     ["busyAnnounced", false],
     ["replacementRaceRecovered", false],
+    ["metadataVisible", false],
+    ["previewLeaseReleased", false],
     ["focusRestored", false],
     ["route", "#/studio/compose"],
     ["consoleErrorCount", 1],
   ])("fails when %s regresses", (key, value) => {
     expect(evaluateSliceSourceEvidence({ ...passingEvidence, [key]: value }).status).toBe("fail");
   });
+
 });

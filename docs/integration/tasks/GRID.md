@@ -8,8 +8,8 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 |---|---|---|---|---|---|---|
 | G0-01 | J | F2-07,F6-06,F7-07 | G1.1-G1.3 | Source-session state machine pick/drop/validate/decode | UT file/type/size/decode matrix | done |
 | G0-02 | E | G0-01 | G1.1-G1.3 | Dropzone/file-picker UI nativa Studio | BR+A11Y + REV | done |
-| G0-03 | J | G0-01,F5-06 | G1.4-G1.5 | Preview, dimensions/size metadata y URL lease | BR + no URL leak | active |
-| G0-04 | E | G0-03 | G1.6 | Replace/reset source con confirmación y cleanup | BR + REV | todo |
+| G0-03 | J | G0-01,F5-06 | G1.4-G1.5 | Preview, dimensions/size metadata y URL lease | BR + no URL leak | done |
+| G0-04 | E | G0-03 | G1.6 | Replace/reset source con confirmación y cleanup | BR + REV | active |
 | G0-05 | J | G0-02,G0-04 | G1.1-G1.6 | Error/focus/retry gate de source session | Hostile BR+A11Y | todo |
 | G1-01 | J | F2-07,F7-07 | G2-G5,G6.1-G6.3 | Protocol requestId/progress/result/error/cancel versionado | Contract UT | done |
 | G1-02 | E | G1-01 | G2-G5 | Port mecánico de helpers algorítmicos donantes puros | Golden UT + REV | done |
