@@ -74,6 +74,73 @@ const processResizeFixture = (enabled: boolean, requestId: string) => createGrid
 });
 const resizeEnabledResult = await processResizeFixture(true, "grid-real-worker-resize-enabled");
 const resizeDisabledResult = await processResizeFixture(false, "grid-real-worker-resize-disabled");
+const quantizeAutoSource = [
+  250, 20, 20, 255,
+  240, 30, 30, 255,
+  20, 30, 240, 255,
+  30, 20, 230, 255,
+  10, 200, 10, 127,
+  9, 9, 9, 0,
+] as const;
+const quantizeFixedSource = [
+  240, 20, 20, 255,
+  10, 20, 240, 255,
+  250, 10, 10, 127,
+  0, 255, 0, 0,
+] as const;
+const processQuantizeFixture = (
+  source: readonly number[],
+  requestId: string,
+  options: { readonly size: number; readonly quantize: boolean; readonly colors: number; readonly palette?: readonly string[] },
+) => createGridProcessingClient().process({
+  request: {
+    version: GRID_PROCESSING_PROTOCOL_VERSION,
+    type: "process",
+    requestId,
+    source: {
+      width: source.length / 4,
+      height: 1,
+      format: "rgba8",
+      colorSpace: "srgb",
+      pixels: new Uint8ClampedArray(source).buffer,
+    },
+    recipe: {
+      kind: "grid-split",
+      version: 1,
+      sourceAssetId: `asset-${requestId}`,
+      layout: { mode: "manual", rows: 1, cols: 1 },
+      crop: { threshold: 0, padding: 0 },
+      chroma: { enabled: false, color: "#00ff00", tolerance: 0, smoothness: 0, spill: 0 },
+      pixel: {
+        enabled: true,
+        size: options.size,
+        quantize: options.quantize,
+        colors: options.colors,
+        ...(options.palette ? { palette: [...options.palette] } : {}),
+      },
+    },
+  },
+});
+const quantizeAutoResult = await processQuantizeFixture(
+  quantizeAutoSource,
+  "grid-real-worker-quantize-auto",
+  { size: 6, quantize: true, colors: 2 },
+);
+const quantizeAutoRepeat = await processQuantizeFixture(
+  quantizeAutoSource,
+  "grid-real-worker-quantize-auto-repeat",
+  { size: 6, quantize: true, colors: 2 },
+);
+const quantizeFixedResult = await processQuantizeFixture(
+  quantizeFixedSource,
+  "grid-real-worker-quantize-fixed",
+  { size: 4, quantize: false, colors: 2, palette: ["#ff0000", "#0000ff"] },
+);
+const quantizeFixedRepeat = await processQuantizeFixture(
+  quantizeFixedSource,
+  "grid-real-worker-quantize-fixed-repeat",
+  { size: 4, quantize: false, colors: 2, palette: ["#ff0000", "#0000ff"] },
+);
 const alphaCropResult = await createGridProcessingClient().process({
   request: {
     version: GRID_PROCESSING_PROTOCOL_VERSION,
@@ -312,6 +379,19 @@ const evidence = Object.freeze({
     disabledOperations: resizeDisabledResult.outputs[0]!.operations,
     disabledPixels: Object.freeze([...new Uint8ClampedArray(resizeDisabledResult.outputs[0]!.surface.pixels)]),
   }),
+  quantizeGolden: Object.freeze({
+    autoDimensions: [quantizeAutoResult.outputs[0]!.surface.width, quantizeAutoResult.outputs[0]!.surface.height],
+    autoOperations: quantizeAutoResult.outputs[0]!.operations,
+    autoWarnings: quantizeAutoResult.outputs[0]!.warnings,
+    autoPixels: Object.freeze([...new Uint8ClampedArray(quantizeAutoResult.outputs[0]!.surface.pixels)]),
+    autoRepeatPixels: Object.freeze([...new Uint8ClampedArray(quantizeAutoRepeat.outputs[0]!.surface.pixels)]),
+    autoRepeatOperations: quantizeAutoRepeat.outputs[0]!.operations,
+    fixedOperations: quantizeFixedResult.outputs[0]!.operations,
+    fixedWarnings: quantizeFixedResult.outputs[0]!.warnings,
+    fixedPixels: Object.freeze([...new Uint8ClampedArray(quantizeFixedResult.outputs[0]!.surface.pixels)]),
+    fixedRepeatPixels: Object.freeze([...new Uint8ClampedArray(quantizeFixedRepeat.outputs[0]!.surface.pixels)]),
+    fixedRepeatOperations: quantizeFixedRepeat.outputs[0]!.operations,
+  }),
   alphaCrop: Object.freeze({
     contentBounds: alphaOutput.contentBounds,
     dimensions: Object.freeze({ width: alphaOutput.surface.width, height: alphaOutput.surface.height }),
@@ -430,6 +510,43 @@ if (
     disabledDimensions: [2, 2],
     disabledOperations: [],
     disabledPixels: resizeSource,
+  }) ||
+  JSON.stringify(evidence.quantizeGolden) !== JSON.stringify({
+    autoDimensions: [6, 1],
+    autoOperations: ["resize", "quantize"],
+    autoWarnings: [],
+    autoPixels: [
+      245, 25, 25, 255,
+      245, 25, 25, 255,
+      25, 25, 235, 255,
+      25, 25, 235, 255,
+      10, 200, 10, 127,
+      9, 9, 9, 0,
+    ],
+    autoRepeatPixels: [
+      245, 25, 25, 255,
+      245, 25, 25, 255,
+      25, 25, 235, 255,
+      25, 25, 235, 255,
+      10, 200, 10, 127,
+      9, 9, 9, 0,
+    ],
+    autoRepeatOperations: ["resize", "quantize"],
+    fixedOperations: ["resize", "quantize"],
+    fixedWarnings: [],
+    fixedPixels: [
+      255, 0, 0, 255,
+      0, 0, 255, 255,
+      250, 10, 10, 127,
+      0, 255, 0, 0,
+    ],
+    fixedRepeatPixels: [
+      255, 0, 0, 255,
+      0, 0, 255, 255,
+      250, 10, 10, 127,
+      0, 255, 0, 0,
+    ],
+    fixedRepeatOperations: ["resize", "quantize"],
   }) ||
   JSON.stringify(evidence.alphaCrop) !== JSON.stringify({
     contentBounds: { x: 2, y: 0, width: 2, height: 1 },

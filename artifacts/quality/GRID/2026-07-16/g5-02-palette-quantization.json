@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-palette-quantization-worker",
+  "status": "pass",
+  "task": "G5-02",
+  "scope": "Deterministic auto/fixed palette quantization, membership, alpha policy and bounded color count.",
+  "evidence": {
+    "realWorker": true,
+    "auto": {
+      "requestedColors": 2,
+      "dimensions": [6, 1],
+      "operations": ["resize", "quantize"],
+      "warnings": [],
+      "pixels": [
+        245, 25, 25, 255, 245, 25, 25, 255,
+        25, 25, 235, 255, 25, 25, 235, 255,
+        10, 200, 10, 127, 9, 9, 9, 0
+      ],
+      "observedOpaquePalette": ["#f51919", "#1919eb"],
+      "membership": true,
+      "repeatPixelsIdentical": true,
+      "repeatOperationsIdentical": true
+    },
+    "fixed": {
+      "palette": ["#ff0000", "#0000ff"],
+      "dimensions": [4, 1],
+      "operations": ["resize", "quantize"],
+      "warnings": [],
+      "pixels": [
+        255, 0, 0, 255, 0, 0, 255, 255,
+        250, 10, 10, 127, 0, 255, 0, 0
+      ],
+      "membership": true,
+      "repeatPixelsIdentical": true,
+      "repeatOperationsIdentical": true
+    },
+    "alphaPolicy": "alpha < 128 is ignored by training/application and every alpha byte plus low-alpha RGB remains unchanged",
+    "algorithmLimits": {
+      "maxPaletteColors": 256,
+      "maxExactTrainingColors": 16384,
+      "maxWeightedTrainingColors": 2048,
+      "maxKMeansIterations": 12
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Palette cardinality drift: auto output has at most the requested two opaque colors and fixed output belongs only to the declared palette.",
+      "Non-deterministic training: repeated real Worker runs match pixels and operation metadata byte-for-byte without Math.random.",
+      "Alpha corruption: low-alpha RGB/alpha and fully transparent RGB remain untouched while opaque pixels quantize.",
+      "Fixed palette order drift: red and blue source colors resolve to the declared fixed entries with deterministic tie policy.",
+      "Unbounded training: exact colors, weighted histogram and k-means iterations are capped by algorithm limits."
+    ],
+    "boundary": "Palette extraction/presets/control UI remains G5-03; stress/performance remains G5-04; process/results/export remains G6/G7."
+  },
+  "verification": {
+    "workerSmoke": "pass",
+    "realWorkerIntegration": "pass (1/1 test)",
+    "contractAlgorithms": "pass",
+    "contractProtocol": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass",
+    "independentReview": "pending"
+  }
+}
