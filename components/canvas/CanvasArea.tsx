@@ -24,6 +24,7 @@ import {
 
 export interface CanvasAreaProps {
   readonly canonicalCanvasOwnership?: boolean;
+  readonly onCanonicalPickColor?: (hex: string) => void;
   readonly sliceGridOverlay?: Readonly<{
     sourceDimensions: GridLayoutSourceDimensions | null;
     effectiveLayout: EffectiveGridLayout | null;
@@ -48,6 +49,7 @@ export function renderCanonicalSliceSourceSnapshot(
 
 const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
   canonicalCanvasOwnership = false,
+  onCanonicalPickColor,
   sliceGridOverlay = null,
 }, ref) => {
   const {
@@ -74,6 +76,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     isLoading,
     loadingMessage,
     isEyedropperActive,
+    setIsEyedropperActive,
     setEyedropperColor: onPickColor,
     handleUpdateFrame: onUpdateFrame,
     handleUpdateFrameEphemeral: onUpdateFrameEphemeral,
@@ -119,6 +122,26 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     builderCanvas,
     fallback: { width: 100, height: 100 },
   });
+  const handleCanonicalPickColor = React.useCallback((hex: string) => {
+    onCanonicalPickColor?.(hex);
+    // Keep the shared legacy swatch in sync while Slice owns the recipe commit.
+    onPickColor(hex);
+  }, [onCanonicalPickColor, onPickColor]);
+  const canonicalEyedropper = React.useMemo(() => canonicalCanvasOwnership ? {
+    isActive: isEyedropperActive,
+    sourceWidth: contentDimensions.width,
+    sourceHeight: contentDimensions.height,
+    onPickColor: handleCanonicalPickColor,
+    onCancel: () => setIsEyedropperActive(false),
+  } : null, [
+    canonicalCanvasOwnership,
+    contentDimensions.height,
+    contentDimensions.width,
+    isEyedropperActive,
+    onPickColor,
+    handleCanonicalPickColor,
+    setIsEyedropperActive,
+  ]);
   const mouse = useCanvasMouse({
     containerRef,
     canvasRef,
@@ -126,6 +149,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     viewport,
     setViewport,
     isSpacePressed,
+    canonicalEyedropper,
     legacyInteraction: canonicalCanvasOwnership
       ? null
       : {

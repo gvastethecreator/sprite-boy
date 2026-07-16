@@ -7,6 +7,7 @@ import {
   serializeSliceGridRecipeState,
   updateSliceGridRecipeLayout,
   updateSliceGridRecipeCrop,
+  updateSliceGridRecipeChroma,
 } from "../../features/slice/grid/gridRecipeState";
 
 const SOURCE = Object.freeze({ width: 12, height: 8 });
@@ -100,5 +101,35 @@ describe("Slice grid recipe state (G2-05)", () => {
       .toThrow(TypeError);
     expect(() => updateSliceGridRecipeCrop(initial, { threshold: 1, padding: 1.5 }))
       .toThrow(TypeError);
+  });
+
+  it("updates chroma settings canonically, normalizes hex and rejects invalid values", () => {
+    const initial = createDefaultSliceGridRecipeState("asset-sheet", SOURCE);
+    const chroma = updateSliceGridRecipeChroma(initial, {
+      enabled: true,
+      color: "#12AbEf",
+      tolerance: 35,
+      smoothness: 20,
+      spill: 15,
+    });
+
+    expect(chroma.recipe.chroma).toEqual({
+      enabled: true,
+      color: "#12abef",
+      tolerance: 35,
+      smoothness: 20,
+      spill: 15,
+    });
+    expect(chroma.recipe.layout).toBe(initial.recipe.layout);
+    expect(chroma.recipe.crop).toBe(initial.recipe.crop);
+    expect(Object.isFrozen(chroma.recipe.chroma)).toBe(true);
+    expect(() => updateSliceGridRecipeChroma(initial, {
+      ...initial.recipe.chroma,
+      color: "#bad",
+    })).toThrow(TypeError);
+    expect(() => updateSliceGridRecipeChroma(initial, {
+      ...initial.recipe.chroma,
+      tolerance: Number.NaN,
+    })).toThrow(TypeError);
   });
 });

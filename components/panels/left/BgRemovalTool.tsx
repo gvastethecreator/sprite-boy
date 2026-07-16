@@ -76,6 +76,7 @@ const BgRemovalTool: React.FC<BgRemovalToolProps> = (props) => {
               type="color"
               aria-label="Background removal target color"
               value={targetColor}
+              disabled={isDisabled}
               onChange={(e) => setTargetColor(e.target.value)}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
@@ -83,12 +84,22 @@ const BgRemovalTool: React.FC<BgRemovalToolProps> = (props) => {
             <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
           </div>
           <button
+            type="button"
+            disabled={isDisabled}
+            aria-label={props.isEyedropperActive ? "Cancel canvas color picker" : "Pick color from canvas"}
+            aria-pressed={props.isEyedropperActive === true}
             onClick={() => props.setIsEyedropperActive?.(!props.isEyedropperActive)}
             className={`flex-1 rounded-md border text-xs font-semibold flex items-center justify-center gap-2 transition-all btn-tactile ${props.isEyedropperActive ? "bg-accent border-accent text-white shadow-sm" : "bg-surface border-border text-textMuted hover:text-white"}`}
           >
             <Pipette size={14} /> Pick Canvas
           </button>
         </div>
+
+        {props.isEyedropperActive ? (
+          <p role="status" className="text-[10px] leading-relaxed text-accent" data-eyedropper-status="active">
+            Click a source pixel to sample its color. Press Escape to cancel.
+          </p>
+        ) : null}
 
         <div className="space-y-4">
           <NumberControl
@@ -97,6 +108,7 @@ const BgRemovalTool: React.FC<BgRemovalToolProps> = (props) => {
             onChange={setTolerance}
             min={0}
             max={100}
+            disabled={isDisabled}
             slider
           />
           <NumberControl
@@ -105,6 +117,7 @@ const BgRemovalTool: React.FC<BgRemovalToolProps> = (props) => {
             onChange={setSoftness}
             min={0}
             max={100}
+            disabled={isDisabled}
             slider
           />
         </div>
@@ -115,6 +128,8 @@ const BgRemovalTool: React.FC<BgRemovalToolProps> = (props) => {
 
         <div className="pt-1">
           <button
+            type="button"
+            disabled={isDisabled}
             onClick={handleApply}
             className="w-full py-2.5 bg-textMain hover:bg-white text-app border border-transparent rounded-lg text-xs font-bold btn-tactile shadow-depth-sm transition-all"
           >

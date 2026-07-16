@@ -32,6 +32,7 @@ import {
   recipeStateToDraft,
   updateSliceGridRecipeLayout,
   updateSliceGridRecipeCrop,
+  updateSliceGridRecipeChroma,
   type SliceGridRecipeStateV1,
 } from "./gridRecipeState";
 
@@ -81,12 +82,19 @@ export interface SliceGridController {
     padding: number;
     cellCount: number;
   }>;
+  readonly chroma: GridSplitRecipeV1["chroma"];
   readonly setMode: (mode: GridLayoutMode) => void;
   readonly setManualRowsInput: (value: string) => void;
   readonly setManualColsInput: (value: string) => void;
   readonly setCropThreshold: (value: number) => boolean;
   readonly setCropPadding: (value: number) => boolean;
   readonly resetCrop: () => boolean;
+  readonly setChromaEnabled: (value: boolean) => boolean;
+  readonly setChromaColor: (value: string) => boolean;
+  readonly setChromaTolerance: (value: number) => boolean;
+  readonly setChromaSmoothness: (value: number) => boolean;
+  readonly setChromaSpill: (value: number) => boolean;
+  readonly resetChroma: () => boolean;
   readonly retry: () => void;
 }
 
@@ -361,6 +369,28 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     return true;
   }, [options.onCommitState]);
 
+  const commitChroma = useCallback((chroma: GridSplitRecipeV1["chroma"]): boolean => {
+    if (!sourceRef.current) return false;
+    const currentChroma = recipeStateRef.current.recipe.chroma;
+    if (currentChroma.enabled === chroma.enabled && currentChroma.color === chroma.color &&
+      currentChroma.tolerance === chroma.tolerance && currentChroma.smoothness === chroma.smoothness &&
+      currentChroma.spill === chroma.spill) return true;
+    let nextState: SliceGridRecipeStateV1;
+    try {
+      nextState = updateSliceGridRecipeChroma(recipeStateRef.current, chroma);
+    } catch {
+      return false;
+    }
+    try {
+      options.onCommitState?.(nextState);
+    } catch {
+      return false;
+    }
+    recipeStateRef.current = nextState;
+    setRecipeState(nextState);
+    return true;
+  }, [options.onCommitState]);
+
   const setMode = useCallback((mode: GridLayoutMode): void => {
     const currentSource = sourceRef.current;
     if (!currentSource) return;
@@ -421,6 +451,30 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
   const resetCrop = useCallback((): boolean => {
     return commitCrop(0, 0);
   }, [commitCrop]);
+  const setChromaEnabled = useCallback((value: boolean): boolean => {
+    return commitChroma({ ...recipeStateRef.current.recipe.chroma, enabled: value });
+  }, [commitChroma]);
+  const setChromaColor = useCallback((value: string): boolean => {
+    return commitChroma({ ...recipeStateRef.current.recipe.chroma, color: value });
+  }, [commitChroma]);
+  const setChromaTolerance = useCallback((value: number): boolean => {
+    return commitChroma({ ...recipeStateRef.current.recipe.chroma, tolerance: value });
+  }, [commitChroma]);
+  const setChromaSmoothness = useCallback((value: number): boolean => {
+    return commitChroma({ ...recipeStateRef.current.recipe.chroma, smoothness: value });
+  }, [commitChroma]);
+  const setChromaSpill = useCallback((value: number): boolean => {
+    return commitChroma({ ...recipeStateRef.current.recipe.chroma, spill: value });
+  }, [commitChroma]);
+  const resetChroma = useCallback((): boolean => {
+    return commitChroma({
+      enabled: false,
+      color: "#00ff00",
+      tolerance: 0,
+      smoothness: 0,
+      spill: 0,
+    });
+  }, [commitChroma]);
   const cropPreview = useMemo(() => Object.freeze({
     enabled: recipeState.recipe.crop.threshold > 0,
     threshold: recipeState.recipe.crop.threshold,
@@ -441,15 +495,28 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     recipe: recipeState.recipe,
     errorMessage,
     cropPreview,
+    chroma: recipeState.recipe.chroma,
     setMode,
     setManualRowsInput: updateRows,
     setManualColsInput: updateCols,
     setCropThreshold,
     setCropPadding,
     resetCrop,
+    setChromaEnabled,
+    setChromaColor,
+    setChromaTolerance,
+    setChromaSmoothness,
+    setChromaSpill,
+    resetChroma,
     retry,
   }), [
     cropPreview,
+    setChromaColor,
+    setChromaEnabled,
+    setChromaSmoothness,
+    setChromaSpill,
+    setChromaTolerance,
+    resetChroma,
     detectedLayout,
     draft,
     effectiveLayout,

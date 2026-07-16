@@ -1626,9 +1626,63 @@ para ejecutar el journey completo con undo/save/export.
   RGBA exacto + Worker real aceptados como VIS alpha/color golden. Artifact:
   `artifacts/quality/GRID/2026-07-16/g4-01-chroma-stage.json`.
 - **Límite honesto:** G4-02 conserva el muestreo eyedropper DPR-correct; G4-03
-  montará los controles y G4-04 demostrará el orden chroma→crop en recipe.
+  montará los controles completos y G4-04 demostrará el orden chroma→crop en recipe.
 
 **Siguiente frontera Grid:** G4-02 DPR-correct eyedropper sampling.
+
+### G4-02 — DPR-correct eyedropper sampling
+
+- **Seam canónico:** `CanvasArea` ya no deja el botón `Pick Canvas` conectado a
+  la ruta legacy cuando Slice tiene ownership canónico. El hook compartido
+  recibe un contrato explícito de eyedropper y conserva el pan/zoom sin volver a
+  habilitar selección, drag/drop o mutaciones legacy.
+- **Coordenadas:** el click CSS se valida contra el source mediante
+  `mapWandClientPointToSource`, invirtiendo offset, zoom y DPR; el pixel se lee
+  del backing canvas con límites y el color se normaliza al hex RGB existente.
+  Click fuera del source no publica una muestra. Escape cancela y el pick
+  exitoso desactiva la herramienta.
+- **UX/A11Y:** el botón tiene `type`, nombre dinámico y `aria-pressed`; el
+  estado activo anuncia cómo seleccionar y cancelar. Sin fuente, controles de
+  color/picker/commit quedan disabled de forma semántica, no sólo visual.
+- **Evidencia:** 4/4 pruebas del hook, 2/2 pruebas del control, typecheck,
+  oxlint, build y diff-check verdes. Chrome productivo a 1440×900 con DPR 2
+  verifica zoom `1→1.164738…`, pan, Escape, muestreo de `#123456` reflejado
+  tanto en el swatch legacy compartido como en el recipe canónico, cero errores
+  runtime, cero overflow, 48 interactivos sin nombre faltante y un landmark
+  main. Captura inspeccionada. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g4-02-eyedropper-dpr.{json,png}`.
+- **Límite honesto:** el picker lee RGB del canvas renderizado; el checkerboard
+  de píxeles transparentes y la semántica de alpha/chroma completa quedan para
+  G4-03/G4-05. El contrato de color existente no persiste un canal alpha.
+
+**Siguiente frontera Grid:** G4-03 controles chroma, swatch y eyedropper completos.
+
+### G4-03 — Chroma controls, swatch and eyedropper UI
+
+- **Recipe canónico:** `SliceGridController` expone setters de enabled, color,
+  tolerance, smoothness, spill y reset. Todos pasan por el mismo
+  `onCommitState` de Slice; no se creó un store paralelo. El updater valida
+  `#RRGGBB`, normaliza a lowercase y contiene host rejection.
+- **Controles:** `SliceChromaControls` añade toggle, swatch nativo, hex editable,
+  tolerancia, suavizado, spill suppression, resumen live y reset. Los sliders
+  mantienen draft local y commit boundary; el hex inválido no atraviesa recipe
+  ni worker y devuelve feedback de campo. Sin fuente, el fieldset y reset son
+  disabled semánticamente.
+- **Sincronización:** el canvas canónico entrega el color muestreado al recipe
+  y al swatch legacy compartido, de modo que Tools y Properties no divergen.
+  La UI de `Pick Canvas` conserva Escape, fuera-de-source y aislamiento legacy
+  ya probados en G4-02.
+- **Evidencia:** 1/1 recipe contract, 1/1 controller, 1/1 inspector, suite
+  focal G4 29/29, typecheck, oxlint, build y diff-check verdes. Chrome real
+  configura `#ff00aa`, 35/20/15, verifica reset y sincronización `#123456`,
+  48 interactivos sin nombre faltante, cero overflow y cinco contadores de
+  error en cero. Captura inspeccionada. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g4-03-chroma-controls.{json,png}`.
+- **Límite honesto:** la matemática Worker está cerrada en G4-01; el orden
+  chroma→crop y el gate hostile transparente/no-match/extreme tolerance quedan
+  para G4-04/G4-05.
+
+**Siguiente frontera Grid:** G4-04 orden chroma→crop y determinismo de recipe.
 
 ## Frontiers abiertos
 

@@ -4,4 +4,5 @@ export * from "./gridOverlayGeometry";
 export * from "./gridRecipeState";
 export * from "./SliceGridOverlay";
 export * from "./SliceGridInspector";
+export * from "./SliceChromaControls";
 export * from "./useSliceGridController";

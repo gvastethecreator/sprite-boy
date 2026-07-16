@@ -31,8 +31,8 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G3-03 | E | G3-02 | G3.1-G3.4 | Crop controls, preview summary y reset | BR+A11Y + REV | done |
 | G3-04 | J | G3-03 | G3.1-G3.4 | OOB/zero-size/huge-padding hostile gate | Property UT + REV | done |
 | G4-01 | J | G1-05,G3-04 | G4.1-G4.4 | Chroma color/tolerance/smoothness/spill stage | VIS alpha/color goldens | done |
-| G4-02 | J | G4-01,F5-06 | G4.5 | DPR-correct eyedropper sampling | Pixel coordinate UT+BR | todo |
-| G4-03 | E | G4-02 | G4.1-G4.6 | Chroma controls, swatch and eyedropper UI | A11Y+BR + REV | todo |
+| G4-02 | J | G4-01,F5-06 | G4.5 | DPR-correct eyedropper sampling | Pixel coordinate UT+BR | done |
+| G4-03 | E | G4-02 | G4.1-G4.6 | Chroma controls, swatch and eyedropper UI | A11Y+BR + REV | done |
 | G4-04 | J | G4-01,G3-04 | G4.7 | Chroma→crop ordering and recipe determinism | RT+VIS | todo |
 | G4-05 | J | G4-03,G4-04 | G4.1-G4.7 | Transparent/no-match/extreme tolerance gate | Hostile VIS+REV | todo |
 | G5-01 | J | G3-04,G4-05 | G5.1-G5.3 | Pixel resize/snapping stage | Pixel/hash UT | todo |
