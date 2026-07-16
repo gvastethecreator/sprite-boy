@@ -37,6 +37,10 @@ import {
 } from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
 import SliceSourceDropzone from "../../features/slice/source/SliceSourceDropzone";
+import {
+  SliceSourceCanvasFrame,
+  SliceSourcePreview,
+} from "../../features/slice/source/SliceSourcePreview";
 import { useSliceSourceSession } from "../../features/slice/source/useSourceSession";
 import type { SourceSessionSnapshot } from "../../features/slice/source/sourceSession";
 
@@ -461,7 +465,13 @@ const AppLayout: React.FC = () => {
             aria-label={`${activeWorkspaceDefinition.label} workspace content`}
             className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            {activeWorkspace === "slice" && !slicerImage && workspaceState.kind === "empty" ? (
+            {activeWorkspace === "slice" && !slicerImage && sourceSessionSnapshot.status === "ready" ? (
+              <SliceSourcePreview
+                snapshot={sourceSessionSnapshot}
+                getBlob={getSourceBlob}
+                committing={isSourceCommitting}
+              />
+            ) : activeWorkspace === "slice" && !slicerImage && workspaceState.kind === "empty" ? (
               <SliceSourceDropzone
                 snapshot={sourceSessionSnapshot}
                 disabled={isSourceCommitting}
@@ -471,7 +481,13 @@ const AppLayout: React.FC = () => {
                 onRetry={retrySliceSource}
               />
             ) : workspaceState.kind === "ready" ? (
-              <CanvasArea ref={canvasRef} />
+              activeWorkspace === "slice" && sourceSessionSnapshot.source ? (
+                <SliceSourceCanvasFrame snapshot={sourceSessionSnapshot}>
+                  <CanvasArea ref={canvasRef} />
+                </SliceSourceCanvasFrame>
+              ) : (
+                <CanvasArea ref={canvasRef} />
+              )
             ) : (
               <StudioWorkspaceStateView
                 state={workspaceState}

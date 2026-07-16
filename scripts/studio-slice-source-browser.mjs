@@ -24,6 +24,8 @@ export function evaluateSliceSourceEvidence(evidence) {
     evidence === null || typeof evidence !== "object" ||
     typeof evidence.busyAnnounced !== "boolean" ||
     typeof evidence.replacementRaceRecovered !== "boolean" ||
+    typeof evidence.metadataVisible !== "boolean" ||
+    typeof evidence.previewLeaseReleased !== "boolean" ||
     typeof evidence.canvasVisible !== "boolean" ||
     typeof evidence.dropzoneRemoved !== "boolean" ||
     typeof evidence.focusRestored !== "boolean" ||
@@ -43,6 +45,7 @@ export function evaluateSliceSourceEvidence(evidence) {
     throw new TypeError("Slice source browser diagnostics are invalid.");
   }
   const passed = evidence.busyAnnounced && evidence.replacementRaceRecovered &&
+    evidence.metadataVisible && evidence.previewLeaseReleased &&
     evidence.canvasVisible && evidence.dropzoneRemoved &&
     evidence.focusRestored && evidence.pageFits && evidence.route === "#/studio/slice" &&
     Object.values(errors).every((value) => value === 0);
@@ -53,6 +56,8 @@ export function evaluateSliceSourceEvidence(evidence) {
     metrics: Object.freeze({
       busyAnnounced: evidence.busyAnnounced,
       replacementRaceRecovered: evidence.replacementRaceRecovered,
+      metadataVisible: evidence.metadataVisible,
+      previewLeaseReleased: evidence.previewLeaseReleased,
       canvasVisible: evidence.canvasVisible,
       dropzoneRemoved: evidence.dropzoneRemoved,
       focusRestored: evidence.focusRestored,
@@ -190,6 +195,22 @@ export async function runSliceSourceBrowser(options = {}) {
         mobile: false,
       }),
     ]);
+    await client.send("Page.addScriptToEvaluateOnNewDocument", {
+      source: `(() => {
+        const nativeCreate = URL.createObjectURL.bind(URL);
+        const nativeRevoke = URL.revokeObjectURL.bind(URL);
+        globalThis.__spriteBoySlicePreviewUrls = { created: [], revoked: [] };
+        URL.createObjectURL = (blob) => {
+          const url = nativeCreate(blob);
+          globalThis.__spriteBoySlicePreviewUrls.created.push(url);
+          return url;
+        };
+        URL.revokeObjectURL = (url) => {
+          globalThis.__spriteBoySlicePreviewUrls.revoked.push(url);
+          return nativeRevoke(url);
+        };
+      })();`,
+    });
     await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
     await client.waitFor(`document.readyState === "complete" && Boolean(
       document.querySelector("[data-slice-source-dropzone]"),
@@ -199,10 +220,17 @@ export async function runSliceSourceBrowser(options = {}) {
       throw new Error("Slice replacement-race fixture is unavailable.");
     }
     await client.waitFor(`(() => {
-      const dropzone = document.querySelector("[data-slice-source-dropzone]");
-      return dropzone?.getAttribute("aria-busy") === "true" &&
-        dropzone.textContent?.includes("Opening the validated source in Slice");
+      const preview = document.querySelector("[data-slice-source-preview]");
+      return preview?.getAttribute("aria-busy") === "true" &&
+        preview.textContent?.includes("Opening the validated source in Slice");
     })()`);
+    const previewUrlCaptured = await client.evaluate(`(() => {
+      const image = document.querySelector('[data-slice-source-preview] img');
+      if (!(image instanceof HTMLImageElement) || !image.src.startsWith("blob:")) return false;
+      globalThis.__spriteBoySlicePreviewProofUrl = image.src;
+      return true;
+    })()`);
+    if (!previewUrlCaptured) throw new Error("Slice preview lease URL is unavailable.");
     if (await replaceWithInvalidSource(client) !== true) {
       throw new Error("Slice invalid replacement fixture is unavailable.");
     }
@@ -223,19 +251,27 @@ export async function runSliceSourceBrowser(options = {}) {
     await client.waitFor(`Boolean(document.querySelector('[aria-label="Canvas workspace"] canvas')) &&
       !document.querySelector("[data-slice-source-dropzone]")`);
     await client.waitFor(`document.body.innerText.includes("Imported browser-source.png")`);
+    await client.evaluate("new Promise((resolvePromise) => setTimeout(resolvePromise, 3200))");
     await captureScreenshot(client, options.screenshotPath);
 
     const page = await client.evaluate(`(() => {
       const content = document.querySelector('[data-studio-workspace-content="slice"]');
       const canvas = document.querySelector('[aria-label="Canvas workspace"] canvas');
+      const metadata = document.querySelector("[data-slice-source-metadata]");
       const canvasRect = canvas?.getBoundingClientRect();
+      const urlCounts = globalThis.__spriteBoySlicePreviewUrls ?? { created: -1, revoked: -1 };
+      const proofUrl = globalThis.__spriteBoySlicePreviewProofUrl;
       return {
+        metadataVisible: Boolean(metadata?.textContent?.includes("browser-source.png") &&
+          metadata.textContent.includes("64 × 32") && metadata.textContent.includes("PNG")),
         canvasVisible: Boolean(canvasRect && canvasRect.width > 0 && canvasRect.height > 0),
         dropzoneRemoved: !document.querySelector("[data-slice-source-dropzone]"),
         focusRestored: document.activeElement === content,
         pageFits: document.documentElement.scrollWidth <= innerWidth &&
           document.documentElement.scrollHeight <= innerHeight,
         route: location.hash,
+        previewLeaseReleased: typeof proofUrl === "string" &&
+          Array.isArray(urlCounts.revoked) && urlCounts.revoked.includes(proofUrl),
       };
     })()`);
     return evaluateSliceSourceEvidence({
