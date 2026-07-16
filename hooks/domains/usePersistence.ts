@@ -49,25 +49,73 @@ export function usePersistence(deps: PersistenceDeps) {
   }, [project, slicerGrid, builderGrid, templateConfig, onionSkin, currentMode, notify]);
 
   const handleLoadProject = useCallback(
-    (file: File) => {
+    (file: File): Promise<boolean> => new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      let settled = false;
+      const finish = (loaded: boolean): void => {
+        if (settled) return;
+        settled = true;
+        reader.onload = null;
+        reader.onerror = null;
+        reader.onabort = null;
+        resolve(loaded);
+      };
+      const fail = (): void => {
         try {
-          const data = JSON.parse(e.target?.result as string);
-          if (data.project) setProject(data.project);
-          if (data.ui) {
-            if (data.ui.slicerGrid) setSlicerGrid(data.ui.slicerGrid);
-            if (data.ui.builderGrid) setBuilderGrid(data.ui.builderGrid);
-            if (data.ui.templateConfig) setTemplateConfig(data.ui.templateConfig);
-            if (data.ui.currentMode) setCurrentMode(data.ui.currentMode);
-          }
-          notify("Project loaded", "success");
-        } catch {
           notify("Invalid file", "error");
+        } finally {
+          finish(false);
         }
       };
-      reader.readAsText(file);
-    },
+      reader.onerror = fail;
+      reader.onabort = fail;
+      reader.onload = () => {
+        try {
+          const result = reader.result;
+          if (typeof result !== "string") {
+            fail();
+            return;
+          }
+          const data: unknown = JSON.parse(result);
+          if (
+            data === null || typeof data !== "object" ||
+            !("project" in data) || !data.project || typeof data.project !== "object"
+          ) {
+            fail();
+            return;
+          }
+          const projectData = data as {
+            project: ProjectState;
+            ui?: Partial<{
+              slicerGrid: GridConfig;
+              builderGrid: GridConfig;
+              templateConfig: TemplateConfig;
+              currentMode: AppMode;
+            }>;
+          };
+          setProject(projectData.project);
+          if (projectData.ui) {
+            if (projectData.ui.slicerGrid) setSlicerGrid(projectData.ui.slicerGrid);
+            if (projectData.ui.builderGrid) setBuilderGrid(projectData.ui.builderGrid);
+            if (projectData.ui.templateConfig) setTemplateConfig(projectData.ui.templateConfig);
+            if (projectData.ui.currentMode) setCurrentMode(projectData.ui.currentMode);
+          }
+          finish(true);
+          try {
+            notify("Project loaded", "success");
+          } catch {
+            // Feedback is best effort after the project transaction commits.
+          }
+        } catch {
+          fail();
+        }
+      };
+      try {
+        reader.readAsText(file);
+      } catch {
+        fail();
+      }
+    }),
     [setProject, setSlicerGrid, setBuilderGrid, setTemplateConfig, setCurrentMode, notify],
   );
 

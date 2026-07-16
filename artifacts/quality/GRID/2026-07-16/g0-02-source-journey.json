@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "check": "slice-source-browser",
+  "status": "pass",
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 }
+  },
+  "metrics": {
+    "busyAnnounced": true,
+    "replacementRaceRecovered": true,
+    "canvasVisible": true,
+    "dropzoneRemoved": true,
+    "focusRestored": true,
+    "pageFits": true,
+    "route": "#/studio/slice",
+    "errors": {
+      "console": 0,
+      "exception": 0,
+      "log": 0,
+      "network": 0,
+      "http": 0
+    }
+  },
+  "command": "node scripts/studio-slice-source-browser.mjs",
+  "screenshot": "artifacts/quality/GRID/2026-07-16/g0-02-source-journey.png"
+}

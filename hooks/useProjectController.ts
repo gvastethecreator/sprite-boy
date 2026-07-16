@@ -198,33 +198,121 @@ export function useProjectController() {
     if (rgb.length === 3) root.style.setProperty("--accent-rgb", preferences.accentColor);
   }, [preferences.theme, preferences.accentColor]);
 
-  const handleUpload = (file: File) => {
+  const handleUpload = (
+    file: File,
+    options: { readonly signal?: AbortSignal } = {},
+  ): Promise<void> => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const src = e.target?.result as string;
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        const newFrames = generateFramesFromGrid(img.width, img.height, defaultGrid);
-        setProject((prev) => ({
-          ...prev,
-          imageMeta: {
-            src,
-            width: img.width,
-            height: img.height,
-            name: file.name,
-            fileSize: file.size,
-          },
-          builderCanvas: { width: img.width, height: img.height },
-          frames: newFrames,
-          builderSlots: {},
-        }));
-        ui.setBgPreviewBlobUrl(null);
-        notify(`Imported ${file.name}`, "success");
-      };
+    const signal = options.signal;
+    let image: HTMLImageElement | null = null;
+    let settled = false;
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      try {
+        if (reader.readyState === FileReader.LOADING) reader.abort();
+      } catch {
+        // The settled flag remains authoritative if a browser abort primitive fails.
+      }
+      if (image) image.src = "";
+      reject(new DOMException("Slice source import was cancelled.", "AbortError"));
     };
-    reader.readAsDataURL(file);
-  };
+    const cleanup = (): void => {
+      signal?.removeEventListener("abort", onAbort);
+      reader.onload = null;
+      reader.onerror = null;
+      reader.onabort = null;
+      if (image) {
+        image.onload = null;
+        image.onerror = null;
+      }
+    };
+    const fail = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (image) image.src = "";
+      try {
+        notify("The validated source could not be opened in Slice.", "error");
+      } finally {
+        reject(new Error("Validated Slice source import failed."));
+      }
+    };
+    reader.onerror = fail;
+    reader.onabort = fail;
+    reader.onload = () => {
+      const src = reader.result;
+      if (typeof src !== "string") {
+        fail();
+        return;
+      }
+      try {
+        image = new Image();
+        image.onerror = fail;
+        image.onload = () => {
+          if (
+            settled || signal?.aborted || image === null ||
+            image.width <= 0 || image.height <= 0
+          ) {
+            if (signal?.aborted) onAbort();
+            else fail();
+            return;
+          }
+          try {
+            const width = image.width;
+            const height = image.height;
+            const newFrames = generateFramesFromGrid(width, height, defaultGrid);
+            if (signal?.aborted) {
+              onAbort();
+              return;
+            }
+            setProject((prev) => ({
+              ...prev,
+              imageMeta: {
+                src,
+                width,
+                height,
+                name: file.name,
+                fileSize: file.size,
+              },
+              builderCanvas: { width, height },
+              frames: newFrames,
+              builderSlots: {},
+            }));
+            try {
+              ui.setBgPreviewBlobUrl(null);
+            } catch {
+              // Preview cleanup must not invalidate an already committed project.
+            }
+            settled = true;
+            cleanup();
+            resolve();
+            try {
+              notify(`Imported ${file.name}`, "success");
+            } catch {
+              // Feedback is best effort after the project transaction commits.
+            }
+          } catch {
+            fail();
+          }
+        };
+        image.src = src;
+      } catch {
+        fail();
+      }
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    try {
+      reader.readAsDataURL(file);
+    } catch {
+      fail();
+    }
+  });
 
   const handleCreateCanvas = (w: number, h: number) => {
     const newFrames = generateFramesFromGrid(w, h, builderGrid);
