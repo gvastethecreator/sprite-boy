@@ -1770,6 +1770,29 @@ para ejecutar el journey completo con undo/save/export.
 - **Límite honesto:** extraction/presets/controls siguen G5-03; stress y budget
   de imagen grande siguen G5-04; process/results/export siguen G6/G7.
 
+### G5-03 — Pixel/palette controls canónicos del Slice inspector
+
+- **Ownership:** `SlicePixelControls` vive junto a Grid/Chroma y consume sólo
+  `SliceGridController`; enabled, size, quantize, colors, auto/fixed palette y
+  reset pasan por `onCommitState`, sin store paralelo ni ruta legacy.
+- **Presets y custom:** el catálogo estable expone Game Boy, PICO-8, Arcade y
+  Monochrome. Fixed mode pinta swatches y mantiene el array hex normalizado;
+  Auto mode limpia la paleta fija y conserva el color-count. Target size ofrece
+  atajos `8/16/32/64/128/256` y un campo custom entero `1..4096` con rollback
+  al último valor aceptado.
+- **Feedback/A11Y:** fieldset y reset quedan semánticamente disabled sin source;
+  summary live anuncia stage, target y palette; radio groups, select, checkbox,
+  swatches y reset tienen nombres estables. CSS del shell mantiene el viewport
+  sin overflow visible y el panel conserva scroll interno.
+- **Evidencia:** contratos de recipe, hook y inspector, typecheck, oxlint, build
+  y diff-check verdes. Chrome real `1440×900 DPR2` configura pixel stage,
+  `64px`, PICO-8, ocho swatches, inspecciona summary/reset, cero errores,
+  61 interactivos con cero sin nombre y captura inspeccionada. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g5-03-pixel-controls-browser.json` y
+  `g5-03-pixel-controls.png`.
+- **Límite honesto:** extracción desde pixels procesados y feedback de jobs
+  siguen G6; stress/performance agregado sigue G5-04; export sigue G7.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
