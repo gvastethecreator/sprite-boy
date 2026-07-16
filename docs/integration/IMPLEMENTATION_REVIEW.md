@@ -1328,9 +1328,22 @@ S1-03 puede avanzar en paralelo sobre commands manuales sin tocar este adapter.
   `ACCEPT`, P0-P3=0. Artifact:
   `artifacts/quality/EDITOR/2026-07-16/a1-01-composition-entry.json`.
 
-**Siguiente frontera Editor:** A1-02 Project menu y Compose bootstrap UI está
-activo; A1-03 canvas dimensions/aspect/background espera el kernel
-`composition.update` (la descripción legacy del ledger se reconciliará con A1.4).
+### A1-03 prerequisite — Canonical `composition.update`
+
+- **Contrato:** patch exacto y no vacío para `name`, dimensiones, fondo y
+  `updatedAt`; límites de eje/producto, color hex/transparent y timestamp se
+  validan sin ejecutar accessors hostiles.
+- **Persistencia:** actualiza la Composition canónica sin reemplazar identidad,
+  owner, layers ni referencias. No-op conserva referencia/revisión; undo/redo,
+  batch e impacto mínimo atraviesan ProjectEngine y ProjectStore.
+- **Evidencia:** focal 8/8, core acumulado 198/198, lint/diff verdes y revisión
+  independiente `ACCEPT`, P0-P3=0. El typecheck global quedó bloqueado sólo por
+  la reparación S1-02 concurrente. Artifact:
+  `artifacts/quality/EDITOR/2026-07-16/a1-03-composition-update-kernel.json`.
+
+**Siguiente frontera Editor:** A1-02 Project menu y Compose bootstrap UI y
+A1-03 composition dimensions/aspect/background están activos. La descripción
+legacy rename/save/reopen se reconcilió con el behavior autoritativo A1.4.
 
 ### G2-03 — Native Grid controls and detected feedback
 

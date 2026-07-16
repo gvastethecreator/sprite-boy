@@ -8,7 +8,7 @@ Superficies propietarias: `features/compose/**`, `features/animate/**`, `feature
 |---|---|---|---|---|---|---|
 | A1-01 | J | F1-08,F2-07,F3-07,F5-06,F6-06 | A1.1-A1.2 | Create/open composition from Asset or Region | IT project graph | done |
 | A1-02 | E | A1-01 | A1.3,A2.1-A2.2 | Project menu and empty/bootstrap Compose UI | BR+A11Y + REV | active |
-| A1-03 | J | A1-01 | A1.4 | Rename/save/reopen composition workflow | RT+BR J1/J3 | todo |
+| A1-03 | J | A1-01 | A1.4 | Composition dimensions/aspect/background workflow | RT+BR J1/J3 | active |
 | A1-04 | J | A1-02,A1-03 | A1.1-A1.4,A2.1-A2.2 | Portable first-composition acceptance | Package RT+REV | todo |
 | A2-01 | J | A1-04 | A2.3-A2.4 | Layer add/remove/duplicate commands | UT+undo | todo |
 | A2-02 | J | A2-01 | A2.5-A2.7 | Sync/reorder and stable layer identity | Identity stress UT | todo |

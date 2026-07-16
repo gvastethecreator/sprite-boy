@@ -45,6 +45,7 @@ const COLLECTION_RANK = new Map<ProjectRecordCollection, number>(
 type ImpactCommandType = ProjectCommand["type"] | "command.batch";
 
 const IMPACT_COMMAND_KEYS: Partial<Record<ImpactCommandType, readonly string[]>> = {
+  "composition.update": ["type", "compositionId", "patch"],
   "asset.remove": ["type", "assetId", "policy"],
   "region.remove": ["type", "regionId", "policy"],
   "processingRecipe.remove": ["type", "recipeId", "policy"],
@@ -802,6 +803,26 @@ export function analyzeProjectCommandImpact(
       return analyzeVariantChange(project, impactType, record);
     }
     if (impactType === "cel.replaceSource") return analyzeCelRelink(project, record);
+    if (impactType === "composition.update") {
+      if (!isEntityId(record.compositionId)) {
+        return invalidImpact("compositionId must be a non-empty string.", "$.compositionId");
+      }
+      const patch = dataRecord(record.patch);
+      const patchKeys = patch ? Object.keys(patch) : [];
+      const allowedPatchKeys = new Set(["name", "width", "height", "background", "updatedAt"]);
+      if (!patch || patchKeys.length === 0) {
+        return invalidImpact("composition.update patch must be a non-empty data-only record.", "$.patch");
+      }
+      for (const key of patchKeys) {
+        if (!allowedPatchKeys.has(key) || patch[key] === undefined) {
+          return invalidImpact(`Field ${key} cannot be patched on a composition.`, `$.patch.${key}`);
+        }
+      }
+      const direct = reference("compositions", record.compositionId);
+      return entityExists(project, direct)
+        ? { direct: [direct], referencedBy: [], cascades: [], blockers: [] }
+        : { direct: [direct], referencedBy: [], cascades: [], blockers: [missingTargetBlocker(direct)] };
+    }
 
     const { target, policy } = removeTarget(impactType, record);
     if (!target) {

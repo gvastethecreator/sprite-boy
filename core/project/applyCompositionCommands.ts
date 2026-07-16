@@ -1,4 +1,5 @@
 import type {
+  Composition,
   Layer,
   StudioProjectV1,
   VariantKey,
@@ -24,6 +25,7 @@ import {
 } from "./commandSupport";
 import type {
   EntityReference,
+  CompositionPatch,
   LayerPatch,
   ProjectCommand,
   ProjectCommandContext,
@@ -31,7 +33,20 @@ import type {
   ProjectCommandInverse,
   ProjectCommandResult,
 } from "./commands";
-import { isEntityId } from "./primitives";
+import { isEntityId, isISO8601Timestamp } from "./primitives";
+
+const MAX_COMPOSITION_EDGE = 16_384;
+const MAX_COMPOSITION_PIXELS = 64 * 1024 * 1024;
+const MAX_COMPOSITION_NAME_LENGTH = 256;
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+const COMPOSITION_PATCH_FIELDS = [
+  "name",
+  "width",
+  "height",
+  "background",
+  "updatedAt",
+] as const;
 
 const LAYER_PATCH_FIELDS = [
   "name",
@@ -52,6 +67,7 @@ type FamilyCommand = Extract<
   {
     type:
       | "composition.create"
+      | "composition.update"
       | "layer.add"
       | "layer.update"
       | "layer.reorder"
@@ -395,6 +411,170 @@ function ownPatchKeys(record: Record<string, unknown>): string[] {
   return Reflect.ownKeys(record).filter((key): key is string => typeof key === "string");
 }
 
+function hasUnsafeNameControls(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) return true;
+  }
+  return false;
+}
+
+function validateCompositionPatch(
+  original: StudioProjectV1,
+  compositionId: string,
+  patch: unknown,
+): ProjectCommandDiagnostic | undefined {
+  const patchDiagnostic = requirePlainRecord(patch, "$.patch", "composition.update patch");
+  if (patchDiagnostic) return patchDiagnostic;
+  const patchRecord = patch as Record<string, unknown>;
+  const keys = Reflect.ownKeys(patchRecord);
+  if (keys.length === 0) return invalidPatch("composition.update patch cannot be empty.", "$.patch");
+
+  for (const ownKey of keys) {
+    if (typeof ownKey !== "string") {
+      return invalidPatch("Symbol fields cannot be patched on a composition.", "$.patch");
+    }
+    if (!(COMPOSITION_PATCH_FIELDS as readonly string[]).includes(ownKey)) {
+      return invalidPatch(`Field ${ownKey} cannot be patched on a composition.`, `$.patch.${ownKey}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(patchRecord, ownKey);
+    if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+      return invalidPatch(
+        `Field ${ownKey} on a composition patch must be an own enumerable data property.`,
+        `$.patch.${ownKey}`,
+      );
+    }
+    if (descriptor.value === undefined) {
+      return invalidPatch(`Field ${ownKey} cannot be undefined.`, `$.patch.${ownKey}`);
+    }
+  }
+
+  const read = (key: string): unknown => Object.getOwnPropertyDescriptor(patchRecord, key)?.value;
+  if (hasOwn(patchRecord, "name")) {
+    const name = read("name");
+    if (
+      typeof name !== "string" ||
+      name.trim().length === 0 ||
+      name.length > MAX_COMPOSITION_NAME_LENGTH ||
+      hasUnsafeNameControls(name)
+    ) {
+      return invalidPatch(
+        `Composition name must be a non-empty control-free string of at most ${MAX_COMPOSITION_NAME_LENGTH} characters.`,
+        "$.patch.name",
+      );
+    }
+  }
+
+  for (const key of ["width", "height"] as const) {
+    if (!hasOwn(patchRecord, key)) continue;
+    const value = read(key);
+    if (
+      typeof value !== "number" ||
+      !Number.isSafeInteger(value) ||
+      Object.is(value, -0) ||
+      value <= 0 ||
+      value > MAX_COMPOSITION_EDGE
+    ) {
+      return invalidPatch(
+        `Composition ${key} must be a positive safe integer no greater than ${MAX_COMPOSITION_EDGE}.`,
+        `$.patch.${key}`,
+      );
+    }
+  }
+
+  const width = hasOwn(patchRecord, "width") ? read("width") : original.compositions[compositionId].width;
+  const height = hasOwn(patchRecord, "height") ? read("height") : original.compositions[compositionId].height;
+  if (
+    typeof width === "number" &&
+    typeof height === "number" &&
+    width * height > MAX_COMPOSITION_PIXELS
+  ) {
+    return invalidPatch(
+      `Composition canvas cannot exceed ${MAX_COMPOSITION_PIXELS} pixels.`,
+      "$.patch",
+    );
+  }
+
+  if (hasOwn(patchRecord, "background")) {
+    const background = read("background");
+    if (background !== null && (typeof background !== "string" || !HEX_COLOR.test(background))) {
+      return invalidPatch(
+        "Composition background must be null for transparency or a CSS hex color.",
+        "$.patch.background",
+      );
+    }
+  }
+
+  if (hasOwn(patchRecord, "updatedAt") && !isISO8601Timestamp(read("updatedAt"))) {
+    return invalidPatch(
+      "Composition updatedAt must be an ISO-8601 timestamp with a timezone.",
+      "$.patch.updatedAt",
+    );
+  }
+  return undefined;
+}
+
+function applyCompositionUpdate(
+  original: StudioProjectV1,
+  command: Extract<FamilyCommand, { type: "composition.update" }>,
+  context: ProjectCommandContext,
+): ProjectCommandResult {
+  const compositionIdDiagnostic = requireEntityId(command.compositionId, "$.compositionId");
+  if (compositionIdDiagnostic) return commandFailure(original, [compositionIdDiagnostic]);
+  if (!hasOwn(original.compositions, command.compositionId)) {
+    return commandFailure(original, [
+      missingEntityDiagnostic("compositions", command.compositionId, "$.compositionId"),
+    ]);
+  }
+  const patchDiagnostic = validateCompositionPatch(original, command.compositionId, command.patch);
+  if (patchDiagnostic) return commandFailure(original, [patchDiagnostic]);
+
+  const previous = original.compositions[command.compositionId] as unknown as Record<string, unknown>;
+  const patchRecord = command.patch as unknown as Record<string, unknown>;
+  const patchKeys = ownPatchKeys(patchRecord);
+  const changesComposition = patchKeys.some((key) =>
+    !jsonValuesEqual(previous[key], Object.getOwnPropertyDescriptor(patchRecord, key)?.value));
+  const direct = directCommandImpact([
+    entityReference("compositions", command.compositionId),
+  ]);
+  if (!changesComposition) {
+    return noChangeCommandResult(original, direct, cloneCommandPayload(command));
+  }
+
+  const prepared = prepareCommandCandidate(original);
+  if (isCommandResult(prepared)) return prepared;
+  const preparedComposition = prepared.compositions[command.compositionId] as Composition & Record<string, unknown>;
+  const inversePatch: Record<string, unknown> = {};
+  let semanticInverseIsExact = true;
+  for (const key of patchKeys) {
+    if (hasOwn(previous, key)) inversePatch[key] = cloneCommandPayload(previous[key]);
+    else semanticInverseIsExact = false;
+    preparedComposition[key] = cloneCommandPayload(
+      Object.getOwnPropertyDescriptor(patchRecord, key)?.value,
+    );
+  }
+  const now = context.now();
+  if (!patchKeys.includes("updatedAt")) {
+    inversePatch.updatedAt = previous.updatedAt;
+    preparedComposition.updatedAt = now;
+  }
+  prepared.updatedAt = now;
+  const inverse: ProjectCommandInverse = semanticInverseIsExact
+    ? {
+        type: "composition.update",
+        compositionId: command.compositionId,
+        patch: inversePatch as CompositionPatch,
+      }
+    : { type: "project.restoreSnapshot", project: cloneCommandPayload(original) };
+  return finalizeCommandMutation(
+    original,
+    prepared,
+    { compositions: [command.compositionId] },
+    direct,
+    inverse,
+  );
+}
+
 function applyLayerUpdate(
   original: StudioProjectV1,
   command: Extract<FamilyCommand, { type: "layer.update" }>,
@@ -668,6 +848,8 @@ export function applyCompositionFamilyCommand(
     switch (type) {
       case "composition.create":
         return applyCompositionCreate(project, command as Extract<FamilyCommand, { type: "composition.create" }>, context);
+      case "composition.update":
+        return applyCompositionUpdate(project, command as Extract<FamilyCommand, { type: "composition.update" }>, context);
       case "layer.add":
         return applyLayerAdd(project, command as Extract<FamilyCommand, { type: "layer.add" }>, context);
       case "layer.update":
