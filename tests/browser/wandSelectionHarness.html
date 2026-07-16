@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>S1-02 Wand Selection Browser Gate</title>
+    <style>
+      body { margin: 24px; background: #f8fafc; color: #0f172a; font-family: system-ui, sans-serif; }
+      #probe { width: 480px; }
+      #probe svg { display: block; width: 480px; height: 320px; image-rendering: pixelated; }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="journey-title">
+      <h1 id="journey-title">S1-02 wand selection visual probe</h1>
+      <div id="probe"></div>
+    </main>
+    <script type="module">
+      import { runWandSelectionBrowserJourney } from "./wandSelectionJourney.ts";
+      Object.defineProperty(globalThis, "__spriteBoyS102", {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: runWandSelectionBrowserJourney(),
+      });
+    </script>
+  </body>
+</html>
