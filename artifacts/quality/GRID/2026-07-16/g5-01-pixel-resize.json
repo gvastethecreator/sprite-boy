@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-pixel-resize-nearest-worker",
+  "status": "pass",
+  "task": "G5-01",
+  "scope": "Pixel-stage toggle and deterministic nearest-neighbor resize with bounded dimensions.",
+  "evidence": {
+    "realWorker": true,
+    "enabled": {
+      "source": "2x2 RGBA quadrant fixture",
+      "target": "4x4",
+      "dimensions": [4, 4],
+      "operations": ["resize"],
+      "pixels": [
+        255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
+        255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
+        0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255, 255, 0, 255,
+        0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255, 255, 0, 255
+      ]
+    },
+    "disabled": {
+      "dimensions": [2, 2],
+      "operations": [],
+      "pixels": [
+        255, 0, 0, 255, 0, 255, 0, 255,
+        0, 0, 255, 255, 255, 255, 0, 255
+      ],
+      "byteIdentical": true
+    },
+    "limits": {
+      "maxEmptyOutputs": 4096,
+      "geometryMatrix": "getScaledDimensions validates safe integer maxSide and result-pixel budget"
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Smooth interpolation: every 2x2 source quadrant remains a crisp 2x2 block.",
+      "Disabled toggle drift: disabled pixel stage returns original dimensions, bytes and no resize operation.",
+      "Dimension overflow: geometry/protocol limits reject hostile maxSide and result pixel budgets before allocation.",
+      "Alpha loss: RGBA bytes, including alpha, are copied by nearest mapping."
+    ],
+    "boundary": "Palette quantization is intentionally not part of G5-01 and remains G5-02; process/results/export UI remains G6/G7."
+  },
+  "verification": {
+    "workerSmoke": "pass",
+    "realWorkerIntegration": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass"
+  }
+}

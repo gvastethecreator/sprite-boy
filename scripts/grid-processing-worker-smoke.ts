@@ -43,6 +43,37 @@ const result = await createGridProcessingClient().process({
   signal: controller.signal,
   onProgress: (progress) => progressStages.push(progress.stage),
 }).finally(() => clearTimeout(timeout));
+const resizeSource = [
+  255, 0, 0, 255,
+  0, 255, 0, 192,
+  0, 0, 255, 64,
+  255, 255, 0, 0,
+] as const;
+const processResizeFixture = (enabled: boolean, requestId: string) => createGridProcessingClient().process({
+  request: {
+    version: GRID_PROCESSING_PROTOCOL_VERSION,
+    type: "process",
+    requestId,
+    source: {
+      width: 2,
+      height: 2,
+      format: "rgba8",
+      colorSpace: "srgb",
+      pixels: new Uint8ClampedArray(resizeSource).buffer,
+    },
+    recipe: {
+      kind: "grid-split",
+      version: 1,
+      sourceAssetId: `asset-${requestId}`,
+      layout: { mode: "manual", rows: 1, cols: 1 },
+      crop: { threshold: 0, padding: 0 },
+      chroma: { enabled: false, color: "#00ff00", tolerance: 0, smoothness: 0, spill: 0 },
+      pixel: { enabled, size: 4, quantize: false, colors: 16 },
+    },
+  },
+});
+const resizeEnabledResult = await processResizeFixture(true, "grid-real-worker-resize-enabled");
+const resizeDisabledResult = await processResizeFixture(false, "grid-real-worker-resize-disabled");
 const alphaCropResult = await createGridProcessingClient().process({
   request: {
     version: GRID_PROCESSING_PROTOCOL_VERSION,
@@ -106,6 +137,71 @@ const processChromaFixture = (enabled: boolean, requestId: string) =>
   });
 const chromaEnabledResult = await processChromaFixture(true, "grid-real-worker-chroma-enabled");
 const chromaDisabledResult = await processChromaFixture(false, "grid-real-worker-chroma-disabled");
+const chromaOrderSource = [
+  0, 255, 0, 255,
+  220, 20, 30, 255,
+  0, 255, 0, 255,
+  30, 80, 220, 255,
+] as const;
+const processChromaCropFixture = (requestId: string) => createGridProcessingClient().process({
+  request: {
+    version: GRID_PROCESSING_PROTOCOL_VERSION,
+    type: "process",
+    requestId,
+    source: {
+      width: 4,
+      height: 1,
+      format: "rgba8",
+      colorSpace: "srgb",
+      pixels: new Uint8ClampedArray(chromaOrderSource).buffer,
+    },
+    recipe: {
+      kind: "grid-split",
+      version: 1,
+      sourceAssetId: `asset-${requestId}`,
+      layout: { mode: "manual", rows: 1, cols: 1 },
+      crop: { threshold: 1, padding: 0 },
+      chroma: { enabled: true, color: "#00ff00", tolerance: 1, smoothness: 0, spill: 0 },
+      pixel: { enabled: false, size: 16, quantize: false, colors: 16 },
+    },
+  },
+});
+const chromaOrderResult = await processChromaCropFixture("grid-real-worker-chroma-order");
+const chromaOrderRepeat = await processChromaCropFixture("grid-real-worker-chroma-order-repeat");
+const processChromaHostileFixture = (pixels: readonly number[], requestId: string, tolerance: number) =>
+  createGridProcessingClient().process({
+    request: {
+      version: GRID_PROCESSING_PROTOCOL_VERSION,
+      type: "process",
+      requestId,
+      source: {
+        width: pixels.length / 4,
+        height: 1,
+        format: "rgba8",
+        colorSpace: "srgb",
+        pixels: new Uint8ClampedArray(pixels).buffer,
+      },
+      recipe: {
+        kind: "grid-split",
+        version: 1,
+        sourceAssetId: `asset-${requestId}`,
+        layout: { mode: "manual", rows: 1, cols: 1 },
+        crop: { threshold: 1, padding: 0 },
+        chroma: { enabled: true, color: "#00ff00", tolerance, smoothness: 100, spill: 100 },
+        pixel: { enabled: false, size: 16, quantize: false, colors: 16 },
+      },
+    },
+  });
+const chromaNoMatchResult = await processChromaHostileFixture([
+  220, 20, 30, 255,
+  0, 255, 0, 0,
+  30, 80, 220, 255,
+], "grid-real-worker-chroma-no-match", 0);
+const chromaExtremeResult = await processChromaHostileFixture([
+  0, 255, 0, 255,
+  220, 20, 30, 128,
+  0, 255, 0, 0,
+], "grid-real-worker-chroma-extreme", 100);
 const edgePixels = new Uint8ClampedArray(7 * 5 * 4);
 const setEdgePixel = (x: number, y: number, rgba: readonly number[]): void => {
   edgePixels.set(rgba, (y * 7 + x) * 4);
@@ -208,6 +304,14 @@ const evidence = Object.freeze({
   sourceDetached: sourceBuffer.byteLength === 0,
   outputPixels: Object.freeze(result.outputs.map((output) =>
     Object.freeze([...new Uint8ClampedArray(output.surface.pixels)]))),
+  resizeGolden: Object.freeze({
+    enabledDimensions: [resizeEnabledResult.outputs[0]!.surface.width, resizeEnabledResult.outputs[0]!.surface.height],
+    enabledOperations: resizeEnabledResult.outputs[0]!.operations,
+    enabledPixels: Object.freeze([...new Uint8ClampedArray(resizeEnabledResult.outputs[0]!.surface.pixels)]),
+    disabledDimensions: [resizeDisabledResult.outputs[0]!.surface.width, resizeDisabledResult.outputs[0]!.surface.height],
+    disabledOperations: resizeDisabledResult.outputs[0]!.operations,
+    disabledPixels: Object.freeze([...new Uint8ClampedArray(resizeDisabledResult.outputs[0]!.surface.pixels)]),
+  }),
   alphaCrop: Object.freeze({
     contentBounds: alphaOutput.contentBounds,
     dimensions: Object.freeze({ width: alphaOutput.surface.width, height: alphaOutput.surface.height }),
@@ -223,6 +327,31 @@ const evidence = Object.freeze({
       ...new Uint8ClampedArray(chromaDisabledResult.outputs[0]!.surface.pixels),
     ]),
     disabledOperations: chromaDisabledResult.outputs[0]!.operations,
+  }),
+  chromaOrder: Object.freeze({
+    operations: chromaOrderResult.outputs[0]!.operations,
+    contentBounds: chromaOrderResult.outputs[0]!.contentBounds,
+    dimensions: [chromaOrderResult.outputs[0]!.surface.width, chromaOrderResult.outputs[0]!.surface.height],
+    pixels: Object.freeze([...new Uint8ClampedArray(chromaOrderResult.outputs[0]!.surface.pixels)]),
+    repeatContentBounds: chromaOrderRepeat.outputs[0]!.contentBounds,
+    repeatDimensions: [chromaOrderRepeat.outputs[0]!.surface.width, chromaOrderRepeat.outputs[0]!.surface.height],
+    repeatPixels: Object.freeze([...new Uint8ClampedArray(chromaOrderRepeat.outputs[0]!.surface.pixels)]),
+    repeatOperations: chromaOrderRepeat.outputs[0]!.operations,
+  }),
+  chromaHostile: Object.freeze({
+    noMatch: Object.freeze({
+      pixels: Object.freeze([...new Uint8ClampedArray(chromaNoMatchResult.outputs[0]!.surface.pixels)]),
+      contentBounds: chromaNoMatchResult.outputs[0]!.contentBounds,
+      operations: chromaNoMatchResult.outputs[0]!.operations,
+      warnings: chromaNoMatchResult.outputs[0]!.warnings,
+    }),
+    extreme: Object.freeze({
+      pixels: Object.freeze([...new Uint8ClampedArray(chromaExtremeResult.outputs[0]!.surface.pixels)]),
+      contentBounds: chromaExtremeResult.outputs[0]!.contentBounds,
+      dimensions: [chromaExtremeResult.outputs[0]!.surface.width, chromaExtremeResult.outputs[0]!.surface.height],
+      operations: chromaExtremeResult.outputs[0]!.operations,
+      warnings: chromaExtremeResult.outputs[0]!.warnings,
+    }),
   }),
   reductionEdge: Object.freeze({
     recipeUnchanged: JSON.stringify(edgeRecipe) === JSON.stringify(edgeRecipeBefore),
@@ -289,6 +418,19 @@ if (
     ],
     [0, 0, 0, 0],
   ]) ||
+  JSON.stringify(evidence.resizeGolden) !== JSON.stringify({
+    enabledDimensions: [4, 4],
+    enabledOperations: ["resize"],
+    enabledPixels: [
+      255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 192, 0, 255, 0, 192,
+      255, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 192, 0, 255, 0, 192,
+      0, 0, 255, 64, 0, 0, 255, 64, 255, 255, 0, 0, 255, 255, 0, 0,
+      0, 0, 255, 64, 0, 0, 255, 64, 255, 255, 0, 0, 255, 255, 0, 0,
+    ],
+    disabledDimensions: [2, 2],
+    disabledOperations: [],
+    disabledPixels: resizeSource,
+  }) ||
   JSON.stringify(evidence.alphaCrop) !== JSON.stringify({
     contentBounds: { x: 2, y: 0, width: 2, height: 1 },
     dimensions: { width: 2, height: 1 },
@@ -307,6 +449,39 @@ if (
     enabledOperations: ["chroma"],
     disabledPixels: chromaSource,
     disabledOperations: [],
+  }) ||
+  JSON.stringify(evidence.chromaOrder) !== JSON.stringify({
+    operations: ["chroma", "crop"],
+    contentBounds: { x: 1, y: 0, width: 3, height: 1 },
+    dimensions: [3, 1],
+    pixels: [
+      220, 20, 30, 255,
+      0, 255, 0, 0,
+      30, 80, 220, 255,
+    ],
+    repeatContentBounds: { x: 1, y: 0, width: 3, height: 1 },
+    repeatDimensions: [3, 1],
+    repeatPixels: [
+      220, 20, 30, 255,
+      0, 255, 0, 0,
+      30, 80, 220, 255,
+    ],
+    repeatOperations: ["chroma", "crop"],
+  }) ||
+  JSON.stringify(evidence.chromaHostile) !== JSON.stringify({
+    noMatch: {
+      pixels: [220, 20, 30, 255, 0, 255, 0, 0, 30, 80, 220, 255],
+      contentBounds: { x: 0, y: 0, width: 3, height: 1 },
+      operations: ["chroma", "crop"],
+      warnings: [],
+    },
+    extreme: {
+      pixels: [0, 0, 0, 0],
+      contentBounds: null,
+      dimensions: [1, 1],
+      operations: ["chroma", "crop"],
+      warnings: ["empty-output"],
+    },
   }) ||
   JSON.stringify(evidence.reductionEdge) !== JSON.stringify({
     recipeUnchanged: true,
