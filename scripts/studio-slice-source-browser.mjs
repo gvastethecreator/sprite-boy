@@ -28,7 +28,13 @@ export function evaluateSliceSourceEvidence(evidence) {
     typeof evidence.previewLeaseReleased !== "boolean" ||
     typeof evidence.actionsVisible !== "boolean" ||
     typeof evidence.pickerCancelPreserved !== "boolean" ||
+    typeof evidence.pickerCancelFocusRestored !== "boolean" ||
     typeof evidence.replaceKeptCurrentSource !== "boolean" ||
+    typeof evidence.retryableErrorFocused !== "boolean" ||
+    typeof evidence.retryFailureFocusRestored !== "boolean" ||
+    typeof evidence.retryBusyBlocksDuplicateActions !== "boolean" ||
+    typeof evidence.retrySucceeded !== "boolean" ||
+    typeof evidence.retrySuccessFocusRestored !== "boolean" ||
     typeof evidence.resetConfirmationAccessible !== "boolean" ||
     typeof evidence.resetCancelPreserved !== "boolean" ||
     typeof evidence.resetCompleted !== "boolean" ||
@@ -56,7 +62,10 @@ export function evaluateSliceSourceEvidence(evidence) {
   const passed = evidence.busyAnnounced && evidence.replacementRaceRecovered &&
     evidence.metadataVisible && evidence.previewLeaseReleased &&
     evidence.actionsVisible && evidence.pickerCancelPreserved &&
-    evidence.replaceKeptCurrentSource && evidence.resetConfirmationAccessible &&
+    evidence.pickerCancelFocusRestored && evidence.replaceKeptCurrentSource &&
+    evidence.retryableErrorFocused && evidence.retryFailureFocusRestored &&
+    evidence.retryBusyBlocksDuplicateActions && evidence.retrySucceeded &&
+    evidence.retrySuccessFocusRestored && evidence.resetConfirmationAccessible &&
     evidence.resetCancelPreserved && evidence.resetCompleted &&
     evidence.resetResourceReleased && evidence.resetFocusRestored &&
     evidence.preferencesPreserved &&
@@ -74,7 +83,13 @@ export function evaluateSliceSourceEvidence(evidence) {
       previewLeaseReleased: evidence.previewLeaseReleased,
       actionsVisible: evidence.actionsVisible,
       pickerCancelPreserved: evidence.pickerCancelPreserved,
+      pickerCancelFocusRestored: evidence.pickerCancelFocusRestored,
       replaceKeptCurrentSource: evidence.replaceKeptCurrentSource,
+      retryableErrorFocused: evidence.retryableErrorFocused,
+      retryFailureFocusRestored: evidence.retryFailureFocusRestored,
+      retryBusyBlocksDuplicateActions: evidence.retryBusyBlocksDuplicateActions,
+      retrySucceeded: evidence.retrySucceeded,
+      retrySuccessFocusRestored: evidence.retrySuccessFocusRestored,
       resetConfirmationAccessible: evidence.resetConfirmationAccessible,
       resetCancelPreserved: evidence.resetCancelPreserved,
       resetCompleted: evidence.resetCompleted,
@@ -216,6 +231,40 @@ async function selectReplacementPng(client) {
   })()`);
 }
 
+async function selectRetryableReplacement(client) {
+  return client.evaluate(`(async () => {
+    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    if (!(input instanceof HTMLInputElement)) return false;
+    const canvas = document.createElement("canvas");
+    canvas.width = 40;
+    canvas.height = 20;
+    const context = canvas.getContext("2d");
+    if (!context) return false;
+    context.fillStyle = "#0ea5e9";
+    context.fillRect(0, 0, 20, 20);
+    context.fillStyle = "#fb7185";
+    context.fillRect(20, 0, 20, 20);
+    const blob = await new Promise((resolvePromise) => canvas.toBlob(resolvePromise, "image/png"));
+    if (!(blob instanceof Blob)) return false;
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([blob], "retryable-source.png", { type: "image/png" }));
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+}
+
+async function clickSliceSourceAction(client, label) {
+  return client.evaluate(`(() => {
+    const button = Array.from(document.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.trim() === ${JSON.stringify(label)});
+    if (!(button instanceof HTMLButtonElement) || button.disabled) return false;
+    button.focus({ preventScroll: true });
+    button.click();
+    return true;
+  })()`);
+}
+
 export async function runSliceSourceBrowser(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const chromePath = resolveChromeExecutable(options);
@@ -266,6 +315,7 @@ export async function runSliceSourceBrowser(options = {}) {
         const nativeRevoke = URL.revokeObjectURL.bind(URL);
         const nativeCreateImageBitmap = globalThis.createImageBitmap?.bind(globalThis);
         globalThis.__spriteBoySlicePreviewUrls = { created: [], revoked: [], bitmapClosed: 0 };
+        globalThis.__spriteBoySliceDecodeFixture = { failuresRemaining: 0, delayMs: 0 };
         URL.createObjectURL = (blob) => {
           const url = nativeCreate(blob);
           globalThis.__spriteBoySlicePreviewUrls.created.push(url);
@@ -277,6 +327,16 @@ export async function runSliceSourceBrowser(options = {}) {
         };
         if (nativeCreateImageBitmap) {
           globalThis.createImageBitmap = async (...args) => {
+            if (globalThis.__spriteBoySliceDecodeFixture.delayMs > 0) {
+              await new Promise((resolvePromise) => setTimeout(
+                resolvePromise,
+                globalThis.__spriteBoySliceDecodeFixture.delayMs,
+              ));
+            }
+            if (globalThis.__spriteBoySliceDecodeFixture.failuresRemaining > 0) {
+              globalThis.__spriteBoySliceDecodeFixture.failuresRemaining -= 1;
+              throw new DOMException("Fixture decode failure", "EncodingError");
+            }
             const bitmap = await nativeCreateImageBitmap(...args);
             const nativeClose = bitmap.close.bind(bitmap);
             try {
@@ -359,14 +419,23 @@ export async function runSliceSourceBrowser(options = {}) {
       };
     })()`);
 
+    if (await clickSliceSourceAction(client, "Replace source") !== true) {
+      throw new Error("Slice replace trigger is unavailable for picker-cancel recovery.");
+    }
     if (await cancelReplacementPicker(client) !== true) {
       throw new Error("Slice picker-cancel fixture is unavailable.");
     }
+    await client.waitFor(`(() => {
+      const replace = Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.trim() === "Replace source");
+      return replace === document.activeElement;
+    })()`);
     const pickerCancelPreserved = await client.evaluate(`(() => {
       const metadata = document.querySelector("[data-slice-source-metadata]");
       return Boolean(metadata?.textContent?.includes("browser-source.png") &&
         document.querySelector('[aria-label="Canvas workspace"] canvas'));
     })()`);
+    const pickerCancelFocusRestored = true;
 
     if (await replaceWithInvalidSource(client) !== true) {
       throw new Error("Slice invalid live replacement fixture is unavailable.");
@@ -399,6 +468,66 @@ export async function runSliceSourceBrowser(options = {}) {
         document.querySelector('[aria-label="Canvas workspace"] canvas'));
     })()`);
     const replaceKeptCurrentSource = invalidKeptCurrentSource && busyKeptCurrentSource;
+
+    if (await clickSliceSourceAction(client, "Replace source") !== true) {
+      throw new Error("Slice replace trigger is unavailable for retry recovery.");
+    }
+    await client.evaluate(`(() => {
+      globalThis.__spriteBoySliceDecodeFixture.failuresRemaining = 2;
+      globalThis.__spriteBoySliceDecodeFixture.delayMs = 180;
+    })()`);
+    if (await selectRetryableReplacement(client) !== true) {
+      throw new Error("Slice retryable replacement fixture is unavailable.");
+    }
+    await client.waitFor(`(() => {
+      const retry = Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.trim() === "Retry");
+      const metadata = document.querySelector("[data-slice-source-metadata]");
+      return retry === document.activeElement &&
+        Boolean(metadata?.textContent?.includes("replacement-source.png")) &&
+        Boolean(document.querySelector('[aria-label="Canvas workspace"] canvas'));
+    })()`);
+    const retryableErrorFocused = true;
+
+    if (await clickSliceSourceAction(client, "Retry") !== true) {
+      throw new Error("Slice retry action is unavailable after retryable decode failure.");
+    }
+    await client.waitFor(`(() => {
+      const retry = Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.trim() === "Retry");
+      const metadata = document.querySelector("[data-slice-source-metadata]");
+      return retry === document.activeElement &&
+        Boolean(metadata?.textContent?.includes("replacement-source.png")) &&
+        Boolean(document.querySelector('[aria-label="Canvas workspace"] canvas'));
+    })()`);
+    const retryFailureFocusRestored = true;
+
+    if (await clickSliceSourceAction(client, "Retry") !== true) {
+      throw new Error("Slice retry action is unavailable for successful recovery.");
+    }
+    await client.waitFor(`(() => {
+      const status = document.querySelector('[role="toolbar"][aria-label="Slice source actions"]')?.parentElement
+        ?.querySelector('[role="status"]');
+      const replace = Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.trim() === "Replacing…");
+      const reset = Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.trim() === "Reset source");
+      return Boolean(status?.textContent?.includes("current source stays active")) &&
+        replace instanceof HTMLButtonElement && replace.disabled &&
+        reset instanceof HTMLButtonElement && !reset.disabled;
+    })()`);
+    const retryBusyBlocksDuplicateActions = true;
+    await client.waitFor(`(() => {
+      const metadata = document.querySelector("[data-slice-source-metadata]");
+      const content = document.querySelector('[data-studio-workspace-content="slice"]');
+      return Boolean(metadata?.textContent?.includes("retryable-source.png") &&
+        metadata.textContent.includes("40 × 20") &&
+        document.querySelector('[aria-label="Canvas workspace"] canvas')) &&
+        document.activeElement === content;
+    })()`);
+    await client.evaluate(`(() => { globalThis.__spriteBoySliceDecodeFixture.delayMs = 0; })()`);
+    const retrySucceeded = true;
+    const retrySuccessFocusRestored = true;
     await client.evaluate("new Promise((resolvePromise) => setTimeout(resolvePromise, 3200))");
     await captureScreenshot(client, options.screenshotPath);
 
@@ -430,7 +559,7 @@ export async function runSliceSourceBrowser(options = {}) {
       const metadata = document.querySelector("[data-slice-source-metadata]");
       const reset = Array.from(document.querySelectorAll("button"))
         .find((button) => button.textContent?.trim() === "Reset source");
-      return Boolean(metadata?.textContent?.includes("replacement-source.png") &&
+      return Boolean(metadata?.textContent?.includes("retryable-source.png") &&
         document.querySelector('[aria-label="Canvas workspace"] canvas') &&
         reset === document.activeElement);
     })()`);
@@ -472,7 +601,13 @@ export async function runSliceSourceBrowser(options = {}) {
       replacementRaceRecovered,
       ...initialPage,
       pickerCancelPreserved,
+      pickerCancelFocusRestored,
       replaceKeptCurrentSource,
+      retryableErrorFocused,
+      retryFailureFocusRestored,
+      retryBusyBlocksDuplicateActions,
+      retrySucceeded,
+      retrySuccessFocusRestored,
       resetConfirmationAccessible,
       resetCancelPreserved,
       ...resetPage,
