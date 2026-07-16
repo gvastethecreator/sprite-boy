@@ -1406,6 +1406,28 @@ del overlay en el journey real está activo.
 **Siguiente frontera irregular:** S1-03 manual Region commands está activo;
 S1-04 espera el cierre conjunto de wand + manual tools.
 
+### A1-03 — Composition canvas settings (preparatory slice)
+
+- **Feature:** inspector de dimensiones, ratios soportados/custom y fondo
+  transparent/color escribe un único `composition.update`; drafts inválidos o
+  stale permanecen locales y recuperables.
+- **Boundary:** resultado de dispatch se valida O(target) por descriptors contra
+  `result.project`, revision/changedIds e identidad/owner/layer order. Éxitos
+  falsos, accessors, proxies/revoked y callbacks hostiles fallan redactados sin
+  recorrer project/inverse/unrelated graph.
+- **Paridad:** ProjectCodec, SceneProjection y export raster coinciden en
+  128×72/#3157a4; short/alpha hex y transparent se preservan.
+- **Evidencia:** 16/16, typecheck/lint/diff verdes. Chrome primer intento:
+  history/reload/export/focus/page-fit, cinco errores en cero y cleanup
+  CDP/Chrome/server/profile/build 5/5 sin residuos. Tercera revisión `ACCEPT`,
+  P0-P3=0. Artifact:
+  `artifacts/quality/EDITOR/2026-07-16/a1-03-composition-canvas.{json,png}`.
+- **Límite honesto:** este slice es preparatorio; A1-04 montará el ProjectStore
+  canónico y el inspector en la ruta Compose real. No se creó provider paralelo.
+
+**Siguiente frontera Editor:** A1-02 Project menu/bootstrap Compose sigue
+activo; A1-04 portable first-composition acceptance espera ese cierre.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
