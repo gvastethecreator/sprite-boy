@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "slice": "A1-01",
+  "generatedAt": "2026-07-16T10:07:30-03:00",
+  "taskState": "completed",
+  "artifactVerdict": "win",
+  "verificationState": "verified",
+  "outcome": "Asset or Region creates or reopens one project-owned Composition through the canonical ProjectStore; the P1 identity/source collision repair passed independent re-review.",
+  "scope": {
+    "implementation": [
+      "features/compose/project/compositionEntry.ts"
+    ],
+    "tests": [
+      "tests/integration/composeCompositionEntry.test.ts",
+      "tests/contract/composeCompositionEntryHostile.test.ts"
+    ],
+    "artifact": "artifacts/quality/EDITOR/2026-07-16/a1-01-composition-entry.json",
+    "excluded": [
+      "core/**",
+      "AppLayout",
+      "LeftSidebar",
+      "RightSidebar",
+      "docs/**",
+      "global barrels",
+      "donor shell/store/persistence"
+    ]
+  },
+  "contract": {
+    "identity": "composition and initial layer IDs derive deterministically from the source kind plus fixed-width UTF-16 source ID encoding",
+    "assetDimensions": "canvas uses Asset intrinsic width and height",
+    "regionDimensions": "canvas uses Region bounds width and height while retaining its backing Asset selection",
+    "initialLayer": "one visible unlocked identity-transform layer with a durable Asset or Region source reference",
+    "background": null,
+    "dispatch": "composition.create plus workspace.update share one command.batch envelope and one ProjectStore revision",
+    "reopen": "reserved identity is reused only for the exact one-Layer source graph and source-derived canvas dimensions; an already-active Composition performs no dispatch",
+    "runtimeFields": "no Blob, object URL, data URL, DOM value, callback, or runtime store field is written to the Project graph"
+  },
+  "coveredCases": [
+    "Asset create/open",
+    "Region create/open",
+    "stable deterministic intent",
+    "already-open no-op",
+    "open existing from another workspace",
+    "missing Asset",
+    "missing Region",
+    "dangling Region to Asset reference",
+    "getter-backed request and Region reference",
+    "revoked request proxy",
+    "extra runtime field rejection",
+    "reserved identity conflict",
+    "valid reserved Layer source kind mismatch",
+    "valid reserved Layer source ID mismatch",
+    "getter-backed reserved Layer source without getter execution",
+    "valid reserved canvas dimension mismatch",
+    "valid reserved Composition with an extra Layer",
+    "atomic dispatch rejection rollback",
+    "own __proto__ Asset ID",
+    "ProjectCodec reload and stable re-encode",
+    "StudioProjectV1 validation after create and reload"
+  ],
+  "gates": [
+    {
+      "name": "focused-compose-tests",
+      "state": "passed",
+      "command": "bunx vitest run tests/integration/composeCompositionEntry.test.ts tests/contract/composeCompositionEntryHostile.test.ts --pool=threads --maxWorkers=1",
+      "evidence": "2 files passed; 13 tests passed after P1 repair"
+    },
+    {
+      "name": "typecheck",
+      "state": "passed",
+      "command": "bun run typecheck",
+      "evidence": "tsc --noEmit exited 0"
+    },
+    {
+      "name": "lint",
+      "state": "passed",
+      "command": "bun run lint",
+      "evidence": "oxlint . exited 0"
+    },
+    {
+      "name": "scope-diff-check",
+      "state": "passed",
+      "command": "git diff --check -- features/compose/project/compositionEntry.ts tests/integration/composeCompositionEntry.test.ts tests/contract/composeCompositionEntryHostile.test.ts",
+      "evidence": "exit 0; implementation remained inside assigned ownership"
+    }
+  ],
+  "adversarialAutopsy": {
+    "strongestObjection": "A valid project could reserve the deterministic Asset Composition identity while its Layer points at a Region and its 128x128 canvas no longer matches the 256x128 Asset.",
+    "initialVerdict": "REJECT",
+    "initialSeverity": "P1",
+    "repair": "Existing-entry inspection now requires exactly one reserved Layer, verifies its id/composition/source through own data descriptors, and compares canvas width/height against the resolved Asset intrinsic dimensions or Region bounds.",
+    "closingProof": "validateStudioProject-valid source kind, source ID, dimension, and extra-Layer regressions now return IDENTITY_CONFLICT; reserved Layer source getter read count remains zero; focused compose matrix passes 13/13.",
+    "unresolvedSeverity": "none"
+  },
+  "independentReview": {
+    "used": true,
+    "initialVerdict": "REJECT",
+    "initialSeverity": "P1",
+    "finding": "readExistingComposition accepted a project-owned reserved Composition without matching reservedLayer.source or canvas dimensions to the resolved request.",
+    "repairState": "verified",
+    "reReview": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "evidence": "Independent rerun passed 13/13 and confirmed exact Composition, Layer, source and dimension matching without accessor execution."
+  },
+  "risks": [
+    "A1-02 still owns Project menu and empty/bootstrap Compose UI; A1-01 intentionally exposes only the project adapter.",
+    "A1-03 and A1-04 still own rename/save/reopen UI and portable journey closure."
+  ]
+}

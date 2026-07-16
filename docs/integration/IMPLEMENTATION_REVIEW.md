@@ -1308,6 +1308,29 @@ cierra el adapter irregular independiente S1-01.
 **Siguiente frontera irregular:** S1-02 wand selection/add-remove está activo;
 S1-03 puede avanzar en paralelo sobre commands manuales sin tocar este adapter.
 
+## Editor/Animoto checkpoint — A1-01 composition entry
+
+- **Owner canónico:** Asset o Region se resuelve contra `StudioProjectV1` y se
+  abre mediante un único `ProjectStore`; no existe shell/store/persistencia del
+  donante ni estado UI paralelo.
+- **Creación atómica:** `composition.create` + `workspace.update` comparten un
+  `command.batch`/envelope y una revisión. Asset usa dimensiones intrínsecas;
+  Region usa bounds conservando el Asset backing y source durable.
+- **Identidad/reopen:** Composition y Layer derivan IDs deterministas del tipo
+  y source ID. Already-open no despacha; reopen reutiliza el mismo graph.
+- **Repair P1:** el review reprodujo una Composition válida en el ID reservado
+  cuya Layer apuntaba a otra fuente. La adopción ahora exige owner project,
+  canvas exacto, una sola reserved Layer, compositionId y source `{type,id}`
+  exactos mediante data descriptors; kind/id/dimensions/extra-layer hostiles
+  retornan `IDENTITY_CONFLICT`.
+- **Evidencia:** 13/13 contract+integration, ProjectCodec reload/re-encode,
+  StudioProjectV1 validation, typecheck/lint/diff-check verdes. Revisión final
+  `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/EDITOR/2026-07-16/a1-01-composition-entry.json`.
+
+**Siguiente frontera Editor:** A1-02 Project menu y Compose bootstrap UI está
+activo; A1-03 rename/save/reopen espera su integración.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
