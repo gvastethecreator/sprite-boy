@@ -50,6 +50,11 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
       aria-label="Slice grid inspector"
       data-slice-grid-inspector=""
       data-grid-inference-origin={controller.detectedLayout?.origin ?? "none"}
+      data-grid-recipe-mode={controller.recipe.layout.mode}
+      data-grid-manual-draft={`${controller.recipeState.manual.rows}x${controller.recipeState.manual.cols}`}
+      data-grid-recipe-layout={controller.recipe.layout.mode === "manual"
+        ? `${controller.recipe.layout.rows}x${controller.recipe.layout.cols}`
+        : "auto"}
     >
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-white/5 bg-white/5 px-4">
         <Grid3X3 size={17} className="text-accent" aria-hidden="true" />

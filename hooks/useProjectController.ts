@@ -34,8 +34,9 @@ const INITIAL_STATE: ProjectState = {
 
 /** Clear only the graph derived from the active Slice source. */
 export function resetSliceSourceProjectState(previous: ProjectState): ProjectState {
+  const { sliceGrid: _sliceGrid, ...retained } = previous;
   return {
-    ...previous,
+    ...retained,
     imageMeta: null,
     builderCanvas: null,
     frames: [],
@@ -183,6 +184,7 @@ export function useProjectController() {
   const ui = useUIController();
   const projectRef = useRef(project);
   const backgroundPreviewUrlRef = useRef(ui.bgPreviewBlobUrl);
+  const backgroundOperationRef = useRef<AbortController | null>(null);
   projectRef.current = project;
   backgroundPreviewUrlRef.current = ui.bgPreviewBlobUrl;
   const uiState = loadUIState();
@@ -319,14 +321,38 @@ export function useProjectController() {
     if (rgb.length === 3) root.style.setProperty("--accent-rgb", preferences.accentColor);
   }, [preferences.theme, preferences.accentColor]);
 
-  const clearSliceDerivedInteractionState = (): void => {
+  const cancelLegacyBackgroundOperations = useCallback((): void => {
+    const operation = backgroundOperationRef.current;
+    backgroundOperationRef.current = null;
+    try { operation?.abort(); } catch {}
+    const previewUrl = backgroundPreviewUrlRef.current;
+    backgroundPreviewUrlRef.current = null;
+    revokeSliceOwnedRuntimeUrls({ backgroundPreview: previewUrl });
+    runSliceTerminalEffects([
+      () => ui.setBgPreviewBlobUrl(null),
+      () => ui.setIsLoading(false),
+      () => ui.setLoadingMessage(""),
+    ]);
+  }, [ui.setBgPreviewBlobUrl, ui.setIsLoading, ui.setLoadingMessage]);
+
+  const clearLegacyCanvasInteractionState = useCallback((): void => {
+    cancelLegacyBackgroundOperations();
     runSliceTerminalEffects([
       () => setSelectedIndex(null),
       () => animLogic.setActiveAnimationId(null),
       () => animLogic.setIsPlaying(false),
-      () => ui.setBgPreviewBlobUrl(null),
+      () => ui.setIsEyedropperActive(false),
+      () => ui.setEyedropperColor(null),
+      () => ui.setIsMagicWandActive(false),
     ]);
-  };
+  }, [
+    animLogic.setActiveAnimationId,
+    animLogic.setIsPlaying,
+    cancelLegacyBackgroundOperations,
+    ui.setEyedropperColor,
+    ui.setIsEyedropperActive,
+    ui.setIsMagicWandActive,
+  ]);
 
   const handleUpload = (
     file: File,
@@ -451,7 +477,7 @@ export function useProjectController() {
           runSliceTerminalEffects([
             () => { projectRef.current = nextProject; },
             () => { backgroundPreviewUrlRef.current = null; },
-            clearSliceDerivedInteractionState,
+            clearLegacyCanvasInteractionState,
             () => revokeSliceOwnedRuntimeUrls({
               backgroundPreview: previousBackgroundPreviewUrl,
               source: previousSourceRuntimeUrl,
@@ -577,7 +603,7 @@ export function useProjectController() {
     runSliceTerminalEffects([
       () => { projectRef.current = nextProject; },
       () => { backgroundPreviewUrlRef.current = null; },
-      clearSliceDerivedInteractionState,
+      clearLegacyCanvasInteractionState,
       () => revokeSliceOwnedRuntimeUrls({
         backgroundPreview: backgroundPreviewUrl,
         source: sourceRuntimeUrl,
@@ -633,18 +659,47 @@ export function useProjectController() {
   };
 
   const handlePreviewBackground = (color: string, tolerance: number, softness: number) => {
-    if (ui.bgPreviewBlobUrl) URL.revokeObjectURL(ui.bgPreviewBlobUrl);
-    slicerLogic.handlePreviewBackground(color, tolerance, softness, ui.setBgPreviewBlobUrl);
+    cancelLegacyBackgroundOperations();
+    const operation = new AbortController();
+    backgroundOperationRef.current = operation;
+    void slicerLogic.handlePreviewBackground(
+      color,
+      tolerance,
+      softness,
+      (url) => {
+        if (operation.signal.aborted || backgroundOperationRef.current !== operation) {
+          revokeSliceOwnedRuntimeUrls({ backgroundPreview: url });
+          return;
+        }
+        backgroundPreviewUrlRef.current = url;
+        ui.setBgPreviewBlobUrl(url);
+      },
+      { signal: operation.signal },
+    ).finally(() => {
+      if (backgroundOperationRef.current === operation && !operation.signal.aborted) {
+        backgroundOperationRef.current = null;
+      }
+    });
   };
 
   const handleCancelPreview = () => {
-    if (ui.bgPreviewBlobUrl) URL.revokeObjectURL(ui.bgPreviewBlobUrl);
-    ui.setBgPreviewBlobUrl(null);
+    cancelLegacyBackgroundOperations();
   };
 
   const handleRemoveBackground = (color: string, tolerance: number, softness: number) => {
-    handleCancelPreview();
-    slicerLogic.handleRemoveBackground(color, tolerance, softness);
+    cancelLegacyBackgroundOperations();
+    const operation = new AbortController();
+    backgroundOperationRef.current = operation;
+    void slicerLogic.handleRemoveBackground(
+      color,
+      tolerance,
+      softness,
+      { signal: operation.signal },
+    ).finally(() => {
+      if (backgroundOperationRef.current === operation && !operation.signal.aborted) {
+        backgroundOperationRef.current = null;
+      }
+    });
   };
 
   const handleRunAIProjectGen = async () => {
@@ -725,12 +780,21 @@ export function useProjectController() {
     );
   };
 
+  const initializeSliceGridState = useCallback((state: NonNullable<ProjectState["sliceGrid"]>) => {
+    setProjectEphemeral((previous) => previous.sliceGrid === state ? previous : { ...previous, sliceGrid: state });
+  }, [setProjectEphemeral]);
+
+  const commitSliceGridState = useCallback((state: NonNullable<ProjectState["sliceGrid"]>) => {
+    setProject((previous) => previous.sliceGrid === state ? previous : { ...previous, sliceGrid: state });
+  }, [setProject]);
+
   return {
     ...ui,
     preferences,
     setPreferences,
     currentMode,
     handleSetMode,
+    clearLegacyCanvasInteractionState,
     slicerImage: project.imageMeta,
     builderCanvas: project.builderCanvas,
     activeGrid,
@@ -739,6 +803,9 @@ export function useProjectController() {
     builderSlots: project.builderSlots,
     animations: project.animations,
     builderAssets: project.builderAssets,
+    sliceGridState: project.sliceGrid as unknown,
+    initializeSliceGridState,
+    commitSliceGridState,
     ...animLogic,
     ...slicerLogic,
     ...builderLogic,

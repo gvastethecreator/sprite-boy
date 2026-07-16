@@ -1,5 +1,6 @@
 import { BuilderCanvasSize } from "./ui";
 import { HitboxType } from "./enums";
+import type { GridSplitRecipeV1 } from "../core/project/schema";
 
 export type SlotAlignment =
   | "top-left"
@@ -108,4 +109,13 @@ export interface ProjectState {
   animations: SpriteAnimation[];
   builderAssets: BuilderAsset[];
   aspectRatio?: string;
+  /** Legacy host bridge until StudioProjectV1 owns the mounted Slice workspace. */
+  sliceGrid?: SliceGridRecipeStateV1;
+}
+
+/** Versioned legacy-host draft; canonical ProcessingRecipe records are created only at commit. */
+export interface SliceGridRecipeStateV1 {
+  readonly version: 1;
+  readonly recipe: GridSplitRecipeV1;
+  readonly manual: Readonly<{ rows: number; cols: number }>;
 }

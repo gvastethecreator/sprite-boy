@@ -53,6 +53,7 @@ describe("useKeyboardShortcuts", () => {
       closeModals: vi.fn(),
       isModalOpen: false,
       activeAnimationId: null,
+      legacyCanvasKeyboardEnabled: true,
     }));
 
     act(() => keyDown(window, "Digit4", { key: "ç", ctrlKey: true }));
@@ -83,6 +84,7 @@ describe("useKeyboardShortcuts", () => {
         closeModals,
         isModalOpen,
         activeAnimationId: null,
+        legacyCanvasKeyboardEnabled: true,
       }),
       { initialProps: { isModalOpen: false } },
     );
@@ -115,6 +117,7 @@ describe("useKeyboardShortcuts", () => {
         closeModals: vi.fn(),
         isModalOpen: false,
         activeAnimationId,
+        legacyCanvasKeyboardEnabled: true,
       }),
       { initialProps: { activeAnimationId: null as string | null } },
     );
@@ -128,5 +131,33 @@ describe("useKeyboardShortcuts", () => {
     act(() => keyDown(window, "Space", { key: " " }));
     expect(stepFrame).toHaveBeenCalledWith(-1);
     expect(togglePlay).toHaveBeenCalledOnce();
+  });
+
+  it("keeps legacy canvas mutations inert under canonical ownership", () => {
+    const deleteSelection = vi.fn();
+    const nudge = vi.fn();
+    const stepFrame = vi.fn();
+    const togglePlay = vi.fn();
+    renderHook(() => useKeyboardShortcuts({
+      registry: createStudioCommandRegistry(handlers()),
+      executeStudioCommand: vi.fn(),
+      deleteSelection,
+      nudge,
+      togglePlay,
+      stepFrame,
+      closeModals: vi.fn(),
+      isModalOpen: false,
+      activeAnimationId: "selected-legacy-animation",
+      legacyCanvasKeyboardEnabled: false,
+    }));
+
+    act(() => keyDown(window, "ArrowRight", { key: "ArrowRight" }));
+    act(() => keyDown(window, "Delete", { key: "Delete" }));
+    act(() => keyDown(window, "Space", { key: " " }));
+
+    expect(nudge).not.toHaveBeenCalled();
+    expect(deleteSelection).not.toHaveBeenCalled();
+    expect(stepFrame).not.toHaveBeenCalled();
+    expect(togglePlay).not.toHaveBeenCalled();
   });
 });

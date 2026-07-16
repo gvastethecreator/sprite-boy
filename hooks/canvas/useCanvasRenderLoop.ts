@@ -3,11 +3,11 @@ import {
   AppMode,
   ImageMeta,
   BuilderAsset,
-  BuilderCanvasSize,
   ViewportState,
   SpriteAnimation,
 } from "../../types";
 import { CanvasRenderer } from "../../utils/renderUtils";
+import type { CanvasContentDimensions } from "./canvasOwnership";
 
 interface RenderLoopDeps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -114,8 +114,8 @@ export function useRenderLoop(deps: RenderLoopDeps) {
           ctx.scale(dpr, dpr);
           CanvasRenderer.render({
             ctx,
-            width: p.builderCanvas?.width || p.imageMeta?.width || 100,
-            height: p.builderCanvas?.height || p.imageMeta?.height || 100,
+            width: p.canvasContentDimensions.width,
+            height: p.canvasContentDimensions.height,
             scale: s.viewport.scale,
             offset: s.viewport.offset,
             currentMode: p.currentMode,
@@ -143,6 +143,7 @@ export function useRenderLoop(deps: RenderLoopDeps) {
             guides: [],
             labelConfig: p.labelConfig,
             isDragOverCanvas: s.isDragOverCanvas,
+            canonicalSliceOverlayActive: p.canonicalSliceOverlayActive === true,
           });
         }
       }
@@ -159,8 +160,8 @@ export function useRenderLoop(deps: RenderLoopDeps) {
 /** Resets viewport (fit-to-view) when image/canvas/mode changes. */
 export function useAutoResetView(
   containerRef: React.RefObject<HTMLDivElement | null>,
-  builderCanvas: BuilderCanvasSize | null | undefined,
-  imageMeta: ImageMeta | null,
+  contentDimensions: CanvasContentDimensions,
+  sourceIdentity: string | null,
   currentMode: AppMode,
   activeAnimation: SpriteAnimation | null,
   setViewport: (vp: ViewportState) => void,
@@ -168,8 +169,7 @@ export function useAutoResetView(
   const lastSourceRef = useRef<string | null>(null);
 
   const handleResetView = useCallback(() => {
-    const w = builderCanvas?.width || imageMeta?.width || 1024;
-    const h = builderCanvas?.height || imageMeta?.height || 1024;
+    const { width: w, height: h } = contentDimensions;
 
     if (containerRef.current) {
       const { clientWidth: cw, clientHeight: ch } = containerRef.current;
@@ -188,19 +188,18 @@ export function useAutoResetView(
         },
       });
     }
-  }, [builderCanvas, imageMeta, currentMode, activeAnimation, setViewport, containerRef]);
+  }, [contentDimensions, currentMode, activeAnimation, setViewport, containerRef]);
 
   useEffect(() => {
-    const currentSource =
-      imageMeta?.src ||
-      (builderCanvas ? `builder-${builderCanvas.width}-${builderCanvas.height}` : null);
+    const currentSource = sourceIdentity ??
+      `canvas-${contentDimensions.width}-${contentDimensions.height}`;
     const modeKey = `${currentMode}-${activeAnimation?.id || "none"}`;
     const changeKey = `${currentSource}-${modeKey}`;
     if (currentSource && changeKey !== lastSourceRef.current) {
       lastSourceRef.current = changeKey;
       setTimeout(handleResetView, 50);
     }
-  }, [imageMeta, builderCanvas, currentMode, activeAnimation, handleResetView]);
+  }, [sourceIdentity, contentDimensions, currentMode, activeAnimation, handleResetView]);
 
   return handleResetView;
 }

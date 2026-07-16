@@ -1,0 +1,85 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  createDefaultSliceGridRecipeState,
+  hydrateSliceGridRecipeState,
+  recipeStateToDraft,
+  serializeSliceGridRecipeState,
+  updateSliceGridRecipeLayout,
+} from "../../features/slice/grid/gridRecipeState";
+
+const SOURCE = Object.freeze({ width: 12, height: 8 });
+
+describe("Slice grid recipe state (G2-05)", () => {
+  it("emits an exact deterministic GridSplitRecipeV1 and preserves manual memory in auto", () => {
+    const initial = createDefaultSliceGridRecipeState("asset-sheet", SOURCE);
+    const manual = updateSliceGridRecipeLayout(initial, {
+      mode: "manual",
+      manual: { rows: 3, cols: 4 },
+    }, SOURCE);
+    const automatic = updateSliceGridRecipeLayout(manual, {
+      mode: "auto",
+      manual: { rows: 3, cols: 4 },
+    }, SOURCE);
+
+    expect(Object.keys(automatic)).toEqual(["version", "recipe", "manual"]);
+    expect(Object.keys(automatic.recipe)).toEqual([
+      "kind", "version", "sourceAssetId", "layout", "crop", "chroma", "pixel",
+    ]);
+    expect(automatic.recipe).toEqual({
+      kind: "grid-split",
+      version: 1,
+      sourceAssetId: "asset-sheet",
+      layout: { mode: "auto" },
+      crop: { threshold: 0, padding: 0 },
+      chroma: { enabled: false, color: "#00ff00", tolerance: 0, smoothness: 0, spill: 0 },
+      pixel: { enabled: false, size: 16, quantize: false, colors: 16 },
+    });
+    expect(automatic.manual).toEqual({ rows: 3, cols: 4 });
+    expect(recipeStateToDraft(automatic)).toEqual({ mode: "auto", manual: { rows: 3, cols: 4 } });
+    expect(Object.isFrozen(automatic.recipe.layout)).toBe(true);
+  });
+
+  it("round-trips JSON exactly and rejects contradictory or accessor-backed state", () => {
+    const manual = updateSliceGridRecipeLayout(
+      createDefaultSliceGridRecipeState("asset-sheet", SOURCE),
+      { mode: "manual", manual: { rows: 3, cols: 4 } },
+      SOURCE,
+    );
+    const serialized = serializeSliceGridRecipeState(manual);
+    expect(hydrateSliceGridRecipeState(JSON.parse(serialized), SOURCE)).toEqual(manual);
+    expect(serializeSliceGridRecipeState(hydrateSliceGridRecipeState(JSON.parse(serialized), SOURCE)!))
+      .toBe(serialized);
+
+    expect(hydrateSliceGridRecipeState({
+      ...manual,
+      manual: { rows: 2, cols: 4 },
+    }, SOURCE)).toBeNull();
+
+    let getterCalls = 0;
+    const hostile = { version: 1, recipe: manual.recipe } as Record<string, unknown>;
+    Object.defineProperty(hostile, "manual", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return { rows: 3, cols: 4 };
+      },
+    });
+    expect(hydrateSliceGridRecipeState(hostile, SOURCE)).toBeNull();
+    expect(getterCalls).toBe(0);
+  });
+
+  it("rejects invalid bounds, extra keys, malformed palettes and oversized identifiers", () => {
+    const state = createDefaultSliceGridRecipeState("asset-sheet", SOURCE);
+    expect(hydrateSliceGridRecipeState({ ...state, extra: true }, SOURCE)).toBeNull();
+    expect(hydrateSliceGridRecipeState({ ...state, manual: { rows: 9, cols: 1 } }, SOURCE)).toBeNull();
+    expect(hydrateSliceGridRecipeState({
+      ...state,
+      recipe: { ...state.recipe, sourceAssetId: "x".repeat(257) },
+    }, SOURCE)).toBeNull();
+    expect(hydrateSliceGridRecipeState({
+      ...state,
+      recipe: { ...state.recipe, pixel: { ...state.recipe.pixel, palette: ["#bad"] } },
+    }, SOURCE)).toBeNull();
+  });
+});

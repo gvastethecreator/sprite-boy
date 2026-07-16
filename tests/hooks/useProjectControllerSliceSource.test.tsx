@@ -15,6 +15,35 @@ vi.mock("../../utils/uiFeedback", () => ({
 }));
 
 describe("useProjectController Slice ownership boundary", () => {
+  it("quarantines stale legacy canvas state without mutating the project", async () => {
+    const { result } = renderHook(() => useProjectController());
+    await act(async () => Promise.resolve());
+    act(() => {
+      result.current.handleCreateCanvas(32, 16);
+      result.current.setSelectedIndex(0);
+      result.current.setIsEyedropperActive(true);
+      result.current.setEyedropperColor("#ff00ff");
+      result.current.setIsMagicWandActive(true);
+    });
+    const projectBefore = {
+      builderCanvas: result.current.builderCanvas,
+      frames: result.current.frames,
+      sliceGridState: result.current.sliceGridState,
+    };
+
+    act(() => result.current.clearLegacyCanvasInteractionState());
+
+    expect(result.current.selectedIndex).toBeNull();
+    expect(result.current.isEyedropperActive).toBe(false);
+    expect(result.current.eyedropperColor).toBeNull();
+    expect(result.current.isMagicWandActive).toBe(false);
+    expect({
+      builderCanvas: result.current.builderCanvas,
+      frames: result.current.frames,
+      sliceGridState: result.current.sliceGridState,
+    }).toEqual(projectBefore);
+  });
+
   beforeEach(() => {
     vi.restoreAllMocks();
     const values = new Map<string, string>();

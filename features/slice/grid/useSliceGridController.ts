@@ -13,7 +13,6 @@ import type {
   SourceSessionSnapshot,
 } from "../source/sourceSession";
 import {
-  createGridLayoutDraft,
   serializeGridRecipeLayout,
   setGridLayoutMode,
   setManualGridLayout,
@@ -27,6 +26,13 @@ import {
   type GridPreviewInference,
   type GridPreviewSource,
 } from "./gridPreviewInference";
+import {
+  createDefaultSliceGridRecipeState,
+  hydrateSliceGridRecipeState,
+  recipeStateToDraft,
+  updateSliceGridRecipeLayout,
+  type SliceGridRecipeStateV1,
+} from "./gridRecipeState";
 
 export type SliceGridDetectionStatus = "idle" | "detecting" | "detected" | "fallback" | "error";
 
@@ -49,6 +55,11 @@ export interface SliceGridControllerSourceOptions {
 
 export interface UseSliceGridControllerOptions extends SliceGridControllerSourceOptions {
   readonly inferPreview?: GridPreviewInference;
+  /** Transitional draft persisted by the current host; never a canonical ProcessingRecipe record. */
+  readonly persistedState?: unknown;
+  readonly sourceAssetId?: string | null;
+  readonly onInitializeState?: (state: SliceGridRecipeStateV1) => void;
+  readonly onCommitState?: (state: SliceGridRecipeStateV1) => void;
 }
 
 export interface SliceGridController {
@@ -60,6 +71,8 @@ export interface SliceGridController {
   readonly status: SliceGridDetectionStatus;
   readonly detectedLayout: EffectiveGridLayout | null;
   readonly effectiveLayout: EffectiveGridLayout | null;
+  readonly recipeState: SliceGridRecipeStateV1;
+  readonly recipe: GridSplitRecipeV1;
   readonly errorMessage: string | null;
   readonly setMode: (mode: GridLayoutMode) => void;
   readonly setManualRowsInput: (value: string) => void;
@@ -133,6 +146,29 @@ function manualLayout(
   });
 }
 
+function migrationSourceAssetId(
+  source: ResolvedGridSource | null,
+  requested: string | null | undefined,
+): string {
+  if (typeof requested === "string" && requested.trim().length > 0 && requested.length <= 256) {
+    return requested;
+  }
+  if (!source) return "slice-source:empty";
+  return `slice-source:${source.generation}:${source.dimensions.width}x${source.dimensions.height}`;
+}
+
+function initialRecipeState(
+  source: ResolvedGridSource | null,
+  options: Pick<UseSliceGridControllerOptions, "persistedState" | "sourceAssetId">,
+): SliceGridRecipeStateV1 {
+  const dimensions = source?.dimensions ?? { width: 1, height: 1 };
+  return hydrateSliceGridRecipeState(options.persistedState, dimensions) ??
+    createDefaultSliceGridRecipeState(
+      migrationSourceAssetId(source, options.sourceAssetId),
+      dimensions,
+    );
+}
+
 export function useSliceGridController(options: UseSliceGridControllerOptions): SliceGridController {
   const inferPreview = options.inferPreview ?? inferGridPreviewLayout;
   const source = resolveSliceGridSource(options);
@@ -141,22 +177,26 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
   sourceRef.current = source;
   inferPreviewRef.current = inferPreview;
 
-  const [draft, setDraft] = useState<GridLayoutDraft>(() =>
-    createGridLayoutDraft(source?.dimensions ?? { width: 1, height: 1 }));
-  const [manualRowsInput, setRowsInput] = useState("1");
-  const [manualColsInput, setColsInput] = useState("1");
+  const [recipeState, setRecipeState] = useState<SliceGridRecipeStateV1>(() =>
+    initialRecipeState(source, options));
+  const initialDraft = recipeStateToDraft(recipeState);
+  const [draft, setDraft] = useState<GridLayoutDraft>(initialDraft);
+  const [manualRowsInput, setRowsInput] = useState(String(initialDraft.manual.rows));
+  const [manualColsInput, setColsInput] = useState(String(initialDraft.manual.cols));
   const [validationIssues, setValidationIssues] = useState<readonly GridLayoutValidationIssue[]>([]);
   const [status, setStatus] = useState<SliceGridDetectionStatus>(source ? "detecting" : "idle");
   const [detectedLayout, setDetectedLayout] = useState<EffectiveGridLayout | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryGeneration, setRetryGeneration] = useState(0);
   const draftRef = useRef(draft);
+  const recipeStateRef = useRef(recipeState);
   const rowsInputRef = useRef(manualRowsInput);
   const colsInputRef = useRef(manualColsInput);
   const operationRef = useRef(0);
   const draftSourceGenerationRef = useRef<number | null>(null);
   const sourceKey = source ? `${source.generation}:ready` : `${options.generation}:empty`;
   draftRef.current = draft;
+  recipeStateRef.current = recipeState;
   rowsInputRef.current = manualRowsInput;
   colsInputRef.current = manualColsInput;
 
@@ -173,15 +213,29 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     }
 
     if (draftSourceGenerationRef.current !== current.generation) {
-      const nextDraft = createGridLayoutDraft(current.dimensions);
+      const hydrated = hydrateSliceGridRecipeState(options.persistedState, current.dimensions);
+      const nextRecipeState = hydrated ?? createDefaultSliceGridRecipeState(
+        migrationSourceAssetId(current, options.sourceAssetId),
+        current.dimensions,
+      );
+      const nextDraft = recipeStateToDraft(nextRecipeState);
       draftSourceGenerationRef.current = current.generation;
       draftRef.current = nextDraft;
+      recipeStateRef.current = nextRecipeState;
       rowsInputRef.current = String(nextDraft.manual.rows);
       colsInputRef.current = String(nextDraft.manual.cols);
+      setRecipeState(nextRecipeState);
       setDraft(nextDraft);
       setRowsInput(String(nextDraft.manual.rows));
       setColsInput(String(nextDraft.manual.cols));
       setValidationIssues([]);
+      if (!hydrated) {
+        try {
+          options.onInitializeState?.(nextRecipeState);
+        } catch {
+          // Host persistence is isolated from grid inference and rendering.
+        }
+      }
     }
     setStatus("detecting");
     setDetectedLayout(null);
@@ -210,9 +264,49 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     return () => controller.abort();
   }, [retryGeneration, sourceKey]);
 
+  useEffect(() => {
+    const current = sourceRef.current;
+    if (!current) return;
+    const hydrated = hydrateSliceGridRecipeState(options.persistedState, current.dimensions);
+    if (!hydrated || hydrated === recipeStateRef.current) return;
+    const currentSerialized = JSON.stringify(recipeStateRef.current);
+    const nextSerialized = JSON.stringify(hydrated);
+    if (currentSerialized === nextSerialized) return;
+    const nextDraft = recipeStateToDraft(hydrated);
+    recipeStateRef.current = hydrated;
+    draftRef.current = nextDraft;
+    rowsInputRef.current = String(nextDraft.manual.rows);
+    colsInputRef.current = String(nextDraft.manual.cols);
+    setRecipeState(hydrated);
+    setDraft(nextDraft);
+    setRowsInput(String(nextDraft.manual.rows));
+    setColsInput(String(nextDraft.manual.cols));
+    setValidationIssues([]);
+  }, [options.persistedState, sourceKey]);
+
   useEffect(() => () => {
     operationRef.current += 1;
   }, []);
+
+  const commitDraft = useCallback((nextDraft: GridLayoutDraft): boolean => {
+    const currentSource = sourceRef.current;
+    if (!currentSource) return false;
+    const nextState = updateSliceGridRecipeLayout(
+      recipeStateRef.current,
+      nextDraft,
+      currentSource.dimensions,
+    );
+    try {
+      options.onCommitState?.(nextState);
+    } catch {
+      return false;
+    }
+    recipeStateRef.current = nextState;
+    draftRef.current = nextDraft;
+    setRecipeState(nextState);
+    setDraft(nextDraft);
+    return true;
+  }, [options.onCommitState]);
 
   const setMode = useCallback((mode: GridLayoutMode): void => {
     const currentSource = sourceRef.current;
@@ -222,9 +316,8 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
       setValidationIssues(result.issues);
       return;
     }
-    draftRef.current = result.value;
-    setDraft(result.value);
-  }, []);
+    commitDraft(result.value);
+  }, [commitDraft]);
 
   const updateManual = useCallback((rowsInput: string, colsInput: string): void => {
     const currentSource = sourceRef.current;
@@ -237,10 +330,9 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
       setValidationIssues(result.issues);
       return;
     }
-    draftRef.current = result.value;
+    if (!commitDraft(result.value)) return;
     setValidationIssues([]);
-    setDraft(result.value);
-  }, []);
+  }, [commitDraft]);
 
   const updateRows = useCallback((value: string): void => {
     rowsInputRef.current = value;
@@ -277,6 +369,8 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     status,
     detectedLayout,
     effectiveLayout,
+    recipeState,
+    recipe: recipeState.recipe,
     errorMessage,
     setMode,
     setManualRowsInput: updateRows,
@@ -290,6 +384,7 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     manualColsInput,
     manualRowsInput,
     retry,
+    recipeState,
     source?.dimensions,
     status,
     updateCols,
