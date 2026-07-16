@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "taskId": "G2-04",
+  "title": "Slice grid overlay geometry",
+  "verificationState": "browser-verified-and-independently-accepted",
+  "artifactVerdict": "win",
+  "acceptanceTarget": "Canonical source-space cells render through explicit CSS and device-pixel transforms without drift across pan, zoom, ResizeObserver changes or DPR changes; the overlay never captures pointer input and cleans up without late writes.",
+  "scope": {
+    "runtime": [
+      "features/slice/grid/gridOverlayGeometry.ts",
+      "features/slice/grid/SliceGridOverlay.tsx",
+      "features/slice/grid/index.ts"
+    ],
+    "tests": [
+      "tests/contract/gridOverlayGeometry.test.ts",
+      "tests/components/sliceGridOverlay.test.tsx",
+      "tests/browser/gridOverlayHarness.html",
+      "tests/browser/gridOverlayJourney.tsx",
+      "scripts/studio-grid-overlay-browser.mjs"
+    ],
+    "sharedSeamMutation": false,
+    "dependenciesChanged": false
+  },
+  "mountSeamForG2_05": {
+    "component": "SliceGridOverlay",
+    "inputs": {
+      "sourceDimensions": "controller.sourceDimensions",
+      "effectiveLayout": "controller.effectiveLayout",
+      "transform": "the existing Slice canvas viewport transform"
+    },
+    "rule": "Mount as an absolute sibling of the source canvas. Do not add an overlay store or recompute cells."
+  },
+  "gates": {
+    "geometryUnit": {
+      "state": "passed",
+      "command": "bunx vitest run tests/contract/gridOverlayGeometry.test.ts tests/components/sliceGridOverlay.test.tsx",
+      "result": "2 files, 6 tests passed",
+      "claims": [
+        "7x5 source split 2x3 preserves non-divisible remainder",
+        "all source, CSS and device rectangles remain inside source bounds",
+        "detected gaps remain gaps",
+        "fractional zoom, negative pan and DPR 2.5 preserve exact shared edges",
+        "getters, sparse arrays, invalid numbers and OOB cells are rejected",
+        "late ResizeObserver callbacks cannot write after cleanup"
+      ]
+    },
+    "scopedLint": {
+      "state": "passed",
+      "command": "bunx oxlint features/slice/grid/gridOverlayGeometry.ts features/slice/grid/SliceGridOverlay.tsx tests/contract/gridOverlayGeometry.test.ts tests/components/sliceGridOverlay.test.tsx tests/browser/gridOverlayJourney.tsx scripts/studio-grid-overlay-browser.mjs --deny-warnings",
+      "result": "exit 0, zero warnings"
+    },
+    "focusedTypeBuild": {
+      "state": "passed",
+      "command": "bun build tests/browser/gridOverlayJourney.tsx --target browser --outdir .scratch/g2-04-browser-check",
+      "result": "31 modules bundled; focused browser TypeScript seam compiled"
+    },
+    "browserVisual": {
+      "state": "passed",
+      "command": "bun scripts/studio-grid-overlay-browser.mjs",
+      "browser": "Chrome headless, 900x700 CSS viewport",
+      "metrics": {
+        "source": "7x5",
+        "layout": "2x3",
+        "initialDpr": 1,
+        "initialBacking": "640x360",
+        "fractionalScale": 27.5,
+        "fractionalOffset": "-18.25,96.75",
+        "resizedCssSurface": "420x260",
+        "dpr2Backing": "840x520",
+        "initialSampledAlpha": 185,
+        "transformedSampledAlpha": 234,
+        "dpr2SampledAlpha": 185,
+        "pointerTarget": "stage",
+        "idleDrawDelta": 0,
+        "cleanupBacking": [0, 0],
+        "consoleErrors": 0,
+        "runtimeExceptions": 0,
+        "browserLogErrors": 0,
+        "networkFailures": 0,
+        "httpErrors": 0
+      },
+      "screenshot": "g2-04-grid-overlay.png",
+      "screenshotSha256": "090ea3afe2192d501e3ecade0bb88043448ef899b43459300ca98f423c68047b",
+      "visualInspection": "passed: six cell outlines align with the non-divisible 7x5 colored fixture after negative pan, fractional 27.5x zoom, 420x260 resize and DPR 2"
+    },
+    "resourceCleanup": {
+      "state": "passed",
+      "evidence": "ResizeObserver/listeners are removed defensively, late callbacks are inert, backing canvas becomes 0x0, and no idle rAF loop exists."
+    },
+    "accessibility": {
+      "state": "passed",
+      "evidence": "Overlay is aria-hidden and pointer-events:none on both host and canvas; Chrome pointer targeting reached the underlying stage."
+    },
+    "repositoryTypecheck": {
+      "state": "not-run",
+      "reason": "Task-local quality policy permits focused checks only while other agents mutate unrelated S1/Editor files."
+    },
+    "independentReview": {
+      "state": "accepted",
+      "verdict": "ACCEPT",
+      "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+      "evidence": "Independent 6/6 rerun and raw-diff review accepted canonical geometry, effective-layout compatibility, fractional transform/DPR edge preservation, hostile cleanup, pointer passthrough and fail-closed Chrome proof."
+    }
+  },
+  "hostileAutopsy": {
+    "strongestObjection": "A standalone Canvas overlay could silently depend on Studio Tailwind utility classes and mis-size in a harness or future host.",
+    "repair": "Critical absolute/inset/overflow/display/pointer behavior is encoded inline as well as in Studio classes.",
+    "closingProof": "Chrome measured exact CSS/backing sizes before and after resize and DPR change; pointer passthrough and cleanup passed.",
+    "remainingSeverity": "none"
+  }
+}

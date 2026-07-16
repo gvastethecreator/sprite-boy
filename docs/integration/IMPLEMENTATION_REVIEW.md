@@ -1367,8 +1367,24 @@ legacy rename/save/reopen se reconcilió con el behavior autoritativo A1.4.
   final `ACCEPT`, P0-P3=0. Artifact y screenshot:
   `artifacts/quality/GRID/2026-07-16/g2-03-grid-controls.{json,png}`.
 
-**Siguiente frontera Grid:** G2-04 overlay geometry está activo; G2-05 espera
-la aceptación conjunta de controls + overlay.
+### G2-04 — Canonical grid overlay geometry
+
+- **Geometría:** cells source-space enteras se proyectan a CSS/device pixels
+  con pan/zoom fraccional y DPR explícitos, preservando remainder, gaps, shared
+  edges y bounds sin acumular snapping.
+- **Runtime:** Canvas absoluto `aria-hidden`/`pointer-events:none`, sin store ni
+  recompute de layout, sin loop rAF. ResizeObserver/window/visualViewport tienen
+  cleanup defensivo y callbacks tardíos inertes.
+- **Seam:** G2-05 montará `SliceGridOverlay` como sibling del source canvas con
+  `controller.sourceDimensions`, `controller.effectiveLayout` y el viewport ya
+  existente; no se abre otra fuente de verdad.
+- **Evidencia:** 6/6, lint/bundle focal verdes. Chrome prueba resize, DPR 1→2,
+  zoom 27.5×, pan negativo, pointer passthrough, idle sin redraw, cleanup 0×0 y
+  cinco contadores de error en cero. Revisión `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g2-04-grid-overlay.{json,png}`.
+
+**Siguiente frontera Grid:** G2-05 manual/auto switching, recipe state y montaje
+del overlay en el journey real está activo.
 
 ## Frontiers abiertos
 
