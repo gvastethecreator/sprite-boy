@@ -1816,8 +1816,8 @@ para ejecutar el journey completo con undo/save/export.
   medición directa del Worker.
 - **Evidencia:** artifact
   `artifacts/quality/GRID/2026-07-16/g5-04-performance.json`, generado por el
-  smoke contra el Worker por defecto. El gate no se cierra hasta pasar typecheck,
-  oxlint, diff-check y revisión independiente.
+  smoke contra el Worker por defecto. Typecheck, oxlint, diff-check y revisión
+  independiente `ACCEPT (P0-P2=0)` están verdes.
 - **Límite honesto:** el perfil es un smoke de Worker real desde el source local de
   release con Bun, estabilizado con warmup y p95; la matriz Chrome/p95 de
   interacción y los journeys de resultados/export siguen G6/G7.
@@ -1840,8 +1840,27 @@ para ejecutar el journey completo con undo/save/export.
   inspecciona `g5-05-pipeline-visual.png` con cero errores como representación
   estática derivada del golden real; la ejecución Worker real queda probada por
   el smoke JSON y no se presenta la captura como una segunda ejecución Worker.
+  Revisión independiente `ACCEPT (P0-P2=0)`.
 - **Límite honesto:** el smoke cubre la receta/Worker y el reset canónico; la
   presentación de resultados y exportación siguen G6/G7.
+
+### G6-01 — Staged results model y process summary
+
+- **Contrato:** `features/slice/results/stagedGridResults.ts` define el snapshot
+  efímero `idle → processing → succeeded/failed/cancelled`. La finalización
+  copia cada buffer RGBA del Worker, congela receta y metadatos, normaliza el
+  resumen con outputs vacíos/warnings y selecciona el primer output sin crear
+  URLs ni Blob temporales.
+- **Resiliencia:** el reducer rechaza resultados con dimensiones/bytes inválidos,
+  índices no row-major, summary drift o warnings desalineados; el progreso es
+  monotónico por stage/ratio/completed. `disposeStagedGridResults` pone a cero
+  los buffers propios y devuelve un snapshot idle idempotente.
+- **Evidencia:** `tests/contract/stagedGridResults.test.ts` pasa `4/4` casos
+  (aliasing, summary/selection, drift/errors y release), junto con typecheck,
+  oxlint y diff-check. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g6-01-staged-results.json`.
+- **Límite honesto:** el modelo todavía no dispara el Worker ni muestra el tray;
+  la orquestación y feedback de proceso son G6-02, y el commit durable es G6-03.
 
 ## Frontiers abiertos
 
