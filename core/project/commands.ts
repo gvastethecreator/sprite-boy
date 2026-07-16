@@ -33,6 +33,7 @@ export const PROJECT_COMMAND_TYPES = [
   "artifact.record",
   "artifact.remove",
   "composition.create",
+  "composition.update",
   "composition.remove",
   "layer.add",
   "layer.update",
@@ -168,6 +169,9 @@ export type RegionPatch = Partial<
 export type LayerPatch = Partial<
   Pick<Layer, "name" | "source" | "transform" | "visible" | "locked" | "updatedAt">
 >;
+export type CompositionPatch = Partial<
+  Pick<Composition, "name" | "width" | "height" | "background" | "updatedAt">
+>;
 export type CelPatch = Partial<
   Pick<Cel, "durationMs" | "pivot" | "transform" | "locked" | "prompt" | "updatedAt">
 >;
@@ -201,6 +205,7 @@ export type ProjectCommand =
     }
   | { type: "artifact.remove"; artifactId: EntityId; policy: DestructivePolicy }
   | { type: "composition.create"; composition: Composition; layers: Layer[]; atIndex?: number }
+  | { type: "composition.update"; compositionId: EntityId; patch: CompositionPatch }
   | { type: "composition.remove"; compositionId: EntityId; policy: DestructivePolicy }
   | { type: "layer.add"; compositionId: EntityId; layer: Layer; atIndex?: number }
   | { type: "layer.update"; layerId: EntityId; patch: LayerPatch }

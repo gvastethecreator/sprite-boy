@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "slice": "A1-03-composition-update-kernel",
+  "generatedAt": "2026-07-16T10:36:17.8674054-03:00",
+  "taskState": "implemented-and-independently-accepted",
+  "artifactVerdict": "win-with-unrelated-typecheck-blocker",
+  "verificationState": "focused-and-accumulated-tests-passed-and-independently-accepted",
+  "outcome": "Canonical composition.update now patches persisted Composition canvas settings through ProjectEngine and ProjectStore without replacing graph entities.",
+  "scope": {
+    "implementation": [
+      "core/project/commands.ts",
+      "core/project/applyCompositionCommands.ts",
+      "core/project/applyCommand.ts",
+      "core/project/impact.ts"
+    ],
+    "tests": [
+      "tests/contract/compositionUpdateCommand.test.ts"
+    ],
+    "artifact": "artifacts/quality/EDITOR/2026-07-16/a1-03-composition-update-kernel.json",
+    "excluded": [
+      "UI",
+      "features",
+      "docs",
+      "commit"
+    ]
+  },
+  "contract": {
+    "command": "{ type: 'composition.update', compositionId, patch } with exact own enumerable data fields",
+    "patchFields": [
+      "name",
+      "width",
+      "height",
+      "background",
+      "updatedAt"
+    ],
+    "patchPolicy": "non-empty; undefined, accessors, symbols, extra fields and non-plain values reject",
+    "name": "non-empty, control-free, maximum 256 UTF-16 code units",
+    "dimensions": "positive safe integers, maximum 16384 per edge and 67108864 total pixels",
+    "background": "null is canonical transparency; CSS hex colors with 3, 4, 6 or 8 digits are accepted",
+    "timestamps": "explicit updatedAt must be an ISO-8601 timestamp with timezone; omitted updatedAt uses command context time on a real change",
+    "noOp": "equal non-empty patches retain the exact project reference, emit NO_CHANGES and do not advance ProjectStore revision",
+    "identity": "composition id, owner, createdAt, layer order, layer records and all external graph references are preserved",
+    "inverse": "published snapshot inverse restores the exact input graph; semantic composition.update inverse is retained where every touched field existed",
+    "impact": "only the target Composition is direct; no referencedBy, cascades or blockers for an existing valid target"
+  },
+  "coveredCases": [
+    "project-owned Composition",
+    "cel-owned Composition",
+    "variantSet-owned Composition",
+    "full canvas patch",
+    "transparent and short/long hex colors",
+    "maximum safe edge and pixel count",
+    "immutable exact inverse roundtrip",
+    "minimal impact",
+    "stable no-op",
+    "missing target",
+    "empty and extra patch",
+    "undefined values",
+    "blank/control/oversized name",
+    "NaN, infinity, fraction, negative zero and oversized dimensions",
+    "invalid background and timestamp",
+    "accessor command and patch without getter execution",
+    "revoked patch proxy",
+    "atomic batch rollback",
+    "ProjectStore revision",
+    "history undo and redo",
+    "StudioProjectV1 graph validation"
+  ],
+  "gates": [
+    {
+      "name": "focused-composition-update",
+      "state": "passed",
+      "command": "bunx vitest run tests/contract/compositionUpdateCommand.test.ts --pool=threads --maxWorkers=1",
+      "evidence": "1 file passed; 8 tests passed"
+    },
+    {
+      "name": "accumulated-project-core",
+      "state": "passed",
+      "command": "vitest project*, compositionMutation*, compositionUpdate* and animationMutation* contract files with one worker",
+      "evidence": "20 files passed; 198 tests passed"
+    },
+    {
+      "name": "typecheck",
+      "state": "blocked-unrelated",
+      "command": "bun run typecheck",
+      "evidence": "No errors reported in owned files. Concurrent untracked features/slice/irregular/wandRegionCommands.ts, wandSelection.ts and tests/contract/wandSelection.test.ts fail with adapter/callback typing errors."
+    },
+    {
+      "name": "lint",
+      "state": "passed",
+      "command": "bun run lint",
+      "evidence": "oxlint exited 0 after removing the owned no-control-regex warning"
+    },
+    {
+      "name": "scope-diff-check",
+      "state": "passed",
+      "command": "git diff --check -- core/project/commands.ts core/project/applyCompositionCommands.ts core/project/applyCommand.ts core/project/impact.ts tests/contract/compositionUpdateCommand.test.ts",
+      "evidence": "exit 0; CRLF conversion notices only"
+    }
+  ],
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 0,
+      "P3": 0
+    },
+    "evidence": "Independent hostile-boundary and invariant review reran the focal suite at 8/8 and accepted command shape, immutable graph preservation, inverse/no-op semantics, batch/store/history behavior and minimal impact."
+  },
+  "risks": [
+    "Repository-wide typecheck remains red only in concurrent irregular wand work outside this slice.",
+    "Composition background uses the existing V1 null-or-string field; this command deliberately narrows new writes to null or CSS hex for portable preview/export behavior."
+  ]
+}

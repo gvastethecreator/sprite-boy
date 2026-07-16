@@ -77,6 +77,7 @@ const SUPPORTED_COMMAND_KEYS: Partial<Record<ProjectCommand["type"], readonly st
   "processingRecipe.remove": ["type", "recipeId", "policy"],
   "artifact.remove": ["type", "artifactId", "policy"],
   "composition.create": ["type", "composition", "layers", "atIndex"],
+  "composition.update": ["type", "compositionId", "patch"],
   "composition.remove": ["type", "compositionId", "policy"],
   "layer.add": ["type", "compositionId", "layer", "atIndex"],
   "layer.update": ["type", "layerId", "patch"],
