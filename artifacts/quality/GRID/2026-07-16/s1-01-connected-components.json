@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "taskId": "S1-01",
+  "generatedAt": "2026-07-16T09:49:08-03:00",
+  "status": "passed",
+  "implementation": {
+    "adapter": "core/processing/irregularRegionDetection.ts",
+    "contractTest": "tests/contract/irregularRegionDetection.test.ts",
+    "donorReferences": [
+      {
+        "path": "D:/DEV/grid-splitter/src/workers/gridSplitter.worker.ts",
+        "adapted": "packed RGBA traversal assumptions and bounded deterministic processing style"
+      },
+      {
+        "path": "utils/imageWorker.ts",
+        "adapted": "legacy alpha > threshold, 4-way flood-fill, stable scan order and 3x3/5-pixel minimum policy"
+      }
+    ],
+    "contract": {
+      "alphaMembership": "alpha > alphaThreshold, with an integer threshold in [0,255]",
+      "connectivity": [4, 8],
+      "donorDefaults": {
+        "alphaThreshold": 10,
+        "connectivity": 4,
+        "minPixelCount": 5,
+        "minWidth": 3,
+        "minHeight": 3,
+        "maxRegions": 4096
+      },
+      "mergePolicy": "none; disconnected components remain separate",
+      "ordering": "accepted components retain deterministic source row-major discovery order",
+      "bounds": "frozen source-space integer rectangles",
+      "workingSetLimits": {
+        "maxDimension": 16384,
+        "maxSourcePixels": 16777216,
+        "maxRegions": 4096
+      },
+      "cancellation": "optional synchronous predicate checked before work, per scan row and at flood head=0, 4096, 8192, ..."
+    }
+  },
+  "coverage": {
+    "goldenCases": [
+      "irregular L-shape and rectangle at source edge",
+      "strict alpha threshold boundary",
+      "4-way versus 8-way diagonal connectivity",
+      "no gap merging",
+      "fully transparent and zero-dimension empty source",
+      "single pixel retained by explicit policy and rejected by donor defaults",
+      "output ceiling failure without partial return"
+    ],
+    "hostileCases": [
+      "options accessor rejected without invocation",
+      "typed-array length accessor rejected without invocation",
+      "wrong typed-array kind rejected",
+      "detached and SharedArrayBuffer-backed views rejected",
+      "cross-realm Uint8ClampedArray accepted",
+      "invalid and excessive dimensions rejected before traversal",
+      "non-boolean cancellation result rejected"
+    ],
+    "cancellationCases": [
+      "1x2 transparent source cancels on the second row boundary after exactly 3 predicate calls",
+      "8193x1 opaque component cancels at flood head=4096 after exactly 4 predicate calls: pre-work, row, head=0, head=4096",
+      "the 8193x1 orientation stays within the 16384 dimension limit and avoids extra row-boundary predicate calls",
+      "the large-component case would return normally with only pre-work and row polling, so it specifically proves inner flood cadence"
+    ],
+    "propertySamples": 80,
+    "propertyInvariants": [
+      "component pixel counts exactly partition alpha-eligible pixels",
+      "8-way component count never exceeds 4-way count",
+      "same input and policy returns identical frozen output",
+      "source RGBA is not mutated",
+      "every returned bound fits inside the source"
+    ]
+  },
+  "performance": {
+    "fixture": "1024x1024 fully opaque RGBA, one 4-way component",
+    "pixels": 1048576,
+    "observedTestDurationMs": 136,
+    "budgetMs": 2500,
+    "result": "passed in the focal Vitest run"
+  },
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "notes": "The repaired evidence isolates row-boundary cancellation and proves the inner flood poll at head=4096 with exact predicate-call counts."
+  },
+  "verification": [
+    {
+      "command": "bunx vitest run tests/contract/irregularRegionDetection.test.ts --reporter=verbose",
+      "result": "passed",
+      "details": "1 file, 10 tests; 432 ms test body; 4.80 s total duration"
+    },
+    {
+      "command": "bunx tsc --noEmit --pretty false",
+      "result": "passed",
+      "details": "exit 0"
+    },
+    {
+      "command": "bunx oxlint core/processing/irregularRegionDetection.ts tests/contract/irregularRegionDetection.test.ts",
+      "result": "passed",
+      "details": "exit 0"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; Get-Content artifacts/quality/GRID/2026-07-16/s1-01-connected-components.json -Raw | ConvertFrom-Json | Out-Null; git diff --no-index --check -- NUL tests/contract/irregularRegionDetection.test.ts; if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }; git diff --no-index --check -- NUL artifacts/quality/GRID/2026-07-16/s1-01-connected-components.json; if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }; exit 0",
+      "result": "passed",
+      "details": "JSON parsed; wrapper exit 0; no whitespace diagnostics (only Git LF-to-CRLF normalization warnings)"
+    }
+  ],
+  "knownRisks": [
+    "The adapter is intentionally synchronous; live cancellation during a CPU-bound call requires the caller to provide a predicate backed by worker-visible state.",
+    "The 16,777,216-pixel flood-fill cap is stricter than the general grid protocol to bound visited/frontier allocation."
+  ]
+}
