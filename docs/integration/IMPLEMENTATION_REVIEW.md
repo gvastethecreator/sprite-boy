@@ -1607,6 +1607,29 @@ para ejecutar el journey completo con undo/save/export.
 
 **Siguiente frontera Grid:** G4-01 chroma color/tolerance/smoothness/spill stage.
 
+### G4-01 — Chroma color, tolerance, smoothness and spill stage
+
+- **Paridad donor:** conserva la matemática exacta del Worker Grid Splitter,
+  incluida comparación estricta de tolerance, feather exponencial `1.5` y
+  suppression del canal dominante para pantallas verde, azul o roja.
+- **Goldens alpha/color:** fixtures RGBA congelan exact target, near-key,
+  feather parcial, foreground rojo/skin-safe, alpha transparente y despill verde
+  y azul. Endpoints `0/100`, monotonicidad y repetición seeded son byte-exact.
+- **Toggle real:** el Worker productivo enabled devuelve los bytes esperados y
+  registra `chroma`; disabled devuelve cada byte source intacto y no registra
+  ninguna operación. Crop/pixel están apagados en esa prueba para aislar stage.
+- **Persistencia:** `StudioProjectV1` acepta el mismo contrato que protocol/UI:
+  color `#RRGGBB` exacto y tolerance/smoothness/spill finitos `0..100`. Ya no se
+  puede guardar un recipe chroma que el Worker rechace al procesar.
+- **Evidencia:** 13/13 en tres archivos incluyendo Worker real, typecheck,
+  oxlint, build y diff-check verdes. Revisión independiente `ACCEPT`, P0-P2=0;
+  RGBA exacto + Worker real aceptados como VIS alpha/color golden. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g4-01-chroma-stage.json`.
+- **Límite honesto:** G4-02 conserva el muestreo eyedropper DPR-correct; G4-03
+  montará los controles y G4-04 demostrará el orden chroma→crop en recipe.
+
+**Siguiente frontera Grid:** G4-02 DPR-correct eyedropper sampling.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

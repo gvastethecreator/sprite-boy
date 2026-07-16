@@ -46,6 +46,7 @@ export interface ProjectValidationResult {
 }
 
 type UnknownRecord = Record<string, unknown>;
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 type CollectionName =
   | "assets"
   | "regions"
@@ -881,9 +882,26 @@ function validateRecipe(
       id,
     );
     validateBoolean(chroma.enabled, `${path}.chroma.enabled`, diagnostics);
-    validateString(chroma.color, `${path}.chroma.color`, diagnostics);
+    if (typeof chroma.color !== "string" || !HEX_COLOR.test(chroma.color)) {
+      push(
+        diagnostics,
+        "INVALID_DOCUMENT",
+        `${path}.chroma.color`,
+        "Chroma color must use exact #RRGGBB notation.",
+        id,
+      );
+    }
     for (const key of ["tolerance", "smoothness", "spill"] as const) {
-      validateFiniteNumber(chroma[key], `${path}.chroma.${key}`, diagnostics);
+      const value = chroma[key];
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) {
+        push(
+          diagnostics,
+          "INVALID_NUMBER",
+          `${path}.chroma.${key}`,
+          `Chroma ${key} must be a finite number from 0 to 100.`,
+          id,
+        );
+      }
     }
   }
   const pixel = item.pixel;

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "task": "G4-01",
+  "title": "Chroma color, tolerance, smoothness and spill stage",
+  "date": "2026-07-16",
+  "status": "accepted",
+  "behaviors": ["G4.1", "G4.2", "G4.4", "G4.5", "G4.6"],
+  "donorParity": {
+    "source": "D:/DEV/grid-splitter/src/workers/gridSplitter.worker.ts",
+    "distance": "normalized Euclidean RGB distance",
+    "tolerance": "strict distance < tolerance; 0 preserves even an exact target, matching the donor",
+    "smoothness": "distance band up to tolerance + smoothness, raised to power 1.5",
+    "spill": "near-key dominant target channel blends toward the mean of the other channels",
+    "alpha": "original alpha multiplied by mask; fully transparent pixels remain byte-identical"
+  },
+  "goldens": {
+    "greenScreen": {
+      "settings": { "color": "#00ff00", "tolerance": 10, "smoothness": 20, "spill": 100 },
+      "sourcePixels": [
+        0, 255, 0, 255,
+        10, 250, 10, 200,
+        0, 200, 0, 255,
+        255, 0, 0, 127,
+        210, 150, 120, 255,
+        0, 255, 0, 0
+      ],
+      "outputPixels": [
+        0, 0, 0, 0,
+        10, 10, 10, 0,
+        0, 55, 0, 70,
+        255, 0, 0, 127,
+        210, 150, 120, 255,
+        0, 255, 0, 0
+      ]
+    },
+    "toleranceAlpha": {
+      "minimum": [255, 255, 255, 255, 255],
+      "tolerance10": [0, 0, 255, 255, 255],
+      "tolerance10Smooth20": [0, 0, 2, 255, 255],
+      "maximum": [0, 0, 0, 0, 255]
+    },
+    "spill": ["green dominant channel reduced", "blue dominant channel reduced", "skin foreground unchanged"],
+    "determinism": "256 seeded RGBA pixels produce byte-identical repeated output"
+  },
+  "persistedContract": {
+    "color": "exact #RRGGBB, case-insensitive hex digits",
+    "tolerance": "canonical finite 0..100",
+    "smoothness": "canonical finite 0..100",
+    "spill": "canonical finite 0..100",
+    "parity": "StudioProjectV1 validation matches Grid processing protocol and recipe state"
+  },
+  "verification": {
+    "selection": { "passed": 13, "failed": 0, "files": 3 },
+    "realWorker": {
+      "enabled": "exact RGBA golden and operations=[chroma]",
+      "disabled": "byte-identical source and operations=[]",
+      "cropAndPixelIsolation": true
+    },
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "diffCheck": "pass",
+    "independentReview": {
+      "verdict": "ACCEPT",
+      "p0": 0,
+      "p1": 0,
+      "p2": 0,
+      "visualGate": "Exact RGBA arrays plus real Worker are sufficient and more precise than a rendered screenshot for this pure stage."
+    }
+  },
+  "commands": [
+    "VITEST_MAX_WORKERS=1 bunx vitest run tests/contract/gridProcessingChroma.test.ts tests/contract/projectValidationMatrix.test.ts tests/integration/gridProcessingRealWorker.test.ts --reporter=verbose",
+    "bun run typecheck",
+    "bunx oxlint core/project/validation.ts scripts/grid-processing-worker-smoke.ts tests/contract/gridProcessingChroma.test.ts tests/contract/projectValidationMatrix.test.ts tests/integration/gridProcessingRealWorker.test.ts",
+    "bun run build",
+    "git diff --check"
+  ],
+  "boundary": "G4-02 owns DPR-correct eyedropper sampling; G4-03 owns controls; G4-04 owns chroma-to-crop ordering."
+}
