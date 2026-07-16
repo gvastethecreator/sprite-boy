@@ -1263,8 +1263,32 @@ verdes y review final `ACCEPT`. Ver el [artifact final](../../artifacts/quality/
   independiente final `ACCEPT`, P0-P3=0. Artifact:
   `artifacts/quality/GRID/2026-07-16/g0-05-source-recovery.json`.
 
-**Siguiente frontera:** G2-02 energy/segments/inference está activo; G2-03 y
-G2-04 permanecen cerrados hasta su aceptación.
+**Transición:** G0 queda cerrado; el checkpoint siguiente acepta el contrato
+layout/inference G2 antes de abrir sus superficies UI y overlay.
+
+### G2-01/G2-02 — Layout contract and auto inference
+
+- **Draft único:** auto/manual comparten validación source-aware; cambiar modo
+  conserva exactamente el último rows/cols manual y la recipe serializada usa
+  el mismo seam que el Worker.
+- **Detección:** perfiles premultiplied-alpha ignoran RGB oculto y conservan
+  bordes sólo-alpha. Segmentos e inferencia producen celdas source-space
+  row-major congeladas; Worker y consumidores de preview llaman al mismo owner.
+- **Refinamiento:** el análisis coarse queda acotado a 600 px de ancho y una
+  detección creíble se refina sobre pixels fuente. La regresión 4097×2049 con
+  gutter alpha de 1 px conserva ocho celdas exactas de 1023×1023, sin crop
+  parcial por redondeo.
+- **Confianza:** vacío, imagen ambigua y ruido opaco 32×32 retornan fallback 1×1
+  con warning; grids claros 1×N/N×1 siguen detectándose.
+- **Rendimiento/evidencia:** landscape 4096×2048 + portrait 600×16384 tienen
+  presupuesto combinado automatizado `<5000 ms`; cinco rechecks midieron
+  2116–2667 ms. Focal completo 23/23, Worker real, golden, typecheck, lint y
+  diff-check verdes. Revisión final `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g2-02-detection-inference.json`.
+
+**Siguiente frontera:** G2-03 controls/detected feedback está activo; G2-04
+overlay puede avanzar después del mismo contrato aceptado. S1-01 sigue en gate
+de evidencia independiente y no se considera cerrado todavía.
 
 ## Frontiers abiertos
 
