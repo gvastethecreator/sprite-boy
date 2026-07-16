@@ -3,5 +3,7 @@ export * from "./jobRunner";
 export * from "./exportJobTask";
 export * from "./gridProcessingGeometry";
 export * from "./gridProcessingAlgorithms";
+export * from "./gridProcessingLimits";
+export * from "./gridLayoutValidation";
 export * from "./gridProcessingJobTask";
 export * from "./gridProcessingGolden";

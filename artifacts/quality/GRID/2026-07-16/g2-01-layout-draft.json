@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-layout-draft-and-shared-boundary",
+  "status": "pass",
+  "tests": {
+    "filesPassed": 3,
+    "testsPassed": 48,
+    "failed": 0,
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass"
+  },
+  "matrix": {
+    "deterministicImmutableDraft": true,
+    "manualSelectionRetainedAcrossModeSwitch": true,
+    "exactAutoAndManualSerialization": true,
+    "sourceAwareAxisLimits": true,
+    "aggregateResultLimit": true,
+    "noInputClamping": true,
+    "nanFloatNegativeZeroRejected": true,
+    "unknownKeysAndSparseArraysRejected": true,
+    "nestedAccessorReads": 0,
+    "transparentAndHostileProxyRejected": true,
+    "workerProtocolSharesValidator": true,
+    "persistedRecipeLimitsMatchWorker": true
+  },
+  "commands": [
+    "bun x vitest run tests/contract/gridLayoutDraft.test.ts tests/contract/gridProcessingProtocol.test.ts tests/contract/projectValidationMatrix.test.ts",
+    "bun x tsc --noEmit",
+    "bun x oxlint features/slice/grid/gridLayoutDraft.ts core/processing/gridLayoutValidation.ts core/processing/gridProcessingLimits.ts core/processing/gridProcessingProtocol.ts core/project/validation.ts tests/contract/gridLayoutDraft.test.ts tests/contract/projectValidationMatrix.test.ts",
+    "git diff --check"
+  ],
+  "independentReview": {
+    "decision": "ACCEPT",
+    "severityCounts": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "notes": [
+      "UI draft, Worker protocol and persisted absolute limits share the accepted boundary.",
+      "Source-aware axes/product, immutable mode switching and hostile data inputs passed without clamping."
+    ]
+  }
+}

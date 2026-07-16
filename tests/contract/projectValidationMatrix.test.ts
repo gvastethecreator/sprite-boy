@@ -285,6 +285,28 @@ describe("StudioProjectV1 hostile validation matrix", () => {
       ["INVALID_NUMBER", "$.processingRecipes.recipe-grid.crop.threshold"],
       ["INVALID_DOCUMENT", "$.processingRecipes.recipe-grid.pixel.palette"],
     ]);
+
+    const workerIncompatible = cloneFixture();
+    record(workerIncompatible.processingRecipes["recipe-grid"]).layout = {
+      mode: "manual",
+      rows: 65,
+      cols: 64,
+    };
+    expectDiagnostics(workerIncompatible, [[
+      "INVALID_NUMBER",
+      "$.processingRecipes.recipe-grid.layout",
+    ]]);
+
+    const excessiveAxis = cloneFixture();
+    record(excessiveAxis.processingRecipes["recipe-grid"]).layout = {
+      mode: "manual",
+      rows: 4_097,
+      cols: 1,
+    };
+    expectDiagnostics(excessiveAxis, [[
+      "INVALID_NUMBER",
+      "$.processingRecipes.recipe-grid.layout.rows",
+    ]]);
   });
 
   it("validates artifact economics, references and provenance consistency", () => {
