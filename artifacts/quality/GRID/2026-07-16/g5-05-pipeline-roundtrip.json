@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-processing-pipeline-roundtrip",
+  "status": "pass",
+  "task": "G5-05",
+  "scope": "Canonical recipe persistence, stage ordering, pixel reset and deterministic repeated Worker output.",
+  "evidence": {
+    "recipe": {
+      "serializedStable": true,
+      "sourceAssetId": "asset-pipeline-smoke",
+      "layout": { "mode": "manual", "rows": 1, "cols": 1 },
+      "crop": { "threshold": 1, "padding": 0 },
+      "chroma": { "enabled": true, "color": "#00ff00", "tolerance": 0, "smoothness": 0, "spill": 0 },
+      "pixel": { "enabled": true, "size": 2, "quantize": false, "colors": 2, "palette": ["#ff0000", "#000000"] }
+    },
+    "full": {
+      "outputCount": 1,
+      "dimensions": [2, 2],
+      "operations": ["chroma", "crop", "resize", "quantize"],
+      "sourceDetached": true,
+      "pixels": [255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255]
+    },
+    "repeat": {
+      "operations": ["chroma", "crop", "resize", "quantize"],
+      "pixelsIdentical": true,
+      "operationsIdentical": true
+    },
+    "reset": {
+      "enabled": false,
+      "size": 16,
+      "quantize": false,
+      "colors": 16,
+      "hasPalette": false,
+      "operations": ["chroma", "crop"],
+      "dimensions": [4, 4]
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Recipe drift: JSON serialization followed by fail-closed hydration re-encodes byte-for-byte identically.",
+      "Stage reordering: the real Worker reports chroma, crop, resize, quantize in the canonical order.",
+      "Nondeterministic repeat: a second real Worker run matches pixels and operation metadata.",
+      "Reset leakage: reset removes the fixed palette and disables resize/quantize while preserving earlier stages.",
+      "Transfer omission: the full request source buffer is detached after Worker transfer."
+    ],
+    "boundary": "Results state and export packaging remain G6/G7; complete editor rollup remains G8."
+  },
+  "verification": {
+    "pipelineSmoke": "pass",
+    "realWorkerIntegration": "pass (1/1)",
+    "contractRecipe": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass",
+    "independentReview": "pending"
+  }
+}

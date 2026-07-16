@@ -1802,22 +1802,42 @@ para ejecutar el journey completo con undo/save/export.
   chroma + crop + resize a `64px` + quantize a ocho colores. La salida completa
   contiene 256 superficies `64x64`, `1,048,576` pixels y conserva el orden de
   operaciones `chroma → crop → resize → quantize`.
-- **Budget observado:** una corrida caliente terminó en `6020.95ms` (gate `≤10s`),
-  y la cancelación solicitada en el primer evento `chroma` rechazó con el error
-  canónico `cancelled` en `1.29ms` (gate `≤200ms`). La fuente transferida quedó
-  detached y no hubo warnings.
-- **Memoria/cleanup:** el delta de heap durante la corrida fue `746,467` bytes y,
-  después de liberar el resultado, `Bun.gc(true)` y un turno de event loop, el
-  delta quedó en `9,273,993` bytes. Esto se registra junto al RSS y ArrayBuffer
-  para no confundir memoria nativa del Worker con heap JS; ambos deltas quedan
-  por debajo del umbral documentado de `512MB`.
+- **Budget observado:** después de un warmup se ejecutaron tres corridas calientes;
+  el p95 fue `6132.67ms` (gate `≤10s`) con muestras `6132.67/5462.22/5073.92ms`.
+  Tres cancelaciones solicitadas en el primer evento `chroma` dieron p95 `3.64ms`
+  (gate `≤200ms`), siempre con error canónico `cancelled`. Cada muestra verificó
+  256 outputs, `1,048,576` pixels, warnings vacíos, progreso completo y la fuente
+  transferida detached.
+- **Memoria/cleanup:** se registran RSS, heap JS y ArrayBuffer por muestra. El
+  máximo observado de heap JS fue `288,171` bytes y, tras liberar resultados,
+  `Bun.gc(true)` y un turno de event loop, el máximo quedó en `8,709,911` bytes.
+  El smoke declara explícitamente que el heap nativo interno del Worker no está
+  expuesto por Bun; por eso no se presenta RSS como heap JS ni se sobreafirma una
+  medición directa del Worker.
 - **Evidencia:** artifact
   `artifacts/quality/GRID/2026-07-16/g5-04-performance.json`, generado por el
   smoke contra el Worker por defecto. El gate no se cierra hasta pasar typecheck,
   oxlint, diff-check y revisión independiente.
-- **Límite honesto:** el perfil es una corrida local de release build con Bun; la
-  matriz Chrome/p95 de interacción y los journeys de resultados/export siguen
-  G6/G7.
+- **Límite honesto:** el perfil es un smoke de Worker real desde el source local de
+  release con Bun, estabilizado con warmup y p95; la matriz Chrome/p95 de
+  interacción y los journeys de resultados/export siguen G6/G7.
+
+### G5-05 — Orden del pipeline, reset y recipe round-trip
+
+- **Receta canónica:** una receta manual `1x1` con crop, chroma y pixel fixed
+  palette se serializa, hidrata fail-closed y vuelve a serializar con el mismo
+  JSON. El estado conserva layout/crop/chroma/pixel sin store paralelo.
+- **Worker real:** el fixture se procesa dos veces y publica exactamente
+  `chroma → crop → resize → quantize`; ambas ejecuciones producen las mismas
+  operaciones y bytes, y la fuente transferida queda detached.
+- **Reset:** al resetear pixel se eliminan enabled/quantize/palette, vuelven
+  `size=16`, `colors=16`, y la corrida deja únicamente `chroma → crop` con la
+  superficie original; no se arrastra resize ni quantize desde el estado previo.
+- **Evidencia:** `tests/integration/gridProcessingPipelineSmoke.test.ts` y el
+  artifact `artifacts/quality/GRID/2026-07-16/g5-05-pipeline-roundtrip.json`.
+  El lote enfocado suma `36/36` tests, typecheck, oxlint y diff-check verdes.
+- **Límite honesto:** el smoke cubre la receta/Worker y el reset canónico; la
+  presentación de resultados y exportación siguen G6/G7.
 
 ## Frontiers abiertos
 
