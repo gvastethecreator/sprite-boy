@@ -14,8 +14,8 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G1-01 | J | F2-07,F7-07 | G2-G5,G6.1-G6.3 | Protocol requestId/progress/result/error/cancel versionado | Contract UT | done |
 | G1-02 | E | G1-01 | G2-G5 | Port mecánico de helpers algorítmicos donantes puros | Golden UT + REV | done |
 | G1-03 | J | G1-02 | G2-G5 | Worker real y adapter JobRunner | IT real worker | done |
-| G1-04 | J | G1-03 | G6.1-G6.3 | Concurrent/cancel/crash/timeout/late-response handling | IT hostile matrix | active |
-| G1-05 | J | G1-04 | G2-G5 | Manifest golden y baseline algorítmico congelado | Hash/geometry evidence + REV | todo |
+| G1-04 | J | G1-03 | G6.1-G6.3 | Concurrent/cancel/crash/timeout/late-response handling | IT hostile matrix | done |
+| G1-05 | J | G1-04 | G2-G5 | Manifest golden y baseline algorítmico congelado | Hash/geometry evidence + REV | active |
 
 ## Pipeline Grid
 
