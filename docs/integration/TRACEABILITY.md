@@ -74,7 +74,7 @@ H1.1-H1.6 forman el gate de no regresión antes de X1/R2; los nuevos formatos An
 | Continuous rAF | `hooks\canvas\useCanvasRenderLoop.ts` | F5 | Idle performance budget |
 | Collision unreachable | enum/panel vs `components\layout\Header.tsx` | F6/C1 | J6 + workspace navigation |
 | Placeholder commands | controller command definitions | F6/X1 | Command registry completeness |
-| Dependency/lock/CI debt | `package.json`, `.gitignore`, missing workflows | F8 | Reproducible install + CI failure injection |
+| Dependency/lock/CI reproducibility | `package.json`, `.gitignore`, `.gitattributes`, `.github/workflows/studio-quality.yml`, `bun.lock` | F8-01/F8-03 | Frozen install + audit + drift injection + full `all`/E2E + review |
 
 ## Slice → acceptance closure
 
@@ -89,6 +89,22 @@ H1.1-H1.6 forman el gate de no regresión antes de X1/R2; los nuevos formatos An
 | A7-A10 | AI/correction/alignment | J5/J6, fake provider, cancellation y provenance |
 | A11-A12 | Export/interaction parity | J7/J9, H1/H6, decode/browser/a11y y adapter consolidation |
 | C1/X1/R1-R2 | Collision/consolidation/release | Full manifest, migration/soak, fallback aislado y retiro físico post-soak |
+
+## Estado de trazabilidad F8 (2026-07-15)
+
+| Slice | Estado | Evidencia aceptada | Pendiente explícito |
+|---|---|---|---|
+| F8-01 | done | Owner aceptó doce upgrades; Bun 1.3.14, Node `>=24.0.0`, overrides y lock SHA-256 `96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5` | ninguno de ownership |
+| F8-02 | done | Gates/scripts estables; revisión focal `ACCEPT` 29/29 + lint; `all` 14/14 y E2E pass | ninguno |
+| F8-03 | done | Baseline/drift, audit, clean worktree, all/E2E y revisión final `ACCEPT`; P0-P3=0; temp `0 -> 0` | ninguno |
+| F8-04 | done | Coverage/fixture policy y artifacts focales aceptados | ninguno |
+| F8-05 | done | Budget artifact y lint focal aceptados | ninguno |
+| F8-06 | done | Manifest Foundation consolidado y review final `ACCEPT` | Grid G0/G1 autorizado |
+
+La baseline read-only anterior (package/lock user-owned, lock ignorado y sin
+workflow) se conserva sólo como histórico en
+[F8_REPRODUCIBILITY_OWNERSHIP.md](./F8_REPRODUCIBILITY_OWNERSHIP.md). No debe
+reaparecer como estado actual en otra matriz.
 
 ## Regla de mantenimiento
 

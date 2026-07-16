@@ -77,7 +77,7 @@ Superficies propietarias: `core/project/**`, `core/assets/**`, `core/persistence
 | F7-07 | J | F7-04,F7-06 | W2 job/export gate y diagnostics policy | SEC + REV | done |
 | F8-01 | J | B0-05,F7-07 | Reconciliar ownership de `package.json`/lock antes de editar | Explicit diff/owner record | done |
 | F8-02 | E | F8-01 | Scripts estables type/lint/unit/integration/e2e/build | Command smoke + REV | done |
-| F8-03 | E | F8-02 | CI reproducible con lockfile e install congelado | CI failure injection + REV | todo |
+| F8-03 | E | F8-02 | CI reproducible con lockfile e install congelado | Clean checkout + CI failure injection + `all`/E2E + REV | done |
 | F8-04 | J | F8-02 | Coverage thresholds y fixture/golden retention policy | Deliberate fail/pass proof | done |
 | F8-05 | J | F8-02 | Bundle/performance/a11y budgets medidos y automatizados | PERF/A11Y artifact | done |
-| F8-06 | J | F8-03,F8-04,F8-05 | Full Foundation manifest y autorización de streams paralelos | All F gates + REV | todo |
+| F8-06 | J | F8-03,F8-04,F8-05 | Full Foundation manifest y autorización de streams paralelos | All F gates + REV `ACCEPT`; Grid G0/G1 autorizado | done |

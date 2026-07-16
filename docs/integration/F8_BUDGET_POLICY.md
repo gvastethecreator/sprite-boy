@@ -1,15 +1,20 @@
 # F8 bundle, performance and accessibility budget policy
 
-Date: 2026-07-15
+Date: 2026-07-15 (reconciled 2026-07-15)
 Task: F8-05
-Status: done
+Status: done (focal baseline)
+
+The measurements below are the accepted F8-05 budget baseline. The staged
+snapshot `f90d8d2/tree60b742` passed clean checkout, full `all`, full E2E and the
+technical budgets. F8-03/F8-06 are `done` after the independent final `ACCEPT`.
 
 ## Enforced gates
 
 `bun scripts/studio-gates.mjs --gate budgets` builds the production app, checks
 the initial JavaScript bundle and runs fresh Chrome profiles at 1440x900 DPR 1.
-`--gate all` includes the same checks. The scripts use fixed argv, no shell
-strings and emit data-only summaries without URLs, labels or request IDs.
+`--gate all` includes the same checks when that suite is explicitly executed.
+The scripts use fixed argv, no shell strings and emit data-only summaries without
+URLs, labels or request IDs.
 
 | Dimension | Ratchet/release threshold | Measured result | Status |
 |---|---:|---:|---|
@@ -86,17 +91,18 @@ This Foundation gate does not misrepresent broader feature budgets as tested.
 Drag/gizmo frame time, 100-asset project open, large-image heap cleanup, Grid
 processing/cancel timing and autosave blocking are owned
 by their G/A/R slices. The native AX invariant is not a substitute for the
-documented full WCAG 2.2 AA Axe/contrast/keyboard audit; adding Axe remains tied
-to the separate F8-03 package/lock ownership decision or an approved no-dependency
-equivalent. These items stay release blockers in `QUALITY_GATES.md`.
+documented full WCAG 2.2 AA Axe/contrast/keyboard audit; adding Axe remains a
+separate quality task and is not claimed by this F8-05 baseline. These items stay
+release blockers in `QUALITY_GATES.md`; they are not an ownership blocker for
+F8-03.
 
 Evidence: [`budgets.json`](../../artifacts/quality/F8/2026-07-15/budgets.json).
 
-The original independent review accepted the 20-sample stability, exhaustive
-workspace mapping, Timeline hidden-transition cleanup and Windows lifecycle
-repairs with no P0-P3 findings. The release closeout re-review found and closed
-one P3 evidence mismatch plus one P2 missing Export-modal boundary, then accepted
-with zero remaining P0-P3. `IMPLEMENTATION_REVIEW.md` records the final counts.
+The original independent review is preserved as historical baseline: it accepted
+the 20-sample stability, exhaustive workspace mapping, Timeline hidden-transition
+cleanup and Windows lifecycle repairs with no P0-P3 findings. The release
+closeout re-review remains historical evidence. `IMPLEMENTATION_REVIEW.md`
+records it separately from the accepted F8-03/F8-06 final review.
 
 Commands:
 

@@ -1,74 +1,63 @@
 # F8 reproducibility ownership record
 
-Fecha de inspección: 2026-07-15
+Fecha de reconciliación: 2026-07-15
+Evidencia de referencia: 2026-07-15
+Tasks: F8-01 / F8-03
 
-Task: F8-01
+## Estado actual
 
-Modo: read-only sobre package/lock
+**F8-03 y F8-06 están `done`.** El owner aceptó los doce upgrades del manifest y
+el par package/lock es coherente. El worktree de implementación
+`f90d8d2/tree60b742` pasó checkout limpio, install frozen, audit, `all`, fixtures,
+persistence, build, budgets y E2E. El delta posterior se limitó al ledger y al
+repair test-only de higiene temporal; la revisión independiente final devolvió
+`ACCEPT` con P0-P3 en cero. La etiqueta es un commit temporal de verificación y
+su tree; no es un commit de rama.
 
-## Resultado
+## Contrato vigente
 
-El repositorio no tiene hoy una fuente versionada única para una instalación
-reproducible. `package.json` está tracked pero contiene un diff local propiedad
-del usuario. `bun.lock` existe, está ignorado y su workspace root conserva los
-ranges de HEAD. Los tests/build verdes describen el entorno instalado actual;
-no prueban que un checkout limpio pueda reconstruirlo.
-
-F8-01 congela esa situación sin modificar, restaurar, stagear ni regenerar
-ninguno de los dos archivos.
-
-## Inventario verificable
-
-| Superficie | Estado | Evidencia | Owner/decisión |
+| Superficie | Estado | Evidencia actual | Nota de cierre |
 |---|---|---|---|
-| `package.json` | tracked + modified | `git status --short`; diff sólo en dependency ranges | usuario; read-only |
-| `bun.lock` | presente + ignored | `.gitignore:40`; `git check-ignore -v bun.lock` | no versionado; no regenerar |
-| otros locks | ausentes | no `package-lock`, `pnpm-lock`, `yarn.lock`, `bun.lockb` | ninguno |
-| package manager | Bun 1.3.14 local | `bun --version` | evidencia de host, todavía no policy |
-| Node | 25.5.0 local | `node --version` | evidencia de host, todavía no engine gate |
-| scripts tracked | `log-runner.mjs`, `studio-baseline.mjs` | `git ls-files scripts` | repo |
-| CI | sin workflows | `.github` contiene sólo templates | F8-03 pendiente |
+| `package.json` | aceptado y tracked | `packageManager: bun@1.3.14`, `engines.node: >=24.0.0`, doce upgrades aceptados por el owner | mantener junto al lock |
+| overrides | aceptado | `protobufjs: 7.6.5`, `undici: 7.28.0`, `ws: 8.21.1` | contrato de supply chain |
+| `bun.lock` | tracked / no ignorado | SHA-256 `96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5` | el digest debe permanecer estable |
+| lock EOL | policy tracked | `.gitattributes`: `bun.lock text eol=lf` | snapshot staged confirmó LF |
+| otros locks | ausentes | no hay `package-lock`, `pnpm-lock`, `yarn.lock`, `bun.lockb` | no introducir un segundo manager |
+| workflow | presente | `.github/workflows/studio-quality.yml`, runner `ubuntu-24.04`, actions fijadas por SHA | incluye install frozen, audit, `all` y `e2e` |
+| runtime CI | definido | Node `24.18.0`, Bun `1.3.14` | debe reproducirse en clean checkout |
 
-`package.json` tampoco declara `packageManager` ni `engines`; añadirlos sería un
-cambio de package policy y queda fuera de esta reconciliación read-only.
+## Evidencia disponible
 
-## Diff local preservado
+| Check | Resultado | Interpretación |
+|---|---|---|
+| Revisión Sol focal | `ACCEPT` | 29/29 checks de implementación y lint focal |
+| `bun audit --audit-level=high` | exit 0 | no high alcanzable en la evidencia disponible |
+| Verificador real, baseline | pass / exit 0 | install frozen acepta el par manifest/lock; lock unchanged |
+| Verificador real, drift | rejected / exit 1 | el drift de manifest bloquea; lock unchanged |
+| Workflow contract | pass | `ubuntu-24.04`, Node/Bun fijados, actions por SHA, `--frozen-lockfile`, audit, `all`, `e2e` |
+| Checkout limpio (`f90d8d2/tree60b742`) | pass | 302 tracked, status 0, `bun.lock` 64864 bytes y CRLF 0 |
+| Install frozen + audit | pass | Bun 1.3.14, frozen install limpio y audit high exit 0 |
+| `--gate all` completo | pass | 14/14 steps; unit 168, contract 521, integration 6, coverage 82 archivos/695 tests |
+| Fixtures/persistence/build/budgets | pass | 7 fixtures; persistence, build y budgets browser verdes; bundle gzip 155474 <= 156500 |
+| E2E completo | pass | build + browser-smoke; Slice visible, page-fit y cero console/network/HTTP |
+| Revisión independiente final | `ACCEPT` | P0=0, P1=0, P2=0, P3=0; Grid G0/G1 autorizado |
 
-| Dependencia | HEAD | Working tree |
-|---|---:|---:|
-| `lucide-react` | `^1.17.0` | `^1.24.0` |
-| `react` | `^19.2.6` | `^19.2.7` |
-| `react-dom` | `^19.2.6` | `^19.2.7` |
-| `@tailwindcss/vite` | `^4.3.0` | `^4.3.2` |
-| `@types/node` | `^25.9.1` | `^25.9.5` |
-| `@types/react` | `^19.2.15` | `^19.2.17` |
-| `@vitejs/plugin-react` | `^6.0.2` | `^6.0.3` |
-| `@vitest/coverage-v8` | `^4.1.7` | `^4.1.10` |
-| `oxlint` | `^1.67.0` | `^1.73.0` |
-| `tailwindcss` | `^4.3.0` | `^4.3.2` |
-| `vite` | `^8.0.14` | `^8.1.4` |
-| `vitest` | `^4.1.7` | `^4.1.10` |
+El artefacto final es
+[`reproducibility.json`](../../artifacts/quality/F8/2026-07-15/reproducibility.json).
+El review inicial encontró un P3 de higiene temporal en una prueba; se reparó sin
+relajar cleanup productivo, se eliminaron 21 residuos verificados y el recheck
+independiente confirmó 29/29 y conteo temporal `0 -> 0`.
 
-El root workspace de `bun.lock` mantiene los doce ranges de HEAD. Aunque su
-grafo incluye resoluciones compatibles más recientes, no es un lock aceptable
-para el working manifest: está ignorado y la declaración root diverge.
+## Baseline histórico (2026-07-15, superseded)
 
-## Boundary writable aprobado
+La inspección read-only inicial registró que `package.json` tenía un diff
+propiedad del usuario, que `bun.lock` estaba ignorado, que no había workflow y
+que no estaban declarados `packageManager` ni `engines`. Ese registro explica el
+motivo de F8-01 y se conserva sólo como baseline histórico; no describe el
+estado vigente después de la aceptación del owner y la reconciliación
+manifest/lock.
 
-Mientras package/lock sigan bajo ownership externo:
+## Cierre de F8-03/F8-06
 
-- F8-02 puede crear commands directos bajo `scripts/**` y tests equivalentes.
-- F8-04/F8-05 pueden definir y probar coverage, fixture y budget policy sin
-  añadir dependencias.
-- No se cambia `.gitignore`, `package.json`, `bun.lock` ni `node_modules`.
-- F8-03 queda condicionado a una decisión explícita del owner sobre aceptar o
-  revertir los doce ranges y versionar después el lock correspondiente.
-- No se declara “frozen install” ni CI reproducible usando rangos sin lock.
-
-## Condición de reanudación para install/CI
-
-1. El owner confirma si los doce upgrades son el nuevo manifest o deben salir.
-2. Package y lock se reconcilian en el mismo patch deliberado.
-3. El lock deja de estar ignorado y queda tracked.
-4. Un checkout limpio ejecuta install frozen, gates y una failure injection que
-   demuestre que drift de manifest/lock bloquea CI.
+La revisión independiente final aceptó workflow, supply chain, diff, cleanup y
+evidencia. F8-03 y F8-06 pasan a `done`; Grid G0/G1 queda autorizado.

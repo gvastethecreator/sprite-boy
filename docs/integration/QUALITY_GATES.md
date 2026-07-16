@@ -27,6 +27,36 @@ Cada slice agrega una entrada versionada, preferentemente `artifacts/quality/<sl
 
 No guardar API keys, prompts privados o imágenes del usuario en artifacts. Las fixtures del repositorio sí pueden versionarse.
 
+## F8-03/F8-06 — Cierre de reproducibilidad (2026-07-15)
+
+El owner aceptó los doce upgrades del manifest y el contrato package/lock ya está
+preparado para CI. El worktree de implementación `f90d8d2/tree60b742` pasó los
+checks técnicos; el delta posterior fue documental y test-only. La revisión
+independiente final cerró con `ACCEPT` y P0-P3 en cero.
+
+| Check | Resultado | Estado |
+|---|---|---|
+| Package manager/engine/overrides | Bun 1.3.14, Node `>=24.0.0`, overrides fijados | pass |
+| Lock identity | SHA-256 `96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5`; unchanged en probes | pass |
+| High audit | `bun audit --audit-level=high`, exit 0 | pass |
+| Repro baseline | frozen install, exit 0 | pass |
+| Repro drift | manifest incompatible rechazado, exit 1; lock unchanged | pass |
+| Sol focal review | `ACCEPT`, 29/29 + lint | pass (focal) |
+| Clean checkout | 302 tracked, status 0, lock 64864 bytes, CRLF 0 | pass |
+| Install frozen + audit | Bun 1.3.14, frozen install limpio, audit high exit 0 | pass |
+| Gate completo `all` | 14/14; unit 168, contract 521, integration 6, coverage 82 archivos/695 tests | pass |
+| Fixtures/persistence/build | 7 fixtures; persistence y build verdes | pass |
+| Bundle/budgets/deferred | gzip 155474 <= 156500; browser budgets y deferred pass | pass |
+| E2E completo | build + browser-smoke; Slice, pageFits, console/network/HTTP 0 | pass |
+| Revisión independiente final | repair P3 de temp hygiene + recheck 29/29, temp `0 -> 0` | ACCEPT / pass |
+
+El workflow esperado es Ubuntu 24.04 con Node 24.18.0 y Bun 1.3.14, actions
+fijadas por SHA, `bun install --frozen-lockfile --ignore-scripts`, audit, `all` y
+`e2e`. Los repairs TS6, pin child e higiene temporal quedaron cerrados con
+29/29 focales, temp `0 -> 0` y typecheck/lint/verifier/audit verdes. El artefacto
+final queda en
+[`artifacts/quality/F8/2026-07-15/reproducibility.json`](../../artifacts/quality/F8/2026-07-15/reproducibility.json).
+
 ## Manifiesto de gates de implementación
 
 | Gate | Estado | Cuándo aplica | Evidencia requerida |
@@ -321,6 +351,9 @@ Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
 `fixtures-journeys.json`, `coverage-bundle.json` y
 `grid-donor-golden-manifest.json`.
 
+> Las secciones de enforcement F8-04/F8-05 que siguen son baselines focales
+> aceptadas. El cierre F8-03/F8-06 confirmó sus gates y review final.
+
 ## Enforcement F8-04 — 2026-07-15
 
 - `bun scripts/studio-quality-policy.mjs coverage --profile release` ejecutó
@@ -360,8 +393,8 @@ Artifacts de autoridad: `../../artifacts/quality/B0/2026-07-14/baseline.json`,
 Política, método y límites: [F8_BUDGET_POLICY.md](./F8_BUDGET_POLICY.md).
 Artifact de ejecución:
 [`budgets.json`](../../artifacts/quality/F8/2026-07-15/budgets.json).
-Closeout release aceptado por revisión independiente con cero P0-P3 restantes;
-F8-03/package-lock sigue siendo una decisión separada del owner.
+El baseline de budgets y el cierre reproducible fueron aceptados. F8-03/F8-06
+están `done`.
 
 ## Enforcement F3-07 — 2026-07-15
 

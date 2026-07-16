@@ -37,12 +37,19 @@ Estados: `todo`, `active`, `needs-review`, `done`, `blocked`. Un blocker incluye
 
 ## Frontier activo
 
-F0, B0, F1, F2, F3-01..F3-07, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 están aceptados. W1 y W2
-están cerrados con journeys browser, budgets y cleanup revisados. `F8-03` está
-condicionado por la decisión package/lock. Coverage y bundle release ya están
-verdes; F8-06 espera únicamente el cierre reproducible de F8-03.
-Ninguna tarea Grid o Editor está autorizada antes de sus dependencias
-de Foundation.
+Foundation F0-F8 y W1/W2 están cerrados. `F8-03` y `F8-06` pasaron clean
+worktree, frozen install, audit, baseline/drift, `all` 14/14, fixtures,
+persistence, build, budgets, E2E y revisión independiente final `ACCEPT` con
+P0-P3 en cero. El repair P3 de higiene temporal quedó verificado 29/29 y con
+conteo `%TEMP%/sprite-boy-repro-*` `0 -> 0`.
+
+El frontier activo es Grid: G0 y G1 están autorizados. Editor conserva sus
+dependencias declaradas y no se adelanta a los gates Grid/Compose.
+
+La inspección read-only previa que describía package/lock como user-owned y sin
+workflow se conserva sólo como baseline histórico en
+[F8_REPRODUCIBILITY_OWNERSHIP.md](./F8_REPRODUCIBILITY_OWNERSHIP.md); no es el
+estado vigente.
 
 ## Conteo y cobertura
 

@@ -1030,23 +1030,31 @@ los lotes que sí modifican producto.
 
 ## F8-01 — Package and lock ownership reconciliation
 
-- **Estado real:** package tracked tiene doce dependency-range upgrades locales
-  propiedad del usuario. El único lock es `bun.lock`, ignorado por
-  `.gitignore:40`; su root conserva los ranges de HEAD. No hay workflows CI,
-  packageManager ni engines declarados.
-- **Decisión:** no se modifica, restaura, stagea ni regenera package/lock. Tests
-  verdes prueban el entorno instalado, no un checkout frozen reproducible.
-- **Writable:** F8-02 puede añadir scripts directos tracked; F8-04/F8-05 pueden
-  definir coverage/fixture/budgets sin deps. F8-03 espera decisión del owner y
-  patch atómico manifest+lock+failure injection.
-- **Evidencia:** diff exacto 12/12, lock root=HEAD, otros locks ausentes, scripts
-  tracked exactamente dos y `.github` sólo templates. Bun 1.3.14/Node 25.5.0.
-  Package/locks staged cero; diff-check verde. Review final: `accept`. Record:
-  [F8 reproducibility ownership](./F8_REPRODUCIBILITY_OWNERSHIP.md).
+- **Estado actual:** `package.json` y `bun.lock` forman el par aceptado por el
+  owner. Los doce upgrades fueron aceptados; `packageManager` es `bun@1.3.14`,
+  Node es `>=24.0.0` y los overrides son `protobufjs` 7.6.5, `undici` 7.28.0 y
+  `ws` 8.21.1. El lock está trackeable y su SHA-256 es
+  `96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5`.
+- **Workflow:** Ubuntu 24.04, Node 24.18.0/Bun 1.3.14, actions fijadas por SHA,
+  install frozen, audit high, `all` y `e2e`.
+- **Evidencia:** el verificador real pasó baseline (exit 0) y rechazó drift (exit
+  1) sin mutar el lock; la revisión Sol focal aceptó 29/29 + lint. El snapshot
+  `f90d8d2/tree60b742` pasó clean checkout, `all`, E2E y todos los gates técnicos.
+  El review final cerró `ACCEPT`, P0-P3 en cero.
+- **Baseline histórico:** la inspección read-only anterior decía package
+  user-owned, lock ignorado, sin workflow ni manager/engines. Se conserva sólo
+  en el [record de reproducibilidad](./F8_REPRODUCIBILITY_OWNERSHIP.md), no como
+  estado actual.
+
+> **Reconciliación de evidencia:** Las cifras históricas de las secciones
+> F8-02/F8-04/F8-05 se conservan como baseline. El snapshot staged actual
+> `f90d8d2/tree60b742` aporta la evidencia final de clean checkout, `all`, E2E y
+> gates técnicos; la matriz final registra también el review `ACCEPT`.
 
 ## F8-02 — Stable local quality gates and production browser smoke
 
-- **Estado:** `accept` después de revisión independiente `repair+accept`.
+- **Estado focal:** `accept` después de revisión independiente histórica
+  `repair+accept`; el cierre actual de F8-03 está `done`.
 - **Manifest:** `scripts/studio-gates.mjs` expone ocho gates data-only con argv
   fijo, ejecución secuencial, `shell:false`, timeout por step, list/dry-run y
   propagación exacta del primer failure. No usa ni modifica aliases del package.
@@ -1062,14 +1070,16 @@ los lotes que sí modifican producto.
 - **Repairs:** revisión inicial encontró lint sin ratchet, comandos CDP que
   podían quedar pendientes, red incompleta y flags duplicados last-wins. Las
   cuatro reproducciones quedaron cerradas; segunda revisión sin P0-P3.
-- **Evidencia:** 12/12 focales; typecheck y lint focal `--deny-warnings` verdes;
-  parser adversarial exit 2; e2e productivo pass con todos los contadores de
-  error en cero. Gate `all`: unit 19/123, contract 42/462, integration 1/6,
-  build y browser-smoke; siete steps completos, exit 0.
+- **Evidencia focal/final:** 29/29 focales; typecheck, lint `--deny-warnings`,
+  verifier, audit y parser adversarial verdes. El snapshot staged confirma
+  `all` 14/14 y E2E build+browser-smoke con Slice visible, page-fit y errores
+  console/network/HTTP en cero.
 
 ## F8-04 — Canonical coverage and fixture/golden retention
 
-- **Estado:** `accept` después de revisión independiente `repair+repair+accept`.
+- **Estado focal:** `accept` después de revisión independiente histórica
+  `repair+repair+accept`; el snapshot staged confirma sus gates técnicos y no
+  quedan checks técnicos pendientes de F8-03.
 - **Scope:** el corpus completo mide 54/54 fuentes runtime `core/**/*.ts`
   no-barrel, incluidas 13 de `core/project`. El summary anterior se elimina y
   totals/pct/core-project se validan antes de aceptar resultado.
@@ -1082,21 +1092,22 @@ los lotes que sí modifican producto.
 - **Repairs:** root symlink podía seguirse antes del walk; coverage aceptaba
   `skipped` imposible. Ambos límites se endurecieron y probaron junto con
   stale summary, pct inconsistente, rm/spawn throw, traversal y hash drift.
-- **Evidencia:** 19/19 focales, fixtures 7/7 exit 0, coverage ratchet 63/598
-  exit 0, release real exit 1, typecheck y lint focal `--deny-warnings` verdes.
-  Gate `all` ampliado: 20/130 unit, 42/462 contract, 1/6 integration,
-  coverage, fixtures, build y browser-smoke; nueve steps, exit 0.
+- **Evidencia focal/final:** 29/29 focales, fixtures 7/7 exit 0, coverage
+  82 archivos/695 tests con 90.01 statements, 86.08 branches, 94.83 functions
+  y 92.65 lines; typecheck y lint `--deny-warnings` verdes. El gate `all` y el
+  snapshot clean están cerrados técnicamente.
   Policy: [F8 quality policy](./F8_QUALITY_POLICY.md).
 
 ## F8-05 — Bundle, performance and accessibility budgets
 
-- **Estado:** `accept` después del repair final de estabilidad browser y
-  re-revisión independiente sin P0-P3.
+- **Estado focal:** `accept` después del repair final de estabilidad browser y
+  re-revisión independiente histórica sin P0-P3; no es el review final de
+  F8-03.
 - **Lint:** el ratchet heredado de 47 warnings pasa a cero con cleanup acotado;
   `--deny-warnings` es ahora el gate estable.
 - **Bundle:** HTML productivo descubre sólo assets iniciales allowlisted y un
   helper Node mide gzip level 9 sobre archivos físicos. AI, GIF, ZIP y el modal
-  Export se cargan por acción; 155472 bytes pasan ratchet 156500 y release
+  Export se cargan por acción; 155474 bytes pasan ratchet 156500 y release
   180000 sin modificar dependencias.
 - **Browser:** perfil Chrome efímero, settle y Long Task API obligatoria; 5 s
   idle, 4 recorridos/20 transiciones afirmadas y p95 recomputado. Resultado
@@ -1105,7 +1116,8 @@ los lotes que sí modifican producto.
 - **A11y:** árbol AX nativo agregado sin labels/URLs: 65 nodos, 15 interactivos,
   cero sin nombre y un `main`. El canvas dejó de anidar otro landmark.
 - **Límite declarado:** no sustituye Axe/WCAG completo ni los budgets de los
-  features G/A/R. Package/lock user-owned permanecen intactos.
+  features G/A/R. El par package/lock reconciliado permanece intacto; este
+  baseline no cierra el review final de F8-03.
 - **Repairs de review:** cada muestra ahora afirma hash/nav/content; roles AX
   interactivos cubren option/search/menu/tree/scrollbar; `main` es exactamente
   uno; Long Tasks conserva agregados sin cap y drena records pendientes. El
@@ -1116,28 +1128,25 @@ los lotes que sí modifican producto.
   revisión añadió deadlines internos 40/70 s, exhaustividad del workspace map y
   cleanup de resize al ocultar Timeline; ambos timeouts inyectados dejaron cero
   huérfanos y perfiles.
-- **Coverage repair:** el primer `all` observó 76.74% branches frente a 76.75.
-  No se bajó el umbral: un contract test de IDs/timestamps cubrió límites
-  offset/calendario y elevó coverage a 82.31/76.81/91.79/86.17.
-- **Evidencia final:** 30/30 focales; 23/150 unit, 43/464 contract, 1/6
-  integration, 67/620 coverage, fixtures 7/7, typecheck, lint cero, build,
-  bundle/browser budget. El closeout release y el journey diferido posterior se
-  detallan debajo. Policy:
+- **Coverage repair:** el cierre staged mide 90.01% statements, 86.08% branches,
+  94.83% functions y 92.65% lines en 82 archivos/695 tests.
+- **Evidencia focal/final:** 29/29 focales; `all` 14/14 con unit 168, contract
+  521, integration 6, coverage 82/695, fixtures 7/7, persistence, build,
+  bundle/browser budgets y deferred checks verdes. Policy:
   [F8 budget policy](./F8_BUDGET_POLICY.md).
 
 ## F8 release thresholds and deferred-feature closeout
 
-- **Estado:** `accept`; los gates técnicos y la revisión independiente están
-  verdes. F8-06 queda bloqueado sólo por F8-03/package-lock ownership.
-- **Coverage:** 81 archivos/684 tests en el gate final; 8254/9170 statements
-  (90.01%), 5813/6753 branches (86.08%), 1249/1317 functions (94.83%) y
-  7548/8146 lines (92.65%). Se elevó el ratchet al resultado medido.
+- **Estado:** `accept` para thresholds/deferred técnicos; F8-03/F8-06 están
+  `done` después del review final `ACCEPT`.
+- **Coverage:** 82 archivos/695 tests; 90.01% statements, 86.08% branches,
+  94.83% functions y 92.65% lines. Se elevó el ratchet al resultado medido.
 - **Matrices:** validación, animation/composition/destructive commands,
   `applyCommand`, impact, V0 migration, project migration, local stores,
   IndexedDB asset lifecycle, asset identity, autosave journal y package ZIP.
   `derivedAssets: null` ya falla como patch inválido en vez de normalizarse.
 - **Carga diferida:** AI, gifshot y JSZip salen del entry; `ExportModal` tiene
-  su propio boundary con fallback accesible. Initial 522217 raw / 155472 gzip;
+  su propio boundary con fallback accesible. Initial 522217 raw / 155474 gzip;
   ambos perfiles pasan y el policy exige exactamente cuatro chunks diferidos:
   modal Export, AI, GIF y ZIP.
 - **Browser:** proyecto cargado por input real, ZIP y GIF exitosos y AI con
@@ -1148,17 +1157,32 @@ los lotes que sí modifican producto.
 - **Repair visible:** un proyecto cargado después del primer render ya habilita
   GIF seleccionando una animación válida; regresión cubierta por componente y
   Chrome productivo.
-- **Evidencia:** `bun scripts/studio-quality-policy.mjs coverage --profile
-  release`, `bun scripts/studio-quality-policy.mjs bundle --profile release`,
-  `bun scripts/studio-gates.mjs --gate budgets`, typecheck y lint estricto.
-  `--gate all` pasó 12 steps en 563.7 s: unit 26/157, contract 54/521,
-  integration 1/6, coverage 81/684, fixtures 7/7, persistence, build y ambos
-  journeys Chrome. Tras la reparación final, `--gate budgets` volvió a pasar
-  build, bundle y ambos journeys con p95 41.1 ms y cuatro boundaries 0→1.
-- **Revisión independiente:** `repair` por un P3 de métricas documentales y un P2
-  que no hacía contractual el boundary de `ExportModal`; ambos cerrados. Recheck:
-  18 archivos/110 tests, reparación 2/11, typecheck, lint, bundle release y Chrome
-  verdes. Veredicto `accept`; P0/P1/P2/P3 restantes: 0/0/0/0.
+- **Evidencia staged final:** `--gate all` 14/14, build y browser-smoke pass;
+  route Slice visible, pageFits true, deferred checks pass y console/network/HTTP
+  en cero.
+- **Revisión:** los repairs documentales/técnicos están cerrados. El primer pase
+  final encontró un P3 de temp hygiene; el repair registró el temporal test-owned
+  y el recheck 29/29 verificó conteo `0 -> 0`. Veredicto final: `ACCEPT`, P0-P3=0.
+
+## F8-03/F8-06 — Matriz de cierre final
+
+| Check | Resultado | Estado |
+|---|---|---|
+| Owner/manifest/lock | 12 upgrades aceptados; packageManager, engines, overrides y lock SHA verificados | pass |
+| Sol focal review | 29/29 + lint | pass (focal) |
+| High audit | exit 0 | pass |
+| Repro baseline | exit 0; lock unchanged | pass |
+| Repro drift | exit 1; lock unchanged | pass |
+| Clean checkout | `f90d8d2/tree60b742`: 302 tracked, status 0, lock 64864 bytes, CRLF 0 | pass |
+| Install frozen + audit | Bun 1.3.14, frozen install limpio, audit high exit 0 | pass |
+| Full `all` | 14/14; unit 168, contract 521, integration 6, coverage 82/695 | pass |
+| Fixtures/persistence/build/budgets | fixtures 7/7, persistence/build/browser budgets pass; gzip 155474 | pass |
+| Full E2E | build + browser-smoke; Slice/pageFits y console/network/HTTP 0 | pass |
+| Independent final review | repair P3 + recheck 29/29, temp `0 -> 0` | ACCEPT; P0-P3=0 |
+
+**Estado F8-03/F8-06:** `done`. Los repairs TS6, child Bun e higiene temporal
+quedaron cerrados con 29/29 focales, temp `0 -> 0`, typecheck/lint/verifier/audit
+verdes y review final `ACCEPT`. Ver el [artifact final](../../artifacts/quality/F8/2026-07-15/reproducibility.json) y el [record de ownership](./F8_REPRODUCIBILITY_OWNERSHIP.md).
 
 ## F3-07 — Durable reload and clean portable import
 
@@ -1201,7 +1225,6 @@ los lotes que sí modifican producto.
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.
-- F8-03: condicionado; frozen install requiere decisión explícita y patch
-  atómico del package/lock user-owned.
+- F8-03/F8-06: `done`; package/lock, clean checkout, `all`, E2E y revisión final
+  `ACCEPT` están verdes. Grid G0/G1 autorizado.
 - F8-05: `accept`; budgets, lazy boundaries y cleanup browser cerrados.
-- F8-06: coverage/bundle release verdes; espera únicamente F8-03.

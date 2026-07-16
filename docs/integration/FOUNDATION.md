@@ -543,8 +543,14 @@ build, diff-check y review `accept`.
 - **Dependencias:** F0-F7.
 - **Writable:** `.github/workflows/**`, config de lint/test/E2E, scripts y tests.
 - **Entregable:** pipeline reproducible con lockfile trackeado, lint sin warnings, unit/integration/E2E/build y budgets.
-- **Prueba:** ejecución local y CI verdes; failure injection demuestra que cada gate bloquea.
-- **Retorno:** `needs-review` hasta auditoría Sol/xhigh del workflow y supply chain.
+- **Contrato vigente:** owner aceptó doce upgrades; `packageManager` es `bun@1.3.14`, Node `>=24.0.0`, overrides `protobufjs` 7.6.5, `undici` 7.28.0 y `ws` 8.21.1; `bun.lock` conserva SHA-256 `96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5`.
+- **Prueba disponible:** verificador baseline exit 0 y drift exit 1 sin mutar el lock, audit high exit 0, workflow Ubuntu 24.04 con Node 24.18.0/Bun 1.3.14 y actions por SHA; revisión focal `ACCEPT` 29/29 + lint. Snapshot staged `f90d8d2/tree60b742`: 302 tracked/status 0, lock 64864 bytes/CRLF 0, frozen install, `all` 14/14, fixtures 7, persistence, build, bundle gzip 155474, browser budgets, deferred y E2E pass; console/network/HTTP 0.
+- **Retorno:** `done`; revisión final `ACCEPT`, P0-P3 en cero. F8-06 `done` y Grid G0/G1 autorizado.
+
+La descripción read-only previa (package/lock user-owned, lock ignorado, sin
+workflow) se conserva como baseline histórico en
+[F8_REPRODUCIBILITY_OWNERSHIP.md](./F8_REPRODUCIBILITY_OWNERSHIP.md) y no
+representa el contrato vigente.
 
 ## Gate de salida de Foundation
 
@@ -555,6 +561,7 @@ Foundation está completa cuando:
 - Asset lifecycle no persiste URLs runtime ni pierde blobs.
 - El shell expone todos los workspaces y no contiene acciones placeholder.
 - El canvas queda idle sin rAF continuo y sus renders no divergen del export.
-- CI y los gates F0-F8 están verdes.
+- CI y los gates F0-F8 están verdes con clean checkout, `all`, E2E y revisión
+  independiente final `ACCEPT`; F8-03/F8-06 están `done`.
 
 Hasta ese punto, los features nuevos pueden usar prototypes detrás de flags, pero no reemplazar recorridos productivos.

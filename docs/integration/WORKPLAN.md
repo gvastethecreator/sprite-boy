@@ -4,9 +4,9 @@ Este archivo convierte los planes de Foundation, Animoto y Grid Splitter en un f
 
 ## Frontier actual
 
-**Wave 0 (F0+B0), F1, F2, F3-01..F3-07, F4-01..F4-06, F5-01..F5-06, F6-01..F6-06, F7-01..F7-07, F8-01..F8-02 y F8-04..F8-05 aceptados. Coverage y bundle release están verdes. Frontier bloqueante: F8-03 requiere la decisión owner de package/lock; F8-06 espera únicamente esa dependencia. W1/W2 están cerrados.**
+**Foundation F0-F8 y W1/W2 están `done`. F8-03/F8-06 cerraron con clean worktree, `all`, E2E y revisión independiente final `ACCEPT` (P0-P3=0). Frontier activo: Grid G0 source session y G1 worker/protocol, autorizados para avanzar con ownership separado y converger en G2.**
 
-No está autorizado iniciar componentes de Animoto/Grid, copiar stores, trasladar el worker ni añadir dependencias de export. W0 ya congeló contrato, baseline y manifest golden fuente; F1 amplía el command kernel por familias independientes. El estado actual de `package.json` pertenece al usuario y debe preservarse; cualquier reconciliación de dependencias empieza con diff/ownership explícito.
+Está autorizado iniciar Grid G0/G1 sobre contratos nativos; no se copia el shell/store del donante ni se monta una aplicación secundaria. W0 congeló contrato, baseline y manifest golden fuente. El par `package.json`/`bun.lock` ya fue reconciliado; nuevos cambios de dependencias deben conservar el lock y pasar supply chain.
 
 F4 avanzó en paralelo porque su contrato depende de F1-08, ya aceptado. F3-07
 ya ejecutó la porción Foundation J1/J8 en Chrome real: dos reloads/pagehide,
@@ -152,22 +152,33 @@ a diagnostics seguros y exhaustivos. Quota nativa queda actionable como
 siendo terminales autoritativos aunque el port rechace después. El security
 review reprodujo y cerró una fuga de registry por errores externos prototype/
 branded. El gate pasó 74/74 acumulados F7, 42 archivos/461 contract tests,
-61 archivos/579 tests completos, typecheck, lint estricto y build. F8-01 puede reconciliar reproducibilidad sin
-asumir ownership del `package.json` modificado por el usuario.
-F8-01 confirmó que `package.json` conserva doce upgrades user-owned mientras
-`bun.lock` está ignorado y su workspace root aún coincide con HEAD. No hay otro
-lock ni workflows CI, y package no declara manager/engines. El record aprobado
-prohíbe tocar/stagear/regenerar package+lock; F8-02 puede crear comandos directos
-tracked. F8-03 no podrá declarar frozen install hasta una decisión explícita del
-owner y reconciliación conjunta de manifest+lock.
+61 archivos/579 tests completos, typecheck, lint estricto y build. F8-01 cerró la
+reconciliación de ownership: el owner aceptó los doce upgrades, `package.json`
+declara `bun@1.3.14` y Node `>=24.0.0`, y los overrides de `protobufjs`, `undici`
+y `ws` están fijados. `bun.lock` está trackeable y conserva SHA-256
+`96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5`; el
+workflow corre en Ubuntu 24.04 con Node 24.18.0/Bun 1.3.14, actions por SHA,
+install frozen, audit, `all` y `e2e`.
+
+La baseline read-only anterior (package user-owned, lock ignorado, sin workflow ni
+manager/engines) se conserva explícitamente como histórica en el record de
+reproducibilidad; no es una descripción vigente. El verificador real pasó
+baseline 0 y rechazó drift con exit 1 sin cambiar el lock. El snapshot staged
+`f90d8d2/tree60b742` confirma 302 tracked, status 0, lock 64864 bytes/CRLF 0,
+frozen install Bun 1.3.14, audit high, `all` 14/14, coverage 82/695, fixtures 7,
+persistence, build, bundle gzip 155474, budgets browser y E2E build+smoke; cero
+console/network/HTTP. Los repairs TS6, child Bun e higiene temporal quedaron
+cerrados (29/29 focales, temp `0 -> 0`, typecheck/lint/verifier/audit verdes).
+La revisión independiente final devolvió `ACCEPT` con P0-P3 en cero; F8-03 y
+F8-06 están `done`.
 F8-02 añadió un manifest ejecutable de ocho gates sin aliases ni shell strings:
 typecheck, lint con ratchet inclusivo de 47 warnings, unit, contract,
 integration, build, e2e y all. El smoke e2e sirve el build de producción y usa
 Chrome/CDP con perfil efímero, timeouts por comando, cleanup propio y
 diagnósticos redactados; exige ruta Slice visible, page-fit y cero errores de
 console/runtime/log/HTTP/red. La revisión cerró ratchet, desconexión CDP,
-observabilidad de red y flags duplicados. F8-04 puede fijar coverage y retención
-de fixtures sin modificar el package user-owned.
+observabilidad de red y flags duplicados. F8-04 fijó coverage y retención de
+fixtures sobre el contrato package/lock vigente.
 F8-04 mide las 54 fuentes runtime canónicas bajo `core/**` —incluidas 13 de
 `core/project`— con el corpus completo. Matrices de boundary/hostile input
 elevaron el resultado a 90.01% statements, 86.08% branches, 94.83% functions y
@@ -266,7 +277,7 @@ Gate W1:
 | F5 | [gpt-5.6-sol \| xhigh] | F1,F4 | `core/render/**`, canvas adapters | Scene projection, compositor e invalidation scheduler | 0 rAF idle + visual baseline; `done` |
 | F6 | [gpt-5.6-sol \| xhigh] | F4-F5 | `components/studio/**`, header/layout/palette | Workspace/command registry y panel contracts | 5 workspaces alcanzables, keyboard/compact layout; `done` |
 | F7 | [gpt-5.6-sol \| xhigh] | F1,F4 | `core/processing/**`, `core/export/**`, Job Center | Job lifecycle, ExportPort/format registry, cancel/retry/timeout y errors tipados | Failure injection sin late writes/leaks; `done` |
-| F8 | [gpt-5.6-sol \| xhigh] strategy + [gpt-5.6-luna \| max] config | F0-F7 | CI/config/scripts/tests | Lock reproducible, lint warnings cero, test/build/E2E/budgets | CI failure injection + Sol audit; `needs-review` hasta aprobar |
+| F8 | [gpt-5.6-sol \| xhigh] strategy + [gpt-5.6-luna \| max] config | F0-F7 | CI/config/scripts/tests | Lock reproducible, lint warnings cero, test/build/E2E/budgets | Clean/all/E2E + REV `ACCEPT`, P0-P3=0; `done` |
 
 Gate W2:
 

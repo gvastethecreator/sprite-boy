@@ -1,8 +1,12 @@
 # F8 canonical coverage and fixture retention policy
 
-Date: 2026-07-15
+Date: 2026-07-15 (reconciled 2026-07-15)
 Task: F8-04
 Status: accepted
+
+The coverage and fixture policy is accepted on its focal evidence. The staged
+snapshot `f90d8d2/tree60b742` also passed clean checkout, full `all`/E2E and the
+technical gates. F8-03/F8-06 are `done` after the independent final `ACCEPT`.
 
 ## Coverage scope
 
@@ -75,9 +79,14 @@ then update the manifest identity in the same reviewed change. New Grid source
 fixtures and processed pixel goldens remain G1/G2-owned and must enter a
 retained root when copied into SpriteBoy; the donor repository stays read-only.
 
-## Package ownership
+## Package and lock boundary
 
-F8-04 does not modify package aliases, dependencies or locks. The coverage
-provider already exists in the user-owned install; frozen-install ownership
-remains the separate F8-03 decision recorded in
-[`F8_REPRODUCIBILITY_OWNERSHIP.md`](./F8_REPRODUCIBILITY_OWNERSHIP.md).
+F8-04 consumes the reconciled package contract and does not add dependencies.
+The owner accepted the twelve manifest upgrades; `packageManager` is
+`bun@1.3.14`, Node is `>=24.0.0`, and the overrides are pinned to `protobufjs`
+7.6.5, `undici` 7.28.0 and `ws` 8.21.1. The tracked `bun.lock` identity is
+SHA-256 `96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5`.
+
+Frozen-install ownership and final review are closed. See
+[`F8_REPRODUCIBILITY_OWNERSHIP.md`](./F8_REPRODUCIBILITY_OWNERSHIP.md) and the
+final reproducibility artifact.

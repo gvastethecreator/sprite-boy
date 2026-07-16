@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "slice": "F8",
+  "task": "F8-03/F8-06",
+  "date": "2026-07-15",
+  "capturedAt": "2026-07-15",
+  "status": "done",
+  "decision": "owner-accepted",
+  "package": {
+    "packageManager": "bun@1.3.14",
+    "nodeEngine": ">=24.0.0",
+    "acceptedUpgradeCount": 12,
+    "overrides": {
+      "protobufjs": "7.6.5",
+      "undici": "7.28.0",
+      "ws": "8.21.1"
+    }
+  },
+  "lock": {
+    "path": "bun.lock",
+    "tracked": true,
+    "ignored": false,
+    "sha256": "96e66bbcff3dc338ab95b6bf5c4396fc73af6863c040b7135eb5eb88c02f44e5",
+    "eolPolicy": ".gitattributes: bun.lock text eol=lf"
+  },
+  "workflow": {
+    "runner": "ubuntu-24.04",
+    "node": "24.18.0",
+    "bun": "1.3.14",
+    "actionsPinnedBySha": true,
+    "steps": [
+      "bun install --frozen-lockfile --ignore-scripts",
+      "bun audit --audit-level=high",
+      "bun scripts/studio-gates.mjs --gate all",
+      "bun scripts/studio-gates.mjs --gate e2e"
+    ]
+  },
+  "snapshot": {
+    "kind": "implementation-worktree",
+    "commit": "f90d8d2774b51fa424c47d88fad4252113d10c7d",
+    "tree": "60b7420a31fa7bc653c0fcd1fb1f9cf2c90d9eeb",
+    "branchCommit": false,
+    "trackedFiles": 302,
+    "cleanStatus": 0,
+    "lockBytes": 64864,
+    "lockCrlfCount": 0
+  },
+  "postSnapshotDelta": {
+    "scope": [
+      "integration ledger and this artifact",
+      "test-only reproducibility temp hygiene repair"
+    ],
+    "productionDrift": false
+  },
+  "checks": [
+    {
+      "name": "sol-focal-review",
+      "status": "pass",
+      "result": "ACCEPT",
+      "evidence": "29/29 implementation checks plus lint"
+    },
+    {
+      "name": "audit-high",
+      "status": "pass",
+      "exitCode": 0
+    },
+    {
+      "name": "repro-baseline",
+      "status": "pass",
+      "exitCode": 0,
+      "lockUnchanged": true
+    },
+    {
+      "name": "repro-drift",
+      "status": "pass",
+      "result": "rejected",
+      "exitCode": 1,
+      "lockUnchanged": true
+    },
+    {
+      "name": "clean-checkout",
+      "status": "pass",
+      "result": "pass",
+      "details": "Staged snapshot f90d8d2/tree60b742: 302 tracked, clean status 0, bun.lock 64864 bytes and CRLF count 0."
+    },
+    {
+      "name": "full-all",
+      "status": "pass",
+      "result": "pass",
+      "completedSteps": 14,
+      "details": "unit 168, contract 521, integration 6, coverage 82 files/695 tests; statements 90.01, branches 86.08, functions 94.83, lines 92.65."
+    },
+    {
+      "name": "full-e2e",
+      "status": "pass",
+      "result": "pass",
+      "details": "Build plus browser-smoke passed Slice route, pageFits and zero console/network/HTTP errors."
+    },
+    {
+      "name": "fixtures-persistence-build-budgets",
+      "status": "pass",
+      "result": "pass",
+      "details": "7 fixtures; persistence and build pass; bundle gzip 155474 <= 156500; browser budgets and deferred checks pass."
+    },
+    {
+      "name": "independent-final-review",
+      "status": "pass",
+      "result": "ACCEPT",
+      "findings": {
+        "p0": 0,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0
+      },
+      "details": "Initial P3 temp hygiene finding repaired; independent recheck passed 29/29 with sprite-boy-repro temp count 0 -> 0."
+    },
+    {
+      "name": "bun-child-version-pin",
+      "status": "pass",
+      "result": "validated",
+      "details": "Child process pin validated with Bun 1.3.14 after repair."
+    }
+  ],
+  "pendingChecks": [],
+  "notes": [
+    "This is the final data-only F8 reproducibility artifact.",
+    "F8-03 and F8-06 are done after independent ACCEPT with zero P0-P3.",
+    "Grid G0 and G1 are authorized."
+  ]
+}
