@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "check": "g3-02-reduction-empty-policy",
+  "status": "accepted",
+  "behaviors": ["G3.3", "G3.4"],
+  "dependency": "G3-01 threshold/padding trim stage",
+  "decision": {
+    "reduction": "exact removed cell-area fraction: (cellPixels - retainedPixels) / cellPixels",
+    "aggregate": "cell-area weighted across the complete result; empty cells retain zero source pixels",
+    "range": "canonical finite 0..1 inclusive; zero is never negative zero",
+    "emptyStageValue": "trim stage null",
+    "emptyWorkerOutput": "contentBounds null plus a fresh 1x1 transparent RGBA8 surface",
+    "skipPolicy": "never skip; every layout cell retains row-major index, row and column",
+    "emptyWarning": "empty-output on each empty result and once in summary",
+    "disabledCrop": "threshold 0 remains donor-compatible disabled sentinel; transparent cells keep original bounds and pixels with reduction 0",
+    "recipeOwnership": "read-only exact protocol recipe; Worker edge proof confirms no mutation"
+  },
+  "scope": [
+    "core/processing/gridProcessingReduction.ts",
+    "core/processing/index.ts",
+    "features/slice/processing/gridProcessing.worker.ts",
+    "scripts/grid-processing-worker-smoke.ts",
+    "tests/contract/gridProcessingReduction.test.ts",
+    "tests/integration/gridProcessingRealWorker.test.ts"
+  ],
+  "edgeFixture": {
+    "source": "7x5 RGBA, manual 2x3 non-divisible layout, threshold 50, padding 1",
+    "cases": [
+      "fully transparent",
+      "alpha 127 excluded and alpha 128 retained",
+      "single pixel at top/right with padding clamped inside cell",
+      "solid cell with zero reduction",
+      "empty cell with 1x1 transparent output",
+      "single center pixel whose padding fills a non-divisible 3x3 cell"
+    ],
+    "outputCount": 6,
+    "indexes": ["0:0:0", "1:0:1", "2:0:2", "3:1:0", "4:1:1", "5:1:2"],
+    "outputDimensions": [[1, 1], [2, 2], [2, 2], [2, 3], [1, 1], [3, 3]],
+    "perCellReduction": [1, 0, 0.3333333333333333, 0, 1, 0],
+    "outputPixelCount": 25,
+    "summaryReduction": 0.34285714285714286,
+    "recipeUnchanged": true
+  },
+  "boundaries": {
+    "allEmpty": "3x2 cells produce six ordered 1x1 transparent outputs; summary reduction 1",
+    "minimum": "empty cell surface is exactly 1x1 RGBA8 and never zero-sized",
+    "maximum": "4096 empty cells produce exactly 4096 ordered outputs; first 0:0:0, last 4095:0:4095",
+    "maximumSummary": { "outputCount": 4096, "outputPixelCount": 4096, "cropReductionRatio": 1 },
+    "hostile": "partial null, retained zero axis, NaN, Infinity, negative zero, fractional, impossible and over-budget values reject",
+    "cancellation": "G3-01 cooperative preflight/scan cancellation remains green; G3-02 policy is bounded O(1)",
+    "padding": "padding changes retained bounds before reduction and cannot cross cell bounds",
+    "threshold": "strict alpha boundary is inherited from G3-01; Worker proof retains 128 and excludes 127 at threshold 50"
+  },
+  "regression": {
+    "g1Golden": "8 fixtures / 59 outputs unchanged",
+    "g3_01": "10 crop tests unchanged",
+    "transparentCropDisabled": "2x2 source remains 2x2, reduction 0, no crop operation or warning",
+    "protocolCancel": "client cancellation terminal path unchanged"
+  },
+  "verification": {
+    "focused": "final combined run: 7 files / 32 tests pass",
+    "timeoutRepair": "real Worker test timeout changed locally from 5s to 30s, matching its existing 30s subprocess ceiling; rerun passed in 5.57s",
+    "realWorker": "pass; edge, all-empty, disabled transparent and max-4096 fixtures",
+    "goldenWorker": "pass; 8 fixtures / 59 outputs",
+    "typecheck": "pass",
+    "scopedLint": "pass; zero warnings",
+    "diffCheck": "pass; line-ending notices only",
+    "independentReview": "accept; P0/P1/P2/P3 = 0"
+  },
+  "commands": [
+    "bun x vitest run tests/contract/gridProcessingReduction.test.ts tests/contract/gridProcessingCrop.test.ts tests/contract/gridProcessingGeometry.test.ts tests/contract/gridProcessingClient.test.ts tests/integration/gridProcessingRealWorker.test.ts tests/integration/gridProcessingGoldenWorker.test.ts tests/contract/gridProcessingGolden.test.ts --reporter=verbose",
+    "bun x vitest run tests/integration/gridProcessingRealWorker.test.ts --reporter=verbose",
+    "bun x tsc --noEmit --pretty false",
+    "bun x oxlint core/processing/gridProcessingReduction.ts core/processing/index.ts features/slice/processing/gridProcessing.worker.ts scripts/grid-processing-worker-smoke.ts tests/contract/gridProcessingReduction.test.ts tests/integration/gridProcessingRealWorker.test.ts",
+    "git diff --check -- core/processing/index.ts core/processing/gridProcessingReduction.ts features/slice/processing/gridProcessing.worker.ts scripts/grid-processing-worker-smoke.ts tests/contract/gridProcessingReduction.test.ts tests/integration/gridProcessingRealWorker.test.ts artifacts/quality/GRID/2026-07-16/g3-02-reduction-empty-policy.json"
+  ],
+  "review": {
+    "state": "accepted",
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "scope": "Raw-diff review of reduction policy, Worker integration, hostile boundaries, max-4096 fixture, recipe immutability and frozen golden parity."
+  }
+}
