@@ -1386,6 +1386,26 @@ legacy rename/save/reopen se reconcilió con el behavior autoritativo A1.4.
 **Siguiente frontera Grid:** G2-05 manual/auto switching, recipe state y montaje
 del overlay en el journey real está activo.
 
+### S1-02 — Canonical wand selection and Region semantics
+
+- **Selección:** flood seed-local alpha-aware con connectivity 4/8, identidad
+  SHA-256/source exacta, replace/add/subtract y aggregate mask/bounds frozen;
+  componentes ajenos y `maxRegions` no contaminan el hit.
+- **Comandos:** add cruza un adapter closed-world. Subtract resuelve dentro de
+  una vista canónica una única Region por asset+bounds+provenance wand/sourceId
+  y construye internamente `region.remove/reject`; no existe callback capaz de
+  autocertificar ownership ni ejecutar efectos antes de validar.
+- **Hostile:** accessors, proxies/revoked, callbacks y cancelación se contienen
+  y redactan. Cero/múltiples matches fallan antes de efectos; apply+undo real
+  conserva el proyecto.
+- **Evidencia:** 16/16, typecheck/lint/diff verdes, 1 MP 126–403 ms <2500.
+  Chrome fail-closed con cinco contadores en cero y PNG/hash reproducidos.
+  Quinta revisión `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/s1-02-wand-selection.{json,png}`.
+
+**Siguiente frontera irregular:** S1-03 manual Region commands está activo;
+S1-04 espera el cierre conjunto de wand + manual tools.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

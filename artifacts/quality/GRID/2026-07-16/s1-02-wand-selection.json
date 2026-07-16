@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 2,
+  "taskId": "S1-02",
+  "generatedAt": "2026-07-16T11:28:56-03:00",
+  "status": "browser-verified-and-independently-accepted",
+  "reviewRepair": {
+    "priorVerdict": "REJECT (fourth re-review)",
+    "repairedFindings": [
+      "P1 seed lookup no longer calls global detectIrregularRegions or enumerates unrelated components",
+      "P1 component identity no longer relies on FNV32 source identity",
+      "P1 subtract command resolves only from an exact own-data canonical project Regions view",
+      "P2 input, selection, intent, adapter, options and callback results use own-data boundaries",
+      "P2 visual evidence is a tracked PNG captured by the real Chrome runner",
+      "P1 subtract no longer accepts any callback that can declare or certify Region ownership",
+      "P1 self-consistent copied Region metadata cannot authorize region-unrelated when project.regions does not contain it",
+      "P2 subtract has no remove callback or equivalent post-resolution execution boundary; it constructs the exact data-only region.remove/reject command internally",
+      "P2 revoked proxies and isCancelled/add callbacks now fail through stable redacted boundaries"
+    ],
+    "reviewState": "accepted on fifth independent review"
+  },
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "evidence": "Independent fifth review reran 16/16 and confirmed closed-world add-only adapter, canonical unique Region resolution, internal data-only remove command, zero external effects, hostile boundaries, undo, browser telemetry and PNG integrity."
+  },
+  "implementation": {
+    "model": "features/slice/irregular/wandSelection.ts",
+    "coordinateAdapter": "features/slice/irregular/wandCoordinates.ts",
+    "commandAdapter": "features/slice/irregular/wandRegionCommands.ts",
+    "visualProbe": "features/slice/irregular/WandSelectionProbe.tsx",
+    "browserRunner": "tests/browser/wandSelectionBrowserRunner.mjs",
+    "seedLookup": {
+      "algorithm": "single seed-local alpha flood only",
+      "globalDetectionCall": false,
+      "semantics": "S1-01 strict alpha threshold, explicit 4/8 connectivity, minimum pixel/width/height policy, dimension and 16,777,216-pixel limits",
+      "maxRegionsPolicy": "validated for recipe parity but intentionally irrelevant to one seed component; unrelated components cannot fail a wand hit"
+    },
+    "identity": {
+      "format": "wand:sha256:<64 lowercase hex>",
+      "digestInput": "versioned domain separator, exact UTF-8 sourceAssetId, source dimensions, first offset, pixel count, bounds and exact row-major RLE membership",
+      "sourceEquality": "sameComponentSet and intent diff also compare exact sourceAssetId",
+      "bounds": "fixed 76-character valid non-empty component ID; source IDs are capped at 4096 UTF-16 code units at this boundary"
+    },
+    "selection": {
+      "modes": ["replace", "add", "subtract"],
+      "deduplication": "same exact source/component preserves prior snapshot and emits no intent",
+      "aggregate": "frozen deterministic source bounds and row-major RLE union mask",
+      "cancellation": "Escape preserves prior identity; cooperative flood cancellation throws before returning a next snapshot"
+    },
+    "commands": {
+      "history": "all mutations adapt to one canonical command.batch",
+      "add": "one matching regions.commitRecipe command",
+      "subtract": "the adapter validates canonical project.regions own data, internally requires one unique Region matching assetId, exact bounds, provenance.source=wand and provenance.sourceId=the component SHA identity, then directly constructs the exact region.remove/reject data command",
+      "canonicalRelation": "Region has the actual model relation assetId+bounds+EntityProvenance source/sourceId; ProcessingRecipe has no Region foreign key, so no invented recipe metadata is used",
+      "callbacks": "only add materializes the expected regions.commitRecipe command; subtract has no callback after canonical resolution",
+      "storeOwnership": "none; the host supplies the canonical StudioProjectV1 Regions view"
+    },
+    "hostileBoundary": {
+      "policy": "exact own enumerable data records are read and rebuilt; accessors/symbols/sparse arrays/non-finite values/cycles reject",
+      "callbacks": "isCancelled/add throws are redacted and add callback result accessors are rejected without getter execution",
+      "proxies": "revoked and throwing proxies at selection/seed/bounds/canonical project Regions/adapter/intent/result boundaries are contained and converted to stable TypeErrors"
+    }
+  },
+  "coverage": {
+    "contractTest": "tests/contract/wandSelection.test.ts",
+    "componentTest": "tests/components/wandSelectionProbe.test.tsx",
+    "browserHarness": "tests/browser/wandSelectionHarness.html",
+    "browserJourney": "tests/browser/wandSelectionJourney.ts",
+    "focalTests": 16,
+    "propertySamples": 40,
+    "reviewRepros": [
+      "three disconnected components with maxRegions=1: seed hit succeeds without global enumeration",
+      "known FNV32 collision asset-haumha-jsez3r versus asset-1koyyyc-k2ukzu: SHA IDs differ and replace emits remove plus add",
+      "SHA-256 component ID matches independent node:crypto expected digest",
+      "attempted remove effect carrying a self-consistent region-unrelated copy is rejected as an extra adapter field and executes zero times",
+      "zero canonical Region matches reject before remove executes",
+      "more than one canonical Region match rejects as ambiguous before remove executes",
+      "input and selection accessors reject with zero getter reads",
+      "unique canonical match produces the exact internal region.remove/reject literal with no external effect boundary",
+      "throwing input and canonical Regions proxies are contained and redacted",
+      "revoked selection, seed, bounds and adapter proxies reject with stable boundary errors",
+      "canonical project/regions getters and revoked proxies reject without execution or secret leakage",
+      "PRIVATE_CANCEL_SECRET and private add callback failures are redacted"
+    ],
+    "otherCases": [
+      "overlapping component bounds with exact seed membership",
+      "repeated add, subtract last, replace clear and deterministic aggregate mask",
+      "transparent, outside, strict threshold and diagonal connectivity",
+      "large flood cancellation at head=4096 with no global pass",
+      "DPR/zoom/pan coordinate mapping",
+      "canonical add and remove command application with full undo round-trips"
+    ]
+  },
+  "visualEvidence": {
+    "fixture": "6x4 L/step alpha component with 6 selected pixels",
+    "bounds": { "x": 1, "y": 0, "width": 3, "height": 4 },
+    "path": "M1 0h1v1h-1zM1 1h3v1h-3zM3 2h1v1h-1zM3 3h1v1h-1z",
+    "componentOuterHtmlFnv1a": "75574a8d",
+    "png": {
+      "path": "artifacts/quality/GRID/2026-07-16/s1-02-wand-selection.png",
+      "bytes": 10583,
+      "sha256": "e7adf57a1f55eb0023708e81dbb694c5d2416550edc07cdedf3f7bc4f871efc1"
+    },
+    "chromeObserved": {
+      "componentCount": 1,
+      "pixelCount": 6,
+      "sourcePointAtDpr2Zoom3": { "x": 8, "y": 6 },
+      "focusTargetCount": 0,
+      "consoleErrorCount": 0,
+      "exceptionCount": 0,
+      "logErrorCount": 0,
+      "networkFailureCount": 0,
+      "httpErrorCount": 0
+    }
+  },
+  "performance": {
+    "fixture": "1024x1024 fully opaque RGBA, center seed, one seed-local flood plus RLE",
+    "pixels": 1048576,
+    "observedFinalTestDurationMs": 126,
+    "maxObservedTestDurationMs": 403,
+    "budgetMs": 2500,
+    "result": "passed"
+  },
+  "verification": [
+    {
+      "command": "bunx vitest run tests/contract/wandSelection.test.ts tests/components/wandSelectionProbe.test.tsx",
+      "result": "passed",
+      "details": "2 files, 16 tests"
+    },
+    {
+      "command": "node tests/browser/wandSelectionBrowserRunner.mjs",
+      "result": "passed",
+      "details": "real Chrome captured tracked PNG and observed Runtime/Log/Network/HTTP/console counters at zero"
+    },
+    {
+      "command": "bunx tsc --noEmit",
+      "result": "passed",
+      "details": "exit 0"
+    },
+    {
+      "command": "bunx oxlint features/slice/irregular tests/contract/wandSelection.test.ts tests/components/wandSelectionProbe.test.tsx tests/browser/wandSelectionJourney.ts tests/browser/wandSelectionBrowserRunner.mjs",
+      "result": "passed",
+      "details": "exit 0"
+    },
+    {
+      "command": "scoped diff-check and JSON/PNG integrity",
+      "result": "passed",
+      "details": "JSON parsed; untracked-file diff-check passed; PNG bytes and SHA-256 match observed Chrome output"
+    }
+  ],
+  "scope": {
+    "changed": [
+      "features/slice/irregular/**",
+      "tests/contract/wandSelection.test.ts",
+      "tests/components/wandSelectionProbe.test.tsx",
+      "tests/browser/wandSelectionJourney.ts",
+      "tests/browser/wandSelectionHarness.html",
+      "tests/browser/wandSelectionBrowserRunner.mjs",
+      "artifacts/quality/GRID/2026-07-16/s1-02-wand-selection.json",
+      "artifacts/quality/GRID/2026-07-16/s1-02-wand-selection.png"
+    ],
+    "deliberatelyUntouched": [
+      "AppLayout and sidebars",
+      "canvas hooks and core processing",
+      "project commands/store",
+      "integration docs and global barrels"
+    ]
+  },
+  "knownRisks": [
+    "Selection remains synchronous; a future non-blocking host should execute this pure seam at the existing worker boundary.",
+    "Transparent proxies cannot be identified portably in browser JavaScript; throwing traps are contained, while accepted payloads are rebuilt only from own data.",
+    "The browser proof is isolated; tool activation and focus return remain S1-04/G8 scope."
+  ]
+}
