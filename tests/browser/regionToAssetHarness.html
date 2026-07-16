@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>S1-05 Region-to-Asset Golden</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #11141a; color: #f4f6fb; font: 14px/1.45 system-ui, sans-serif; }
+      main { width: min(720px, calc(100vw - 40px)); padding: 28px; border: 1px solid #343b48; border-radius: 16px; background: #1a1f29; box-shadow: 0 18px 60px #0008; }
+      h1 { margin: 0 0 6px; font-size: 22px; }
+      p { margin: 0; color: #aeb7c7; }
+      .canvases { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin: 24px 0; }
+      figure { margin: 0; padding: 16px; border-radius: 12px; background: #101319; }
+      figcaption { margin-bottom: 12px; color: #d7ddea; font-weight: 650; }
+      canvas { display: block; width: 100%; height: 220px; border-radius: 7px; background: conic-gradient(#343944 25%, #202631 0 50%, #343944 0 75%, #202631 0) 0 0 / 24px 24px; image-rendering: pixelated; }
+      dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0; }
+      dl div { padding: 10px; border: 1px solid #343b48; border-radius: 8px; }
+      dt { color: #8f9aad; font-size: 11px; text-transform: uppercase; }
+      dd { margin: 3px 0 0; font: 600 15px ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Region-to-Asset pixel golden</h1>
+      <p>Exact source-space crop. Transparent pixels remain transparent.</p>
+      <section class="canvases">
+        <figure><figcaption>Canonical source · 6×5</figcaption><canvas id="source" width="6" height="5"></canvas></figure>
+        <figure><figcaption>Derived Asset · 4×3</figcaption><canvas id="output" width="4" height="3"></canvas></figure>
+      </section>
+      <dl>
+        <div><dt>Margin X</dt><dd>7 px</dd></div><div><dt>Margin Y</dt><dd>5 px</dd></div>
+        <div><dt>Gap X</dt><dd>3 px</dd></div><div><dt>Gap Y</dt><dd>2 px</dd></div>
+      </dl>
+    </main>
+    <script type="module" src="./regionToAssetJourney.ts"></script>
+  </body>
+</html>

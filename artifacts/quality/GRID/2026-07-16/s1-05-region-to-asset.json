@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 2,
+  "task": "S1-05",
+  "date": "2026-07-16",
+  "status": "browser-verified-and-independently-accepted",
+  "scope": "Canonical Region-to-Asset conversion with exact PNG crop and margin/gap provenance",
+  "reviewHistory": {
+    "priorVerdict": "REJECT",
+    "priorFindings": { "P1": 4, "P2": 1 },
+    "latestVerdict": "REJECT",
+    "latestFindings": { "P1": 1, "P2": 0 },
+    "currentVerdict": "ACCEPT",
+    "repairs": [
+      "Source Blob identity is verified against canonical blobKey, contentHash, byteSize and MIME before crop.",
+      "Post-put graph ownership is reconciled through descriptor-safe validated snapshots before storage action.",
+      "Destination metadata and Blob are preflighted; rejected put is reconciled even when post-write metadata becomes unavailable.",
+      "Conversion never removes storage; every attempt-created graph-absent failure emits exact cleanup debt.",
+      "Conversion and cleanup retry share a module-scoped queue keyed by assetId.",
+      "Only the conditional cleanup helper can remove, after two exact record fingerprint and Blob identity reads plus an immediate graph recheck.",
+      "Cleanup rechecks graph ownership after remove and restores the cached exact record plus Blob if exact ownership appeared during the awaited remove.",
+      "Returned AssetRecord requires exact own-data equality for all fields and provenance v2 geometry/source hash.",
+      "Browser failures expose bounded phase, reason and observed metrics without raw exception payloads."
+    ]
+  },
+  "transactionModel": {
+    "projectGraph": "Authoritative canonical asset.import; throw-after-commit resolves as success when exact graph ownership is observed.",
+    "binaryStorage": "Content-addressed destination preflight plus createdByAttempt ownership state.",
+    "strictSharedTransaction": false,
+    "reason": "AssetRepository and ProjectStore expose no shared or staged transaction seam.",
+    "keyedSerialization": "Module-scoped per-assetId queue shared by conversion destination work and cleanup retry.",
+    "convertDeletePolicy": "Conversion never calls remove; attempt-owned graph-absent failures always produce cleanup debt.",
+    "cleanupRule": "The conditional helper alone may remove, after two exact full-record fingerprint and Blob identity reads and an immediate valid graph-absent recheck.",
+    "postRemoveRule": "Recheck graph after awaited remove; exact ownership triggers restoration of the cached exact record and Blob, while unknown ownership restores then emits ownership debt.",
+    "uncertainRule": "Unknown graph ownership preserves storage and emits redacted OWNERSHIP_UNCERTAIN recovery debt.",
+    "preexistingRule": "Reused destination storage is never removed and never produces cleanup debt.",
+    "undoPolicy": "Undo removes graph Asset but deliberately retains durable Blob for redo and reload."
+  },
+  "identity": {
+    "format": "asset:region:<regionId>:sha256:<contentHash>",
+    "sourceRead": "AssetRepository.getBlob(canonical sourceAssetId)",
+    "sourceVerification": ["blobKey", "contentHash", "byteSize", "mimeType"],
+    "sourceReimported": false,
+    "outputMimeType": "image/png",
+    "provenance": "sprite-boy.region-to-asset/v2",
+    "preservedMetadata": ["sourceAssetId", "sourceContentHash", "sourceRegionId", "sourceBounds", "marginX", "marginY", "gapX", "gapY"]
+  },
+  "tests": {
+    "focusedFilesPassed": 1,
+    "focusedTestsPassed": 18,
+    "failed": 0,
+    "coverage": [
+      "strict source hash/key/size/MIME rejection before crop/write",
+      "successful import, provenance v2 reload, undo, redo and no-op retry",
+      "missing source and quota plus cancel/stale attempt-owned cleanup debt without inline deletion",
+      "put persist-then-throw with unavailable metadata produces exact cleanup debt without inline deletion",
+      "all AssetRecord fields plus source hash/bounds/gaps and hostile metadata results",
+      "null, forged, accessor and revoked dispatch results",
+      "dispatch throw-after-commit exact ownership reconciliation",
+      "throw, null, forged, accessor-project and revoked post-dispatch snapshots",
+      "undo then failed reconvert then redo/reload keeps preexisting Blob",
+      "metadata-missing destination Blob conflict without removal",
+      "cleanup debt created/absent/full-record fingerprint/Blob identity/graph gates, pre-remove graph recheck and idempotent retry",
+      "metadata unavailable during cleanup preserves storage with zero removes",
+      "same id/hash but changed record fingerprint after first read preserves storage with zero removes",
+      "graph ownership acquired during awaited remove restores the exact cached record and Blob",
+      "unknown graph ownership after remove restores exact storage and emits redacted ownership debt",
+      "concurrent cleanup retry and conversion for the same assetId are serialized with remove-before-put ordering"
+    ]
+  },
+  "browser": {
+    "status": "pass",
+    "modulePrewarm": ["harness", "journey module", "crop adapter"],
+    "coldFirstRunProof": "not-claimed",
+    "failureContract": ["reason", "phase", "observed bounded metrics"],
+    "failureProbe": {
+      "reason": "failed-browser-resolve",
+      "phase": "browser-resolve",
+      "journeyReady": false,
+      "rawLeak": false
+    },
+    "bounds": "1,1,4,3",
+    "outputDimensions": [4, 3],
+    "transparentPixelCount": 1,
+    "partialAlphaPixelCount": 1,
+    "pixelSha256": "b5e9adc588c85129d62b8e59747fb76b7bda3689fdc0df232bd0f93ff71c39ff",
+    "errors": { "console": 0, "exception": 0, "log": 0, "network": 0, "http": 0 }
+  },
+  "artifacts": {
+    "pixelGolden": {
+      "path": "artifacts/quality/GRID/2026-07-16/s1-05-region-to-asset-golden.png",
+      "bytes": 138,
+      "sha256": "9b0cd3b4e3528c0c4f10023b8a161a8dd330546cdc82524fb3808483475512d2"
+    },
+    "visual": {
+      "path": "artifacts/quality/GRID/2026-07-16/s1-05-region-to-asset-visual.png",
+      "bytes": 24014,
+      "sha256": "80c75579b73bdc9be23e1b02a0cac7cc639756d7568c99e592fa2b87dc250803"
+    }
+  },
+  "gates": {
+    "focusedTests": "pass",
+    "browserRuntime": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "diffCheck": "pass",
+    "independentRecoveryReview": "passed",
+    "externalTaskReview": "passed"
+  },
+  "commands": [
+    "bunx vitest run tests/contract/regionToAsset.test.ts",
+    "node tests/browser/regionToAssetBrowserRunner.mjs",
+    "node --input-type=module -e <forced browser-resolve failure probe>",
+    "bunx tsc --noEmit --pretty false",
+    "bunx oxlint features/slice/assets tests/contract/regionToAsset.test.ts tests/browser/regionToAssetJourney.ts tests/browser/regionToAssetBrowserRunner.mjs",
+    "bun run build",
+    "git diff --check -- features/slice/assets tests/contract/regionToAsset.test.ts tests/browser/regionToAssetHarness.html tests/browser/regionToAssetJourney.ts tests/browser/regionToAssetBrowserRunner.mjs"
+  ],
+  "visualReview": {
+    "verdict": "ACCEPT",
+    "reason": "Independent review accepted the pixel/alpha golden, visual crop, provenance display and zero-error browser evidence."
+  },
+  "independentRecoveryReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "scope": "Final external review accepted source identity/provenance, descriptor-safe post-put reconciliation, keyed serialization, conditional cleanup, graph-race restoration, undo/redo/reload and redacted browser diagnostics."
+  }
+}
