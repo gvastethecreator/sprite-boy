@@ -72,6 +72,40 @@ const alphaCropResult = await createGridProcessingClient().process({
   },
 });
 const alphaOutput = alphaCropResult.outputs[0]!;
+const chromaSource = [
+  0, 255, 0, 255,
+  10, 250, 10, 200,
+  0, 200, 0, 255,
+  255, 0, 0, 127,
+  210, 150, 120, 255,
+  0, 255, 0, 0,
+] as const;
+const processChromaFixture = (enabled: boolean, requestId: string) =>
+  createGridProcessingClient().process({
+    request: {
+      version: GRID_PROCESSING_PROTOCOL_VERSION,
+      type: "process",
+      requestId,
+      source: {
+        width: 6,
+        height: 1,
+        format: "rgba8",
+        colorSpace: "srgb",
+        pixels: new Uint8ClampedArray(chromaSource).buffer,
+      },
+      recipe: {
+        kind: "grid-split",
+        version: 1,
+        sourceAssetId: `asset-${requestId}`,
+        layout: { mode: "manual", rows: 1, cols: 1 },
+        crop: { threshold: 0, padding: 0 },
+        chroma: { enabled, color: "#00ff00", tolerance: 10, smoothness: 20, spill: 100 },
+        pixel: { enabled: false, size: 16, quantize: false, colors: 16 },
+      },
+    },
+  });
+const chromaEnabledResult = await processChromaFixture(true, "grid-real-worker-chroma-enabled");
+const chromaDisabledResult = await processChromaFixture(false, "grid-real-worker-chroma-disabled");
 const edgePixels = new Uint8ClampedArray(7 * 5 * 4);
 const setEdgePixel = (x: number, y: number, rgba: readonly number[]): void => {
   edgePixels.set(rgba, (y * 7 + x) * 4);
@@ -180,6 +214,16 @@ const evidence = Object.freeze({
     operations: alphaOutput.operations,
     pixels: Object.freeze([...new Uint8ClampedArray(alphaOutput.surface.pixels)]),
   }),
+  chromaGolden: Object.freeze({
+    enabledPixels: Object.freeze([
+      ...new Uint8ClampedArray(chromaEnabledResult.outputs[0]!.surface.pixels),
+    ]),
+    enabledOperations: chromaEnabledResult.outputs[0]!.operations,
+    disabledPixels: Object.freeze([
+      ...new Uint8ClampedArray(chromaDisabledResult.outputs[0]!.surface.pixels),
+    ]),
+    disabledOperations: chromaDisabledResult.outputs[0]!.operations,
+  }),
   reductionEdge: Object.freeze({
     recipeUnchanged: JSON.stringify(edgeRecipe) === JSON.stringify(edgeRecipeBefore),
     outputCount: edgeResult.outputs.length,
@@ -250,6 +294,19 @@ if (
     dimensions: { width: 2, height: 1 },
     operations: ["crop"],
     pixels: [7, 8, 9, 128, 7, 8, 9, 255],
+  }) ||
+  JSON.stringify(evidence.chromaGolden) !== JSON.stringify({
+    enabledPixels: [
+      0, 0, 0, 0,
+      10, 10, 10, 0,
+      0, 55, 0, 70,
+      255, 0, 0, 127,
+      210, 150, 120, 255,
+      0, 255, 0, 0,
+    ],
+    enabledOperations: ["chroma"],
+    disabledPixels: chromaSource,
+    disabledOperations: [],
   }) ||
   JSON.stringify(evidence.reductionEdge) !== JSON.stringify({
     recipeUnchanged: true,

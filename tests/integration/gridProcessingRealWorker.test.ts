@@ -51,6 +51,26 @@ describe("grid processing real Worker integration", () => {
           7, 8, 9, 255,
         ],
       },
+      chromaGolden: {
+        enabledPixels: [
+          0, 0, 0, 0,
+          10, 10, 10, 0,
+          0, 55, 0, 70,
+          255, 0, 0, 127,
+          210, 150, 120, 255,
+          0, 255, 0, 0,
+        ],
+        enabledOperations: ["chroma"],
+        disabledPixels: [
+          0, 255, 0, 255,
+          10, 250, 10, 200,
+          0, 200, 0, 255,
+          255, 0, 0, 127,
+          210, 150, 120, 255,
+          0, 255, 0, 0,
+        ],
+        disabledOperations: [],
+      },
       reductionEdge: {
         recipeUnchanged: true,
         outputCount: 6,

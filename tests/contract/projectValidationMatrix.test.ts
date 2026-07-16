@@ -323,6 +323,24 @@ describe("StudioProjectV1 hostile validation matrix", () => {
         `$.processingRecipes.recipe-grid.crop.${key}`,
       ]]);
     }
+
+    for (const [key, value, code] of [
+      ["color", "00ff00", "INVALID_DOCUMENT"],
+      ["color", "#0f0", "INVALID_DOCUMENT"],
+      ["tolerance", -1, "INVALID_NUMBER"],
+      ["tolerance", 100.01, "INVALID_NUMBER"],
+      ["smoothness", -1, "INVALID_NUMBER"],
+      ["smoothness", 101, "INVALID_NUMBER"],
+      ["spill", -1, "INVALID_NUMBER"],
+      ["spill", 101, "INVALID_NUMBER"],
+    ] as const) {
+      const hostileChroma = cloneFixture();
+      record(record(hostileChroma.processingRecipes["recipe-grid"]).chroma)[key] = value;
+      expectDiagnostics(hostileChroma, [[
+        code,
+        `$.processingRecipes.recipe-grid.chroma.${key}`,
+      ]]);
+    }
   });
 
   it("validates artifact economics, references and provenance consistency", () => {
