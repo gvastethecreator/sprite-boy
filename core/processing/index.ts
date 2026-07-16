@@ -3,3 +3,4 @@ export * from "./jobRunner";
 export * from "./exportJobTask";
 export * from "./gridProcessingGeometry";
 export * from "./gridProcessingAlgorithms";
+export * from "./gridProcessingJobTask";

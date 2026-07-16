@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-processing-real-worker",
+  "status": "pass",
+  "tests": {
+    "g1_03Passed": 28,
+    "failed": 0,
+    "typecheck": "pass",
+    "lint": "pass",
+    "productionBuild": "pass"
+  },
+  "realWorker": {
+    "runtime": "Bun 1.3.14 Worker",
+    "sourceDetached": true,
+    "outputCount": 2,
+    "progressStages": [
+      "decode",
+      "detect",
+      "chroma",
+      "chroma",
+      "crop",
+      "crop",
+      "resize",
+      "resize",
+      "quantize",
+      "quantize",
+      "finalize"
+    ],
+    "outputPixels": [
+      [255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255],
+      [0, 0, 0, 0]
+    ]
+  },
+  "chromiumWorker": {
+    "runtime": "Chromium production preview",
+    "workerConstructed": true,
+    "workerType": "module",
+    "sourceDetached": true,
+    "outputCount": 2,
+    "progressMonotonic": true,
+    "progressStages": [
+      "decode",
+      "detect",
+      "chroma",
+      "chroma",
+      "crop",
+      "crop",
+      "resize",
+      "resize",
+      "quantize",
+      "quantize",
+      "finalize"
+    ],
+    "outputDimensions": [[2, 2], [1, 1]],
+    "outputPixels": [
+      [255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255],
+      [0, 0, 0, 0]
+    ],
+    "errors": {
+      "console": 0,
+      "exception": 0,
+      "log": 0,
+      "network": 0,
+      "http": 0
+    }
+  },
+  "commands": [
+    "bun x vitest run tests/contract/gridProcessingClient.test.ts tests/contract/gridProcessingJobTask.test.ts tests/contract/gridProcessingWorkerDiagnostics.test.ts tests/integration/gridProcessingRealWorker.test.ts tests/scripts/gridProcessingBrowserSmoke.test.ts",
+    "bun x tsc --noEmit",
+    "bun x oxlint core/processing/gridProcessingJobTask.ts core/processing/index.ts features/slice/processing/gridProcessingClient.ts features/slice/processing/gridProcessing.worker.ts features/slice/processing/gridProcessingWorkerDiagnostics.ts features/slice/processing/gridProcessingBrowserProbe.ts index.tsx tests/contract/gridProcessingClient.test.ts tests/contract/gridProcessingJobTask.test.ts tests/contract/gridProcessingWorkerDiagnostics.test.ts tests/integration/gridProcessingRealWorker.test.ts tests/scripts/gridProcessingBrowserSmoke.test.ts",
+    "bun run build",
+    "bun scripts/grid-processing-worker-smoke.ts",
+    "node scripts/grid-processing-browser-smoke.mjs"
+  ],
+  "independentReview": {
+    "decision": "ACCEPT",
+    "severityCounts": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "notes": [
+      "Production Chromium used the Vite-emitted module Worker with no main-thread fallback.",
+      "Input transfer, response validation, monotonic progress, cleanup and active-stage diagnostics were accepted.",
+      "The production query-gated fixed-input probe restores the native Worker descriptor and accepts no page payload."
+    ]
+  }
+}
