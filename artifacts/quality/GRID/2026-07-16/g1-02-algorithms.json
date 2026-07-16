@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-processing-algorithms-independent-review",
+  "status": "pass",
+  "verdict": "ACCEPT",
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0,
+    "P3": 0
+  },
+  "tests": {
+    "passed": 20,
+    "failed": 0,
+    "typecheck": "pass",
+    "lint": "pass"
+  },
+  "performanceMs": {
+    "surface256x256Palette256": [1059.67, 1045.11, 1121.14],
+    "exact16384Colors": 840.26,
+    "budget": 1500
+  },
+  "probes": {
+    "lowCardinalityGolden": "pass",
+    "fractionalAxisRemap": { "start": 2, "end": 5 },
+    "crossRealmTypedArray": "pass",
+    "sharedBufferRejected": "pass",
+    "detachedBufferRejected": "pass"
+  }
+}
