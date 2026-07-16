@@ -26,6 +26,8 @@ interface SlicerToolsProps {
   onFrameToAsset?: (id: number) => void;
   gridConfig?: GridConfig;
   setGridConfig?: (config: GridConfig) => void;
+  /** Legacy project-grid editor. Slice owns its replacement in SliceGridInspector. */
+  showLegacyGridControls?: boolean;
 }
 
 const SectionHeader = ({
@@ -111,7 +113,7 @@ const SlicerTools: React.FC<SlicerToolsProps> = (props) => {
           </div>
         )}
 
-        {props.gridConfig && (
+        {props.gridConfig && props.showLegacyGridControls !== false && (
           <div className="border border-white/5 rounded-xl bg-black/20 overflow-hidden shadow-inner-depth animate-slide-up">
             <button
               onClick={() => setIsGridOpen(!isGridOpen)}

@@ -150,7 +150,11 @@ const ViewTools: React.FC = () => {
   );
 };
 
-const BuildTools: React.FC = () => {
+interface BuildToolsProps {
+  readonly isSliceWorkspace: boolean;
+}
+
+const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace }) => {
   const {
     builderCanvas,
     slicerImage,
@@ -234,6 +238,7 @@ const BuildTools: React.FC = () => {
                 onFrameToAsset={handleFrameToAsset}
                 gridConfig={activeGrid}
                 setGridConfig={handleSetGridConfig}
+                showLegacyGridControls={!isSliceWorkspace}
               />
 
               <BgRemovalTool
@@ -264,7 +269,11 @@ const BuildTools: React.FC = () => {
   );
 };
 
-const LeftSidebar: React.FC = () => {
+interface LeftSidebarProps {
+  readonly isSliceWorkspace?: boolean;
+}
+
+const LeftSidebar: React.FC<LeftSidebarProps> = ({ isSliceWorkspace = false }) => {
   const {
     currentMode,
     animations,
@@ -298,7 +307,7 @@ const LeftSidebar: React.FC = () => {
 
   return (
     <aside className="h-full flex flex-col overflow-hidden panel-gradient">
-      <BuildTools />
+      <BuildTools isSliceWorkspace={isSliceWorkspace} />
     </aside>
   );
 };

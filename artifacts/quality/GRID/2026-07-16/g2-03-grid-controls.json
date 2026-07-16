@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "check": "slice-grid-controls-and-detected-feedback",
+  "status": "pass",
+  "verificationState": "browser-verified-and-independently-accepted",
+  "tests": {
+    "g203FilesPassed": 3,
+    "g203TestsPassed": 29,
+    "supportingGridFilesPassed": 3,
+    "supportingGridTestsPassed": 54,
+    "failed": 0,
+    "typecheck": {
+      "status": "blocked-unrelated",
+      "failures": [
+        "features/slice/irregular/wandSelection.ts:443 detectIrregularRegions is missing",
+        "features/slice/irregular/wandSelection.ts:473 component has implicit any"
+      ]
+    },
+    "focusedLint": "pass",
+    "productionBuild": "pass",
+    "diffCheck": "pass"
+  },
+  "matrix": {
+    "featureLocalControllerMountedOnce": true,
+    "desktopAndDrawerShareController": true,
+    "legacyGridAndSyncQuarantinedInSlice": true,
+    "sharedSourceDimensionBoundary": true,
+    "oversizedSourceRejectedBeforeWorkerAllocation": true,
+    "invalidReplacementRetention": true,
+    "sourceGenerationCancelAndLateWriteGuard": true,
+    "ownedDecodedImageBorrowedWithoutCloseOrTransfer": true,
+    "ownedDecodedImageClonedBeforeTransfer": true,
+    "legacyUrlDecodedInsideWorker": true,
+    "mainThreadCanvasAllocations": 0,
+    "mainThreadRgbaMaterializations": 0,
+    "offscreenCanvasWorkerInference": true,
+    "workerBitmapDimensionsMustMatchCommittedSource": true,
+    "exhaustiveNoThrowCleanup": true,
+    "hostileWorkerResponseRebuiltAndFrozen": true,
+    "closedWarningVocabulary": true,
+    "canonicalRowMajorCellsValidated": true,
+    "autoManualRadiogroup": true,
+    "manualValuesRetained": true,
+    "invalidAttemptVisibleWithoutClamp": true,
+    "ariaInvalidAndDescribedBy": true,
+    "detectingAndDetectedPoliteStatus": true,
+    "retryFocusStableThroughDetectingAndResolution": true,
+    "manualAvailableWhileDetecting": true,
+    "fallback1x1Warning": true,
+    "effectiveLayoutExportedWithoutOverlay": true,
+    "browserObservableInferenceOrigin": true
+  },
+  "workerEvidence": {
+    "entry": "features/slice/grid/gridPreviewInference.worker.ts",
+    "productionChunk": "dist/assets/gridPreviewInference.worker-DyUNrrsr.js",
+    "mainToWorkerTransfer": "cloned ImageBitmap only",
+    "sourceOwnerTransferred": false,
+    "workerOwns": "transferred clone or URL-decoded bitmap",
+    "workerCleanup": "bitmap.close in finally",
+    "abortPolicy": "terminate Worker; suppress late result; close late untransferred clone"
+  },
+  "browserVerification": {
+    "status": "pass",
+    "command": "node scripts/studio-grid-controls-browser.mjs",
+    "route": "#/studio/slice",
+    "viewport": "1440x900 desktop and 900x800 compact drawer",
+    "metrics": {
+      "lateCloneSuppressed": true,
+      "workerCancelled": true,
+      "inspectorVisible": true,
+      "legacyGridQuarantined": true,
+      "detectedOrigin": "detected",
+      "realModuleWorker": true,
+      "cloneTransferred": true,
+      "ownerTransferred": 0,
+      "ownerStillReadable": true,
+      "invalidAttemptVisible": true,
+      "compactDrawerVisible": true,
+      "workersCreated": 4,
+      "workersTerminated": 4,
+      "cancelledPendingMessages": 1,
+      "pageFits": true,
+      "errors": {
+        "console": 0,
+        "exception": 0,
+        "log": 0,
+        "network": 0,
+        "http": 0
+      }
+    },
+    "screenshot": "artifacts/quality/GRID/2026-07-16/g2-03-grid-controls.png"
+  },
+  "independentReview": {
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "evidence": "Independent 29/29 rerun plus Chrome artifact confirmed off-main inference, exact hostile response validation, owner/clone lifecycle, focus restoration and real module Worker cleanup."
+  },
+  "commands": [
+    "bunx vitest run tests/contract/gridPreviewInference.test.ts tests/hooks/useSliceGridController.test.tsx tests/components/sliceGridInspector.test.tsx",
+    "bunx vitest run tests/contract/gridLayoutDraft.test.ts tests/contract/gridProcessingAlgorithms.test.ts tests/contract/gridProcessingGeometry.test.ts",
+    "bunx oxlint features/slice/grid components/layout/AppLayout.tsx components/layout/LeftSidebar.tsx components/layout/RightSidebar.tsx components/panels/left/SlicerTools.tsx tests/contract/gridPreviewInference.test.ts tests/hooks/useSliceGridController.test.tsx tests/components/sliceGridInspector.test.tsx scripts/studio-grid-controls-browser.mjs",
+    "bun run build",
+    "STUDIO_GRID_CONTROLS_SCREENSHOT=artifacts/quality/GRID/2026-07-16/g2-03-grid-controls.png node scripts/studio-grid-controls-browser.mjs",
+    "git diff --check"
+  ]
+}

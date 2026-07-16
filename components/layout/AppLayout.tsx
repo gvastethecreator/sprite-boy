@@ -50,6 +50,7 @@ import type {
   SourceSessionError,
   SourceSessionSnapshot,
 } from "../../features/slice/source/sourceSession";
+import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
 
 const LEGACY_MODE_BY_WORKSPACE = {
   slice: AppMode.BUILDER,
@@ -157,6 +158,7 @@ const AppLayout: React.FC = () => {
   const [isResetSourceDialogOpen, setResetSourceDialogOpen] = useState(false);
   const [committedSourceMetadata, setCommittedSourceMetadata] =
     useState<SourceReadyMetadata | null>(null);
+  const [sliceGridSourceGeneration, setSliceGridSourceGeneration] = useState(0);
   const [sourceActionError, setSourceActionError] = useState<SourceSessionError | null>(null);
   const sourceImportGenerationRef = useRef(0);
   const sourceCommitControllerRef = useRef<AbortController | null>(null);
@@ -167,6 +169,12 @@ const AppLayout: React.FC = () => {
     reset: resetSourceSession,
     getBlob: getSourceBlob,
   } = useSliceSourceSession();
+  const sliceGridController = useSliceGridController({
+    generation: sliceGridSourceGeneration,
+    committedMetadata: committedSourceMetadata,
+    sessionSnapshot: sourceSessionSnapshot,
+    legacyImage: slicerImage,
+  });
   const isCompactLayout = useCompactStudioLayout();
   const jobStore = useJobStore();
   const jobRunner = useStudioJobRunner();
@@ -209,6 +217,7 @@ const AppLayout: React.FC = () => {
 
   const clearSourceWorkflow = useCallback((): void => {
     sourceImportGenerationRef.current += 1;
+    setSliceGridSourceGeneration((generation) => generation + 1);
     cancelSourceCommit();
     resetSourceSession();
     setCommittedSourceMetadata(null);
@@ -338,6 +347,7 @@ const AppLayout: React.FC = () => {
       await handleUpload(file, { signal: controller.signal });
       if (sourceImportGenerationRef.current !== generation) return false;
       setCommittedSourceMetadata(snapshot.metadata);
+      setSliceGridSourceGeneration((current) => current + 1);
       setSourceActionError(null);
       setStudioError(null);
       navigate("slice");
@@ -550,7 +560,7 @@ const AppLayout: React.FC = () => {
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
-            <LeftSidebar />
+            <LeftSidebar isSliceWorkspace={activeWorkspace === "slice"} />
           </StudioPanel>
         )}
 
@@ -626,7 +636,10 @@ const AppLayout: React.FC = () => {
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
-            <RightSidebar />
+            <RightSidebar
+              isSliceWorkspace={activeWorkspace === "slice"}
+              sliceGridController={sliceGridController}
+            />
           </StudioPanel>
         )}
       </div>
@@ -645,7 +658,7 @@ const AppLayout: React.FC = () => {
             onClose={() => setCompactPanel(null)}
             className="h-full border-0"
           >
-            <LeftSidebar />
+            <LeftSidebar isSliceWorkspace={activeWorkspace === "slice"} />
           </StudioPanel>
         ) : compactPanel === "properties" ? (
           <StudioPanel
@@ -654,7 +667,10 @@ const AppLayout: React.FC = () => {
             onClose={() => setCompactPanel(null)}
             className="h-full border-0"
           >
-            <RightSidebar />
+            <RightSidebar
+              isSliceWorkspace={activeWorkspace === "slice"}
+              sliceGridController={sliceGridController}
+            />
           </StudioPanel>
         ) : null}
       </StudioDialog>
