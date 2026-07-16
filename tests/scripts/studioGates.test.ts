@@ -107,6 +107,7 @@ describe("studio gate manifest", () => {
       "build",
       "bundle-budget",
       "browser-budget",
+      "deferred-feature-browser",
     ]);
     expect(STUDIO_GATE_MANIFEST.gates.all.steps.filter(({ id }) => id === "build")).toHaveLength(1);
     expect(STUDIO_GATE_MANIFEST.gates.lint.steps[0]?.args).toEqual([
@@ -116,6 +117,7 @@ describe("studio gate manifest", () => {
       "build",
       "bundle-budget",
       "browser-budget",
+      "deferred-feature-browser",
     ]);
     expect(STUDIO_GATE_MANIFEST.gates.persistence.steps.map(({ id }) => id)).toEqual([
       "persistence-browser",

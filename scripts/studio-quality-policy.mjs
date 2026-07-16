@@ -14,8 +14,14 @@ export const QUALITY_POLICY_SCHEMA_VERSION = 1;
 export const COVERAGE_SUMMARY_PATH = "coverage/coverage-summary.json";
 export const FIXTURE_RETENTION_MANIFEST_PATH = "quality/fixture-retention.json";
 export const BUNDLE_THRESHOLDS = Object.freeze({
-  ratchet: Object.freeze({ initialJsGzipBytes: 245_999 }),
+  ratchet: Object.freeze({ initialJsGzipBytes: 156_500 }),
   release: Object.freeze({ initialJsGzipBytes: 180_000 }),
+});
+export const DEFERRED_FEATURE_CHUNK_PATTERNS = Object.freeze({
+  ai: /^aiService-[A-Za-z0-9_-]+\.js$/u,
+  gif: /^gifshot-[A-Za-z0-9_-]+\.js$/u,
+  zip: /^jszip(?:\.min)?-[A-Za-z0-9_-]+\.js$/u,
+  exportModal: /^ExportModal-[A-Za-z0-9_-]+\.js$/u,
 });
 
 export const COVERAGE_TEST_PATHS = Object.freeze([
@@ -45,7 +51,7 @@ function freezeThresholds(value) {
 }
 
 export const COVERAGE_THRESHOLDS = Object.freeze({
-  ratchet: freezeThresholds({ statements: 82.29, branches: 76.75, functions: 91.72, lines: 86.15 }),
+  ratchet: freezeThresholds({ statements: 90.01, branches: 86.08, functions: 94.83, lines: 92.65 }),
   release: freezeThresholds({ statements: 90, branches: 85, functions: 90, lines: 90 }),
 });
 
@@ -198,12 +204,32 @@ export function extractInitialJsPaths(indexHtml) {
   return Object.freeze(unique);
 }
 
+export function validateDeferredFeatureChunks(assetNames, initialPaths) {
+  if (
+    !Array.isArray(assetNames) || !Array.isArray(initialPaths) ||
+    assetNames.some((name) => typeof name !== "string" || !/^[A-Za-z0-9._-]+\.js$/u.test(name)) ||
+    initialPaths.some((path) => typeof path !== "string")
+  ) {
+    throw new TypeError("Deferred feature chunk inventory is invalid.");
+  }
+  const initialNames = new Set(initialPaths.map((path) => path.split("/").at(-1)));
+  const deferred = Object.entries(DEFERRED_FEATURE_CHUNK_PATTERNS).map(([feature, pattern]) => {
+    const matches = assetNames.filter((name) => pattern.test(name));
+    if (matches.length !== 1 || initialNames.has(matches[0])) {
+      throw new TypeError("Deferred feature chunk boundary is invalid.");
+    }
+    return Object.freeze({ feature, path: `/assets/${matches[0]}` });
+  });
+  return Object.freeze(deferred);
+}
+
 export function evaluateBundleEvidence(evidence, profile = "ratchet") {
   if (!Object.hasOwn(BUNDLE_THRESHOLDS, profile)) throw new TypeError("Unknown bundle profile.");
   if (
     !isRecord(evidence) || !Number.isSafeInteger(evidence.initialChunkCount) || evidence.initialChunkCount <= 0 ||
     !Number.isSafeInteger(evidence.initialJsBytes) || evidence.initialJsBytes <= 0 ||
-    !Number.isSafeInteger(evidence.initialJsGzipBytes) || evidence.initialJsGzipBytes <= 0
+    !Number.isSafeInteger(evidence.initialJsGzipBytes) || evidence.initialJsGzipBytes <= 0 ||
+    (evidence.deferredFeatureChunkCount !== undefined && evidence.deferredFeatureChunkCount !== 4)
   ) {
     throw new TypeError("Bundle evidence is invalid.");
   }
@@ -226,9 +252,18 @@ export function runBundleCheck(profile = "ratchet", options = {}) {
   if (!Object.hasOwn(BUNDLE_THRESHOLDS, profile)) throw new TypeError("Unknown bundle profile.");
   const cwd = resolve(options.cwd ?? process.cwd());
   const read = options.readFileSync ?? readFileSync;
+  const readDirectory = options.readdirSync ?? readdirSync;
   const spawn = options.spawnSync ?? spawnSync;
   try {
     const initialPaths = extractInitialJsPaths(read(resolve(cwd, "dist/index.html"), "utf8"));
+    const assetNames = readDirectory(resolve(cwd, "dist/assets"));
+    if (!Array.isArray(assetNames) || assetNames.some((name) => typeof name !== "string")) {
+      throw new TypeError("Production asset inventory is invalid.");
+    }
+    const deferredFeatureChunks = validateDeferredFeatureChunks(
+      assetNames.filter((name) => name.endsWith(".js")),
+      initialPaths,
+    );
     const measurement = spawn("node", [
       "scripts/studio-gzip-size.mjs",
       ...initialPaths.map((path) => `dist${path}`),
@@ -248,6 +283,7 @@ export function runBundleCheck(profile = "ratchet", options = {}) {
       initialChunkCount: result.initialChunkCount,
       initialJsBytes: result.initialJsBytes,
       initialJsGzipBytes: result.initialJsGzipBytes,
+      deferredFeatureChunkCount: deferredFeatureChunks.length,
     }, profile);
   } catch {
     return Object.freeze({

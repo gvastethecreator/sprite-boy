@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-07-15",
-  "task": "F8-05",
+  "task": "F8-05-release-closeout",
   "environment": {
     "os": "Windows",
     "cpu": "AMD Ryzen 9 3900XT 12-Core Processor",
@@ -22,15 +22,18 @@
   "bundle": {
     "buildCommand": "bun x vite build",
     "measurement": "Node zlib gzip level 9",
-    "initialChunkCount": 1,
-    "initialJsBytes": 918631,
-    "initialJsGzipBytes": 245999,
-    "ratchetBytes": 245999,
+    "initialChunkCount": 2,
+    "initialJsBytes": 522217,
+    "initialJsGzipBytes": 155472,
+    "ratchetBytes": 156500,
     "ratchetStatus": "pass",
     "releaseTargetBytes": 180000,
-    "releaseStatus": "fail",
+    "releaseStatus": "pass",
     "previousBaselineBytes": 224866,
-    "debt": "Foundation growth remains measurable; release requires code splitting or equivalent reduction."
+    "previousFoundationBytes": 245999,
+    "deferredFeatureChunkCount": 4,
+    "deferredFeatures": ["ai", "gif", "zip", "exportModal"],
+    "exportModalDeferred": true
   },
   "browser": {
     "command": "bun scripts/studio-gates.mjs --gate budgets",
@@ -41,7 +44,8 @@
     "interactionRuns": 4,
     "interactionSamples": 20,
     "verifiedWorkspaceTransitions": 20,
-    "inputToPaintP95Ms": 38,
+    "inputToPaintP95Ms": 41.1,
+    "fullGateInputToPaintP95Ms": 34,
     "stabilityP95Ms": [34.5, 34.7, 49.8],
     "inputToPaintLimitMs": 50,
     "longTaskObserverAvailable": true,
@@ -49,7 +53,7 @@
     "longTaskMaxMs": 0,
     "longTaskLimitMs": 100,
     "longTaskTotalMs": 0,
-    "jsHeapUsedBytes": 4335316,
+    "jsHeapUsedBytes": 4213548,
     "headlessRendererThrottlingDisabled": true,
     "timelineColdMountAvoided": true,
     "accessibility": {
@@ -59,6 +63,20 @@
       "unlabeledLimit": 0,
       "mainLandmarks": 1,
       "mainLandmarkRequired": 1
+    },
+    "deferredFeatures": {
+      "initialRequests": { "ai": 0, "gif": 0, "zip": 0, "exportModal": 0 },
+      "actionRequests": { "ai": 1, "gif": 1, "zip": 1, "exportModal": 1 },
+      "zipSucceeded": true,
+      "gifSucceeded": true,
+      "aiFailureContained": true,
+      "pageFits": true,
+      "dialogVisible": true,
+      "consoleErrors": 0,
+      "runtimeExceptions": 0,
+      "logErrors": 0,
+      "networkFailures": 0,
+      "httpErrors": 0
     }
   },
   "scope": {
@@ -66,13 +84,13 @@
       "Foundation shell idle behavior",
       "warm workspace navigation input-to-paint",
       "main-thread long tasks during the measured shell journey",
-      "native accessibility names and main landmark on the final Slice route"
+      "native accessibility names and main landmark on the final Slice route",
+      "AI, GIF and ZIP lazy-load boundaries through real UI actions"
     ],
     "deferredToFeatureSlices": [
       "drag and gizmo frame time",
       "large-project open and heap delta",
       "Grid processing and cancel feedback",
-      "AI and codec lazy chunks",
       "full WCAG 2.2 AA Axe and contrast audit"
     ]
   },
@@ -83,25 +101,25 @@
   "fullGate": {
     "command": "bun scripts/studio-gates.mjs --gate all",
     "status": "pass",
-    "unit": { "files": 23, "tests": 150 },
-    "contract": { "files": 43, "tests": 464 },
+    "unit": { "files": 26, "tests": 157 },
+    "contract": { "files": 54, "tests": 521 },
     "integration": { "files": 1, "tests": 6 },
     "coverage": {
-      "files": 66,
-      "tests": 620,
-      "statements": 82.31,
-      "branches": 76.82,
-      "functions": 91.79,
-      "lines": 86.17
+      "files": 81,
+      "tests": 684,
+      "statements": 90.01,
+      "branches": 86.08,
+      "functions": 94.83,
+      "lines": 92.65
     },
     "fixtures": { "roots": 2, "retained": 7 },
-    "completedSteps": 11
+    "completedSteps": 12
   },
   "review": {
     "status": "accepted",
-    "findingsClosed": 11,
-    "remainingP0P3": 0,
-    "focalTests": "4 files / 30 tests",
+    "previousFindingsClosed": 11,
+    "releaseCloseoutFindingsClosed": 2,
+    "remainingP0P3": { "p0": 0, "p1": 0, "p2": 0, "p3": 0 },
     "verdict": "accept"
   }
 }
