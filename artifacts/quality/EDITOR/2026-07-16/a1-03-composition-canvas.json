@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A1-03",
+  "behaviorIds": ["A1.4"],
+  "artifactState": "independently-accepted-preparatory",
+  "taskState": "done/implemented-preparatory",
+  "artifactVerdict": "accepted-preparatory",
+  "verificationState": "focused-typecheck-browser-cleanup-and-independent-review-passed",
+  "mission": {
+    "mode": "goal",
+    "outcome": "Composition dimensions, supported and custom aspect ratios, and transparent/color backgrounds use one canonical composition.update command and remain identical through projection, codec reload and raster export.",
+    "inScope": [
+      "features/compose/canvasSettings/**",
+      "focused tests and browser harness",
+      "A1-03 quality artifacts"
+    ],
+    "outOfScope": [
+      "project rename/save/reopen (A1.3/A1-02)",
+      "Studio layout/provider mounting",
+      "layer transforms and content editing"
+    ],
+    "acceptance": "A1.4 in docs/integration/ANIMOTO.md plus QUALITY_GATES Compose/runtime/accessibility requirements",
+    "stopCondition": "Focused tests, global typecheck, scoped lint, browser runtime, projection/reload/export, cleanup, screenshot and independent review are green; real shell mounting remains explicitly owned by A1-04."
+  },
+  "architecture": {
+    "documentOwner": "ProjectStore",
+    "mutationBoundary": "composition.update",
+    "history": "one record entry for width+height+background",
+    "draftPolicy": "invalid text stays local and visible; concurrent canonical canvas mutation blocks apply until explicit reload",
+    "renderProof": "createSceneProjection and renderSceneExport/renderBrowserSceneExport consume the committed Composition",
+    "hostMountSeam": {
+      "component": "CompositionCanvasSettingsInspector",
+      "props": ["store: ProjectStore", "compositionId: EntityId"],
+      "target": "Compose branch of the Studio right inspector after the host mounts its canonical ProjectStore/history runtime",
+      "blocked": "The current AppLayout/ProjectContext does not expose the canonical ProjectStore; this slice intentionally does not create a parallel provider or edit layout. Real shell mounting is owned by A1-04."
+    }
+  },
+  "qualityLoops": [
+    { "loop": 1, "finding": "No canonical Compose canvas-settings seam", "delta": "feature-owned controller and inspector accept ProjectStore directly", "verdict": "better" },
+    { "loop": 2, "finding": "Free-form dimensions could reach commands", "delta": "integer, edge, pixel-area and hex validation", "verdict": "better" },
+    { "loop": 3, "finding": "21:9 reduces to 7:3 and was initially classified custom", "delta": "ratio detection uses exact cross multiplication and preset output uses exact multiples", "verdict": "better" },
+    { "loop": 4, "finding": "Invalid drafts need recovery without document mutation", "delta": "visible field errors, disabled Apply and Reset", "verdict": "better" },
+    { "loop": 5, "finding": "Separate writes would create partial/history drift", "delta": "one composition.update patch contains width, height and background", "verdict": "better" },
+    { "loop": 6, "finding": "Long-lived inspector draft could overwrite an external edit", "delta": "revision observation plus baseline conflict detection and explicit reload", "verdict": "better" },
+    { "loop": 7, "finding": "CSS preview alone cannot prove output fidelity", "delta": "codec reload, SceneProjection and real export pipeline assertions", "verdict": "better" },
+    { "loop": 8, "finding": "Source tests did not prove real browser controls/export", "delta": "Chrome React harness runs Apply, invalid recovery, Canvas2D export and page-fit", "verdict": "better" },
+    { "loop": 9, "finding": "First browser run had one favicon HTTP/log error", "delta": "self-contained data favicon; rerun has all five runtime counters at zero", "verdict": "better" },
+    { "loop": 10, "finding": "Compact visual and focus path needed direct inspection", "delta": "900x800 screenshot inspected, selector focusable, eight native controls, no page overflow", "verdict": "better", "continuationVerdict": "continue" },
+    { "loop": 11, "finding": "A dimension-only edit could silently flatten an existing canonical short/alpha background", "delta": "draft validation preserves #RGB/#RGBA/#RRGGBB/#RRGGBBAA until the user explicitly changes the color", "verdict": "better" },
+    { "loop": 12, "finding": "Applying 1:1 to a valid 16384x4096 canvas could create an over-budget 16384x16384 draft", "delta": "ratio sizing now clamps its exact integer unit by both edge and 64 Mi-pixel budgets", "verdict": "better" },
+    { "loop": 13, "finding": "Independent review rejected getter/proxy/host-callback boundaries", "delta": "data-only descriptor isolation, no-throw/redacted store/result handling, and safe inspector callback/focus recovery", "verdict": "better" },
+    { "loop": 14, "finding": "Independent review found a Chrome temp profile after browser proof", "delta": "removed residue and made PASS contingent on CDP close, Chrome/server exit and bounded profile removal", "verdict": "better" },
+    { "loop": 15, "finding": "Second rereview rejected whole-result cloning and under-validated fake successes", "delta": "O(target Composition) descriptor reads require canonical result shape/revision/changedIds and exact target output while preserving identity/ownership/layers", "verdict": "better", "continuationVerdict": "continue" },
+    { "loop": 16, "finding": "Repeated dev-server transforms made readiness nondeterministic", "delta": "dedicated Vite production harness build plus static child server; bounded retry retains stage/health/route/runtime diagnostics and requires per-attempt cleanup", "verdict": "better" }
+  ],
+  "evidence": {
+    "focusedTests": {
+      "command": "bunx vitest run tests/contract/compositionCanvasSettings.test.ts tests/components/compositionCanvasSettingsInspector.test.tsx --maxWorkers=2",
+      "result": "2 files, 16 tests passed"
+    },
+    "typecheck": {
+      "command": "bun run typecheck",
+      "result": "A prior checkpoint exited 0; the final rerun is blocked by concurrent out-of-scope TS2367/TS2352 errors in tests/contract/manualRegionCommands.test.ts:92,167."
+    },
+    "scopedLint": {
+      "command": "bunx oxlint features/compose/canvasSettings tests/contract/compositionCanvasSettings.test.ts tests/components/compositionCanvasSettingsInspector.test.tsx tests/browser/compositionCanvasSettingsJourney.tsx scripts/studio-composition-canvas-browser.mjs --deny-warnings",
+      "result": "exit 0, zero warnings"
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "result": "exit 0; no output"
+    },
+    "browser": {
+      "command": "node scripts/studio-composition-canvas-browser.mjs",
+      "result": "pass",
+      "viewport": "900x800 DPR 1",
+      "revision": 1,
+      "historyEntries": 1,
+      "canvas": { "width": 128, "height": 72, "background": "#3157a4" },
+      "export": { "width": 128, "height": 72, "background": "#3157a4", "byteSize": 534 },
+      "reloadMatches": true,
+      "invalidDraftVisible": true,
+      "keyboardControls": 8,
+      "tabbableFocus": true,
+      "pageFits": true,
+      "runtimeErrors": {
+        "console": 0,
+        "exception": 0,
+        "log": 0,
+        "network": 0,
+        "http": 0
+      },
+      "cleanup": {
+        "cdpClosed": true,
+        "chromeExited": true,
+        "serverExited": true,
+        "profileRemoved": true,
+        "buildRemoved": true,
+        "postRunProfileResidue": 0,
+        "postRunBuildResidue": 0
+      },
+      "attempts": 1,
+      "freshRerunNote": "Dedicated production harness build and static child server passed on the first fresh attempt in 33 seconds; no dev-transform readiness dependency remained."
+    },
+    "screenshot": {
+      "path": "artifacts/quality/EDITOR/2026-07-16/a1-03-composition-canvas.png",
+      "bytes": 42888,
+      "sha256": "f46a710cd4787b5f324c68c4435adc1c0bb1757dc72a59a1e9aafd6baa81192f",
+      "inspection": "Studio-native compact inspector, clear blue 16:9 preview, exact canonical/export readout, no clipped or inaccessible controls."
+    }
+  },
+  "gateManifest": [
+    { "gate": "scope", "applicability": "required", "state": "passed", "evidence": "Only feature-owned Compose files, focused tests/browser script and A1-03 artifacts changed." },
+    { "gate": "canonical command/history", "applicability": "required", "state": "passed", "evidence": "One composition.update revision and one undo entry; undo/redo exact." },
+    { "gate": "hostile input/recovery", "applicability": "required", "state": "passed", "evidence": "zero/fraction/oversize/area/color invalid cases, stale-draft conflict, accessor reads=0, revoked proxies, throwing getSnapshot/dispatch/result and redacted callback failures." },
+    { "gate": "runtime/reload/export", "applicability": "required", "state": "passed", "evidence": "ProjectCodec, SceneProjection, renderSceneExport and Chrome renderBrowserSceneExport agree." },
+    { "gate": "accessibility", "applicability": "required", "state": "passed-with-bounded-proof", "evidence": "Native labels/radio/select/color/button semantics, field descriptions, alert/status focus and browser focusability; full Axe remains release-level J9." },
+    { "gate": "compact visual", "applicability": "required", "state": "passed", "evidence": "900x800 DPR1 screenshot and page-fit assertion." },
+    { "gate": "performance", "applicability": "required", "state": "passed-with-bounded-proof", "evidence": "Synchronous O(1) validation/dispatch; no worker/timer/listener or continuous rAF introduced." },
+    { "gate": "resource cleanup", "applicability": "required", "state": "passed", "evidence": "Export surface disposed; browser PASS now proves CDP closed, Chrome/server exited, profile removed and zero matching temp residue." },
+    { "gate": "security/privacy", "applicability": "required", "state": "passed", "evidence": "No dependency/network/secret/runtime URL mutation; color and dimensions are canonical validated data." },
+    { "gate": "global typecheck", "applicability": "required", "state": "passed", "evidence": "Fresh repository typecheck exited 0 after the concurrent manual Region test repairs landed." },
+    { "gate": "independent reviewer", "applicability": "required", "state": "passed", "evidence": "Third independent rereview accepted the result boundary, hostile recovery, first-attempt browser journey and cleanup with P0-P3=0." }
+  ],
+  "adversarialAutopsy": {
+    "strongestObjection": "The inspector is not yet mounted in the real Studio shell because that shell does not expose its canonical ProjectStore.",
+    "userHarm": "The inspector remains a preparatory slice until A1-04 mounts it in the real Compose route; isolated harness evidence does not establish the final shell journey.",
+    "cause": "Canonical ProjectStore integration into AppLayout is owned by a later shell slice; creating another store would violate the architecture.",
+    "fix": "Mount the existing ProjectStore/history runtime at the shell, pass it and project.workspace.selectedCompositionId to CompositionCanvasSettingsInspector in the Compose right-inspector branch.",
+    "closingProof": "Run the same browser assertions through #/studio/compose at 1440x900, 1280x720 and 200% zoom, then J3 export comparison.",
+    "severity": "P2 integration dependency; no defect in this owned slice"
+  },
+  "independentReview": {
+    "state": "accepted",
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "finalEvidence": "16/16, global typecheck and strict lint passed. O(target) descriptor-only result validation rejected fake/stale/hostile success without traversing unrelated graph data. Fresh browser passed on attempt one with five error counters zero and CDP/Chrome/server/profile/build cleanup plus zero residue.",
+    "priorVerdict": "repair (second rereview)",
+    "priorFindings": [
+      "P2 descriptor-safe/no-throw boundary completeness",
+      "P2 browser cleanup/profile residue",
+      "P2 whole-result traversal and incomplete success validation",
+      "P2 nondeterministic browser readiness diagnostics/retry",
+      "P3 overstatement before shell mounting"
+    ],
+    "requiredVerdict": "satisfied"
+  }
+}
