@@ -8,9 +8,12 @@ import { trimGridCell } from "../../../core/processing/gridProcessingCrop";
 import { inferAutoGridLayout } from "../../../core/processing/gridProcessingDetection";
 import {
   buildManualGrid,
-  calculateReductionRatio,
   getScaledDimensions,
 } from "../../../core/processing/gridProcessingGeometry";
+import {
+  calculateAggregateCropReductionRatio,
+  resolveGridCellReductionPolicy,
+} from "../../../core/processing/gridProcessingReduction";
 import {
   GRID_PROCESSING_LIMITS,
   GRID_PROCESSING_PROTOCOL_VERSION,
@@ -232,20 +235,21 @@ async function applyCropStage(
       () => process.cancelled || process.terminalSent,
     );
     output.operations.push("crop");
+    const policy = resolveGridCellReductionPolicy(
+      output.cellBounds.width,
+      output.cellBounds.height,
+      trimmed?.localBounds.width ?? null,
+      trimmed?.localBounds.height ?? null,
+    );
     if (trimmed === null) {
       output.contentBounds = null;
-      output.width = 1;
-      output.height = 1;
+      output.width = policy.surfaceWidth;
+      output.height = policy.surfaceHeight;
       output.pixels = new Uint8ClampedArray(4);
-      output.cropReductionRatio = 1;
-      addWarning(output, "empty-output");
+      output.cropReductionRatio = policy.cropReductionRatio;
+      if (policy.warning) addWarning(output, policy.warning);
     } else {
-      output.cropReductionRatio = calculateReductionRatio(
-        output.cellBounds.width,
-        output.cellBounds.height,
-        trimmed.localBounds.width,
-        trimmed.localBounds.height,
-      );
+      output.cropReductionRatio = policy.cropReductionRatio;
       output.contentBounds = {
         x: output.cellBounds.x + trimmed.localBounds.x,
         y: output.cellBounds.y + trimmed.localBounds.y,
@@ -253,8 +257,8 @@ async function applyCropStage(
         height: trimmed.localBounds.height,
       };
       output.pixels = trimmed.pixels;
-      output.width = trimmed.localBounds.width;
-      output.height = trimmed.localBounds.height;
+      output.width = policy.surfaceWidth;
+      output.height = policy.surfaceHeight;
     }
     if (!await reportProgress(process, "crop", index + 1, outputs.length)) return false;
   }
@@ -365,7 +369,10 @@ function finalizeResult(
     summary: {
       outputCount: outputs.length,
       outputPixelCount,
-      cropReductionRatio: 1 - retainedPixelCount / cellPixelCount,
+      cropReductionRatio: calculateAggregateCropReductionRatio(
+        cellPixelCount,
+        retainedPixelCount,
+      ),
       warnings: [...warningSet],
     },
   };

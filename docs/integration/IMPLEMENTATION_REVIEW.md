@@ -1428,6 +1428,21 @@ S1-04 espera el cierre conjunto de wand + manual tools.
 **Siguiente frontera Editor:** A1-02 Project menu/bootstrap Compose sigue
 activo; A1-04 portable first-composition acceptance espera ese cierre.
 
+### G3-02 — Reduction and empty/transparent cell policy
+
+- **Política:** la reducción es la fracción exacta de área removida; el resumen
+  pondera por área source de cada celda. `0` queda normalizado y el rango es
+  siempre finito `0..1`.
+- **Celdas vacías:** nunca se omiten. Conservan índice/fila/columna, exponen
+  `contentBounds: null`, una superficie RGBA8 transparente `1×1`, reducción
+  `1` y warning `empty-output` individual/agregado.
+- **Compatibilidad:** crop `threshold: 0` conserva el sentinel desactivado y el
+  output donor; G1 mantiene 8 fixtures/59 outputs sin drift.
+- **Evidencia:** 32 tests combinados, Worker real con alpha 127/128, padding,
+  layout no divisible, all-empty y máximo 4096; typecheck/lint/diff/JSON verdes.
+  Revisión independiente `ACCEPT`, P0-P3=0. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g3-02-reduction-empty-policy.json`.
+
 ### S1-03 — Manual Region command contract
 
 - **Core seam:** `region.create` exact-own-data, ID único, Asset owner existente,
