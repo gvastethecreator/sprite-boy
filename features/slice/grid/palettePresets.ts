@@ -4,7 +4,6 @@ export interface GridPalettePreset {
   readonly description: string;
   readonly colors: readonly string[];
 }
-
 const preset = (
   id: string,
   label: string,
@@ -36,4 +35,3 @@ export function palettePresetForColors(colors: readonly string[] | undefined): G
     entry.colors.length === normalized.length && entry.colors.every((color, index) => color === normalized[index]),
   ) ?? null;
 }
-
