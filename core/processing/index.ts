@@ -4,6 +4,7 @@ export * from "./exportJobTask";
 export * from "./gridProcessingGeometry";
 export * from "./gridProcessingAlgorithms";
 export * from "./gridProcessingDetection";
+export * from "./gridProcessingCrop";
 export * from "./irregularRegionDetection";
 export * from "./gridProcessingLimits";
 export * from "./gridLayoutValidation";

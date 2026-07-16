@@ -43,12 +43,47 @@ const result = await createGridProcessingClient().process({
   signal: controller.signal,
   onProgress: (progress) => progressStages.push(progress.stage),
 }).finally(() => clearTimeout(timeout));
+const alphaCropResult = await createGridProcessingClient().process({
+  request: {
+    version: GRID_PROCESSING_PROTOCOL_VERSION,
+    type: "process",
+    requestId: "grid-real-worker-alpha-crop",
+    source: {
+      width: 4,
+      height: 1,
+      format: "rgba8",
+      colorSpace: "srgb",
+      pixels: new Uint8ClampedArray([
+        7, 8, 9, 1,
+        7, 8, 9, 127,
+        7, 8, 9, 128,
+        7, 8, 9, 255,
+      ]).buffer,
+    },
+    recipe: {
+      kind: "grid-split",
+      version: 1,
+      sourceAssetId: "asset-real-worker-alpha-crop",
+      layout: { mode: "manual", rows: 1, cols: 1 },
+      crop: { threshold: 50, padding: 0 },
+      chroma: { enabled: false, color: "#00ff00", tolerance: 0, smoothness: 0, spill: 0 },
+      pixel: { enabled: false, size: 16, quantize: false, colors: 16 },
+    },
+  },
+});
+const alphaOutput = alphaCropResult.outputs[0]!;
 const evidence = Object.freeze({
   outputCount: result.outputs.length,
   progressStages: Object.freeze(progressStages),
   sourceDetached: sourceBuffer.byteLength === 0,
   outputPixels: Object.freeze(result.outputs.map((output) =>
     Object.freeze([...new Uint8ClampedArray(output.surface.pixels)]))),
+  alphaCrop: Object.freeze({
+    contentBounds: alphaOutput.contentBounds,
+    dimensions: Object.freeze({ width: alphaOutput.surface.width, height: alphaOutput.surface.height }),
+    operations: alphaOutput.operations,
+    pixels: Object.freeze([...new Uint8ClampedArray(alphaOutput.surface.pixels)]),
+  }),
 });
 if (
   evidence.outputCount !== 2 ||
@@ -63,7 +98,13 @@ if (
       255, 0, 0, 255,
     ],
     [0, 0, 0, 0],
-  ])
+  ]) ||
+  JSON.stringify(evidence.alphaCrop) !== JSON.stringify({
+    contentBounds: { x: 2, y: 0, width: 2, height: 1 },
+    dimensions: { width: 2, height: 1 },
+    operations: ["crop"],
+    pixels: [7, 8, 9, 128, 7, 8, 9, 255],
+  })
 ) {
   throw new Error("Real grid worker smoke assertions failed.");
 }

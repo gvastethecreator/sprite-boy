@@ -1494,6 +1494,23 @@ avanzar sobre Region-to-Asset y preservación de margins/gaps.
 **Siguiente frontera irregular:** S1-04 UI sigue activo; S1-06 espera su cierre
 para ejecutar el journey completo con undo/save/export.
 
+### G3-01 — Alpha threshold and padding trim stage
+
+- **Semántica:** stage puro full-source/cell usa
+  `alpha > floor(threshold×255/100)`, devuelve bounds local+absoluto frozen o
+  null; padding expande simétrico y clampa dentro de la celda.
+- **Compatibilidad:** llamadas directas cubren 0/50/99/100; en Worker,
+  `crop.threshold=0` conserva el sentinel donor crop-disabled para no alterar el
+  baseline G1-05. Threshold no-cero usa el stage canónico y recipe queda intacta.
+- **Hostile/perf:** records exact-own-data, typed arrays detached/shared/wrong/
+  cross-realm y método sombreado, OOB/product limits, cancel pre/row/4096.
+  Fixture 2 MP 703 ms <2500.
+- **Evidencia:** 18/18 focal, 80 properties, Worker real y 8 fixtures/59 outputs
+  frozen sin drift; typecheck/lint/diff verdes. Revisión `ACCEPT`, P0-P3=0.
+  Artifact: `artifacts/quality/GRID/2026-07-16/g3-01-threshold-padding-trim.json`.
+
+**Siguiente frontera Grid:** G3-02 reduction y empty/transparent policy activo.
+
 ## Frontiers abiertos
 
 - F3-07: `accept`; lifecycle browser y W1 cerrados.

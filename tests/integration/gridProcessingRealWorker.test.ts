@@ -42,6 +42,15 @@ describe("grid processing real Worker integration", () => {
         ],
         [0, 0, 0, 0],
       ],
+      alphaCrop: {
+        contentBounds: { x: 2, y: 0, width: 2, height: 1 },
+        dimensions: { width: 2, height: 1 },
+        operations: ["crop"],
+        pixels: [
+          7, 8, 9, 128,
+          7, 8, 9, 255,
+        ],
+      },
     });
   });
 });

@@ -26,8 +26,8 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G2-03 | E | G2-02,F5-06 | G2.1-G2.5 | Grid controls y detected-feedback UI | BR+A11Y + REV | done |
 | G2-04 | J | G2-02,F5-06 | G2.6 | Overlay geometry DPR/zoom/resize-safe | VIS + geometry UT | done |
 | G2-05 | J | G2-03,G2-04 | G2.1-G2.6 | Manual/auto switching and deterministic recipe state | BR+RT | done |
-| G3-01 | J | G2-05 | G3.1-G3.2 | Threshold/padding trim stage | Pixel golden UT | active |
-| G3-02 | J | G3-01 | G3.3-G3.4 | Reduction and empty/transparent cell policy | Edge fixture UT | todo |
+| G3-01 | J | G2-05 | G3.1-G3.2 | Threshold/padding trim stage | Pixel golden UT | done |
+| G3-02 | J | G3-01 | G3.3-G3.4 | Reduction and empty/transparent cell policy | Edge fixture UT | active |
 | G3-03 | E | G3-02 | G3.1-G3.4 | Crop controls, preview summary y reset | BR+A11Y + REV | todo |
 | G3-04 | J | G3-03 | G3.1-G3.4 | OOB/zero-size/huge-padding hostile gate | Property UT + REV | todo |
 | G4-01 | J | G1-05,G3-04 | G4.1-G4.4 | Chroma color/tolerance/smoothness/spill stage | VIS alpha/color goldens | todo |

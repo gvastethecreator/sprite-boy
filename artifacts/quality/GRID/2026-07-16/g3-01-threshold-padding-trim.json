@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "check": "g3-01-threshold-padding-trim",
+  "status": "worker-verified-and-independently-accepted",
+  "behaviors": ["G3.1", "G3.2"],
+  "decision": {
+    "contentRule": "alpha > floor(thresholdPercent * 255 / 100)",
+    "thresholdRange": "0..100 inclusive; direct stage calls cover 0/50/99/100 monotonically",
+    "workerZeroSentinel": "GridSplitRecipeV1 crop.threshold=0 remains donor-compatible crop-disabled so the reviewed G1-05 baseline does not drift",
+    "padding": "expand retained bounds equally and clamp to the original cell",
+    "empty": "canonical stage returns null; the existing Worker result policy materializes its reviewed 1x1 transparent output",
+    "recipeOwnership": "reads an exact own-data GridSplitRecipeV1.crop snapshot; no store or durable schema added"
+  },
+  "scope": [
+    "core/processing/gridProcessingCrop.ts",
+    "core/processing/index.ts",
+    "core/processing/gridProcessingAlgorithms.ts",
+    "features/slice/processing/gridProcessing.worker.ts",
+    "scripts/grid-processing-worker-smoke.ts",
+    "tests/contract/gridProcessingCrop.test.ts",
+    "tests/integration/gridProcessingRealWorker.test.ts"
+  ],
+  "pixelGolden": {
+    "source": "5x4 RGBA with alpha=1 and alpha=255 content inside a 4x4 source cell",
+    "threshold": 0,
+    "padding": 0,
+    "expectedLocalBounds": { "x": 1, "y": 1, "width": 2, "height": 2 },
+    "expectedContentBounds": { "x": 2, "y": 1, "width": 2, "height": 2 },
+    "expectedRgbaBytes": [
+      10, 20, 30, 1, 9, 8, 7, 0,
+      9, 8, 7, 0, 40, 50, 60, 255
+    ],
+    "result": "exact-pass"
+  },
+  "hostile": {
+    "sourceBounds": "zero-size, OOB and source-pixel over-budget rejected",
+    "typedArrays": "wrong-kind, wrong-size, detached, SharedArrayBuffer and shadowed length rejected; genuine cross-realm accepted; shadowed subarray is never invoked",
+    "records": "unknown keys and accessors rejected without getter invocation",
+    "cancellation": "preflight and exact 4096-pixel scan checkpoint pass",
+    "seededProperties": 80,
+    "invariants": "deterministic, monotonic threshold, padding containment, cell bounds and exact source pixels"
+  },
+  "performance": {
+    "fixture": "2048x1024 opaque RGBA scan plus exact copy",
+    "budgetMs": 2500,
+    "observedTestMs": 703,
+    "result": "pass"
+  },
+  "verification": {
+    "focusedUnit": "10/10 pass",
+    "realWorker": "pass; identical RGB with alpha 1/127/128/255 trims exactly to alpha 128/255 at threshold 50",
+    "frozenGoldenWorker": "pass; 8 fixtures / 59 outputs unchanged",
+    "typecheck": "pass",
+    "scopedLint": "pass; zero warnings",
+    "diffCheck": "pass; line-ending notices only"
+  },
+  "commands": [
+    "bun x vitest run tests/contract/gridProcessingCrop.test.ts tests/integration/gridProcessingRealWorker.test.ts tests/integration/gridProcessingGoldenWorker.test.ts tests/contract/gridProcessingGolden.test.ts --reporter=verbose",
+    "bun x tsc --noEmit --pretty false",
+    "bun x oxlint core/processing/gridProcessingCrop.ts core/processing/gridProcessingAlgorithms.ts core/processing/index.ts features/slice/processing/gridProcessing.worker.ts scripts/grid-processing-worker-smoke.ts tests/contract/gridProcessingCrop.test.ts tests/integration/gridProcessingRealWorker.test.ts",
+    "git diff --check -- core/processing/gridProcessingCrop.ts core/processing/gridProcessingAlgorithms.ts core/processing/index.ts features/slice/processing/gridProcessing.worker.ts scripts/grid-processing-worker-smoke.ts tests/contract/gridProcessingCrop.test.ts tests/integration/gridProcessingRealWorker.test.ts artifacts/quality/GRID/2026-07-16/g3-01-threshold-padding-trim.json"
+  ],
+  "review": {
+    "state": "accepted",
+    "verdict": "ACCEPT",
+    "findings": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 },
+    "evidence": "Independent raw-diff review accepted pure alpha semantics, Worker threshold-zero sentinel compatibility, hostile typed-array handling, cancellation cadence, real Worker proof and frozen G1 outputs."
+  }
+}

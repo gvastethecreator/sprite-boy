@@ -259,7 +259,7 @@ export function applyAdvancedChromaKey(
   }
 }
 
-/** Returns source-local retained bounds. Null is reserved for a fully transparent cell. */
+/** Donor RGB-background compatibility helper. Canonical alpha crop lives in gridProcessingCrop. */
 export function findLocalTrimBounds(
   pixels: Uint8ClampedArray,
   width: number,
