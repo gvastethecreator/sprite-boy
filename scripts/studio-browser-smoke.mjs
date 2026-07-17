@@ -218,6 +218,7 @@ export class CdpClient {
     this.closed = false;
     this.consoleErrorCount = 0;
     this.exceptionCount = 0;
+    this.exceptionKinds = [];
     this.logErrorCount = 0;
     this.logErrorKinds = [];
     this.networkFailureCount = 0;
@@ -239,6 +240,14 @@ export class CdpClient {
         this.consoleErrorCount += 1;
       } else if (message.method === "Runtime.exceptionThrown") {
         this.exceptionCount += 1;
+        const details = message.params?.exceptionDetails;
+        this.exceptionKinds.push({
+          text: details?.text ?? null,
+          description: details?.exception?.description ?? null,
+          url: details?.url ?? null,
+          lineNumber: details?.lineNumber ?? null,
+          columnNumber: details?.columnNumber ?? null,
+        });
       } else if (message.method === "Log.entryAdded" && message.params?.entry?.level === "error") {
         this.logErrorCount += 1;
         const entry = message.params.entry;
@@ -374,6 +383,29 @@ export async function connectToPage(port, commandTimeoutMs = 10_000) {
     "Chrome connection timed out.",
   );
   return new CdpClient(socket, commandTimeoutMs);
+}
+
+/**
+ * Waits for the Slice dropzone with a bounded reload retry. Chrome can publish
+ * `document.readyState=complete` before React has mounted after a cold preview
+ * start; a reload makes that transient state observable without weakening the
+ * final readiness assertion.
+ */
+export async function waitForSliceSourceDropzone(client, timeoutMs = 60_000, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await client.waitFor(
+        `document.readyState === "complete" && Boolean(document.querySelector("[data-slice-source-dropzone]"))`,
+        timeoutMs,
+      );
+      return;
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      await client.send("Page.reload", { ignoreCache: true });
+      await delay(300);
+    }
+  }
+  throw new Error("Slice source dropzone readiness timed out.");
 }
 
 export function processHasExited(child, dependencies = {}) {

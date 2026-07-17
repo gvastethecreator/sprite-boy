@@ -84,9 +84,10 @@ const ViewTools: React.FC = () => {
           <div className="space-y-4 bg-black/20 p-4 rounded-xl border border-white/5 shadow-inner-depth">
             <div className="flex items-center justify-between">
               <span className="text-xs text-textMuted">Background</span>
-              <input
-                type="color"
-                value={templateConfig.backgroundColor}
+                <input
+                  type="color"
+                  aria-label="Background color"
+                  value={templateConfig.backgroundColor}
                 onChange={(e) =>
                   setTemplateConfig({ ...templateConfig, backgroundColor: e.target.value })
                 }
@@ -95,9 +96,10 @@ const ViewTools: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-textMuted">Grid Color</span>
-              <input
-                type="color"
-                value={templateConfig.gridColor}
+                <input
+                  type="color"
+                  aria-label="Grid color"
+                  value={templateConfig.gridColor}
                 onChange={(e) =>
                   setTemplateConfig({ ...templateConfig, gridColor: e.target.value })
                 }
@@ -152,9 +154,10 @@ const ViewTools: React.FC = () => {
 
 interface BuildToolsProps {
   readonly isSliceWorkspace: boolean;
+  readonly irregularTools?: React.ReactNode;
 }
 
-const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace }) => {
+const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace, irregularTools }) => {
   const {
     builderCanvas,
     slicerImage,
@@ -239,7 +242,10 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace }) => {
                 gridConfig={activeGrid}
                 setGridConfig={handleSetGridConfig}
                 showLegacyGridControls={!isSliceWorkspace}
+                showLegacySliceControls={!isSliceWorkspace}
               />
+
+              {isSliceWorkspace ? irregularTools : null}
 
               <BgRemovalTool
                 onRemoveBackground={handleRemoveBackground}
@@ -271,9 +277,10 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace }) => {
 
 interface LeftSidebarProps {
   readonly isSliceWorkspace?: boolean;
+  readonly irregularTools?: React.ReactNode;
 }
 
-const LeftSidebar: React.FC<LeftSidebarProps> = ({ isSliceWorkspace = false }) => {
+const LeftSidebar: React.FC<LeftSidebarProps> = ({ isSliceWorkspace = false, irregularTools }) => {
   const {
     currentMode,
     animations,
@@ -307,7 +314,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ isSliceWorkspace = false }) =
 
   return (
     <aside className="h-full flex flex-col overflow-hidden panel-gradient">
-      <BuildTools isSliceWorkspace={isSliceWorkspace} />
+      <BuildTools isSliceWorkspace={isSliceWorkspace} irregularTools={irregularTools} />
     </aside>
   );
 };

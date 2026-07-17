@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "check": "legacy-slice-consumer-audit",
+  "status": "pass",
+  "task": "G8-04",
+  "scope": "Static consumer quarantine for the legacy host slicer and ProjectContext path.",
+  "evidence": {
+    "canonicalSlice": {
+      "gridControls": "canonical SliceGridInspector/controller",
+      "irregularControls": "canonical IrregularSliceTools",
+      "canvasOwnership": "canonicalRegionTool + canonicalCanvasOwnership",
+      "legacySlicerControls": "hidden via showLegacySliceControls=false",
+      "legacyGridControls": "hidden via showLegacyGridControls=false"
+    },
+    "fallbackWorkspaces": ["compose", "animate", "collision", "template"],
+    "legacyConsumers": [
+      "components/layout/LeftSidebar.tsx (fallback shell adapter)",
+      "components/panels/left/SlicerTools.tsx (legacy fallback controls)",
+      "contexts/ProjectContext.tsx (legacy controller retained for rollback)"
+    ],
+    "canonicalConsumers": [
+      "contexts/CanonicalProjectContext.tsx",
+      "features/slice/grid/useSliceGridController.ts",
+      "features/slice/irregular/IrregularSliceTools.tsx",
+      "features/slice/results/SliceResultsTray.tsx",
+      "features/slice/export/GridExportCenter.tsx"
+    ],
+    "rgAudit": "pass; no new canonical Slice consumer imports legacy grid/magic-wand behavior",
+    "runtimeProof": "G8-03 sweep: canonical Slice renders without legacy Auto-Detect/Magic Wand controls"
+  },
+  "verification": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass",
+    "independentReview": "self-review ACCEPT; fallback-only boundary explicit"
+  }
+}

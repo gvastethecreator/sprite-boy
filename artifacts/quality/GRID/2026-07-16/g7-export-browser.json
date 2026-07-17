@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-export-browser",
+  "status": "pass",
+  "task": "G7-01/G7-02/G7-03/G7-04",
+  "scope": "Committed Grid region PNG, ZIP+manifest artifact, Export workspace and canonical Compose handoff.",
+  "evidence": {
+    "exportCenter": {
+      "route": "#/studio/export",
+      "regionTiles": 8,
+      "exportZipEnabled": true,
+      "downloadPngEnabled": true,
+      "composeEnabled": true
+    },
+    "pngDownload": {
+      "fileName": "Slice 1.png",
+      "mimeType": "image/png",
+      "byteSize": 357,
+      "signature": [137, 80, 78, 71]
+    },
+    "zipDownload": {
+      "fileName": "Untitled project.zip",
+      "mimeType": "application/zip",
+      "byteSize": 3673,
+      "byteSizeNote": "Observed value; UUIDs and ZIP compression make byte size non-invariant.",
+      "signature": [80, 75, 3, 4]
+    },
+    "composeHandoff": {
+      "activeWorkspace": "compose",
+      "selectedRegion": true,
+      "compositionCount": 1,
+      "layerCount": 1,
+      "recipeCount": 1,
+      "regionCount": 8
+    },
+    "accessibility": {
+      "unlabeledInteractiveCount": 0,
+      "mainLandmarkCount": 1
+    },
+    "layout": {
+      "horizontalOverflow": false,
+      "verticalOverflow": false
+    },
+    "screenshot": {
+      "path": "artifacts/quality/GRID/2026-07-16/g7-export-browser.png",
+      "bytes": 86847,
+      "sha256": "924ea9806cad28b06e6d87ee7137b68ba1d6686dfd504825f46d2b2f085572f1"
+    },
+    "runtimeErrors": {
+      "console": 0,
+      "exception": 0,
+      "log": 0,
+      "network": 0,
+      "http": 0
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "UI-only download: PNG and ZIP are captured as real Blob artifacts with MIME and magic-byte checks.",
+      "ZIP without provenance: unit contract inspects manifest region, asset and bounds entries.",
+      "Route-only Compose handoff: canonical autosave is re-read after Saved locally and contains one Composition and one Layer for the Region.",
+      "Happy-path-only cancellation: the ExportPort cancellation test asserts no writer call after an aborted request."
+    ],
+    "focusedTests": "pass (7/7 G7 export integration cases; broader G6/G7 focus 36/36)",
+    "browser": "Chrome headless production preview at 1440x900"
+  },
+  "verification": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass (Vite production build; pre-existing jszip/chunk warnings)",
+    "diffCheck": "pass",
+    "independentReview": "ACCEPT (P0/P1/P2=0; code, tests and evidence re-audited)"
+  }
+}

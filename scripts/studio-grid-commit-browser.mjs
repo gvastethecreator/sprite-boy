@@ -13,6 +13,7 @@ import {
   resolveChromeExecutable,
   spawnViteServer,
   summarizeAccessibilityTree,
+  waitForSliceSourceDropzone,
   waitForDevToolsPort,
   waitForPreview,
 } from "./studio-browser-smoke.mjs";
@@ -153,10 +154,7 @@ export async function runGridCommitBrowserGate(options = {}) {
     ]);
     stage = "navigate";
     await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
-    await client.waitFor(
-      `document.readyState === "complete" && Boolean(document.querySelector("[data-slice-source-dropzone]"))`,
-      60_000,
-    );
+    await waitForSliceSourceDropzone(client);
     if (await selectSource(client) !== true) throw new Error("Source fixture could not be selected.");
     stage = "source-ready";
     await client.waitFor(
@@ -204,7 +202,7 @@ export async function runGridCommitBrowserGate(options = {}) {
 
     stage = "reload-after-commit";
     await client.send("Page.reload", { ignoreCache: false });
-    await client.waitFor(`document.readyState === "complete" && Boolean(document.querySelector("[data-slice-source-dropzone]"))`, 60_000);
+    await client.waitFor(`document.readyState === "complete" && Boolean(document.querySelector("[data-slice-source-dropzone], [data-slice-source-canvas-frame]"))`, 60_000);
     await client.waitFor(
       `document.querySelector('[data-slice-results-tray] [role="status"]')?.textContent?.includes("Ready to process")`,
       60_000,
@@ -228,7 +226,9 @@ export async function runGridCommitBrowserGate(options = {}) {
       return { enabled: true };
     })()`);
     if (!undoState.enabled) throw new Error("Canonical Slice undo was disabled after reload.");
-    await client.waitFor(`document.querySelector('button[data-command-id="edit.undo"]')?.hasAttribute("disabled") === true`, 10_000);
+    await client.waitFor(`document.body.innerText.includes("Grid commit undone.")`, 60_000);
+    await client.waitFor(`document.querySelector('button[data-command-id="edit.undo"]')?.disabled === true`, 10_000);
+    const undoDisabledAfterDurableUndo = await client.evaluate(`document.querySelector('button[data-command-id="edit.undo"]')?.disabled === true`);
     const undone = await readCanonical(client);
     if (!undone || undone.regionCount !== 0 || undone.recipeCount !== 0 || undone.assetCount !== 1 || undone.sourceAssetId !== committed.sourceAssetId) {
       throw new Error(`Canonical undo did not remove committed graph only: ${JSON.stringify({ committed, undone })}`);
@@ -239,7 +239,7 @@ export async function runGridCommitBrowserGate(options = {}) {
 
     stage = "reload-after-undo";
     await client.send("Page.reload", { ignoreCache: false });
-    await client.waitFor(`document.readyState === "complete" && Boolean(document.querySelector("[data-slice-source-dropzone]"))`, 60_000);
+    await client.waitFor(`document.readyState === "complete" && Boolean(document.querySelector("[data-slice-source-dropzone], [data-slice-source-canvas-frame]"))`, 60_000);
     await client.waitFor(
       `document.querySelector('[data-slice-results-tray] [role="status"]')?.textContent?.includes("Ready to process")`,
       60_000,
@@ -269,6 +269,7 @@ export async function runGridCommitBrowserGate(options = {}) {
       && undone.regionCount === 0 && undone.recipeCount === 0
       && afterUndoReload.regionCount === 0 && afterUndoReload.recipeCount === 0
       && afterUndoReload.repositoryCount === 1 && afterUndoReload.sourceInRepository
+      && undoDisabledAfterDurableUndo
       && restoredSource.runtimeUrlText === false
       && accessibility.unlabeledInteractiveCount === 0
       && layout.horizontalOverflow === false && layout.verticalOverflow === false
@@ -286,6 +287,7 @@ export async function runGridCommitBrowserGate(options = {}) {
       restoredSource,
       undone,
       afterUndoReload,
+      undoDisabledAfterDurableUndo,
       accessibility,
       layout,
       screenshot,

@@ -3,3 +3,4 @@ export * from "./manualRegionCommands";
 export * from "./wandRegionCommands";
 export * from "./wandSelection";
 export * from "./WandSelectionProbe";
+export * from "./IrregularSliceTools";

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "check": "irregular-slice-browser",
+  "status": "pass",
+  "task": "S1-04/S1-06",
+  "scope": "Canonical Slice irregular/manual tools, wand selection, undo, save/reload and PNG/ZIP export.",
+  "evidence": {
+    "afterManual": {
+      "regions": 1,
+      "selected": "region-manual-c9756ceb-4355-4949-a921-fd03c5dd8efc80×80"
+    },
+    "wand": {
+      "selectedComponents": 1,
+      "selectedPixels": 6400,
+      "mode": "replace"
+    },
+    "beforeReload": {
+      "workspace": "slice",
+      "regionCount": 1,
+      "assetCount": 1,
+      "selectedRegionId": null
+    },
+    "afterReload": {
+      "workspace": "slice",
+      "regionCount": 1,
+      "assetCount": 1,
+      "selectedRegionId": null
+    },
+    "exportCenter": {
+      "regionTiles": 1,
+      "pngEnabled": true,
+      "zipEnabled": true
+    },
+    "downloads": {
+      "png": {
+        "mimeType": "image/png",
+        "byteSize": 2628,
+        "signature": [137, 80, 78, 71]
+      },
+      "zip": {
+        "mimeType": "application/zip",
+        "byteSize": 2736,
+        "signature": [80, 75, 3, 4]
+      }
+    },
+    "accessibility": {
+      "unlabeledInteractiveCount": 0,
+      "mainLandmarkCount": 1
+    },
+    "layout": {
+      "horizontalOverflow": false,
+      "verticalOverflow": false
+    },
+    "screenshot": {
+      "path": "artifacts/quality/GRID/2026-07-16/s1-04-irregular-browser.png",
+      "bytes": 114281,
+      "sha256": "e837f61926f3a95916c1b76997bdbb273e5edb117047f603e6ae64f240efb797"
+    },
+    "runtimeErrors": {
+      "console": 0,
+      "exception": 0,
+      "log": 0,
+      "network": 0,
+      "http": 0
+    }
+  },
+  "verification": {
+    "componentTests": "pass (1/1)",
+    "focusedG6G7Tests": "pass (36/36)",
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass",
+    "diffCheck": "pass",
+    "independentReview": "self-review ACCEPT; browser gate is fail-closed"
+  }
+}

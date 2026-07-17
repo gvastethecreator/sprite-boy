@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useRef, useLayoutEffect, useEffect, useCallback, useState, forwardRef, useImperativeHandle } from "react";
 import { AppMode, CanvasHandle } from "../../types";
 import { Upload, Plus, Maximize2, Monitor } from "lucide-react";
 import { CanvasRenderer } from "../../utils/renderUtils";
@@ -21,6 +21,16 @@ import {
   type EffectiveGridLayout,
   type GridLayoutSourceDimensions,
 } from "../../features/slice/grid";
+import { mapWandClientPointToSource, type WandSeedPoint } from "../../features/slice/irregular";
+
+export interface CanonicalRegionToolInteraction {
+  readonly mode: "wand" | "manual" | null;
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+  readonly onWandSeed?: (seed: WandSeedPoint, pixels: Uint8ClampedArray) => void;
+  readonly onManualCommit?: (bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }) => void;
+  readonly onCancel?: () => void;
+}
 
 export interface CanvasAreaProps {
   readonly canonicalCanvasOwnership?: boolean;
@@ -29,6 +39,7 @@ export interface CanvasAreaProps {
     sourceDimensions: GridLayoutSourceDimensions | null;
     effectiveLayout: EffectiveGridLayout | null;
   }> | null;
+  readonly canonicalRegionTool?: CanonicalRegionToolInteraction | null;
 }
 
 /**
@@ -51,6 +62,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
   canonicalCanvasOwnership = false,
   onCanonicalPickColor,
   sliceGridOverlay = null,
+  canonicalRegionTool = null,
 }, ref) => {
   const {
     currentMode,
@@ -97,6 +109,8 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const localInputRef = useRef<HTMLInputElement>(null);
+  const [manualDragStart, setManualDragStart] = useState<WandSeedPoint | null>(null);
+  const [manualDragBounds, setManualDragBounds] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // --- Extracted hooks ---
   const { isSpacePressed, modifiers } = useCanvasKeyboard({
@@ -122,6 +136,73 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     builderCanvas,
     fallback: { width: 100, height: 100 },
   });
+  const sourcePointFromClient = useCallback((clientX: number, clientY: number): WandSeedPoint | null => {
+    const canvas = canvasRef.current;
+    if (!canvas || !canonicalRegionTool || canonicalRegionTool.sourceWidth < 1 || canonicalRegionTool.sourceHeight < 1) return null;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = typeof window !== "undefined" && Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
+      ? window.devicePixelRatio : 1;
+    return mapWandClientPointToSource(
+      { clientX, clientY },
+      {
+        canvasClientLeft: rect.left,
+        canvasClientTop: rect.top,
+        devicePixelRatio: dpr,
+        zoom: viewport.scale,
+        sourceOriginCanvasX: viewport.offset.x * dpr,
+        sourceOriginCanvasY: viewport.offset.y * dpr,
+        sourceWidth: canonicalRegionTool.sourceWidth,
+        sourceHeight: canonicalRegionTool.sourceHeight,
+      },
+    );
+  }, [canonicalRegionTool, viewport]);
+  const readSourcePixels = useCallback((): Uint8ClampedArray | null => {
+    if (!slicerImgObj || !canonicalRegionTool) return null;
+    const width = canonicalRegionTool.sourceWidth;
+    const height = canonicalRegionTool.sourceHeight;
+    const surface = typeof OffscreenCanvas === "function"
+      ? new OffscreenCanvas(width, height)
+      : (() => {
+          if (typeof document === "undefined") return null;
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          return canvas;
+        })();
+    if (!surface) return null;
+    const context = surface.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+    if (!context) return null;
+    context.clearRect(0, 0, width, height);
+    context.drawImage(slicerImgObj, 0, 0, width, height);
+    try {
+      return new Uint8ClampedArray(context.getImageData(0, 0, width, height).data);
+    } catch {
+      return null;
+    }
+  }, [canonicalRegionTool, slicerImgObj]);
+  const clampBounds = useCallback((start: WandSeedPoint, end: WandSeedPoint) => {
+    const x = Math.max(0, Math.min(start.x, end.x));
+    const y = Math.max(0, Math.min(start.y, end.y));
+    const right = Math.min(canonicalRegionTool?.sourceWidth ?? contentDimensions.width, Math.max(start.x, end.x) + 1);
+    const bottom = Math.min(canonicalRegionTool?.sourceHeight ?? contentDimensions.height, Math.max(start.y, end.y) + 1);
+    return { x, y, width: Math.max(1, right - x), height: Math.max(1, bottom - y) };
+  }, [canonicalRegionTool, contentDimensions.height, contentDimensions.width]);
+  useEffect(() => {
+    if (canonicalRegionTool?.mode === "wand" || canonicalRegionTool?.mode === "manual") {
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        setManualDragStart(null);
+        setManualDragBounds(null);
+        canonicalRegionTool.onCancel?.();
+      };
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    }
+    setManualDragStart(null);
+    setManualDragBounds(null);
+    return undefined;
+  }, [canonicalRegionTool]);
   const handleCanonicalPickColor = React.useCallback((hex: string) => {
     onCanonicalPickColor?.(hex);
     // Keep the shared legacy swatch in sync while Slice owns the recipe commit.
@@ -359,17 +440,52 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
-        style={{ cursor: mouse.getCursor() }}
+        style={{ cursor: canonicalRegionTool?.mode ? "crosshair" : mouse.getCursor() }}
         onMouseDown={(event) => {
           const workspaceContent = event.currentTarget.closest("[data-studio-workspace-content]");
           if (workspaceContent instanceof HTMLElement) {
             workspaceContent.focus({ preventScroll: true });
           }
+          if (canonicalRegionTool?.mode && !canonicalEyedropper?.isActive && event.button === 0 && !isSpacePressed && !isEmpty) {
+            const seed = sourcePointFromClient(event.clientX, event.clientY);
+            if (!seed) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (canonicalRegionTool.mode === "wand") {
+              const pixels = readSourcePixels();
+              if (pixels) canonicalRegionTool.onWandSeed?.(seed, pixels);
+            } else {
+              setManualDragStart(seed);
+              setManualDragBounds(clampBounds(seed, seed));
+            }
+            return;
+          }
           mouse.handleMouseDown(event);
         }}
-        onMouseMove={mouse.handleMouseMove}
-        onMouseUp={mouse.handleMouseUp}
-        onMouseLeave={mouse.handleMouseUp}
+        onMouseMove={(event) => {
+          if (manualDragStart && canonicalRegionTool?.mode === "manual") {
+            const point = sourcePointFromClient(event.clientX, event.clientY);
+            if (point) setManualDragBounds(clampBounds(manualDragStart, point));
+            return;
+          }
+          mouse.handleMouseMove(event);
+        }}
+        onMouseUp={() => {
+          if (manualDragStart && canonicalRegionTool?.mode === "manual") {
+            if (manualDragBounds) canonicalRegionTool.onManualCommit?.(manualDragBounds);
+            setManualDragStart(null);
+            setManualDragBounds(null);
+            return;
+          }
+          mouse.handleMouseUp();
+        }}
+        onMouseLeave={() => {
+          if (manualDragStart) {
+            setManualDragStart(null);
+            setManualDragBounds(null);
+          }
+          mouse.handleMouseUp();
+        }}
       >
         {isEmpty && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 p-8">
@@ -480,6 +596,18 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
             sourceDimensions={sliceGridOverlay.sourceDimensions}
             effectiveLayout={sliceGridOverlay.effectiveLayout}
             transform={viewport}
+          />
+        ) : null}
+        {manualDragBounds ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute border border-accent bg-accent/15"
+            style={{
+              left: viewport.offset.x + manualDragBounds.x * viewport.scale,
+              top: viewport.offset.y + manualDragBounds.y * viewport.scale,
+              width: manualDragBounds.width * viewport.scale,
+              height: manualDragBounds.height * viewport.scale,
+            }}
           />
         ) : null}
       </div>

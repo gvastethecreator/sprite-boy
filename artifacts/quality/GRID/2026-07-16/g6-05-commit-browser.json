@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-commit-browser",
+  "status": "pass",
+  "task": "G6-05",
+  "scope": "Production Chrome process → canonical commit → autosave/reload → durable undo → autosave/reload.",
+  "evidence": {
+    "initial": {
+      "status": "Ready to process the current recipe.",
+      "processDisabled": false
+    },
+    "processed": {
+      "status": "8 staged slices ready",
+      "outputs": 8,
+      "commitVisible": true
+    },
+    "committed": {
+      "recipeCount": 1,
+      "regionCount": 8,
+      "assetCount": 1,
+      "repositoryCount": 1,
+      "sourceInRepository": true
+    },
+    "reloaded": {
+      "recipeCount": 1,
+      "regionCount": 8,
+      "assetCount": 1,
+      "repositoryCount": 1,
+      "sourceInRepository": true
+    },
+    "restoredSource": {
+      "sourceCanvas": true,
+      "processDisabled": false,
+      "runtimeUrlText": false
+    },
+    "undone": {
+      "recipeCount": 0,
+      "regionCount": 0,
+      "assetCount": 1,
+      "repositoryCount": 1,
+      "sourceInRepository": true
+    },
+    "undoDisabledAfterDurableUndo": true,
+    "afterUndoReload": {
+      "recipeCount": 0,
+      "regionCount": 0,
+      "assetCount": 1,
+      "repositoryCount": 1,
+      "sourceInRepository": true
+    },
+    "accessibility": {
+      "unlabeledInteractiveCount": 0,
+      "mainLandmarkCount": 1
+    },
+    "layout": {
+      "horizontalOverflow": false,
+      "verticalOverflow": false
+    },
+    "screenshot": {
+      "path": "artifacts/quality/GRID/2026-07-16/g6-05-commit-browser.png",
+      "bytes": 119032,
+      "sha256": "82b9187d3eeb22e96b671746c78a4b1ffd0e8404a38d06fcb4ac150e137958c6"
+    },
+    "runtimeErrors": {
+      "console": 0,
+      "exception": 0,
+      "log": 0,
+      "network": 0,
+      "http": 0
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Graph-only happy path: the source Blob is verified in the project-scoped repository after both reloads.",
+      "Ephemeral undo: the post-reload undo action is enabled by a validated durable Grid commit marker and dispatches one canonical batch.",
+      "Startup cleanup race: reconciliation rechecks the active graph immediately before removing any orphan candidate.",
+      "Runtime URL persistence: project JSON and the browser-visible main text contain no blob/data image URL."
+    ],
+    "focusedTests": "pass (29/29 focused G6 cases)",
+    "browser": "Chrome headless production preview at 1440x900"
+  },
+  "verification": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass (Vite production build; pre-existing jszip/chunk warnings)",
+    "diffCheck": "pass",
+    "independentReview": "ACCEPT (P0/P1/P2=0; code, tests and evidence re-audited)"
+  }
+}

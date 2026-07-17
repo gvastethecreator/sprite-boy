@@ -102,6 +102,29 @@ describe("useKeyboardShortcuts", () => {
     expect(closeModals).toHaveBeenCalledOnce();
   });
 
+  it("gives Escape to the active tool before global editor shortcuts", () => {
+    const cancelActiveTool = vi.fn(() => true);
+    const closeModals = vi.fn();
+    renderHook(() => useKeyboardShortcuts({
+      registry: createStudioCommandRegistry(handlers()),
+      executeStudioCommand: vi.fn(),
+      deleteSelection: vi.fn(),
+      nudge: vi.fn(),
+      togglePlay: vi.fn(),
+      stepFrame: vi.fn(),
+      closeModals,
+      cancelActiveTool,
+      isModalOpen: false,
+      activeAnimationId: null,
+      legacyCanvasKeyboardEnabled: true,
+    }));
+
+    act(() => keyDown(window, "Escape", { key: "Escape" }));
+
+    expect(cancelActiveTool).toHaveBeenCalledOnce();
+    expect(closeModals).not.toHaveBeenCalled();
+  });
+
   it("keeps repeatable editor keys local and de-bounces playback", () => {
     const nudge = vi.fn();
     const togglePlay = vi.fn();
