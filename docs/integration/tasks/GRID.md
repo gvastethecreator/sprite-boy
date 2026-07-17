@@ -39,7 +39,7 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G5-02 | J | G5-01 | G5.4-G5.6 | Palette quantization count + auto/fixed modes | Determinism/membership UT | done |
 | G5-03 | E | G5-02 | G1.7,G5.7-G5.8 | Palette extraction/presets/control UI | BR+A11Y + REV | done |
 | G5-04 | J | G5-02 | G5.1-G5.8 | Large-image and palette performance budget | PERF artifact | done |
-| G5-05 | J | G5-03,G5-04 | G5.1-G5.8 | Pipeline ordering, reset and recipe round-trip | RT+VIS+REV | active |
+| G5-05 | J | G5-03,G5-04 | G5.1-G5.8 | Pipeline ordering, reset and recipe round-trip | RT+VIS+REV | done |
 
 ## Results, irregular parity y hardening
 
@@ -49,19 +49,19 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | G6-02 | E | G6-01 | G6.1-G6.3 | Results tray/status/tips UI | BR+A11Y + REV | done |
 | G6-03 | J | G6-01 | G6.6-G6.8 | Atomic commit recipe+Regions+optional Assets | IT commit/rollback/undo | done |
 | G6-04 | J | G6-03 | G6.9 | Reload and provenance reconstruction | RT save/reload | done |
-| G6-05 | J | G6-02,G6-04 | G6.1-G6.3,G6.6-G6.9 | Process-save-reload-undo journey | BR J2 + REV | todo |
-| G7-01 | J | G6-05,F7-07 | G6.4 | Download-one through ExportPort | ART decode | todo |
-| G7-02 | E | G7-01 | G6.5 | Download-all package + manifest | ART + REV | todo |
-| G7-03 | J | G6-05 | G6.6-G6.9 | Open committed output in Compose/Animate intent | IT handoff contract | todo |
-| G7-04 | J | G7-02,G7-03 | G6.4-G6.9,G7.7 | Export shortcut, cancel/error and artifact gate | BR+ART+A11Y+REV | todo |
+| G6-05 | J | G6-02,G6-04 | G6.1-G6.3,G6.6-G6.9 | Process-save-reload-undo journey | BR J2 + REV | done |
+| G7-01 | J | G6-05,F7-07 | G6.4 | Download-one through ExportPort | ART decode | done |
+| G7-02 | E | G7-01 | G6.5 | Download-all package + manifest | ART + REV | done |
+| G7-03 | J | G6-05 | G6.6-G6.9 | Open committed output in Compose/Animate intent | IT handoff contract | done |
+| G7-04 | J | G7-02,G7-03 | G6.4-G6.9,G7.7 | Export shortcut, cancel/error and artifact gate | BR+ART+A11Y+REV | done |
 | S1-01 | J | F1-08,F7-07,G0-05 | H4.1-H4.3 | Connected-components/irregular region detection adapter | Golden/property UT | done |
 | S1-02 | J | S1-01,F5-06 | H4.4 | Wand select and add/remove region semantics | BR+VIS | done |
 | S1-03 | J | S1-01 | H4.5-H4.6 | Manual create/move/resize/delete Region commands | UT+undo | done |
-| S1-04 | E | S1-02,S1-03 | H4.1-H4.6 | Irregular/manual Slice tools UI | BR+A11Y + REV | active |
+| S1-04 | E | S1-02,S1-03 | H4.1-H4.6 | Irregular/manual Slice tools UI | BR+A11Y + REV | done |
 | S1-05 | J | S1-03,F2-07 | H4.7-H4.8 | Region-to-asset and margins/gaps preservation | IT+VIS+RT | done |
-| S1-06 | J | S1-04,S1-05 | H4.1-H4.8 | Irregular journey with undo/save/export | BR J2 irregular + REV | todo |
-| G8-01 | J | G0-05,G7-04,S1-06 | G7.1-G7.5 | Unified Slice keyboard/focus/toast/error boundary | A11Y+BR | todo |
-| G8-02 | J | G8-01 | G7.6 | Escape cancellation precedence across tools/jobs/modals | Keyboard integration UT | todo |
-| G8-03 | J | G8-02 | G1-G7,H4 | Console/leak/repeated-run resilience sweep | BR+PERF | todo |
-| G8-04 | J | G8-03 | G1-G7,H4 | Legacy slicer fallback-only adapter and consumer audit | `rg`+IT fallback | todo |
-| G8-05 | J | G8-04 | G1-G7,H4 | Full Grid/host parity matrix and W3 acceptance | 56 behaviors evidence + REV | todo |
+| S1-06 | J | S1-04,S1-05 | H4.1-H4.8 | Irregular journey with undo/save/export | BR J2 irregular + REV | done |
+| G8-01 | J | G0-05,G7-04,S1-06 | G7.1-G7.5 | Unified Slice keyboard/focus/toast/error boundary | A11Y+BR | done |
+| G8-02 | J | G8-01 | G7.6 | Escape cancellation precedence across tools/jobs/modals | Keyboard integration UT | done |
+| G8-03 | J | G8-02 | G1-G7,H4 | Console/leak/repeated-run resilience sweep | BR+PERF | done |
+| G8-04 | J | G8-03 | G1-G7,H4 | Legacy slicer fallback-only adapter and consumer audit | `rg`+IT fallback | done |
+| G8-05 | J | G8-04 | G1-G7,H4 | Full Grid/host parity matrix and W3 acceptance | 56 behaviors evidence + REV | done |

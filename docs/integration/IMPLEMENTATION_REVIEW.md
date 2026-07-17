@@ -1403,8 +1403,8 @@ del overlay en el journey real está activo.
   Quinta revisión `ACCEPT`, P0-P3=0. Artifact:
   `artifacts/quality/GRID/2026-07-16/s1-02-wand-selection.{json,png}`.
 
-**Siguiente frontera irregular:** S1-03 manual Region commands está activo;
-S1-04 espera el cierre conjunto de wand + manual tools.
+**Siguiente frontera irregular:** S1-03 manual Region commands está cerrado;
+S1-04 integra la superficie UI canónica.
 
 ### A1-03 — Composition canvas settings (preparatory slice)
 
@@ -1460,8 +1460,8 @@ activo; A1-04 portable first-composition acceptance espera ese cierre.
 - **Riesgo acotado:** el command path valida/clona el proyecto completo; S1-04
   debe invocarlo al confirmar el gesto, nunca durante cada `pointermove`.
 
-**Siguiente frontera irregular:** S1-04 UI wand/manual está activo; S1-05 puede
-avanzar sobre Region-to-Asset y preservación de margins/gaps.
+**Siguiente frontera irregular:** S1-04 UI wand/manual está cerrado; S1-05
+mantiene la conversión Region-to-Asset y preservación de margins/gaps.
 
 ### G2-05 — Integrated canonical Grid ownership
 
@@ -1506,8 +1506,35 @@ avanzar sobre Region-to-Asset y preservación de margins/gaps.
   el adapter ofrece graph atomicity + compensación serializada/deuda, sin claim
   de cold-run (el harness usa prewarm explícito).
 
-**Siguiente frontera irregular:** S1-04 UI sigue activo; S1-06 espera su cierre
-para ejecutar el journey completo con undo/save/export.
+**Siguiente frontera irregular:** S1-04 y S1-05 están cerrados; S1-06 queda
+verificado por el journey browser de undo/save/reload/export.
+
+### S1-04 — Irregular/manual Slice tools
+
+- **UI canónica:** `IrregularSliceTools` vive en el panel Slice compartido y
+  ofrece Wand/Manual, replace/add/subtract, alpha threshold, connectivity,
+  bounds source-space, create/apply/duplicate/hide/delete y Region-to-Asset.
+  La selección de wand se pinta desde el CanvasArea canónico; no se monta otro
+  store, shell ni fuente de imagen.
+- **Interacción:** clicks de canvas se transforman por DPR/zoom al seed entero;
+  el gesto manual muestra bounds y confirma una única orden al soltar. Escape
+  limpia la selección/drag y el panel mantiene feedback de busy/error y labels
+  accesibles.
+- **Evidencia:** `scripts/studio-irregular-browser.mjs` pasa en Chrome
+  productivo `1440×900`: manual create, wand component (`1 selected`, 6400 px),
+  undo, checkpoint/reload, PNG y ZIP con magic bytes, `0` errores runtime,
+  `0` interactivos sin nombre y sin overflow. Artifact y captura:
+  `artifacts/quality/GRID/2026-07-16/s1-04-irregular-browser.{json,png}`.
+
+### S1-06 — Journey irregular undo/save/export
+
+- **Persistencia:** la Region manual permanece en el Asset canónico después de
+  save/reload; el undo usa el historial ProjectStore y reduce el grafo antes de
+  guardar. Export Center rehidrata las Regions y publica PNG individual + ZIP
+  con manifest/provenance vía `ExportPort`.
+- **Gate:** la misma corrida S1-04 cubre la jornada completa y comprueba
+  MIME/magic (`image/png`, `application/zip`), `0` errores console/exception/log/
+  network/HTTP y layout sin overflow.
 
 ### G3-01 — Alpha threshold and padding trim stage
 
@@ -1911,10 +1938,12 @@ para ejecutar el journey completo con undo/save/export.
   source-backed (sin puts), derived (2 puts/2 Regions), rechazo del dispatch con
   cleanup completo, undo del historial, repositorio cross-project, colisiones de
   IDs, put tardío con escritura efectiva, reemplazo concurrente del source y
-  mutación no relacionada durante el procesamiento; el foco total G6 pasa
-  `18/18`, además
+  mutación no relacionada durante el procesamiento; G6-03 pasa `7/7` y el
+  foco total G6 pasa
+  `29/29`, además
   de typecheck, oxlint y diff-check. Artifact:
-  `artifacts/quality/GRID/2026-07-16/g6-03-commit.json`.
+  `artifacts/quality/GRID/2026-07-16/g6-03-commit.json`. Revisión
+  independiente `ACCEPT (P0/P1/P2=0)`.
 - **Límite honesto:** el helper ya es transaccional en memoria + repositorio y
   el bind/reload canónico está cerrado en G6-04; la jornada browser completa
   process→commit→save→reload→undo queda en G6-05.
@@ -1931,12 +1960,124 @@ para ejecutar el journey completo con undo/save/export.
   conserva el source Asset durante reemplazos/rollback.
 - **Evidencia:** `importSliceSource.test.ts` cubre import/undo, cross-project,
   colisión y late-write; `gridSourcePersistence.test.ts` demuestra checkpoint
-  autosave, codec round-trip, recipe→source binding, Regions con provenance y
-  restauración del Blob. Son `4/4` casos G6-04 y la batería enfocada G6 queda
-  en `22/22`; artifacts:
-  `artifacts/quality/GRID/2026-07-16/g6-04-source-persistence.json`.
-- **Límite honesto:** queda cerrar la jornada browser completa process→commit→
-  save→reload→undo como G6-05 antes de declarar el Slice durable end-to-end.
+  autosave, codec round-trip, recipe→source binding, Regions con provenance,
+  restauración del Blob y las carreras de reconciliación durante startup en
+  ambos órdenes (remove→import e import→reconcile). El lock por repositorio
+  también cubre cleanup de deuda y todas las llamadas productivas re-leen el
+  grafo dentro del lock. Son `8/8` casos G6-04 y la batería enfocada G6 queda
+  en `29/29`; artifacts:
+  `artifacts/quality/GRID/2026-07-16/g6-04-source-persistence.json`. Revisión
+  independiente `ACCEPT (P0/P1/P2=0)`.
+- **Límite honesto:** el puente canónico queda cerrado; G6-05 aporta la prueba
+  browser end-to-end y G7 aún debe montar ExportPort y handoff a Compose.
+
+### G6-05 — Journey durable process→commit→save→reload→undo
+
+- **Journey:** Chrome productivo importa una fixture 2×4, procesa ocho outputs,
+  expone `Commit slices`, registra `ProcessingRecipe` + ocho Regions sobre el
+  Asset fuente, espera `Saved locally`, recarga y rehidrata el Blob sin URL
+  runtime. Tras reload, Undo usa un marker de commit validado contra el grafo
+  y despacha un único batch canónico; el checkpoint siguiente conserva la
+  fuente, elimina recipe/Regions y la segunda recarga mantiene `0/0` y un único
+  registro de repositorio.
+- **Feedback y seguridad:** el undo durable muestra `Grid commit undone.`;
+  markers de otro proyecto o con IDs ausentes no habilitan la acción. La
+  reconciliación de startup vuelve a leer el grafo dentro de un lock por
+  repositorio antes de cada remove para no borrar una importación concurrente;
+  después del undo durable, el comando queda deshabilitado.
+- **Evidencia:** `scripts/studio-grid-commit-browser.mjs` pasa en Chrome
+  `1440×900`, `29/29` casos G6 enfocados, `0` errores console/exception/log/
+  network/HTTP, `0` interactivos sin label y sin overflow. Screenshot y JSON:
+  `artifacts/quality/GRID/2026-07-16/g6-05-commit-browser.png` y
+  `artifacts/quality/GRID/2026-07-16/g6-05-commit-browser.json`. Revisión
+  independiente `ACCEPT (P0/P1/P2=0)`.
+- **Límite honesto:** G6 durable end-to-end está cerrado; ExportPort,
+  download/package y handoff Compose son G7.
+
+### G7-01/G7-02 — PNG individual y paquete ZIP con manifest
+
+- **Contrato:** `features/slice/export/gridExport.ts` resuelve cada Region
+  desde el AssetRepository canónico; las Regions source-backed se recortan a
+  sus bounds mediante `createImageBitmap`/Canvas y las derivadas conservan su
+  Blob. Las Regions manual/wand conservan provenance source-backed y siguen el
+  mismo crop aunque el UI haya cambiado de selección. `ExportPort` publica
+  `grid-region-png` y `grid-regions-zip`, con nombres
+  seguros, `manifest.json` versionado y entradas `slices/<fileName>`.
+- **Resiliencia:** abortar una request no invoca el writer; MIME, Blob vacío,
+  provider y receipt siguen las validaciones comunes del puerto. El manifest
+  conserva project/revision, Region, Asset y bounds para reconstruir
+  provenance fuera del Studio.
+- **Evidencia:** `tests/integration/gridExport.test.ts` pasa `7/7` casos:
+  PNG con MIME/magic bytes, ZIP con manifest/provenance, cancelación sin
+  escritura y handoff de Region al intent canónico de Compose. Chrome
+  productivo captura PNG válido y ZIP `application/zip` con magic
+  `50 4b 03 04`; el tamaño ZIP es no determinista por UUID/compresión.
+  Artifact:
+  `artifacts/quality/GRID/2026-07-16/g7-export-browser.json`.
+
+### G7-03/G7-04 — Export Center y handoff Compose
+
+- **UI:** `GridExportCenter` vive en el workspace Export unificado, mantiene
+  selección de Region incluso después de hidratar el proyecto, expone acciones
+  PNG/ZIP/Compose con nombres accesibles, cancelación y error inline. La ruta
+  no monta otro store ni shell donante.
+- **Handoff:** `Open in Compose` utiliza `openCompositionFromSource`; crea o
+  reabre Composition+Layer con la Region como source, persiste la selección y
+  deja el workspace Compose activo. El browser gate espera `Saved locally` y
+  re-inspecciona el checkpoint canónico.
+- **Evidencia:** Chrome `1440×900`, 8 tiles, acciones habilitadas, Composition
+  1 + Layer 1 + Region seleccionada, `0` errores console/exception/log/network/
+  HTTP, `0` interactivos sin label y sin overflow; captura inspeccionada en
+  `artifacts/quality/GRID/2026-07-16/g7-export-browser.png`. Revisión
+  independiente `ACCEPT (P0/P1/P2=0)` sobre código y pruebas; los artifacts se
+  sincronizaron después con esos resultados y sus hashes observados.
+
+### G8-01/G8-02 — Boundary de accesibilidad, recovery y Escape
+
+- **Recovery local:** `StudioWorkspaceErrorBoundary` contiene un throw de
+  render dentro del workspace, conserva el shell/proyecto y ofrece `Retry
+  workspace`; el error se restablece al cambiar de proyecto/ruta. Los inputs de
+  color del panel fallback también tienen nombres accesibles.
+- **Teclado:** `useKeyboardShortcuts` aplica la precedencia modal → herramienta
+  activa → comandos globales. Escape cancela la selección wand antes de que
+  entren shortcuts legacy; el hook tiene regresión de foco/modal y de
+  ownership canónico.
+- **Evidencia:** `tests/components/studioWorkspaceErrorBoundary.test.tsx`
+  `2/2` y `tests/hooks/useKeyboardShortcuts.test.ts` `5/5`; el sweep Chrome
+  confirma `0` interactivos sin nombre, `0` excepciones y layout estable.
+
+### G8-03 — Resilience sweep repetido
+
+- **Gate:** `scripts/studio-grid-resilience-sweep.mjs` ejecuta tres iteraciones
+  de G6 commit/reload/undo, G7 export/Compose y S1 irregular
+  manual/wand/undo/save/reload/export. Cada gate tiene readiness retry acotado
+  ante el arranque frío de React y falla cerrado después de tres intentos.
+- **Resultado:** `9/9` journeys pass; todos reportan console/exception/log/
+  network/HTTP en cero, `0` interactivos sin label y sin overflow. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g8-03-resilience-sweep.json`.
+
+### G8-04 — Cuarentena del slicer legacy
+
+- **Boundary:** Slice canónico usa `CanonicalProjectContext`,
+  `useSliceGridController`, `IrregularSliceTools`, `SliceResultsTray` y
+  `GridExportCenter`; `SlicerTools` oculta Auto-Detect/Magic Wand y Grid
+  Layout cuando `isSliceWorkspace=true`. El renderer/ProjectContext legacy se
+  conserva sólo para Compose/Animate/Collision/Template como rollback fallback.
+- **Auditoría:** `rg` y el runtime sweep no encuentran nuevos consumidores de
+  controles legacy dentro de Slice. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g8-04-legacy-audit.json`.
+
+### G8-05 — Matriz de paridad y W3
+
+- **Matriz:** las 48 filas G1.1–G7.7 más H4.1–H4.8 (56 comportamientos) tienen
+  cobertura automatizada, artifacts de browser/worker o evidencia manual
+  registrada. El worker real y el path irregular no se reducen a fixtures
+  estáticos.
+- **Aceptación:** el sweep repetido mantiene el workflow Grid
+  import→process→commit→save→reload→undo→export→Compose y el workflow
+  irregular manual/wand con `0` errores/leaks; W3 queda aceptado para el
+  entorno Studio actual. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g8-05-parity-matrix.json`.
 
 ## Frontiers abiertos
 

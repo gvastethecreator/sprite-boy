@@ -9,7 +9,7 @@
       "tests/integration/importSliceSource.test.ts",
       "tests/integration/gridSourcePersistence.test.ts"
     ],
-    "tests": 4,
+    "tests": 8,
     "canonicalImport": {
       "assetId": "asset-slice-source",
       "workspaceSelection": true,
@@ -26,7 +26,9 @@
     "failureBoundaries": {
       "crossProject": true,
       "idCollision": true,
-      "lateWriteCleanup": true
+      "lateWriteCleanup": true,
+      "startupReconciliationRace": true,
+      "startupImportThenReconcileRace": true
     }
   },
   "adversarialAutopsy": {
@@ -38,10 +40,10 @@
     "boundary": "Process-save-reload-undo browser journey and export remain G6-05/G7."
   },
   "verification": {
-    "focusedTests": "pass (4/4 G6-04; broader focused G6 slice 22/22)",
+    "focusedTests": "pass (8/8 G6-04; broader focused G6 slice 29/29)",
     "typecheck": "pass",
     "lint": "pass",
     "diffCheck": "pass",
-    "independentReview": "pending"
+    "independentReview": "ACCEPT (P0/P1/P2=0; code, tests and evidence re-audited)"
   }
 }

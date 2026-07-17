@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "check": "studio-grid-resilience-sweep",
+  "status": "pass",
+  "iterations": 3,
+  "runs": [
+    {
+      "iteration": 1,
+      "checks": [
+        "grid-commit-browser",
+        "grid-export-browser",
+        "irregular-slice-browser"
+      ],
+      "statuses": [
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "errors": [
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        },
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        },
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        }
+      ],
+      "layouts": [
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        },
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        },
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        }
+      ],
+      "accessibility": [
+        {
+          "exposedNodeCount": 405,
+          "interactiveNodeCount": 72,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        },
+        {
+          "exposedNodeCount": 235,
+          "interactiveNodeCount": 44,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        },
+        {
+          "exposedNodeCount": 166,
+          "interactiveNodeCount": 32,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        }
+      ]
+    },
+    {
+      "iteration": 2,
+      "checks": [
+        "grid-commit-browser",
+        "grid-export-browser",
+        "irregular-slice-browser"
+      ],
+      "statuses": [
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "errors": [
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        },
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        },
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        }
+      ],
+      "layouts": [
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        },
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        },
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        }
+      ],
+      "accessibility": [
+        {
+          "exposedNodeCount": 414,
+          "interactiveNodeCount": 72,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        },
+        {
+          "exposedNodeCount": 235,
+          "interactiveNodeCount": 44,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        },
+        {
+          "exposedNodeCount": 166,
+          "interactiveNodeCount": 32,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        }
+      ]
+    },
+    {
+      "iteration": 3,
+      "checks": [
+        "grid-commit-browser",
+        "grid-export-browser",
+        "irregular-slice-browser"
+      ],
+      "statuses": [
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "errors": [
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        },
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        },
+        {
+          "console": 0,
+          "exception": 0,
+          "log": 0,
+          "network": 0,
+          "http": 0
+        }
+      ],
+      "layouts": [
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        },
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        },
+        {
+          "horizontalOverflow": false,
+          "verticalOverflow": false
+        }
+      ],
+      "accessibility": [
+        {
+          "exposedNodeCount": 405,
+          "interactiveNodeCount": 72,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        },
+        {
+          "exposedNodeCount": 235,
+          "interactiveNodeCount": 44,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        },
+        {
+          "exposedNodeCount": 166,
+          "interactiveNodeCount": 32,
+          "unlabeledInteractiveCount": 0,
+          "unlabeledRoles": {},
+          "mainLandmarkCount": 1
+        }
+      ]
+    }
+  ],
+  "assertion": "all G6/G7/S1 browser journeys repeat without runtime errors, unlabeled interactives or overflow"
+}

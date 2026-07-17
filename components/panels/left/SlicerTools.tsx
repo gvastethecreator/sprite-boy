@@ -28,6 +28,8 @@ interface SlicerToolsProps {
   setGridConfig?: (config: GridConfig) => void;
   /** Legacy project-grid editor. Slice owns its replacement in SliceGridInspector. */
   showLegacyGridControls?: boolean;
+  /** Legacy auto-detect/magic-wand controls. Slice owns canonical irregular tools. */
+  showLegacySliceControls?: boolean;
 }
 
 const SectionHeader = ({
@@ -63,7 +65,7 @@ const SlicerTools: React.FC<SlicerToolsProps> = (props) => {
       />
 
       <div className="p-4 space-y-5">
-        {!isBuilder && (
+        {!isBuilder && props.showLegacySliceControls !== false && (
           <div className="space-y-3">
             <button
               onClick={props.onAutoSlice}

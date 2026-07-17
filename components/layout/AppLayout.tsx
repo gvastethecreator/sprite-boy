@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExtern
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
-import CanvasArea from "../canvas/CanvasArea";
+import CanvasArea, { type CanonicalRegionToolInteraction } from "../canvas/CanvasArea";
 import TimelinePanel from "./TimelinePanel";
 import SettingsModal from "../overlays/SettingsModal";
 import HelpModal from "../overlays/HelpModal";
@@ -19,7 +19,7 @@ import {
   useStudioJobRunner,
 } from "../../contexts/StudioStoreContext";
 import { createJobCenterSummarySelector } from "../../core/stores";
-import type { StudioProjectV1 } from "../../core/project";
+import type { ProcessingRecipe, ProjectCommand, ProjectCommandBatch, StudioProjectV1 } from "../../core/project";
 import { useJobStoreSelector, useProjectStoreSelector } from "../../hooks/useStudioStoreSelector";
 import {
   createStudioCommandRegistry,
@@ -52,20 +52,45 @@ import type {
   SourceSessionError,
   SourceSessionSnapshot,
 } from "../../features/slice/source/sourceSession";
+import {
+  IRREGULAR_REGION_DONOR_DEFAULTS,
+} from "../../core/processing/irregularRegionDetection";
+import {
+  adaptManualRegionIntentToProjectCommand,
+  adaptWandRegionIntentToProjectBatch,
+  createEmptyWandSelection,
+  selectWandComponent,
+  type WandSelectionMode,
+  type WandSelectionSnapshot,
+} from "../../features/slice/irregular";
+import IrregularSliceTools, {
+  type IrregularToolMode,
+  type ManualRegionDraft,
+} from "../../features/slice/irregular/IrregularSliceTools";
+import { browserRegionCrop, convertRegionToAsset } from "../../features/slice/assets";
 import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
 import {
   commitStagedGridResults,
   SliceResultsTray,
   useStagedGridResults,
-  type CommitStagedGridResultsResult,
   type StagedGridResultsSnapshot,
 } from "../../features/slice/results";
 import {
   importSliceSource,
   restoreCanonicalSliceSource,
 } from "../../features/slice/source/importSliceSource";
+import GridExportCenter from "../../features/slice/export/GridExportCenter";
+import { openCompositionFromSource } from "../../features/compose/project/compositionEntry";
+import {
+  clearDurableGridCommitUndo,
+  durableGridCommitMatchesProject,
+  readDurableGridCommitUndo,
+  writeDurableGridCommitUndo,
+  type DurableGridCommitUndo,
+} from "../../features/slice/results/durableGridCommitUndo";
 import ComposeBootstrapWorkspace from "../../features/compose/project/ComposeBootstrapWorkspace";
 import CompositionCanvasSettingsInspector from "../../features/compose/canvasSettings/CompositionCanvasSettingsInspector";
+import StudioWorkspaceErrorBoundary from "../studio/StudioWorkspaceErrorBoundary";
 
 const LEGACY_MODE_BY_WORKSPACE = {
   slice: AppMode.BUILDER,
@@ -78,79 +103,19 @@ const LEGACY_MODE_BY_WORKSPACE = {
 const COMPACT_STUDIO_QUERY = "(max-width: 1279px)";
 const ExportModal = React.lazy(() => import("../overlays/ExportModal"));
 
+function newIrregularEntityId(prefix: string): string {
+  try {
+    if (typeof globalThis.crypto?.randomUUID === "function") return `${prefix}-${globalThis.crypto.randomUUID()}`;
+  } catch {
+    // Timestamp fallback remains local to this interaction.
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 interface StudioShellError {
   readonly workspaceId: StudioWorkspaceId;
   readonly commandId: StudioCommandId;
   readonly message: string;
-}
-
-const GRID_COMMIT_UNDO_KEY = "sprite-boy-studio:grid-commit-undo:v1";
-
-interface DurableGridCommitUndo {
-  readonly projectId: string;
-  readonly sourceAssetId: string;
-  readonly recipeId: string;
-  readonly regionIds: readonly string[];
-  readonly derivedAssetIds: readonly string[];
-  readonly committedRevision: number;
-}
-
-function readDurableGridCommitUndo(projectId: string): DurableGridCommitUndo | null {
-  try {
-    const raw = globalThis.localStorage?.getItem(GRID_COMMIT_UNDO_KEY);
-    if (!raw) return null;
-    const value: unknown = JSON.parse(raw);
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-    const candidate = value as Record<string, unknown>;
-    if (candidate.projectId !== projectId || typeof candidate.sourceAssetId !== "string" ||
-      typeof candidate.recipeId !== "string" || !Array.isArray(candidate.regionIds) ||
-      !candidate.regionIds.every((id) => typeof id === "string") || !Array.isArray(candidate.derivedAssetIds) ||
-      !candidate.derivedAssetIds.every((id) => typeof id === "string") ||
-      !Number.isSafeInteger(candidate.committedRevision)) return null;
-    return Object.freeze({
-      projectId,
-      sourceAssetId: candidate.sourceAssetId,
-      recipeId: candidate.recipeId,
-      regionIds: Object.freeze([...candidate.regionIds] as string[]),
-      derivedAssetIds: Object.freeze([...candidate.derivedAssetIds] as string[]),
-      committedRevision: candidate.committedRevision,
-    });
-  } catch {
-    return null;
-  }
-}
-
-function writeDurableGridCommitUndo(result: CommitStagedGridResultsResult, projectId: string): void {
-  try {
-    globalThis.localStorage?.setItem(GRID_COMMIT_UNDO_KEY, JSON.stringify({
-      projectId,
-      sourceAssetId: result.recipe.sourceAssetId,
-      recipeId: result.recipe.id,
-      regionIds: result.regions.map((region) => region.id),
-      derivedAssetIds: result.derivedAssets.map((asset) => asset.id),
-      committedRevision: result.revision,
-    } satisfies DurableGridCommitUndo));
-  } catch {
-    // The canonical graph and autosave remain authoritative when metadata storage is unavailable.
-  }
-}
-
-function clearDurableGridCommitUndo(): void {
-  try {
-    globalThis.localStorage?.removeItem(GRID_COMMIT_UNDO_KEY);
-  } catch {
-    // Metadata cleanup is best effort; stale markers are validated against the graph before use.
-  }
-}
-
-function durableGridCommitMatchesProject(
-  project: StudioProjectV1,
-  marker: DurableGridCommitUndo | null,
-): marker is DurableGridCommitUndo {
-  if (!marker || marker.projectId !== project.id || project.workspace.selectedAssetId !== marker.sourceAssetId) return false;
-  if (!project.processingRecipes[marker.recipeId]) return false;
-  return marker.regionIds.every((id) => Boolean(project.regions[id])) &&
-    marker.derivedAssetIds.every((id) => Boolean(project.assets[id]));
 }
 
 function useCompactStudioLayout(): boolean {
@@ -255,6 +220,17 @@ const AppLayout: React.FC = () => {
     useState<SourceReadyMetadata | null>(null);
   const [sliceGridSourceGeneration, setSliceGridSourceGeneration] = useState(0);
   const [sourceActionError, setSourceActionError] = useState<SourceSessionError | null>(null);
+  const [irregularToolMode, setIrregularToolMode] = useState<IrregularToolMode>("wand");
+  const [wandMode, setWandMode] = useState<WandSelectionMode>("replace");
+  const [wandAlphaThreshold, setWandAlphaThreshold] = useState(IRREGULAR_REGION_DONOR_DEFAULTS.alphaThreshold);
+  const [wandConnectivity, setWandConnectivity] = useState<4 | 8>(IRREGULAR_REGION_DONOR_DEFAULTS.connectivity);
+  const [wandSelection, setWandSelection] = useState<WandSelectionSnapshot>(() => createEmptyWandSelection());
+  const [manualRegionDraft, setManualRegionDraft] = useState<ManualRegionDraft>({ x: 0, y: 0, width: 1, height: 1 });
+  const [irregularRegionId, setIrregularRegionId] = useState<string | null>(
+    () => canonicalProject.workspace.selectedRegionId ?? null,
+  );
+  const [irregularBusy, setIrregularBusy] = useState(false);
+  const [irregularError, setIrregularError] = useState<string | null>(null);
   const [canonicalSliceSourceId, setCanonicalSliceSourceId] = useState<string | null>(
     () => canonicalProject.workspace.selectedAssetId ?? null,
   );
@@ -281,6 +257,11 @@ const AppLayout: React.FC = () => {
   useEffect(() => {
     setCanonicalSliceSourceId(canonicalProject.workspace.selectedAssetId ?? null);
   }, [canonicalProject.workspace.selectedAssetId]);
+  useEffect(() => {
+    setWandSelection(createEmptyWandSelection());
+    setIrregularRegionId(canonicalProject.workspace.selectedRegionId ?? null);
+    setIrregularError(null);
+  }, [canonicalProject.workspace.selectedAssetId, canonicalProject.id]);
   useEffect(() => {
     setDurableGridCommitUndo(readDurableGridCommitUndo(canonicalProject.id));
   }, [canonicalProject.id]);
@@ -330,7 +311,221 @@ const AppLayout: React.FC = () => {
     onInitializeState: initializeSliceGridState,
     onCommitState: commitSliceGridState,
   });
+  const dispatchIrregularCommand = useCallback((command: ProjectCommand | ProjectCommandBatch, commandId: string): boolean => {
+    const result = canonical.store.dispatch({
+      command,
+      metadata: {
+        commandId,
+        origin: "user",
+        history: "record",
+        issuedAt: new Date().toISOString(),
+      },
+    });
+    if (!result.result.ok) {
+      const message = result.result.diagnostics[0]?.message ?? "The irregular Region change was rejected.";
+      setIrregularError(message);
+      showToast(message, "error");
+      return false;
+    }
+    setIrregularError(null);
+    return true;
+  }, [canonical.store, showToast]);
+  const createWandRecipe = useCallback((sourceAssetId: string, componentId: string, timestamp: string): ProcessingRecipe => {
+    const suffix = componentId.replace(/[^a-zA-Z0-9_-]/gu, "").slice(-48) || newIrregularEntityId("wand");
+    const project = canonical.store.getSnapshot().project as StudioProjectV1;
+    let id = `recipe-wand-${suffix}`;
+    if (project.processingRecipes[id]) id = newIrregularEntityId("recipe-wand");
+    return {
+      id,
+      name: "Magic wand region",
+      kind: "grid-split",
+      version: 1,
+      sourceAssetId,
+      layout: { mode: "auto" },
+      crop: { threshold: 0, padding: 0 },
+      chroma: { enabled: false, color: "#000000", tolerance: 0, smoothness: 0, spill: 0 },
+      pixel: { enabled: false, size: 1, quantize: false, colors: 2 },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+  }, [canonical.store]);
+  const handleWandSeed = useCallback((seed: { readonly x: number; readonly y: number }, pixels: Uint8ClampedArray): void => {
+    const sourceAssetId = canonicalSliceSourceId;
+    const dimensions = sliceGridController.sourceDimensions;
+    if (!sourceAssetId || !dimensions) return;
+    try {
+      const transition = selectWandComponent(wandSelection, {
+        sourceAssetId,
+        pixels,
+        width: dimensions.width,
+        height: dimensions.height,
+        seed,
+        mode: wandMode,
+        options: {
+          ...IRREGULAR_REGION_DONOR_DEFAULTS,
+          alphaThreshold: wandAlphaThreshold,
+          connectivity: wandConnectivity,
+        },
+      });
+      if (!transition.intent) {
+        setWandSelection(transition.selection);
+        return;
+      }
+      const timestamp = new Date().toISOString();
+      const command = adaptWandRegionIntentToProjectBatch(
+        transition.intent,
+        { regions: canonical.store.getSnapshot().project.regions },
+        {
+          add: (component) => {
+            const recipe = createWandRecipe(sourceAssetId, component.id, timestamp);
+            const regionId = newIrregularEntityId("region-wand");
+            return {
+              type: "regions.commitRecipe",
+              recipe,
+              regions: [{
+                id: regionId,
+                assetId: sourceAssetId,
+                bounds: { ...component.bounds },
+                createdAt: timestamp,
+                updatedAt: timestamp,
+                provenance: { source: "wand", sourceId: component.id, importedAt: timestamp },
+              }],
+            };
+          },
+        },
+      );
+      if (dispatchIrregularCommand(command, `wand-region:${sourceAssetId}`)) {
+        setWandSelection(transition.selection);
+        const added = transition.intent.operations.find((operation) => operation.type === "add");
+        if (added) setManualRegionDraft({ ...added.component.bounds });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The wand selection could not be applied.";
+      setIrregularError(message);
+      showToast(message, "error");
+    }
+  }, [canonical.store, canonicalSliceSourceId, createWandRecipe, dispatchIrregularCommand, showToast, sliceGridController.sourceDimensions, wandAlphaThreshold, wandConnectivity, wandMode, wandSelection]);
+  const clearWandSelection = useCallback((): void => {
+    setWandSelection(createEmptyWandSelection());
+    setIrregularError(null);
+  }, []);
+  const createManualRegion = useCallback((bounds: ManualRegionDraft = manualRegionDraft): void => {
+    const sourceAssetId = canonicalSliceSourceId;
+    if (!sourceAssetId) return;
+    const timestamp = new Date().toISOString();
+    const regionId = newIrregularEntityId("region-manual");
+    try {
+      const command = adaptManualRegionIntentToProjectCommand(canonical.store.getSnapshot().project, {
+        type: "create",
+        regionId,
+        sourceAssetId,
+        bounds,
+        timestamp,
+      });
+      const canonicalCommand = command?.type === "region.create"
+        ? {
+            ...command,
+            region: {
+              ...command.region,
+              provenance: { source: "manual", importedAt: timestamp },
+            },
+          }
+        : command;
+      if (canonicalCommand && dispatchIrregularCommand(canonicalCommand, `manual-region-create:${regionId}`)) {
+        setIrregularRegionId(regionId);
+        setManualRegionDraft(bounds);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The manual Region could not be created.";
+      setIrregularError(message);
+      showToast(message, "error");
+    }
+  }, [canonical.store, canonicalSliceSourceId, dispatchIrregularCommand, manualRegionDraft, showToast]);
+  const applyManualRegion = useCallback((): void => {
+    if (!irregularRegionId) return;
+    try {
+      const command = adaptManualRegionIntentToProjectCommand(canonical.store.getSnapshot().project, {
+        type: "resize", regionId: irregularRegionId, bounds: manualRegionDraft,
+      });
+      if (command && dispatchIrregularCommand(command, `manual-region-resize:${irregularRegionId}`)) setManualRegionDraft({ ...manualRegionDraft });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The Region bounds could not be applied.";
+      setIrregularError(message);
+      showToast(message, "error");
+    }
+  }, [canonical.store, dispatchIrregularCommand, irregularRegionId, manualRegionDraft, showToast]);
+  const deleteManualRegion = useCallback((): void => {
+    if (!irregularRegionId) return;
+    try {
+      const command = adaptManualRegionIntentToProjectCommand(canonical.store.getSnapshot().project, { type: "delete", regionId: irregularRegionId });
+      if (command && dispatchIrregularCommand(command, `manual-region-delete:${irregularRegionId}`)) setIrregularRegionId(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The Region could not be deleted.";
+      setIrregularError(message);
+      showToast(message, "error");
+    }
+  }, [canonical.store, dispatchIrregularCommand, irregularRegionId, showToast]);
+  const duplicateManualRegion = useCallback((): void => {
+    const project = canonical.store.getSnapshot().project;
+    const region = irregularRegionId ? project.regions[irregularRegionId] : undefined;
+    if (!region) return;
+    createManualRegion({ ...region.bounds });
+  }, [canonical.store, createManualRegion, irregularRegionId]);
+  const toggleManualRegionHidden = useCallback((): void => {
+    const project = canonical.store.getSnapshot().project;
+    const region = irregularRegionId ? project.regions[irregularRegionId] : undefined;
+    if (!region) return;
+    dispatchIrregularCommand({
+      type: "region.update",
+      regionId: region.id,
+      patch: { hidden: !region.hidden, updatedAt: new Date().toISOString() },
+    }, `manual-region-hidden:${region.id}`);
+  }, [canonical.store, dispatchIrregularCommand, irregularRegionId]);
+  const convertManualRegionToAsset = useCallback(async (): Promise<void> => {
+    if (!irregularRegionId) return;
+    setIrregularBusy(true);
+    try {
+      const result = await convertRegionToAsset(
+        { store: canonical.store, repository: canonical.assets, cropper: browserRegionCrop },
+        {
+          regionId: irregularRegionId,
+          name: `Region ${irregularRegionId}`,
+          timestamp: new Date().toISOString(),
+          grid: { marginX: 0, marginY: 0, gapX: 0, gapY: 0 },
+        },
+      );
+      showToast(result.reused ? "Region Asset already exists." : "Region converted to Asset.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The Region could not be converted to an Asset.";
+      setIrregularError(message);
+      showToast(message, "error");
+    } finally {
+      setIrregularBusy(false);
+    }
+  }, [canonical.assets, canonical.store, irregularRegionId, showToast]);
+  const handleManualCanvasCommit = useCallback((bounds: ManualRegionDraft): void => {
+    setManualRegionDraft(bounds);
+    createManualRegion(bounds);
+  }, [createManualRegion]);
+  const canonicalRegionTool = useMemo<CanonicalRegionToolInteraction | null>(() => {
+    if (activeWorkspace !== "slice" || !sliceGridController.sourceDimensions) return null;
+    return {
+      mode: irregularToolMode,
+      sourceWidth: sliceGridController.sourceDimensions.width,
+      sourceHeight: sliceGridController.sourceDimensions.height,
+      onWandSeed: handleWandSeed,
+      onManualCommit: handleManualCanvasCommit,
+      onCancel: clearWandSelection,
+    };
+  }, [activeWorkspace, clearWandSelection, handleManualCanvasCommit, handleWandSeed, irregularToolMode, sliceGridController.sourceDimensions]);
   const sliceCommitBusyRef = useRef(false);
+  const sliceCommitControllerRef = useRef<AbortController | null>(null);
+  const sliceCommitProjectIdRef = useRef<string | null>(null);
+  const cancelSliceCommit = useCallback((): void => {
+    sliceCommitControllerRef.current?.abort();
+    sliceCommitControllerRef.current = null;
+    sliceCommitProjectIdRef.current = null;
+  }, []);
   const commitSliceResults = useCallback(async (staged: StagedGridResultsSnapshot): Promise<boolean> => {
     if (sliceCommitBusyRef.current) return false;
     const sourceAssetId = canonicalSliceSourceId;
@@ -339,6 +534,10 @@ const AppLayout: React.FC = () => {
       return false;
     }
     sliceCommitBusyRef.current = true;
+    const commitController = new AbortController();
+    const commitProjectId = canonical.store.getSnapshot().project.id;
+    sliceCommitControllerRef.current = commitController;
+    sliceCommitProjectIdRef.current = commitProjectId;
     try {
       const committed = await commitStagedGridResults({
         store: canonical.store,
@@ -346,9 +545,12 @@ const AppLayout: React.FC = () => {
         staged,
         sourceAssetId,
         name: slicerImage?.name ?? "slice",
+        signal: commitController.signal,
       });
+      if (commitController.signal.aborted || canonical.store.getSnapshot().project.id !== commitProjectId) return false;
       await canonical.saveProject();
-      writeDurableGridCommitUndo(committed, canonical.store.getSnapshot().project.id);
+      if (commitController.signal.aborted || canonical.store.getSnapshot().project.id !== commitProjectId) return false;
+      writeDurableGridCommitUndo(committed, commitProjectId);
       setDurableGridCommitUndo(readDurableGridCommitUndo(canonical.store.getSnapshot().project.id));
       showToast(`${committed.regions.length} slices committed to the project.`, "success");
       return true;
@@ -358,8 +560,46 @@ const AppLayout: React.FC = () => {
       return false;
     } finally {
       sliceCommitBusyRef.current = false;
+      if (sliceCommitControllerRef.current === commitController) {
+        sliceCommitControllerRef.current = null;
+        sliceCommitProjectIdRef.current = null;
+      }
     }
   }, [canonical, canonicalSliceSourceId, showToast, slicerImage?.name]);
+  useEffect(() => {
+    if (sliceCommitProjectIdRef.current && sliceCommitProjectIdRef.current !== canonicalProject.id) {
+      cancelSliceCommit();
+    }
+  }, [cancelSliceCommit, canonicalProject.id]);
+  const openGridRegionInCompose = useCallback((regionId: string): void => {
+    const result = openCompositionFromSource(canonical.store, {
+      source: { type: "region", id: regionId },
+      commandId: `grid-compose-${regionId}`,
+      issuedAt: new Date().toISOString(),
+    });
+    if (!result.ok) {
+      showToast(result.message, "error");
+      return;
+    }
+    // Compose layers own the Region source, while Slice keeps the canonical
+    // sheet selected so durable Grid undo/source restoration survives a
+    // round-trip through another workspace.
+    const sourceAssetId = canonicalSliceSourceId;
+    if (sourceAssetId && canonical.store.getSnapshot().project.workspace.selectedAssetId !== sourceAssetId) {
+      canonical.store.dispatch({
+        command: { type: "workspace.update", patch: { selectedAssetId: sourceAssetId } },
+        metadata: {
+          commandId: `grid-compose-source:${regionId}`,
+          origin: "user",
+          history: "ignore",
+          issuedAt: new Date().toISOString(),
+        },
+      });
+    }
+    canonical.setActiveWorkspace("compose");
+    navigate("compose");
+    showToast("Region opened in Compose.", "success");
+  }, [canonical, navigate, showToast]);
   const sliceResultsController = useStagedGridResults({
     sourceSnapshot: sourceSessionSnapshot,
     recipe: sliceGridController.recipe,
@@ -438,6 +678,56 @@ const AppLayout: React.FC = () => {
 
   const canonicalSliceHistoryOwned = activeWorkspace === "slice" && canonicalSliceSourceId !== null;
   const canonicalHistoryOwned = activeWorkspace === "compose" || canonicalSliceHistoryOwned;
+  const canonicalCanUndo = canonicalHistory.undoEntries.length > 0;
+  const canonicalCanRedo = canonicalHistory.redoEntries.length > 0;
+  const durableGridCommitAvailable = canonicalSliceHistoryOwned &&
+    durableGridCommitMatchesProject(canonicalProject as unknown as StudioProjectV1, durableGridCommitUndo);
+
+  const undoCanonical = useCallback(async (): Promise<void> => {
+    if (canonicalCanUndo) {
+      canonical.history.undo();
+      return;
+    }
+    if (!durableGridCommitAvailable || !durableGridCommitUndo) return;
+    const commands = [
+      ...[...durableGridCommitUndo.regionIds].reverse().map((regionId) => ({
+        type: "region.remove" as const,
+        regionId,
+        policy: "reject" as const,
+      })),
+      ...[...durableGridCommitUndo.derivedAssetIds].reverse().map((assetId) => ({
+        type: "asset.remove" as const,
+        assetId,
+        policy: "reject" as const,
+      })),
+      {
+        type: "processingRecipe.remove" as const,
+        recipeId: durableGridCommitUndo.recipeId,
+        policy: "reject" as const,
+      },
+    ];
+    const result = canonical.store.dispatch({
+      command: { type: "command.batch", commands },
+      metadata: {
+        commandId: `grid-undo-${durableGridCommitUndo.recipeId}`,
+        origin: "user",
+        history: "ignore",
+        issuedAt: new Date().toISOString(),
+      },
+    });
+    if (!result.result.ok) {
+      showToast("The saved Grid commit could not be undone.", "error");
+      return;
+    }
+    try {
+      await canonical.saveProject();
+      clearDurableGridCommitUndo(canonical.store.getSnapshot().project.id);
+      setDurableGridCommitUndo(null);
+      showToast("Grid commit undone.", "success");
+    } catch {
+      showToast("The Grid undo is staged but could not be saved.", "error");
+    }
+  }, [canonical, canonicalCanUndo, durableGridCommitAvailable, durableGridCommitUndo, showToast]);
 
   const openSourcePicker = useCallback((trigger: HTMLButtonElement | null): void => {
     sourcePickerReturnFocusRef.current = trigger;
@@ -447,11 +737,12 @@ const AppLayout: React.FC = () => {
   const clearSourceWorkflow = useCallback((): void => {
     sourceImportGenerationRef.current += 1;
     setSliceGridSourceGeneration((generation) => generation + 1);
+    cancelSliceCommit();
     cancelSourceCommit();
     resetSourceSession();
     setCommittedSourceMetadata(null);
     setSourceActionError(null);
-  }, [cancelSourceCommit, resetSourceSession]);
+  }, [cancelSliceCommit, cancelSourceCommit, resetSourceSession]);
 
   const commandRegistry = useMemo(() => createStudioCommandRegistry({
     newProject: async () => {
@@ -475,7 +766,7 @@ const AppLayout: React.FC = () => {
       }
     },
     undo: () => {
-      if (canonicalHistoryOwned) canonical.history.undo();
+      if (canonicalHistoryOwned) void undoCanonical();
       else undo();
     },
     redo: () => {
@@ -510,13 +801,11 @@ const AppLayout: React.FC = () => {
     clearLegacyCanvasInteractionState,
     canonicalSliceSourceAvailable,
     canonicalHistoryOwned,
+    undoCanonical,
   ]);
 
   const sourceSessionBusy = sourceSessionSnapshot.status === "validating" ||
     sourceSessionSnapshot.status === "decoding" || isSourceCommitting;
-
-  const canonicalCanUndo = canonicalHistory.undoEntries.length > 0;
-  const canonicalCanRedo = canonicalHistory.redoEntries.length > 0;
 
   const commandContext = useMemo<StudioCommandContext>(() => ({
     projectAvailable: true,
@@ -524,7 +813,7 @@ const AppLayout: React.FC = () => {
     busy: isLoading || sourceSessionBusy || composeImportBusy
       || canonical.persistenceState === "loading"
       || canonical.persistenceState === "saving",
-    canUndo: canonicalHistoryOwned ? canonicalCanUndo : canUndo,
+    canUndo: canonicalHistoryOwned ? (canonicalCanUndo || durableGridCommitAvailable) : canUndo,
     canRedo: canonicalHistoryOwned ? canonicalCanRedo : canRedo,
     canvasAvailable: activeWorkspace === "compose" ? Boolean(canonicalComposition) : hasWorkspace,
   }), [
@@ -534,6 +823,7 @@ const AppLayout: React.FC = () => {
     canonical.persistenceState,
     canonicalCanRedo,
     canonicalCanUndo,
+    durableGridCommitAvailable,
     canonicalHistoryOwned,
     canonicalComposition,
     composeImportBusy,
@@ -574,9 +864,10 @@ const AppLayout: React.FC = () => {
 
   useEffect(() => () => {
     sourceImportGenerationRef.current += 1;
+    cancelSliceCommit();
     sourceCommitControllerRef.current?.abort();
     sourceCommitControllerRef.current = null;
-  }, []);
+  }, [cancelSliceCommit]);
 
   useEffect(() => {
     const input = assetInputRef.current;
@@ -748,6 +1039,45 @@ const AppLayout: React.FC = () => {
   const visibleSourceError = sourceActionError ?? (
     sourceSessionSnapshot.status === "error" ? sourceSessionSnapshot.error : null
   );
+  const irregularTools = activeWorkspace === "slice" ? (
+    <IrregularSliceTools
+      project={canonicalProject}
+      sourceAssetId={canonicalSliceSourceId}
+      selection={wandSelection}
+      toolMode={irregularToolMode}
+      wandMode={wandMode}
+      wandAlphaThreshold={wandAlphaThreshold}
+      wandConnectivity={wandConnectivity}
+      manualDraft={manualRegionDraft}
+      selectedRegionId={irregularRegionId}
+      busy={irregularBusy}
+      error={irregularError}
+      onToolModeChange={setIrregularToolMode}
+      onWandModeChange={setWandMode}
+      onWandAlphaThresholdChange={setWandAlphaThreshold}
+      onWandConnectivityChange={setWandConnectivity}
+      onCancelSelection={clearWandSelection}
+      onManualDraftChange={(patch) => setManualRegionDraft((current) => ({ ...current, ...patch }))}
+      onCreateManual={() => createManualRegion()}
+      onApplyManual={applyManualRegion}
+      onDeleteRegion={deleteManualRegion}
+      onDuplicateRegion={duplicateManualRegion}
+      onToggleHidden={toggleManualRegionHidden}
+      onConvertToAsset={() => void convertManualRegionToAsset()}
+      onSelectRegion={(regionId) => {
+        setIrregularRegionId(regionId);
+        const region = canonicalProject.regions[regionId];
+        if (region) setManualRegionDraft({ ...region.bounds });
+      }}
+    />
+  ) : null;
+  const cancelActiveCanonicalTool = useCallback((): boolean => {
+    if (activeWorkspace === "slice" && wandSelection.components.length > 0) {
+      clearWandSelection();
+      return true;
+    }
+    return false;
+  }, [activeWorkspace, clearWandSelection, wandSelection.components.length]);
   useKeyboardShortcuts({
     registry: commandRegistry,
     executeStudioCommand: executeCommand,
@@ -762,6 +1092,7 @@ const AppLayout: React.FC = () => {
     },
     togglePlay: () => setIsPlaying(!isPlaying),
     stepFrame: handleStepFrame,
+    cancelActiveTool: cancelActiveCanonicalTool,
     closeModals: () => {
       setCompactPanel(null);
       setJobCenterOpen(false);
@@ -873,18 +1204,19 @@ const AppLayout: React.FC = () => {
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
-            <LeftSidebar key={`desktop-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} />
+            <LeftSidebar key={`desktop-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
           </StudioPanel>
         )}
 
         <div className="flex-1 flex flex-col min-w-0 gap-2">
-          <main
-            ref={workspaceContentRef}
-            tabIndex={-1}
-            data-studio-workspace-content={activeWorkspace}
-            aria-label={`${activeWorkspaceDefinition.label} workspace content`}
-            className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
+          <StudioWorkspaceErrorBoundary resetKey={`${canonicalProject.id}:${activeWorkspace}`}>
+            <main
+              ref={workspaceContentRef}
+              tabIndex={-1}
+              data-studio-workspace-content={activeWorkspace}
+              aria-label={`${activeWorkspaceDefinition.label} workspace content`}
+              className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
             {activeWorkspace === "compose" ? (
               <ComposeBootstrapWorkspace
                 key={canonicalProject.id}
@@ -913,7 +1245,15 @@ const AppLayout: React.FC = () => {
                 onRetry={retrySliceSource}
               />
             ) : workspaceState.kind === "ready" ? (
-              activeWorkspace === "slice" ? (
+              activeWorkspace === "export" && canonicalSliceSourceAvailable ? (
+                <GridExportCenter
+                  project={canonicalProject}
+                  revision={canonical.store.getSnapshot().revision}
+                  repository={canonical.assets}
+                  onOpenCompose={openGridRegionInCompose}
+                  onToast={showToast}
+                />
+              ) : activeWorkspace === "slice" ? (
                 <SliceSourceCanvasFrame
                   snapshot={sourceSessionSnapshot}
                   metadataOverride={committedSourceMetadata}
@@ -939,6 +1279,7 @@ const AppLayout: React.FC = () => {
                     ref={canvasRef}
                     canonicalCanvasOwnership={canonicalCanvasOwnership}
                     onCanonicalPickColor={sliceGridController.setChromaColor}
+                    canonicalRegionTool={canonicalRegionTool}
                     sliceGridOverlay={{
                       sourceDimensions: sliceGridController.sourceDimensions,
                       effectiveLayout: sliceGridController.effectiveLayout,
@@ -961,7 +1302,8 @@ const AppLayout: React.FC = () => {
                 onDismissError={() => setStudioError(null)}
               />
             )}
-          </main>
+            </main>
+          </StudioWorkspaceErrorBoundary>
           {hasWorkspace && activeWorkspace !== "compose" && (
             <TimelinePanel hidden={activeWorkspaceDefinition.capabilities.timeline !== "editable"} />
           )}
@@ -1002,7 +1344,7 @@ const AppLayout: React.FC = () => {
             onClose={() => setCompactPanel(null)}
             className="h-full border-0"
           >
-            <LeftSidebar key={`compact-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} />
+            <LeftSidebar key={`compact-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
           </StudioPanel>
         ) : compactPanel === "properties" ? (
           <StudioPanel

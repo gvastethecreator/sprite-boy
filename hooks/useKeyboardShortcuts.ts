@@ -13,6 +13,8 @@ interface ShortcutsConfig {
   togglePlay: () => void;
   stepFrame: (dir: number) => void;
   closeModals: () => void;
+  /** Cancels the highest-priority active canvas/tool interaction. */
+  cancelActiveTool?: () => boolean;
   isModalOpen: boolean;
   activeAnimationId: string | null;
   legacyCanvasKeyboardEnabled: boolean;
@@ -27,6 +29,7 @@ export const useKeyboardShortcuts = ({
   togglePlay,
   stepFrame,
   closeModals,
+  cancelActiveTool,
   isModalOpen,
   activeAnimationId,
   legacyCanvasKeyboardEnabled,
@@ -35,10 +38,16 @@ export const useKeyboardShortcuts = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       const editable = isEditableKeyboardTarget(e.target);
 
-      if (isModalOpen && e.key === "Escape") {
-        e.preventDefault();
-        closeModals();
-        return;
+      if (e.key === "Escape") {
+        if (isModalOpen) {
+          e.preventDefault();
+          closeModals();
+          return;
+        }
+        if (cancelActiveTool?.() === true) {
+          e.preventDefault();
+          return;
+        }
       }
 
       const command = registry.findByKeyboardInput({
@@ -112,6 +121,7 @@ export const useKeyboardShortcuts = ({
     togglePlay,
     stepFrame,
     closeModals,
+    cancelActiveTool,
     isModalOpen,
     activeAnimationId,
     legacyCanvasKeyboardEnabled,
