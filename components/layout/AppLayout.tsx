@@ -52,6 +52,7 @@ import type {
   SourceSessionSnapshot,
 } from "../../features/slice/source/sourceSession";
 import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
+import { SliceResultsTray, useStagedGridResults } from "../../features/slice/results";
 import ComposeBootstrapWorkspace from "../../features/compose/project/ComposeBootstrapWorkspace";
 import CompositionCanvasSettingsInspector from "../../features/compose/canvasSettings/CompositionCanvasSettingsInspector";
 
@@ -221,6 +222,10 @@ const AppLayout: React.FC = () => {
     sourceAssetId: sliceGridSourceAssetId,
     onInitializeState: initializeSliceGridState,
     onCommitState: commitSliceGridState,
+  });
+  const sliceResultsController = useStagedGridResults({
+    sourceSnapshot: sourceSessionSnapshot,
+    recipe: sliceGridController.recipe,
   });
   const canonicalSliceSourceAvailable = sliceGridController.sourceDimensions !== null;
   const canonicalSliceExportSourceOnly =
@@ -763,6 +768,7 @@ const AppLayout: React.FC = () => {
                       onRetry={retrySliceSource}
                     />
                   )}
+                  footer={<SliceResultsTray controller={sliceResultsController} />}
                 >
                   <CanvasArea
                     ref={canvasRef}

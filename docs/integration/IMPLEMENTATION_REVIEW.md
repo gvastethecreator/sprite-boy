@@ -1852,15 +1852,45 @@ para ejecutar el journey completo con undo/save/export.
   resumen con outputs vacíos/warnings y selecciona el primer output sin crear
   URLs ni Blob temporales.
 - **Resiliencia:** el reducer rechaza resultados con dimensiones/bytes inválidos,
-  índices no row-major, summary drift o warnings desalineados; el progreso es
-  monotónico por stage/ratio/completed. `disposeStagedGridResults` pone a cero
-  los buffers propios y devuelve un snapshot idle idempotente.
+  source/layout/output-count que no corresponden a la request, índices no
+  row-major, bounds fuera de la celda/fuente, operaciones fuera de orden,
+  summary drift o warnings desalineados; también usa una whitelist explícita de
+  códigos de error. El progreso es monotónico por stage/ratio/completed.
+  `disposeStagedGridResults` pone a cero los buffers propios y devuelve un
+  snapshot idle idempotente.
 - **Evidencia:** `tests/contract/stagedGridResults.test.ts` pasa `4/4` casos
   (aliasing, summary/selection, drift/errors y release), junto con typecheck,
   oxlint y diff-check. Artifact:
   `artifacts/quality/GRID/2026-07-16/g6-01-staged-results.json`.
 - **Límite honesto:** el modelo todavía no dispara el Worker ni muestra el tray;
   la orquestación y feedback de proceso son G6-02, y el commit durable es G6-03.
+
+### G6-02 — Results tray, status, selection y tips
+
+- **Orquestación:** `useStagedGridResults` publica `processing` antes de
+  rasterizar el `ImageBitmap` validado en una superficie RGBA nueva, dejando una
+  ventana cancelable y visible de preparación; luego entrega la receta canónica
+  al cliente Worker, publica progreso monotónico y convierte
+  cancelación/crash/memory/decode en mensajes seguros. Reemplazo/reset o cambio
+  de receta cancela y libera los resultados anteriores.
+- **UI:** `SliceResultsTray` se monta como footer del canvas, no como una ruta
+  paralela. Ofrece process/process-again, cancel, retry, clear, selección con
+  `aria-pressed`, thumbnails pixel-perfect, resumen de outputs/pixels/reducción
+  y warnings sólo cuando aportan una decisión. El tray limita el montaje a 48
+  thumbnails por página y ofrece paginación para grids grandes; el layout
+  conserva scroll horizontal local para outputs y no crea overflow del Studio.
+- **Evidencia:** contrato, hook y componente pasan `10/10` casos enfocados; build
+  Vite, typecheck, oxlint y diff-check están verdes. Chrome productivo a
+  `1440×900` importa una fixture 2×4, procesa ocho outputs con el Worker real,
+  selecciona el segundo tile, mantiene `0` errores console/network/HTTP,
+  `0` interactivos sin nombre y sin overflow. El cap de 48 y la preparación
+  previa al raster se prueban en los contratos focalizados. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g6-02-results-browser.json` y captura
+  `g6-02-results-browser.png`.
+- **Revisión independiente:** `ACCEPT (P0-P2=0)` tras cerrar el scheduler
+  `rAF → setTimeout`, el cap de outputs y el contrato fail-closed.
+- **Límite honesto:** el tray sólo mantiene outputs staged en memoria; todavía
+  no crea `Region`/`Asset`, no persiste provenance y no exporta, que son G6-03/G7.
 
 ## Frontiers abiertos
 

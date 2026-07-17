@@ -1,5 +1,8 @@
 import type { EntityId, GridSplitRecipeV1 } from "../../../core/project";
-import { GRID_PROCESSING_STAGES } from "../../../core/processing/gridProcessingProtocol";
+import {
+  GRID_PROCESSING_OPERATIONS,
+  GRID_PROCESSING_STAGES,
+} from "../../../core/processing/gridProcessingProtocol";
 import type { GridProcessingClientProgress } from "../processing/gridProcessingClient";
 import type {
   GridProcessingOutputV1,
@@ -30,6 +33,18 @@ export type StagedGridResultErrorCode =
   | "memory"
   | "worker-crash"
   | "timeout";
+
+const STAGED_GRID_ERROR_CODES = Object.freeze([
+  "invalid-result",
+  "invalid-state",
+  "cancelled",
+  "invalid-input",
+  "decode",
+  "detect",
+  "memory",
+  "worker-crash",
+  "timeout",
+] as const satisfies readonly StagedGridResultErrorCode[]);
 
 export interface StagedGridResultError {
   readonly code: StagedGridResultErrorCode;
@@ -322,6 +337,60 @@ function cloneResult(result: GridProcessingResultV1): {
   return Object.freeze({ outputs, summary: cloneSummary(result, outputs) });
 }
 
+function assertResultMatchesRequest(state: StagedGridResultsSnapshot, result: GridProcessingResultV1): void {
+  const source = state.source;
+  const recipe = state.recipe;
+  if (!source || !recipe) throw invalid("processing state is missing source or recipe metadata.");
+  if (result.source.width !== source.width || result.source.height !== source.height) {
+    throw invalid("result source dimensions do not match the request.");
+  }
+  if (recipe.layout.mode === "manual") {
+    if (result.layout.origin !== "manual" || result.layout.rows !== recipe.layout.rows || result.layout.cols !== recipe.layout.cols) {
+      throw invalid("manual result layout does not match the recipe.");
+    }
+  } else if (result.layout.origin === "manual") {
+    throw invalid("auto recipe cannot return a manual result layout.");
+  }
+  const expectedOutputCount = result.layout.rows * result.layout.cols;
+  if (!Number.isSafeInteger(expectedOutputCount) || result.outputs.length !== expectedOutputCount) {
+    throw invalid("result output count does not match its layout.");
+  }
+  for (const output of result.outputs) {
+    const expectedRow = Math.floor(output.index / result.layout.cols);
+    const expectedColumn = output.index % result.layout.cols;
+    if (output.row !== expectedRow || output.column !== expectedColumn) {
+      throw invalid(`output ${output.index} row/column is not row-major.`);
+    }
+    const cell = output.cellBounds;
+    if (cell.x + cell.width > source.width || cell.y + cell.height > source.height) {
+      throw invalid(`output ${output.index} cell bounds exceed the source.`);
+    }
+    if (output.contentBounds) {
+      const content = output.contentBounds;
+      if (content.x < cell.x || content.y < cell.y ||
+        content.x + content.width > cell.x + cell.width ||
+        content.y + content.height > cell.y + cell.height) {
+        throw invalid(`output ${output.index} content bounds exceed its cell.`);
+      }
+    }
+    let previousOperationIndex = -1;
+    for (const operation of output.operations) {
+      const operationIndex = GRID_PROCESSING_OPERATIONS.indexOf(operation);
+      if (operationIndex <= previousOperationIndex) throw invalid(`output ${output.index} operations are out of order.`);
+      previousOperationIndex = operationIndex;
+    }
+  }
+}
+
+function cloneSourceMetadata(source: StagedGridResultSource): StagedGridResultSource {
+  if (!isRecord(source) || typeof source.assetId !== "string" || source.assetId.length === 0) {
+    throw invalid("source.assetId is required.");
+  }
+  assertPositiveInteger(source.width, "source.width");
+  assertPositiveInteger(source.height, "source.height");
+  return Object.freeze({ assetId: source.assetId, width: source.width, height: source.height });
+}
+
 function clearSnapshot(status: StagedGridResultStatus = "idle"): StagedGridResultsSnapshot {
   return Object.freeze({
     status,
@@ -362,6 +431,26 @@ export function beginStagedGridProcessing(
   });
 }
 
+/** Start the visible preparation state before main-thread rasterization begins. */
+export function beginStagedGridPreparation(
+  previous: StagedGridResultsSnapshot,
+  request: { readonly requestId: EntityId; readonly source: StagedGridResultSource; readonly recipe: GridSplitRecipeV1 },
+): StagedGridResultsSnapshot {
+  if (!previous || typeof previous !== "object") throw invalid("previous snapshot is required.");
+  if (typeof request.requestId !== "string" || request.requestId.length === 0) throw invalid("requestId is required.");
+  return Object.freeze({
+    status: "processing" as const,
+    requestId: request.requestId,
+    source: cloneSourceMetadata(request.source),
+    recipe: cloneRecipe(request.recipe),
+    progress: null,
+    outputs: EMPTY_OUTPUTS,
+    summary: null,
+    selectedIndex: null,
+    error: null,
+  });
+}
+
 export function updateStagedGridProgress(
   state: StagedGridResultsSnapshot,
   progress: GridProcessingClientProgress,
@@ -385,6 +474,7 @@ export function completeStagedGridProcessing(
   result: GridProcessingResultV1,
 ): StagedGridResultsSnapshot {
   if (state.status !== "processing") throw invalid("only processing state can complete.");
+  assertResultMatchesRequest(state, result);
   const cloned = cloneResult(result);
   return Object.freeze({
     ...state,
@@ -400,7 +490,8 @@ export function failStagedGridProcessing(
   state: StagedGridResultsSnapshot,
   error: Pick<StagedGridResultError, "code" | "message" | "stage" | "retryable">,
 ): StagedGridResultsSnapshot {
-  if (!isRecord(error) || typeof error.code !== "string" || typeof error.message !== "string" ||
+  if (!isRecord(error) || typeof error.code !== "string" ||
+    !(STAGED_GRID_ERROR_CODES as readonly string[]).includes(error.code) || typeof error.message !== "string" ||
     (error.stage !== null && !(GRID_PROCESSING_STAGES as readonly string[]).includes(error.stage)) ||
     typeof error.retryable !== "boolean") {
     throw invalid("error is invalid.");

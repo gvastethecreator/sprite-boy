@@ -23,6 +23,7 @@ export interface SliceSourceMetadataBarProps {
 
 export interface SliceSourceCanvasFrameProps extends SliceSourceMetadataBarProps {
   readonly children: ReactNode;
+  readonly footer?: ReactNode;
 }
 
 export function formatSourceByteSize(bytes: number): string {
@@ -164,6 +165,7 @@ export function SliceSourceCanvasFrame({
   legacyImageMeta,
   actions,
   children,
+  footer,
 }: SliceSourceCanvasFrameProps) {
   return (
     <section
@@ -179,6 +181,7 @@ export function SliceSourceCanvasFrame({
         actions={actions}
       />
       <div className="min-h-0 flex-1">{children}</div>
+      {footer}
     </section>
   );
 }

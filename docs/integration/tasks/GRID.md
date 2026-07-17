@@ -46,7 +46,7 @@ Superficie propietaria: `features/slice/**`, adapters `core/processing/**`, resu
 | ID | Tipo | Dep. | Behaviors | Resultado individual | Prueba de cierre | Estado |
 |---|---|---|---|---|---|---|
 | G6-01 | J | G2-05,G3-04,G4-05,G5-05,F1-08,F3-07 | G6.1-G6.3 | Staged results model and process summary | UT state/result contract | done |
-| G6-02 | E | G6-01 | G6.1-G6.3 | Results tray/status/tips UI | BR+A11Y + REV | todo |
+| G6-02 | E | G6-01 | G6.1-G6.3 | Results tray/status/tips UI | BR+A11Y + REV | done |
 | G6-03 | J | G6-01 | G6.6-G6.8 | Atomic commit recipe+Regions+optional Assets | IT commit/rollback/undo | todo |
 | G6-04 | J | G6-03 | G6.9 | Reload and provenance reconstruction | RT save/reload | todo |
 | G6-05 | J | G6-02,G6-04 | G6.1-G6.3,G6.6-G6.9 | Process-save-reload-undo journey | BR J2 + REV | todo |
