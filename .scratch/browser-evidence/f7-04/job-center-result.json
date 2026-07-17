@@ -1,0 +1,46 @@
+{
+  "status": "pass",
+  "desktop": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "triggerExpanded": "true",
+    "focusInside": true,
+    "activeLabel": "Close Job Center",
+    "dialogModal": "true",
+    "panelLabel": "Job Center",
+    "width": 420,
+    "height": 900,
+    "rightGap": 0,
+    "topGap": 0,
+    "emptyHeading": "No jobs yet",
+    "summary": "Job Center is empty.",
+    "actionCount": 0,
+    "pageFits": true
+  },
+  "desktopFocusAfterTab": true,
+  "desktopRestored": true,
+  "compact": {
+    "viewport": [
+      1024,
+      768
+    ],
+    "triggerExpanded": "true",
+    "focusInside": true,
+    "activeLabel": "Close Job Center",
+    "dialogModal": "true",
+    "panelLabel": "Job Center",
+    "width": 420,
+    "height": 768,
+    "rightGap": 0,
+    "topGap": 0,
+    "emptyHeading": "No jobs yet",
+    "summary": "Job Center is empty.",
+    "actionCount": 0,
+    "pageFits": true
+  },
+  "compactRestored": true,
+  "consoleErrors": [],
+  "exceptions": []
+}

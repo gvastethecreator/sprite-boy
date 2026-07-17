@@ -5,7 +5,10 @@ import type {
   GridProcessingClient,
   GridProcessingClientProgress,
 } from "../../features/slice/processing/gridProcessingClient";
-import type { GridProcessingResultV1 } from "../../core/processing/gridProcessingProtocol";
+import type {
+  GridProcessingResultV1,
+  GridProcessingSurfaceV1,
+} from "../../core/processing/gridProcessingProtocol";
 import {
   scheduleGridRasterization,
   useStagedGridResults,
@@ -151,8 +154,8 @@ describe("useStagedGridResults (G6-02)", () => {
   });
 
   it("publishes preparation before rasterization resolves", async () => {
-    let resolveRasterize: ((surface: Awaited<ReturnType<SliceSourceRasterizer>>) => void) | null = null;
-    const rasterize: SliceSourceRasterizer = vi.fn(() => new Promise((resolve) => {
+    let resolveRasterize: (surface: GridProcessingSurfaceV1) => void = () => undefined;
+    const rasterize: SliceSourceRasterizer = vi.fn(() => new Promise<GridProcessingSurfaceV1>((resolve) => {
       resolveRasterize = resolve;
     }));
     const process = vi.fn(async () => result());
@@ -172,7 +175,7 @@ describe("useStagedGridResults (G6-02)", () => {
     expect(hook.current.state.status).toBe("processing");
     expect(hook.current.state.progress).toBeNull();
     expect(process).not.toHaveBeenCalled();
-    resolveRasterize?.({
+    resolveRasterize({
       width: 2,
       height: 2,
       format: "rgba8",

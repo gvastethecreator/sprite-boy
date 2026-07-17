@@ -42,7 +42,7 @@
     "boundary": "Durable recipe/Region/Asset commit is G6-03; reload/provenance and undo journey are G6-04/G6-05."
   },
   "verification": {
-    "componentAndHook": "pass (10/10 focused cases including G6-01, preparation and output cap)",
+    "componentAndHook": "pass (11/11 focused cases including G6-01, preparation scheduler and output cap)",
     "typecheck": "pass",
     "lint": "pass",
     "build": "pass (Vite production build; pre-existing chunk/dynamic-import warnings)",

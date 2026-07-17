@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "check": "staged-grid-commit",
+  "status": "pass",
+  "task": "G6-03",
+  "scope": "Canonical atomic commit of staged Grid outputs into ProcessingRecipe, Regions and optional derived Assets.",
+  "evidence": {
+    "testFile": "tests/integration/commitStagedGridResults.test.ts",
+    "tests": 7,
+    "sourceBackedCommit": {
+      "derivedAssets": 0,
+      "regions": 2,
+      "sourceAssetBinding": true,
+      "repositoryPutCalls": 0
+    },
+    "derivedCommit": {
+      "derivedAssets": 2,
+      "regions": 2,
+      "repositoryPutCalls": 2,
+      "regionAssetBinding": true
+    },
+    "dispatchRejectsCleanup": {
+      "repositoryPutCalls": 2,
+      "repositoryRemoveCalls": 2,
+      "orphanRecords": 0
+    },
+    "historyUndo": true,
+    "singleProjectDispatch": true,
+    "runtimeUrlsCreated": false
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Happy-path-only commit: source-backed and transformed/derived paths are both exercised.",
+      "Partial durable state: dispatch rejection removes every repository asset created by the attempt.",
+      "History bypass: the integration test undoes the canonical command and preserves the source Asset.",
+      "Source drift: the helper requires the staged recipe sourceAssetId to equal the canonical source argument.",
+      "Concurrent stale work: source replacement and unrelated project mutation are rejected by revision plus source identity checks."
+    ],
+    "boundary": "Save/reload reconstruction and process-save-reload-undo browser proof remain G6-04/G6-05."
+  },
+  "verification": {
+    "focusedTests": "pass (7/7 G6-03 integration cases; broader focused G6 slice 22/22)",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass",
+    "independentReview": "pending"
+  }
+}

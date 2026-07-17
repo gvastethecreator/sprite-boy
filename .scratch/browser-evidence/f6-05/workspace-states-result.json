@@ -1,0 +1,129 @@
+{
+  "status": "pass",
+  "workspaces": [
+    {
+      "workspaceId": "slice",
+      "kind": "empty",
+      "title": "Bring in a spritesheet",
+      "labelledBy": "studio-slice-empty-title",
+      "headingId": "studio-slice-empty-title",
+      "actions": [
+        {
+          "commandId": "asset.import",
+          "label": "Import source art",
+          "disabled": false,
+          "title": "Add source art to the shared Asset Library."
+        }
+      ],
+      "canvasCount": 0,
+      "pageFits": true
+    },
+    {
+      "workspaceId": "compose",
+      "kind": "empty",
+      "title": "Start a composition",
+      "labelledBy": "studio-compose-empty-title",
+      "headingId": "studio-compose-empty-title",
+      "actions": [
+        {
+          "commandId": "asset.import",
+          "label": "Import artwork",
+          "disabled": false,
+          "title": "Add source art to the shared Asset Library."
+        },
+        {
+          "commandId": "workspace.open.slice",
+          "label": "Go to Slice",
+          "disabled": false,
+          "title": "Cut sprites from source art."
+        }
+      ],
+      "canvasCount": 0,
+      "pageFits": true
+    },
+    {
+      "workspaceId": "animate",
+      "kind": "empty",
+      "title": "Add artwork before animating",
+      "labelledBy": "studio-animate-empty-title",
+      "headingId": "studio-animate-empty-title",
+      "actions": [
+        {
+          "commandId": "asset.import",
+          "label": "Import artwork",
+          "disabled": false,
+          "title": "Add source art to the shared Asset Library."
+        },
+        {
+          "commandId": "workspace.open.compose",
+          "label": "Go to Compose",
+          "disabled": false,
+          "title": "Build frames from layered assets."
+        }
+      ],
+      "canvasCount": 0,
+      "pageFits": true
+    },
+    {
+      "workspaceId": "collision",
+      "kind": "empty",
+      "title": "Create frames before hitboxes",
+      "labelledBy": "studio-collision-empty-title",
+      "headingId": "studio-collision-empty-title",
+      "actions": [
+        {
+          "commandId": "workspace.open.slice",
+          "label": "Go to Slice",
+          "disabled": false,
+          "title": "Cut sprites from source art."
+        },
+        {
+          "commandId": "asset.import",
+          "label": "Import source art",
+          "disabled": false,
+          "title": "Add source art to the shared Asset Library."
+        }
+      ],
+      "canvasCount": 0,
+      "pageFits": true
+    },
+    {
+      "workspaceId": "export",
+      "kind": "empty",
+      "title": "Build something to export",
+      "labelledBy": "studio-export-empty-title",
+      "headingId": "studio-export-empty-title",
+      "actions": [
+        {
+          "commandId": "asset.import",
+          "label": "Import artwork",
+          "disabled": false,
+          "title": "Add source art to the shared Asset Library."
+        },
+        {
+          "commandId": "workspace.open.compose",
+          "label": "Go to Compose",
+          "disabled": false,
+          "title": "Build frames from layered assets."
+        }
+      ],
+      "canvasCount": 0,
+      "pageFits": true
+    }
+  ],
+  "recoveryAction": {
+    "hash": "#/studio/slice",
+    "focusWorkspace": "slice",
+    "focusLabel": "Slice workspace content",
+    "workspace": "slice"
+  },
+  "ready": {
+    "workspace": "slice",
+    "stateCount": 0,
+    "canvasCount": 1,
+    "panelCount": 2,
+    "pageFits": true
+  },
+  "consoleErrors": [],
+  "exceptions": []
+}

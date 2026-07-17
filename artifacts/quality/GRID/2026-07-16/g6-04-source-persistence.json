@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-source-persistence",
+  "status": "pass",
+  "task": "G6-04",
+  "scope": "Canonical source Asset binding, autosave checkpoint, reload reconstruction and provenance preservation.",
+  "evidence": {
+    "testFiles": [
+      "tests/integration/importSliceSource.test.ts",
+      "tests/integration/gridSourcePersistence.test.ts"
+    ],
+    "tests": 4,
+    "canonicalImport": {
+      "assetId": "asset-slice-source",
+      "workspaceSelection": true,
+      "singleHistoryEntry": true,
+      "restoreReadsBlob": true
+    },
+    "saveReload": {
+      "autosaveCheckpoint": true,
+      "codecRoundTrip": true,
+      "recipeSourceBinding": true,
+      "regionProvenance": true,
+      "runtimeUrlsCreated": false
+    },
+    "failureBoundaries": {
+      "crossProject": true,
+      "idCollision": true,
+      "lateWriteCleanup": true
+    }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Transitional fingerprint source IDs: the canonical workspace selectedAssetId is now the only source binding used by Grid recipes.",
+      "URL-backed persistence: reload reads the repository Blob directly and keeps runtime URLs out of project JSON.",
+      "Happy-path-only import: cross-project, ID collision, late write and dispatch cleanup paths are covered."
+    ],
+    "boundary": "Process-save-reload-undo browser journey and export remain G6-05/G7."
+  },
+  "verification": {
+    "focusedTests": "pass (4/4 G6-04; broader focused G6 slice 22/22)",
+    "typecheck": "pass",
+    "lint": "pass",
+    "diffCheck": "pass",
+    "independentReview": "pending"
+  }
+}

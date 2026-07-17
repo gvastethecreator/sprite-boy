@@ -1,0 +1,57 @@
+{
+  "status": "pass",
+  "settings": {
+    "reducedMotion": "true",
+    "focusInside": true,
+    "focusLabel": "Close settings"
+  },
+  "settingsRestored": true,
+  "desktop": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "visibleWorkspaceLinks": [
+      "Slice",
+      "Compose",
+      "Animate",
+      "Collision",
+      "Export"
+    ],
+    "visiblePanels": [
+      "Tools",
+      "Properties"
+    ],
+    "pageFits": true
+  },
+  "compact": {
+    "viewport": [
+      1024,
+      768
+    ],
+    "workspace": "collision",
+    "workspaceItems": [
+      "Slice",
+      "Compose",
+      "Animate",
+      "Collision",
+      "Export"
+    ],
+    "desktopNavVisible": false,
+    "toolbarVisible": true,
+    "sidebarCount": 0,
+    "pageFits": true
+  },
+  "drawerBeforeTab": {
+    "focusInside": true,
+    "panel": "Tools"
+  },
+  "drawerAfterTab": true,
+  "drawerRestored": true,
+  "palette": {
+    "reducedMotion": "true",
+    "searchFocused": true
+  },
+  "consoleErrors": [],
+  "exceptions": []
+}

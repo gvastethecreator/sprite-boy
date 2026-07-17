@@ -19,6 +19,7 @@ import {
   useStudioJobRunner,
 } from "../../contexts/StudioStoreContext";
 import { createJobCenterSummarySelector } from "../../core/stores";
+import type { StudioProjectV1 } from "../../core/project";
 import { useJobStoreSelector, useProjectStoreSelector } from "../../hooks/useStudioStoreSelector";
 import {
   createStudioCommandRegistry,
@@ -52,7 +53,17 @@ import type {
   SourceSessionSnapshot,
 } from "../../features/slice/source/sourceSession";
 import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
-import { SliceResultsTray, useStagedGridResults } from "../../features/slice/results";
+import {
+  commitStagedGridResults,
+  SliceResultsTray,
+  useStagedGridResults,
+  type CommitStagedGridResultsResult,
+  type StagedGridResultsSnapshot,
+} from "../../features/slice/results";
+import {
+  importSliceSource,
+  restoreCanonicalSliceSource,
+} from "../../features/slice/source/importSliceSource";
 import ComposeBootstrapWorkspace from "../../features/compose/project/ComposeBootstrapWorkspace";
 import CompositionCanvasSettingsInspector from "../../features/compose/canvasSettings/CompositionCanvasSettingsInspector";
 
@@ -73,26 +84,73 @@ interface StudioShellError {
   readonly message: string;
 }
 
-function sliceSourceAssetIdentity(source: {
-  readonly src: string;
-  readonly width: number;
-  readonly height: number;
-  readonly fileSize: number;
-  readonly name: string;
-} | null): string | null {
-  if (!source) return null;
-  const seed = `${source.width}x${source.height}|${source.fileSize}|${source.name}|${source.src}`;
-  let first = 0x811c9dc5;
-  let second = 0x9e3779b9;
-  for (let index = 0; index < seed.length; index += 1) {
-    const code = seed.charCodeAt(index);
-    first = Math.imul(first ^ code, 0x01000193);
-    second = Math.imul(second ^ code, 0x85ebca6b);
+const GRID_COMMIT_UNDO_KEY = "sprite-boy-studio:grid-commit-undo:v1";
+
+interface DurableGridCommitUndo {
+  readonly projectId: string;
+  readonly sourceAssetId: string;
+  readonly recipeId: string;
+  readonly regionIds: readonly string[];
+  readonly derivedAssetIds: readonly string[];
+  readonly committedRevision: number;
+}
+
+function readDurableGridCommitUndo(projectId: string): DurableGridCommitUndo | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(GRID_COMMIT_UNDO_KEY);
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+    const candidate = value as Record<string, unknown>;
+    if (candidate.projectId !== projectId || typeof candidate.sourceAssetId !== "string" ||
+      typeof candidate.recipeId !== "string" || !Array.isArray(candidate.regionIds) ||
+      !candidate.regionIds.every((id) => typeof id === "string") || !Array.isArray(candidate.derivedAssetIds) ||
+      !candidate.derivedAssetIds.every((id) => typeof id === "string") ||
+      !Number.isSafeInteger(candidate.committedRevision)) return null;
+    return Object.freeze({
+      projectId,
+      sourceAssetId: candidate.sourceAssetId,
+      recipeId: candidate.recipeId,
+      regionIds: Object.freeze([...candidate.regionIds] as string[]),
+      derivedAssetIds: Object.freeze([...candidate.derivedAssetIds] as string[]),
+      committedRevision: candidate.committedRevision,
+    });
+  } catch {
+    return null;
   }
-  const fingerprint = `${(first >>> 0).toString(16).padStart(8, "0")}${
-    (second >>> 0).toString(16).padStart(8, "0")
-  }`;
-  return `slice-source:${fingerprint}`;
+}
+
+function writeDurableGridCommitUndo(result: CommitStagedGridResultsResult, projectId: string): void {
+  try {
+    globalThis.localStorage?.setItem(GRID_COMMIT_UNDO_KEY, JSON.stringify({
+      projectId,
+      sourceAssetId: result.recipe.sourceAssetId,
+      recipeId: result.recipe.id,
+      regionIds: result.regions.map((region) => region.id),
+      derivedAssetIds: result.derivedAssets.map((asset) => asset.id),
+      committedRevision: result.revision,
+    } satisfies DurableGridCommitUndo));
+  } catch {
+    // The canonical graph and autosave remain authoritative when metadata storage is unavailable.
+  }
+}
+
+function clearDurableGridCommitUndo(): void {
+  try {
+    globalThis.localStorage?.removeItem(GRID_COMMIT_UNDO_KEY);
+  } catch {
+    // Metadata cleanup is best effort; stale markers are validated against the graph before use.
+  }
+}
+
+function durableGridCommitMatchesProject(
+  project: StudioProjectV1,
+  marker: DurableGridCommitUndo | null,
+): marker is DurableGridCommitUndo {
+  if (!marker || marker.projectId !== project.id || project.workspace.selectedAssetId !== marker.sourceAssetId) return false;
+  if (!project.processingRecipes[marker.recipeId]) return false;
+  return marker.regionIds.every((id) => Boolean(project.regions[id])) &&
+    marker.derivedAssetIds.every((id) => Boolean(project.assets[id]));
 }
 
 function useCompactStudioLayout(): boolean {
@@ -197,9 +255,16 @@ const AppLayout: React.FC = () => {
     useState<SourceReadyMetadata | null>(null);
   const [sliceGridSourceGeneration, setSliceGridSourceGeneration] = useState(0);
   const [sourceActionError, setSourceActionError] = useState<SourceSessionError | null>(null);
+  const [canonicalSliceSourceId, setCanonicalSliceSourceId] = useState<string | null>(
+    () => canonicalProject.workspace.selectedAssetId ?? null,
+  );
+  const [durableGridCommitUndo, setDurableGridCommitUndo] = useState<DurableGridCommitUndo | null>(
+    () => readDurableGridCommitUndo(canonicalProject.id),
+  );
   const sourceImportGenerationRef = useRef(0);
   const sourceCommitControllerRef = useRef<AbortController | null>(null);
   const canonicalNavigationProjectRef = useRef<string | null>(null);
+  const canonicalSourceRestoreRef = useRef<string | null>(null);
   const [composeImportRequestToken, setComposeImportRequestToken] = useState(0);
   const [composeImportBusy, setComposeImportBusy] = useState(false);
   const {
@@ -209,10 +274,52 @@ const AppLayout: React.FC = () => {
     reset: resetSourceSession,
     getBlob: getSourceBlob,
   } = useSliceSourceSession();
-  const sliceGridSourceAssetId = useMemo(
-    () => sliceSourceAssetIdentity(slicerImage),
-    [slicerImage?.fileSize, slicerImage?.height, slicerImage?.name, slicerImage?.src, slicerImage?.width],
-  );
+  const handleUploadRef = useRef(handleUpload);
+  handleUploadRef.current = handleUpload;
+  const selectSourceSessionRef = useRef(selectSourceSession);
+  selectSourceSessionRef.current = selectSourceSession;
+  useEffect(() => {
+    setCanonicalSliceSourceId(canonicalProject.workspace.selectedAssetId ?? null);
+  }, [canonicalProject.workspace.selectedAssetId]);
+  useEffect(() => {
+    setDurableGridCommitUndo(readDurableGridCommitUndo(canonicalProject.id));
+  }, [canonicalProject.id]);
+  const sliceGridSourceAssetId = canonicalSliceSourceId;
+
+  useEffect(() => {
+    const assetId = canonicalProject.workspace.selectedAssetId;
+    if (activeWorkspace !== "slice" || canonical.persistenceState !== "saved" || !assetId || slicerImage ||
+      sourceSessionSnapshot.status !== "idle" || canonicalSourceRestoreRef.current === assetId) return;
+    canonicalSourceRestoreRef.current = assetId;
+    const controller = new AbortController();
+    const generation = ++sourceImportGenerationRef.current;
+    void (async () => {
+      try {
+        const restored = await restoreCanonicalSliceSource({
+          store: canonical.store,
+          repository: canonical.assets,
+          assetId,
+          signal: controller.signal,
+        });
+        const file = new File([restored.blob], restored.asset.name, { type: restored.asset.mimeType });
+        const snapshot = await selectSourceSessionRef.current(file);
+        if (snapshot.status !== "ready") throw new Error("The saved source could not be decoded.");
+        await handleUploadRef.current(file, { signal: controller.signal });
+        if (controller.signal.aborted || sourceImportGenerationRef.current !== generation) return;
+        setCommittedSourceMetadata(snapshot.metadata);
+        setCanonicalSliceSourceId(assetId);
+        setSliceGridSourceGeneration((current) => current + 1);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          showToast(error instanceof Error ? error.message : "The saved Slice source could not be restored.", "error");
+        }
+      }
+    })();
+    return () => {
+      controller.abort();
+      if (canonicalSourceRestoreRef.current === assetId) canonicalSourceRestoreRef.current = null;
+    };
+  }, [activeWorkspace, canonical.assets, canonical.persistenceState, canonical.store, canonicalProject.workspace.selectedAssetId, showToast, slicerImage]);
   const sliceGridController = useSliceGridController({
     generation: sliceGridSourceGeneration,
     committedMetadata: committedSourceMetadata,
@@ -223,9 +330,40 @@ const AppLayout: React.FC = () => {
     onInitializeState: initializeSliceGridState,
     onCommitState: commitSliceGridState,
   });
+  const sliceCommitBusyRef = useRef(false);
+  const commitSliceResults = useCallback(async (staged: StagedGridResultsSnapshot): Promise<boolean> => {
+    if (sliceCommitBusyRef.current) return false;
+    const sourceAssetId = canonicalSliceSourceId;
+    if (!sourceAssetId) {
+      showToast("Import and validate a canonical source before committing slices.", "error");
+      return false;
+    }
+    sliceCommitBusyRef.current = true;
+    try {
+      const committed = await commitStagedGridResults({
+        store: canonical.store,
+        repository: canonical.assets,
+        staged,
+        sourceAssetId,
+        name: slicerImage?.name ?? "slice",
+      });
+      await canonical.saveProject();
+      writeDurableGridCommitUndo(committed, canonical.store.getSnapshot().project.id);
+      setDurableGridCommitUndo(readDurableGridCommitUndo(canonical.store.getSnapshot().project.id));
+      showToast(`${committed.regions.length} slices committed to the project.`, "success");
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Slices could not be committed.";
+      showToast(message, "error");
+      return false;
+    } finally {
+      sliceCommitBusyRef.current = false;
+    }
+  }, [canonical, canonicalSliceSourceId, showToast, slicerImage?.name]);
   const sliceResultsController = useStagedGridResults({
     sourceSnapshot: sourceSessionSnapshot,
     recipe: sliceGridController.recipe,
+    commit: commitSliceResults,
   });
   const canonicalSliceSourceAvailable = sliceGridController.sourceDimensions !== null;
   const canonicalSliceExportSourceOnly =
@@ -298,6 +436,9 @@ const AppLayout: React.FC = () => {
     queueMicrotask(() => target?.focus({ preventScroll: true }));
   }, []);
 
+  const canonicalSliceHistoryOwned = activeWorkspace === "slice" && canonicalSliceSourceId !== null;
+  const canonicalHistoryOwned = activeWorkspace === "compose" || canonicalSliceHistoryOwned;
+
   const openSourcePicker = useCallback((trigger: HTMLButtonElement | null): void => {
     sourcePickerReturnFocusRef.current = trigger;
     assetInputRef.current?.click();
@@ -334,11 +475,11 @@ const AppLayout: React.FC = () => {
       }
     },
     undo: () => {
-      if (activeWorkspace === "compose") canonical.history.undo();
+      if (canonicalHistoryOwned) canonical.history.undo();
       else undo();
     },
     redo: () => {
-      if (activeWorkspace === "compose") canonical.history.redo();
+      if (canonicalHistoryOwned) canonical.history.redo();
       else redo();
     },
     openWorkspace: (workspaceId) => {
@@ -368,6 +509,7 @@ const AppLayout: React.FC = () => {
     clearSourceWorkflow,
     clearLegacyCanvasInteractionState,
     canonicalSliceSourceAvailable,
+    canonicalHistoryOwned,
   ]);
 
   const sourceSessionBusy = sourceSessionSnapshot.status === "validating" ||
@@ -382,8 +524,8 @@ const AppLayout: React.FC = () => {
     busy: isLoading || sourceSessionBusy || composeImportBusy
       || canonical.persistenceState === "loading"
       || canonical.persistenceState === "saving",
-    canUndo: activeWorkspace === "compose" ? canonicalCanUndo : canUndo,
-    canRedo: activeWorkspace === "compose" ? canonicalCanRedo : canRedo,
+    canUndo: canonicalHistoryOwned ? canonicalCanUndo : canUndo,
+    canRedo: canonicalHistoryOwned ? canonicalCanRedo : canRedo,
     canvasAvailable: activeWorkspace === "compose" ? Boolean(canonicalComposition) : hasWorkspace,
   }), [
     activeWorkspace,
@@ -392,6 +534,7 @@ const AppLayout: React.FC = () => {
     canonical.persistenceState,
     canonicalCanRedo,
     canonicalCanUndo,
+    canonicalHistoryOwned,
     canonicalComposition,
     composeImportBusy,
     hasWorkspace,
@@ -479,11 +622,26 @@ const AppLayout: React.FC = () => {
     const controller = new AbortController();
     sourceCommitControllerRef.current = controller;
     setSourceCommitting(true);
+    let importedSourceId: string | null = null;
+    let importedSourceRevision: number | null = null;
     try {
       const file = new File([blob], snapshot.metadata.name, {
         type: snapshot.metadata.mimeType,
         lastModified: snapshot.metadata.lastModified ?? 0,
       });
+      const imported = await importSliceSource({
+        store: canonical.store,
+        repository: canonical.assets,
+        blob,
+        name: snapshot.metadata.name,
+        mimeType: snapshot.metadata.mimeType,
+        width: snapshot.metadata.width,
+        height: snapshot.metadata.height,
+        signal: controller.signal,
+      });
+      importedSourceId = imported.asset.id;
+      importedSourceRevision = imported.revision;
+      setCanonicalSliceSourceId(importedSourceId);
       await handleUpload(file, { signal: controller.signal });
       if (sourceImportGenerationRef.current !== generation) return false;
       setCommittedSourceMetadata(snapshot.metadata);
@@ -493,6 +651,13 @@ const AppLayout: React.FC = () => {
       navigate("slice");
       return true;
     } catch {
+      if (importedSourceId && importedSourceRevision !== null &&
+        canonical.store.getSnapshot().revision === importedSourceRevision) {
+        const rollback = canonical.history.undo();
+        if (!rollback.ok) {
+          canonical.reportAssetCleanupDebt(canonical.store.getSnapshot().project.id, importedSourceId, true);
+        }
+      }
       if (!isSliceSourceSignalAborted(controller.signal) &&
         sourceImportGenerationRef.current === generation) {
         resetSourceSession();
@@ -519,7 +684,7 @@ const AppLayout: React.FC = () => {
       }
       if (sourceImportGenerationRef.current === generation) setSourceCommitting(false);
     }
-  }, [cancelSourceCommit, getSourceBlob, handleUpload, navigate, resetSourceSession, showToast]);
+  }, [cancelSourceCommit, canonical, getSourceBlob, handleUpload, navigate, resetSourceSession, showToast]);
 
   const selectSliceSource = useCallback(async (
     input: File | FileList,
