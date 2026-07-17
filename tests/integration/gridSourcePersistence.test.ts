@@ -69,7 +69,7 @@ class MemoryAutosaveStorage implements AutosaveJournalStorage {
 function repository(projectId: string) {
   const records = new Map<string, AssetRecord>();
   const blobs = new Map<string, Blob>();
-  const put = vi.fn(async (blob: Blob, metadata: AssetMetadata): Promise<AssetRecord> => {
+  const putRecord = async (blob: Blob, metadata: AssetMetadata): Promise<AssetRecord> => {
     const hash = "f".repeat(64);
     const record: AssetRecord = {
       id: metadata.id,
@@ -87,7 +87,8 @@ function repository(projectId: string) {
     records.set(record.id, record);
     blobs.set(record.id, blob);
     return record;
-  });
+  };
+  const put = vi.fn(putRecord);
   const getMetadata = vi.fn(async (assetId: string): Promise<AssetRecord> => {
     const record = records.get(assetId);
     if (!record) throw new AssetRepositoryError("ASSET_NOT_FOUND", "missing", { operation: "get-metadata", assetId });
@@ -98,12 +99,13 @@ function repository(projectId: string) {
     if (!blob) throw new AssetRepositoryError("ASSET_NOT_FOUND", "missing", { operation: "get-blob", assetId });
     return blob;
   });
+  const remove = vi.fn(async (assetId: string) => { records.delete(assetId); blobs.delete(assetId); });
   const value = {
     projectId,
     put,
     getMetadata,
     getBlob,
-    remove: vi.fn(async (assetId: string) => { records.delete(assetId); blobs.delete(assetId); }),
+    remove,
     list: vi.fn(async () => [...records.values()]),
     verify: vi.fn(),
     scanIntegrity: vi.fn(),
@@ -113,7 +115,7 @@ function repository(projectId: string) {
     releaseOwner: vi.fn(),
     dispose: vi.fn(),
   } as unknown as AssetRepository;
-  return { value, records, blobs };
+  return { value, records, blobs, put, putRecord, remove };
 }
 
 function staged(sourceAssetId: string) {
@@ -230,5 +232,97 @@ describe("Grid source persistence and reconstruction (G6-04)", () => {
       listFailed: false,
     });
     expect(repo.records.has(source.id)).toBe(true);
+  });
+
+  it("serializes startup removal before an import can recreate the same asset ID", async () => {
+    const project = createEmptyStudioProject({ id: "project-grid-reconcile-lock", now: NOW });
+    const repo = repository(project.id);
+    const source: AssetRecord = {
+      id: "asset-reconcile-lock",
+      name: "stale.png",
+      blobKey: "sha256:" + "d".repeat(64),
+      contentHash: "d".repeat(64),
+      mimeType: "image/png",
+      width: 2,
+      height: 2,
+      byteSize: 4,
+      createdAt: NOW,
+      updatedAt: NOW,
+      provenance: { source: "import", importedAt: NOW },
+    };
+    repo.records.set(source.id, source);
+    repo.blobs.set(source.id, new Blob([new Uint8Array([9, 8, 7, 6])], { type: "image/png" }));
+    let enteredRemove!: () => void;
+    const removeEntered = new Promise<void>((resolve) => { enteredRemove = resolve; });
+    let releaseRemove!: () => void;
+    const removeReleased = new Promise<void>((resolve) => { releaseRemove = resolve; });
+    repo.remove.mockImplementation(async (assetId: string) => {
+      if (assetId === source.id) {
+        enteredRemove();
+        await removeReleased;
+      }
+      repo.records.delete(assetId);
+      repo.blobs.delete(assetId);
+    });
+
+    const reconciliation = reconcileProjectAssetRepository(repo.value, project);
+    await removeEntered;
+    const imported = importSliceSource({
+      store: createProjectStoreWithHistory(project, { context: { nextId: () => "unused", now: () => NOW } }).store,
+      repository: repo.value,
+      blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: "image/png" }),
+      name: "fresh.png",
+      mimeType: "image/png",
+      width: 2,
+      height: 2,
+      nextId: () => source.id,
+      now: () => NOW,
+    });
+    expect(repo.value.put).not.toHaveBeenCalled();
+    releaseRemove();
+    await expect(reconciliation).resolves.toMatchObject({ removedAssetIds: [source.id] });
+    await imported;
+    expect(repo.records.has(source.id)).toBe(true);
+    expect(repo.value.put).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads the canonical graph when reconciliation waits behind an import", async () => {
+    const project = createEmptyStudioProject({ id: "project-grid-reconcile-order", now: NOW });
+    const repo = repository(project.id);
+    const bundle = createProjectStoreWithHistory(project, { context: { nextId: () => "unused", now: () => NOW } });
+    let enteredPut!: () => void;
+    const putEntered = new Promise<void>((resolve) => { enteredPut = resolve; });
+    let releasePut!: () => void;
+    const putReleased = new Promise<void>((resolve) => { releasePut = resolve; });
+    repo.put.mockImplementation(async (blob: Blob, metadata: AssetMetadata) => {
+      enteredPut();
+      await putReleased;
+      return repo.putRecord(blob, metadata);
+    });
+
+    const imported = importSliceSource({
+      store: bundle.store,
+      repository: repo.value,
+      blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: "image/png" }),
+      name: "ordered.png",
+      mimeType: "image/png",
+      width: 2,
+      height: 2,
+      nextId: () => "asset-reconcile-order",
+      now: () => NOW,
+    });
+    await putEntered;
+    const reconciliation = reconcileProjectAssetRepository(repo.value, project, {
+      getProject: () => bundle.store.getSnapshot().project as StudioProjectV1,
+    });
+    releasePut();
+    await imported;
+    await expect(reconciliation).resolves.toEqual({
+      complete: true,
+      removedAssetIds: [],
+      pendingAssetIds: [],
+      listFailed: false,
+    });
+    expect(repo.records.has("asset-reconcile-order")).toBe(true);
   });
 });

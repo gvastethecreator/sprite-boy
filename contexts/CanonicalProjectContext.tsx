@@ -12,6 +12,7 @@ import {
   IndexedDbAssetRepository,
   isAssetRepositoryError,
   reconcileProjectAssetRepository,
+  withAssetRepositoryMutation,
   type AssetRepository,
 } from "../core/assets";
 import {
@@ -269,6 +270,7 @@ export function CanonicalProjectProvider({
             const reconciliation = await reconcileProjectAssetRepository(
               current.assets,
               current.store.getSnapshot().project as StudioProjectV1,
+              { getProject: () => current.store.getSnapshot().project as StudioProjectV1 },
             );
             if (generation !== generationRef.current) return;
             if (!reconciliation.listFailed) {
@@ -277,18 +279,28 @@ export function CanonicalProjectProvider({
             }
           }
         }
-        const resolvedCleanupIds: EntityId[] = [];
-        for (const assetId of assetCleanupIdsRef.current) {
-          try {
-            await current.assets.remove(assetId, "release-and-remove");
-            resolvedCleanupIds.push(assetId);
-          } catch (error) {
-            if (isAssetRepositoryError(error) && error.code === "ASSET_NOT_FOUND") {
-              resolvedCleanupIds.push(assetId);
+        const resolvedCleanupIds = await withAssetRepositoryMutation(current.assets, async () => {
+          const resolved: EntityId[] = [];
+          for (const assetId of assetCleanupIdsRef.current) {
+            const currentProject = current.store.getSnapshot().project as StudioProjectV1;
+            // A late rollback must never remove a binary that the active graph now owns.
+            // The graph is authoritative over cleanup debt.
+            if (currentProject.assets[assetId]) {
+              resolved.push(assetId);
+              continue;
             }
-            // Other failures keep the exact debt id for the next retry.
+            try {
+              await current.assets.remove(assetId, "release-and-remove");
+              resolved.push(assetId);
+            } catch (error) {
+              if (isAssetRepositoryError(error) && error.code === "ASSET_NOT_FOUND") {
+                resolved.push(assetId);
+              }
+              // Other failures keep the exact debt id for the next retry.
+            }
           }
-        }
+          return resolved;
+        });
         if (generation !== generationRef.current) return;
         for (const assetId of resolvedCleanupIds) assetCleanupIdsRef.current.delete(assetId);
         assetCleanupPendingRef.current = assetCleanupScanFailedRef.current
@@ -354,6 +366,7 @@ export function CanonicalProjectProvider({
         const reconciliation = await reconcileProjectAssetRepository(
           current.assets,
           current.store.getSnapshot().project as StudioProjectV1,
+          { getProject: () => current.store.getSnapshot().project as StudioProjectV1 },
         );
         if (!reconciliation.complete) {
           cleanupBlocked = true;

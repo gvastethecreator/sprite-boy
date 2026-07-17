@@ -13,16 +13,42 @@ export interface ProjectAssetReconciliationOptions {
   readonly getProject?: () => StudioProjectV1;
 }
 
+const repositoryMutationLocks = new WeakMap<AssetRepository, Promise<void>>();
+
+/** Serialize repository writes/removals with lifecycle reconciliation per project repository. */
+export function withAssetRepositoryMutation<T>(
+  repository: AssetRepository,
+  operation: () => T | PromiseLike<T>,
+): Promise<T> {
+  const previous = repositoryMutationLocks.get(repository) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(operation);
+  repositoryMutationLocks.set(repository, next.then(() => undefined, () => undefined));
+  return next;
+}
+
 /**
  * Remove repository records that have no owner in the recovered canonical
  * graph. Run only at a project lifecycle boundary, never during an import.
  */
-export async function reconcileProjectAssetRepository(
+async function reconcileProjectAssetRepositoryUnlocked(
   repository: AssetRepository,
   project: StudioProjectV1,
   options: ProjectAssetReconciliationOptions = {},
 ): Promise<ProjectAssetReconciliationResult> {
-  if (repository.projectId !== project.id) {
+  let activeProject: StudioProjectV1;
+  try {
+    // The caller's project argument can predate a queued import. Resolve the
+    // canonical graph only after this operation owns the repository lock.
+    activeProject = options.getProject?.() ?? project;
+  } catch {
+    return Object.freeze({
+      complete: false,
+      removedAssetIds: Object.freeze([]),
+      pendingAssetIds: Object.freeze([]),
+      listFailed: true,
+    });
+  }
+  if (repository.projectId !== activeProject.id) {
     return Object.freeze({
       complete: false,
       removedAssetIds: Object.freeze([]),
@@ -46,7 +72,7 @@ export async function reconcileProjectAssetRepository(
   const removedAssetIds: EntityId[] = [];
   const pendingAssetIds: EntityId[] = [];
   for (const record of records) {
-    const currentProject = options.getProject?.() ?? project;
+    const currentProject = options.getProject?.() ?? activeProject;
     if (currentProject.id !== repository.projectId) {
       pendingAssetIds.push(record.id);
       continue;
@@ -65,4 +91,12 @@ export async function reconcileProjectAssetRepository(
     pendingAssetIds: Object.freeze(pendingAssetIds),
     listFailed: false,
   });
+}
+
+export function reconcileProjectAssetRepository(
+  repository: AssetRepository,
+  project: StudioProjectV1,
+  options: ProjectAssetReconciliationOptions = {},
+): Promise<ProjectAssetReconciliationResult> {
+  return withAssetRepositoryMutation(repository, () => reconcileProjectAssetRepositoryUnlocked(repository, project, options));
 }

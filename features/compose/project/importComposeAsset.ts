@@ -1,5 +1,6 @@
 import {
   isAssetRepositoryError,
+  withAssetRepositoryMutation,
   type AssetRepository,
 } from "../../../core/assets";
 import {
@@ -107,7 +108,7 @@ function cleanupFailure(
   );
 }
 
-export async function retryComposeAssetCleanup(
+async function retryComposeAssetCleanupUnlocked(
   assets: AssetRepository,
   assetId: EntityId,
 ): Promise<{ readonly ok: true } | ComposeAssetImportFailure> {
@@ -116,12 +117,19 @@ export async function retryComposeAssetCleanup(
     : cleanupFailure(assetId);
 }
 
+export function retryComposeAssetCleanup(
+  assets: AssetRepository,
+  assetId: EntityId,
+): Promise<{ readonly ok: true } | ComposeAssetImportFailure> {
+  return withAssetRepositoryMutation(assets, () => retryComposeAssetCleanupUnlocked(assets, assetId));
+}
+
 /**
  * Import one browser image into the canonical AssetRepository and open its
  * first Composition through the preflighted A1-01 intent. Runtime URLs and
  * data URLs never cross this boundary.
  */
-export async function importComposeAsset(
+async function importComposeAssetUnlocked(
   input: SourceFileInput,
   ports: ComposeAssetImportPorts,
   options: { readonly signal?: AbortSignal } = {},
@@ -293,4 +301,12 @@ export async function importComposeAsset(
       // Decode resource ownership is terminal at this boundary.
     }
   }
+}
+
+export function importComposeAsset(
+  input: SourceFileInput,
+  ports: ComposeAssetImportPorts,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<ComposeAssetImportResult> {
+  return withAssetRepositoryMutation(ports.assets, () => importComposeAssetUnlocked(input, ports, options));
 }

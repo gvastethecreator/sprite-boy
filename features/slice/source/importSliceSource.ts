@@ -1,5 +1,6 @@
 import {
   isAssetRepositoryError,
+  withAssetRepositoryMutation,
   type AssetMetadata,
   type AssetRepository,
 } from "../../../core/assets";
@@ -129,6 +130,13 @@ async function cleanupAttempt(
     if (current.revision !== initialRevision || current.project.assets[assetId]) return Object.freeze([assetId]);
     const record = await options.repository.getMetadata(assetId);
     if (!matchesAttempt(record, expected)) return Object.freeze([assetId]);
+    // Metadata lookup yields. Re-read the canonical graph immediately before
+    // removal so a concurrent dispatch cannot turn this late write into an
+    // owned source between the first check and cleanup.
+    const latest = options.store.getSnapshot();
+    if (latest.revision !== initialRevision || latest.project.id !== options.repository.projectId || latest.project.assets[assetId]) {
+      return Object.freeze([assetId]);
+    }
     await options.repository.remove(assetId, "release-and-remove");
     try {
       await options.repository.getMetadata(assetId);
@@ -159,7 +167,7 @@ function dispatchFailureMessage(result: ProjectStoreDispatchResult): string {
     : result.result.diagnostics[0]?.message ?? "Source Asset import was rejected by the canonical project.";
 }
 
-export async function importSliceSource(options: ImportSliceSourceOptions): Promise<ImportSliceSourceResult> {
+async function importSliceSourceUnlocked(options: ImportSliceSourceOptions): Promise<ImportSliceSourceResult> {
   const initialState = options.store.getSnapshot();
   const project = initialState.project as StudioProjectV1;
   if (options.repository.projectId !== project.id) fail("repository-mismatch", "The AssetRepository belongs to a different active project.");
@@ -235,6 +243,10 @@ export async function importSliceSource(options: ImportSliceSourceOptions): Prom
     if (error instanceof SliceSourceImportError) throw error;
     throw new SliceSourceImportError("repository-failed", "Source Asset could not be persisted.", { assetIds: [assetId] });
   }
+}
+
+export function importSliceSource(options: ImportSliceSourceOptions): Promise<ImportSliceSourceResult> {
+  return withAssetRepositoryMutation(options.repository, () => importSliceSourceUnlocked(options));
 }
 
 /** Read the durable source without creating a runtime URL or mutating the graph. */

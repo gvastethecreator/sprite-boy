@@ -1,6 +1,7 @@
 import {
   computeAssetContentIdentity,
   isAssetRepositoryError,
+  withAssetRepositoryMutation,
   type AssetContentIdentity,
   type AssetMetadata,
   type AssetRepository,
@@ -734,7 +735,7 @@ async function conditionalCleanup(ports: Ports, debt: RegionToAssetCleanupDebt):
   }
 }
 
-export async function convertRegionToAsset(
+async function convertRegionToAssetUnlocked(
   dependencies: RegionToAssetDependencies,
   requestValue: unknown,
   options: RegionToAssetOptions = {},
@@ -917,4 +918,15 @@ export async function convertRegionToAsset(
   }
   return reconcileFailure(ports, expected, expectedRecordFingerprint, initial.revision, createdByAttempt, "PROJECT_DISPATCH_FAILED", "Project Asset import was not committed.", true);
   });
+}
+
+export function convertRegionToAsset(
+  dependencies: RegionToAssetDependencies,
+  requestValue: unknown,
+  options: RegionToAssetOptions = {},
+): Promise<RegionToAssetResult> {
+  return withAssetRepositoryMutation(
+    dependencies.repository,
+    () => convertRegionToAssetUnlocked(dependencies, requestValue, options),
+  );
 }

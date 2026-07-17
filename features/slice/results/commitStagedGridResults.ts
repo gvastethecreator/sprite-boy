@@ -1,5 +1,6 @@
 import {
   isAssetRepositoryError,
+  withAssetRepositoryMutation,
   type AssetMetadata,
   type AssetRepository,
 } from "../../../core/assets";
@@ -291,6 +292,21 @@ async function removeCreatedAssets(
         failed.push(assetId);
         continue;
       }
+      // Metadata lookup yields. Re-read the graph immediately before remove;
+      // a late dispatch may have claimed the same ID while cleanup awaited IO.
+      const latest = store.getSnapshot();
+      if (latest.project.id !== repository.projectId) {
+        failed.push(assetId);
+        continue;
+      }
+      const latestGraphRecord = latest.project.assets[assetId];
+      if (latestGraphRecord) {
+        if (attempt && latestGraphRecord.provenance.source === "derived"
+          && latestGraphRecord.provenance.recipeId === attempt.recipeId
+          && latestGraphRecord.provenance.parentAssetId === attempt.parentAssetId) continue;
+        failed.push(assetId);
+        continue;
+      }
       await repository.remove(assetId, "release-and-remove");
       try {
         await repository.getMetadata(assetId);
@@ -312,7 +328,7 @@ function attemptedAssetIds(attempts: readonly CreatedAssetAttempt[]): readonly s
   return Object.freeze([...new Set(ids)]);
 }
 
-export async function commitStagedGridResults(options: CommitStagedGridResultsOptions): Promise<CommitStagedGridResultsResult> {
+async function commitStagedGridResultsUnlocked(options: CommitStagedGridResultsOptions): Promise<CommitStagedGridResultsResult> {
   const staged = options.staged;
   if (staged.status !== "succeeded" || staged.recipe === null || staged.source === null || staged.outputs.length === 0) {
     fail("invalid-input", "Only a non-empty succeeded Grid result can be committed.");
@@ -450,4 +466,8 @@ export async function commitStagedGridResults(options: CommitStagedGridResultsOp
     }
     throw new StagedGridCommitError("repository-failed", "Grid outputs could not be committed.", { assetIds: attemptedAssetIds(createdAssetAttempts) });
   }
+}
+
+export function commitStagedGridResults(options: CommitStagedGridResultsOptions): Promise<CommitStagedGridResultsResult> {
+  return withAssetRepositoryMutation(options.repository, () => commitStagedGridResultsUnlocked(options));
 }
