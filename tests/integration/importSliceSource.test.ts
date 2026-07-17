@@ -166,4 +166,28 @@ describe("importSliceSource (G6-04 source binding)", () => {
     expect(repo.remove).toHaveBeenCalledOnce();
     expect(repo.records.size).toBe(0);
   });
+
+  it("keeps a late-written record when the graph claims it during cleanup metadata IO", async () => {
+    const store = runtime().store;
+    const repo = repository(store.getSnapshot().project.id, { rejectAfterPut: true });
+    let metadataCalls = 0;
+    repo.getMetadata.mockImplementation(async (assetId: string): Promise<AssetRecord> => {
+      metadataCalls += 1;
+      const record = repo.records.get(assetId);
+      if (!record) throw new AssetRepositoryError("ASSET_NOT_FOUND", "missing", { operation: "get-metadata", assetId });
+      if (metadataCalls === 2) {
+        const dispatch = store.dispatch({
+          command: { type: "asset.import", asset: record, atIndex: store.getSnapshot().project.rootOrder.assetIds.length },
+          metadata: { commandId: "claim-late-source", origin: "user", history: "record", issuedAt: NOW },
+        });
+        expect(dispatch.result.ok).toBe(true);
+      }
+      return record;
+    });
+
+    await expect(importSliceSource(options(store, repo.value))).rejects.toMatchObject({ code: "cleanup-failed" });
+    expect(repo.remove).not.toHaveBeenCalled();
+    expect(repo.records).toHaveProperty("size", 1);
+    expect(store.getSnapshot().project.assets["asset-slice-source"]).toBeDefined();
+  });
 });
