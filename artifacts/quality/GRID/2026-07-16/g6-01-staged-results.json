@@ -7,6 +7,8 @@
   "evidence": {
     "testFile": "tests/contract/stagedGridResults.test.ts",
     "tests": 4,
+    "requestInvariantChecks": true,
+    "errorCodeWhitelist": true,
     "clonesWorkerBuffers": true,
     "freezesRecipeAndMetadata": true,
     "summaryIncludesEmptyOutputs": true,
@@ -31,6 +33,6 @@
     "typecheck": "pass",
     "lint": "pass",
     "diffCheck": "pass",
-    "independentReview": "pending"
+    "independentReview": "ACCEPT (P0-P2=0)"
   }
 }

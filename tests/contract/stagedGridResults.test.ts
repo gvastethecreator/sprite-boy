@@ -119,6 +119,18 @@ describe("staged Grid results contract (G6-01)", () => {
       summary: { ...valid.summary, outputPixelCount: 99 },
     };
     expect(() => completeStagedGridProcessing(processing, invalid)).toThrow(/summary counts/);
+    const invalidRow = {
+      ...valid,
+      outputs: valid.outputs.map((output, index) => index === 0 ? { ...output, row: 1 } : output),
+    };
+    expect(() => completeStagedGridProcessing(processing, invalidRow)).toThrow(/row\/column/);
+    expect(() => completeStagedGridProcessing(processing, { ...valid, source: { width: 8, height: 2 } })).toThrow(/source dimensions/);
+    expect(() => failStagedGridProcessing(processing, {
+      code: "worker-error" as never,
+      message: "unexpected",
+      stage: null,
+      retryable: true,
+    })).toThrow(/error is invalid/);
     const failed = failStagedGridProcessing(processing, {
       code: "worker-crash",
       message: "Worker stopped unexpectedly.",

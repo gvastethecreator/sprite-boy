@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "check": "grid-results-browser",
+  "status": "pass",
+  "task": "G6-02",
+  "scope": "Production Chrome process feedback, staged output tray, selection, retry/cancel affordances and compact layout fit.",
+  "evidence": {
+    "route": "#/studio/slice",
+    "preparationState": "processing is published before rasterization/client await (covered by hook contract)",
+    "initialReady": "Ready to process the current recipe.",
+    "initialProcessEnabled": true,
+    "stagedStatus": "8 staged slices ready",
+    "outputCount": 8,
+    "selectedAfterClick": true,
+    "processAgainVisible": true,
+    "clearVisible": true,
+    "outputPageSize": 48,
+    "maxVisibleOutputs": 48,
+    "trayHeight": 184,
+    "accessibility": {
+      "unlabeledInteractiveCount": 0,
+      "interactiveNodeCount": 71
+    },
+    "layout": {
+      "horizontalOverflow": false,
+      "verticalOverflow": false
+    },
+    "screenshot": {
+      "path": "artifacts/quality/GRID/2026-07-16/g6-02-results-browser.png",
+      "bytes": 115570,
+      "sha256": "548e66041c72710b6103055b4c28842b8fefa53c392bfce2a8010823bf70a72f"
+    },
+    "errors": { "console": 0, "exception": 0, "log": 0, "network": 0, "http": 0 }
+  },
+  "adversarialAutopsy": {
+    "rejected": [
+      "Happy-path-only tray: the focused component contract covers failed/cancelled retry feedback and the browser path reaches a real Worker result.",
+      "Stale selection: the browser clicks the second output and waits for aria-pressed to settle true.",
+      "Invisible action: process-again and clear actions are asserted in the rendered tray.",
+      "Layout regression: production Chrome reports no horizontal or vertical overflow and zero unlabeled interactive nodes."
+    ],
+    "boundary": "Durable recipe/Region/Asset commit is G6-03; reload/provenance and undo journey are G6-04/G6-05."
+  },
+  "verification": {
+    "componentAndHook": "pass (10/10 focused cases including G6-01, preparation and output cap)",
+    "typecheck": "pass",
+    "lint": "pass",
+    "build": "pass (Vite production build; pre-existing chunk/dynamic-import warnings)",
+    "browser": "pass (Chrome, 1440x900, console/network/HTTP errors 0)",
+    "diffCheck": "pass",
+    "independentReview": "ACCEPT (P0-P2=0)"
+  }
+}
