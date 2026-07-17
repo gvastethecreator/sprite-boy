@@ -1,0 +1,326 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/components/overlays/HelpModal.tsx");const React = __vite__cjsImport0_react;const _jsxDEV = __vite__cjsImport3_react_jsxDevRuntime["jsxDEV"];import __vite__cjsImport0_react from "/node_modules/.vite/deps/react.js?v=2e3a209d";
+import { X, Keyboard, Command } from "/node_modules/.vite/deps/lucide-react.js?v=2e3a209d";
+import { StudioDialog } from "/components/studio/StudioDialog.tsx";
+var _jsxFileName = "D:/DEV/sprite-boy/components/overlays/HelpModal.tsx";
+import __vite__cjsImport3_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=2e3a209d";
+const ShortcutRow = ({ keys, desc }) => /* @__PURE__ */ _jsxDEV("div", {
+	className: "flex items-center justify-between py-2 border-b border-border/50 last:border-0",
+	children: [/* @__PURE__ */ _jsxDEV("span", {
+		className: "text-sm text-textMain",
+		children: desc
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 12,
+		columnNumber: 5
+	}, this), /* @__PURE__ */ _jsxDEV("div", {
+		className: "flex gap-1",
+		children: keys.map((k, i) => /* @__PURE__ */ _jsxDEV("kbd", {
+			className: "px-2 py-0.5 bg-white/10 rounded text-xs font-mono border border-white/20 text-white min-w-[24px] text-center",
+			children: k
+		}, i, false, {
+			fileName: _jsxFileName,
+			lineNumber: 15,
+			columnNumber: 9
+		}, this))
+	}, void 0, false, {
+		fileName: _jsxFileName,
+		lineNumber: 13,
+		columnNumber: 5
+	}, this)]
+}, void 0, true, {
+	fileName: _jsxFileName,
+	lineNumber: 11,
+	columnNumber: 3
+}, this);
+_c = ShortcutRow;
+const HelpModal = ({ isOpen, onClose }) => {
+	return /* @__PURE__ */ _jsxDEV(StudioDialog, {
+		isOpen,
+		onClose,
+		labelledBy: "studio-help-title",
+		backdropClassName: "items-center pt-4",
+		panelClassName: "max-w-md border-border",
+		children: [
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader",
+				children: [/* @__PURE__ */ _jsxDEV("h2", {
+					id: "studio-help-title",
+					className: "text-lg font-semibold text-textMain flex items-center gap-2",
+					children: [/* @__PURE__ */ _jsxDEV(Keyboard, {
+						size: 20,
+						className: "text-accent"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 37,
+						columnNumber: 13
+					}, this), " Keyboard Shortcuts"]
+				}, void 0, true, {
+					fileName: _jsxFileName,
+					lineNumber: 36,
+					columnNumber: 11
+				}, this), /* @__PURE__ */ _jsxDEV("button", {
+					type: "button",
+					"aria-label": "Close keyboard shortcuts",
+					onClick: onClose,
+					className: "text-textMuted hover:text-textMain transition-colors p-1 hover:bg-white/10 rounded-full",
+					children: /* @__PURE__ */ _jsxDEV(X, { size: 20 }, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 45,
+						columnNumber: 13
+					}, this)
+				}, void 0, false, {
+					fileName: _jsxFileName,
+					lineNumber: 39,
+					columnNumber: 11
+				}, this)]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 35,
+				columnNumber: 9
+			}, this),
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "p-6 overflow-y-auto max-h-[70vh] custom-scrollbar bg-app",
+				children: [
+					/* @__PURE__ */ _jsxDEV("h3", {
+						className: "text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2",
+						children: [/* @__PURE__ */ _jsxDEV(Command, { size: 12 }, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 51,
+							columnNumber: 13
+						}, this), " Canvas & Navigation"]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 50,
+						columnNumber: 11
+					}, this),
+					/* @__PURE__ */ _jsxDEV("div", {
+						className: "mb-6 space-y-1",
+						children: [
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Space + Drag"],
+								desc: "Pan View"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 54,
+								columnNumber: 13
+							}, this),
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Wheel"],
+								desc: "Scroll Vertical"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 55,
+								columnNumber: 13
+							}, this),
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Ctrl", "Wheel"],
+								desc: "Zoom In / Out"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 56,
+								columnNumber: 13
+							}, this),
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Ctrl", "0"],
+								desc: "Reset View"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 57,
+								columnNumber: 13
+							}, this)
+						]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 53,
+						columnNumber: 11
+					}, this),
+					/* @__PURE__ */ _jsxDEV("h3", {
+						className: "text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2",
+						children: [/* @__PURE__ */ _jsxDEV(Command, { size: 12 }, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 61,
+							columnNumber: 13
+						}, this), " Editing"]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 60,
+						columnNumber: 11
+					}, this),
+					/* @__PURE__ */ _jsxDEV("div", {
+						className: "mb-6 space-y-1",
+						children: [
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Ctrl", "Z"],
+								desc: "Undo"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 64,
+								columnNumber: 13
+							}, this),
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Ctrl", "Y"],
+								desc: "Redo"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 65,
+								columnNumber: 13
+							}, this),
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Delete"],
+								desc: "Delete Selection"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 66,
+								columnNumber: 13
+							}, this),
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Arrows"],
+								desc: "Nudge Selection (1px)"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 67,
+								columnNumber: 13
+							}, this),
+							/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+								keys: ["Shift", "Arrows"],
+								desc: "Nudge Selection (10px)"
+							}, void 0, false, {
+								fileName: _jsxFileName,
+								lineNumber: 68,
+								columnNumber: 13
+							}, this)
+						]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 63,
+						columnNumber: 11
+					}, this),
+					/* @__PURE__ */ _jsxDEV("h3", {
+						className: "text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2",
+						children: [/* @__PURE__ */ _jsxDEV(Command, { size: 12 }, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 72,
+							columnNumber: 13
+						}, this), " Animation"]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 71,
+						columnNumber: 11
+					}, this),
+					/* @__PURE__ */ _jsxDEV("div", {
+						className: "mb-6 space-y-1",
+						children: [/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+							keys: ["Space"],
+							desc: "Play / Pause"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 75,
+							columnNumber: 13
+						}, this), /* @__PURE__ */ _jsxDEV(ShortcutRow, {
+							keys: ["←", "→"],
+							desc: "Prev / Next Frame"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 76,
+							columnNumber: 13
+						}, this)]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 74,
+						columnNumber: 11
+					}, this),
+					/* @__PURE__ */ _jsxDEV("h3", {
+						className: "text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2",
+						children: [/* @__PURE__ */ _jsxDEV(Command, { size: 12 }, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 80,
+							columnNumber: 13
+						}, this), " Hitboxes"]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 79,
+						columnNumber: 11
+					}, this),
+					/* @__PURE__ */ _jsxDEV("div", {
+						className: "space-y-1",
+						children: [/* @__PURE__ */ _jsxDEV(ShortcutRow, {
+							keys: ["Ctrl", "C"],
+							desc: "Copy Hitboxes (from frame)"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 83,
+							columnNumber: 13
+						}, this), /* @__PURE__ */ _jsxDEV(ShortcutRow, {
+							keys: ["Ctrl", "V"],
+							desc: "Paste Hitboxes (to frame)"
+						}, void 0, false, {
+							fileName: _jsxFileName,
+							lineNumber: 84,
+							columnNumber: 13
+						}, this)]
+					}, void 0, true, {
+						fileName: _jsxFileName,
+						lineNumber: 82,
+						columnNumber: 11
+					}, this)
+				]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 49,
+				columnNumber: 9
+			}, this),
+			/* @__PURE__ */ _jsxDEV("div", {
+				className: "p-4 bg-panel border-t border-border flex justify-center text-[10px] text-textMuted",
+				children: [
+					"Press ",
+					/* @__PURE__ */ _jsxDEV("kbd", {
+						className: "mx-1 px-1 bg-white/10 rounded",
+						children: "ESC"
+					}, void 0, false, {
+						fileName: _jsxFileName,
+						lineNumber: 89,
+						columnNumber: 17
+					}, this),
+					" to close any modal"
+				]
+			}, void 0, true, {
+				fileName: _jsxFileName,
+				lineNumber: 88,
+				columnNumber: 9
+			}, this)
+		]
+	}, void 0, true, {
+		fileName: _jsxFileName,
+		lineNumber: 28,
+		columnNumber: 5
+	}, this);
+};
+_c2 = HelpModal;
+export default HelpModal;
+var _c, _c2;
+$RefreshReg$(_c, "ShortcutRow");
+$RefreshReg$(_c2, "HelpModal");
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+import * as __vite_react_currentExports from "/components/overlays/HelpModal.tsx";
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+
+  const currentExports = __vite_react_currentExports;
+  queueMicrotask(() => {
+    RefreshRuntime.registerExportsForReactRefresh("D:/DEV/sprite-boy/components/overlays/HelpModal.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("D:/DEV/sprite-boy/components/overlays/HelpModal.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+function $RefreshReg$(type, id) { return RefreshRuntime.register(type, "D:/DEV/sprite-boy/components/overlays/HelpModal.tsx" + ' ' + id); }
+function $RefreshSig$() { return RefreshRuntime.createSignatureFunctionForTransform(); }
+
+//# sourceMappingURL=data:application/json;base64,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LFdBQVU7Z0JBQWYsQ0FDRSx3QkFBQyxhQUFEO09BQWEsTUFBTSxDQUFDLFFBQVEsR0FBRztPQUFHLE1BQUs7TUFBOEI7Ozs7Z0JBQ3JFLHdCQUFDLGFBQUQ7T0FBYSxNQUFNLENBQUMsUUFBUSxHQUFHO09BQUcsTUFBSztNQUE2Qjs7OztjQUNqRTs7Ozs7O0lBQ0Y7Ozs7OztHQUVMLHdCQUFDLE9BQUQ7SUFBSyxXQUFVO2NBQWY7S0FBb0c7S0FDNUYsd0JBQUMsT0FBRDtNQUFLLFdBQVU7Z0JBQWdDO0tBQVE7Ozs7O0tBQUM7SUFDM0Q7Ozs7OztFQUNLOzs7Ozs7QUFFbEI7O0FBRUEsZUFBZSIsIm5hbWVzIjpbXSwic291cmNlcyI6WyJIZWxwTW9kYWwudHN4Il0sInZlcnNpb24iOjMsInNvdXJjZXNDb250ZW50IjpbImltcG9ydCBSZWFjdCBmcm9tIFwicmVhY3RcIjtcclxuaW1wb3J0IHsgWCwgS2V5Ym9hcmQsIENvbW1hbmQgfSBmcm9tIFwibHVjaWRlLXJlYWN0XCI7XHJcbmltcG9ydCB7IFN0dWRpb0RpYWxvZyB9IGZyb20gXCIuLi9zdHVkaW8vU3R1ZGlvRGlhbG9nXCI7XG5cclxuaW50ZXJmYWNlIEhlbHBNb2RhbFByb3BzIHtcclxuICBpc09wZW46IGJvb2xlYW47XHJcbiAgb25DbG9zZTogKCkgPT4gdm9pZDtcclxufVxyXG5cclxuY29uc3QgU2hvcnRjdXRSb3cgPSAoeyBrZXlzLCBkZXNjIH06IHsga2V5czogc3RyaW5nW107IGRlc2M6IHN0cmluZyB9KSA9PiAoXHJcbiAgPGRpdiBjbGFzc05hbWU9XCJmbGV4IGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWJldHdlZW4gcHktMiBib3JkZXItYiBib3JkZXItYm9yZGVyLzUwIGxhc3Q6Ym9yZGVyLTBcIj5cclxuICAgIDxzcGFuIGNsYXNzTmFtZT1cInRleHQtc20gdGV4dC10ZXh0TWFpblwiPntkZXNjfTwvc3Bhbj5cclxuICAgIDxkaXYgY2xhc3NOYW1lPVwiZmxleCBnYXAtMVwiPlxyXG4gICAgICB7a2V5cy5tYXAoKGssIGkpID0+IChcclxuICAgICAgICA8a2JkXHJcbiAgICAgICAgICBrZXk9e2l9XHJcbiAgICAgICAgICBjbGFzc05hbWU9XCJweC0yIHB5LTAuNSBiZy13aGl0ZS8xMCByb3VuZGVkIHRleHQteHMgZm9udC1tb25vIGJvcmRlciBib3JkZXItd2hpdGUvMjAgdGV4dC13aGl0ZSBtaW4tdy1bMjRweF0gdGV4dC1jZW50ZXJcIlxyXG4gICAgICAgID5cclxuICAgICAgICAgIHtrfVxyXG4gICAgICAgIDwva2JkPlxyXG4gICAgICApKX1cclxuICAgIDwvZGl2PlxyXG4gIDwvZGl2PlxyXG4pO1xyXG5cclxuY29uc3QgSGVscE1vZGFsOiBSZWFjdC5GQzxIZWxwTW9kYWxQcm9wcz4gPSAoeyBpc09wZW4sIG9uQ2xvc2UgfSkgPT4ge1xuICByZXR1cm4gKFxuICAgIDxTdHVkaW9EaWFsb2dcbiAgICAgIGlzT3Blbj17aXNPcGVufVxuICAgICAgb25DbG9zZT17b25DbG9zZX1cbiAgICAgIGxhYmVsbGVkQnk9XCJzdHVkaW8taGVscC10aXRsZVwiXG4gICAgICBiYWNrZHJvcENsYXNzTmFtZT1cIml0ZW1zLWNlbnRlciBwdC00XCJcbiAgICAgIHBhbmVsQ2xhc3NOYW1lPVwibWF4LXctbWQgYm9yZGVyLWJvcmRlclwiXG4gICAgPlxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIGp1c3RpZnktYmV0d2VlbiBweC02IHB5LTQgYm9yZGVyLWIgYm9yZGVyLWJvcmRlciBiZy1wYW5lbEhlYWRlclwiPlxuICAgICAgICAgIDxoMiBpZD1cInN0dWRpby1oZWxwLXRpdGxlXCIgY2xhc3NOYW1lPVwidGV4dC1sZyBmb250LXNlbWlib2xkIHRleHQtdGV4dE1haW4gZmxleCBpdGVtcy1jZW50ZXIgZ2FwLTJcIj5cbiAgICAgICAgICAgIDxLZXlib2FyZCBzaXplPXsyMH0gY2xhc3NOYW1lPVwidGV4dC1hY2NlbnRcIiAvPiBLZXlib2FyZCBTaG9ydGN1dHNcbiAgICAgICAgICA8L2gyPlxuICAgICAgICAgIDxidXR0b25cbiAgICAgICAgICAgIHR5cGU9XCJidXR0b25cIlxuICAgICAgICAgICAgYXJpYS1sYWJlbD1cIkNsb3NlIGtleWJvYXJkIHNob3J0Y3V0c1wiXG4gICAgICAgICAgICBvbkNsaWNrPXtvbkNsb3NlfVxyXG4gICAgICAgICAgICBjbGFzc05hbWU9XCJ0ZXh0LXRleHRNdXRlZCBob3Zlcjp0ZXh0LXRleHRNYWluIHRyYW5zaXRpb24tY29sb3JzIHAtMSBob3ZlcjpiZy13aGl0ZS8xMCByb3VuZGVkLWZ1bGxcIlxyXG4gICAgICAgICAgPlxyXG4gICAgICAgICAgICA8WCBzaXplPXsyMH0gLz5cclxuICAgICAgICAgIDwvYnV0dG9uPlxyXG4gICAgICAgIDwvZGl2PlxyXG5cclxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cInAtNiBvdmVyZmxvdy15LWF1dG8gbWF4LWgtWzcwdmhdIGN1c3RvbS1zY3JvbGxiYXIgYmctYXBwXCI+XHJcbiAgICAgICAgICA8aDMgY2xhc3NOYW1lPVwidGV4dC14cyBmb250LWJvbGQgdGV4dC10ZXh0TXV0ZWQgdXBwZXJjYXNlIHRyYWNraW5nLXdpZGVyIG1iLTMgZmxleCBpdGVtcy1jZW50ZXIgZ2FwLTJcIj5cclxuICAgICAgICAgICAgPENvbW1hbmQgc2l6ZT17MTJ9IC8+IENhbnZhcyAmIE5hdmlnYXRpb25cclxuICAgICAgICAgIDwvaDM+XHJcbiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cIm1iLTYgc3BhY2UteS0xXCI+XHJcbiAgICAgICAgICAgIDxTaG9ydGN1dFJvdyBrZXlzPXtbXCJTcGFjZSArIERyYWdcIl19IGRlc2M9XCJQYW4gVmlld1wiIC8+XHJcbiAgICAgICAgICAgIDxTaG9ydGN1dFJvdyBrZXlzPXtbXCJXaGVlbFwiXX0gZGVzYz1cIlNjcm9sbCBWZXJ0aWNhbFwiIC8+XHJcbiAgICAgICAgICAgIDxTaG9ydGN1dFJvdyBrZXlzPXtbXCJDdHJsXCIsIFwiV2hlZWxcIl19IGRlc2M9XCJab29tIEluIC8gT3V0XCIgLz5cclxuICAgICAgICAgICAgPFNob3J0Y3V0Um93IGtleXM9e1tcIkN0cmxcIiwgXCIwXCJdfSBkZXNjPVwiUmVzZXQgVmlld1wiIC8+XHJcbiAgICAgICAgICA8L2Rpdj5cclxuXHJcbiAgICAgICAgICA8aDMgY2xhc3NOYW1lPVwidGV4dC14cyBmb250LWJvbGQgdGV4dC10ZXh0TXV0ZWQgdXBwZXJjYXNlIHRyYWNraW5nLXdpZGVyIG1iLTMgZmxleCBpdGVtcy1jZW50ZXIgZ2FwLTJcIj5cclxuICAgICAgICAgICAgPENvbW1hbmQgc2l6ZT17MTJ9IC8+IEVkaXRpbmdcclxuICAgICAgICAgIDwvaDM+XHJcbiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cIm1iLTYgc3BhY2UteS0xXCI+XHJcbiAgICAgICAgICAgIDxTaG9ydGN1dFJvdyBrZXlzPXtbXCJDdHJsXCIsIFwiWlwiXX0gZGVzYz1cIlVuZG9cIiAvPlxyXG4gICAgICAgICAgICA8U2hvcnRjdXRSb3cga2V5cz17W1wiQ3RybFwiLCBcIllcIl19IGRlc2M9XCJSZWRvXCIgLz5cclxuICAgICAgICAgICAgPFNob3J0Y3V0Um93IGtleXM9e1tcIkRlbGV0ZVwiXX0gZGVzYz1cIkRlbGV0ZSBTZWxlY3Rpb25cIiAvPlxyXG4gICAgICAgICAgICA8U2hvcnRjdXRSb3cga2V5cz17W1wiQXJyb3dzXCJdfSBkZXNjPVwiTnVkZ2UgU2VsZWN0aW9uICgxcHgpXCIgLz5cclxuICAgICAgICAgICAgPFNob3J0Y3V0Um93IGtleXM9e1tcIlNoaWZ0XCIsIFwiQXJyb3dzXCJdfSBkZXNjPVwiTnVkZ2UgU2VsZWN0aW9uICgxMHB4KVwiIC8+XHJcbiAgICAgICAgICA8L2Rpdj5cclxuXHJcbiAgICAgICAgICA8aDMgY2xhc3NOYW1lPVwidGV4dC14cyBmb250LWJvbGQgdGV4dC10ZXh0TXV0ZWQgdXBwZXJjYXNlIHRyYWNraW5nLXdpZGVyIG1iLTMgZmxleCBpdGVtcy1jZW50ZXIgZ2FwLTJcIj5cclxuICAgICAgICAgICAgPENvbW1hbmQgc2l6ZT17MTJ9IC8+IEFuaW1hdGlvblxyXG4gICAgICAgICAgPC9oMz5cclxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwibWItNiBzcGFjZS15LTFcIj5cclxuICAgICAgICAgICAgPFNob3J0Y3V0Um93IGtleXM9e1tcIlNwYWNlXCJdfSBkZXNjPVwiUGxheSAvIFBhdXNlXCIgLz5cclxuICAgICAgICAgICAgPFNob3J0Y3V0Um93IGtleXM9e1tcIuKGkFwiLCBcIuKGklwiXX0gZGVzYz1cIlByZXYgLyBOZXh0IEZyYW1lXCIgLz5cclxuICAgICAgICAgIDwvZGl2PlxyXG5cclxuICAgICAgICAgIDxoMyBjbGFzc05hbWU9XCJ0ZXh0LXhzIGZvbnQtYm9sZCB0ZXh0LXRleHRNdXRlZCB1cHBlcmNhc2UgdHJhY2tpbmctd2lkZXIgbWItMyBmbGV4IGl0ZW1zLWNlbnRlciBnYXAtMlwiPlxyXG4gICAgICAgICAgICA8Q29tbWFuZCBzaXplPXsxMn0gLz4gSGl0Ym94ZXNcclxuICAgICAgICAgIDwvaDM+XHJcbiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cInNwYWNlLXktMVwiPlxyXG4gICAgICAgICAgICA8U2hvcnRjdXRSb3cga2V5cz17W1wiQ3RybFwiLCBcIkNcIl19IGRlc2M9XCJDb3B5IEhpdGJveGVzIChmcm9tIGZyYW1lKVwiIC8+XHJcbiAgICAgICAgICAgIDxTaG9ydGN1dFJvdyBrZXlzPXtbXCJDdHJsXCIsIFwiVlwiXX0gZGVzYz1cIlBhc3RlIEhpdGJveGVzICh0byBmcmFtZSlcIiAvPlxyXG4gICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgPC9kaXY+XHJcblxyXG4gICAgICAgIDxkaXYgY2xhc3NOYW1lPVwicC00IGJnLXBhbmVsIGJvcmRlci10IGJvcmRlci1ib3JkZXIgZmxleCBqdXN0aWZ5LWNlbnRlciB0ZXh0LVsxMHB4XSB0ZXh0LXRleHRNdXRlZFwiPlxyXG4gICAgICAgICAgUHJlc3MgPGtiZCBjbGFzc05hbWU9XCJteC0xIHB4LTEgYmctd2hpdGUvMTAgcm91bmRlZFwiPkVTQzwva2JkPiB0byBjbG9zZSBhbnkgbW9kYWxcclxuICAgICAgICA8L2Rpdj5cclxuICAgIDwvU3R1ZGlvRGlhbG9nPlxuICApO1xufTtcblxyXG5leHBvcnQgZGVmYXVsdCBIZWxwTW9kYWw7XHJcbiJdfQ==

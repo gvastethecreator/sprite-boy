@@ -224,6 +224,7 @@ export function CanonicalProjectProvider({
         const reconciliation = await reconcileProjectAssetRepository(
           activeBundle.assets,
           activeBundle.store.getSnapshot().project as StudioProjectV1,
+          { getProject: () => bundleRef.current.store.getSnapshot().project as StudioProjectV1 },
         );
         if (!active) return;
         if (!reconciliation.complete) {

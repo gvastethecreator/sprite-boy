@@ -8,6 +8,11 @@ export interface ProjectAssetReconciliationResult {
   readonly listFailed: boolean;
 }
 
+export interface ProjectAssetReconciliationOptions {
+  /** Re-read the active graph immediately before each removal. */
+  readonly getProject?: () => StudioProjectV1;
+}
+
 /**
  * Remove repository records that have no owner in the recovered canonical
  * graph. Run only at a project lifecycle boundary, never during an import.
@@ -15,6 +20,7 @@ export interface ProjectAssetReconciliationResult {
 export async function reconcileProjectAssetRepository(
   repository: AssetRepository,
   project: StudioProjectV1,
+  options: ProjectAssetReconciliationOptions = {},
 ): Promise<ProjectAssetReconciliationResult> {
   if (repository.projectId !== project.id) {
     return Object.freeze({
@@ -40,7 +46,12 @@ export async function reconcileProjectAssetRepository(
   const removedAssetIds: EntityId[] = [];
   const pendingAssetIds: EntityId[] = [];
   for (const record of records) {
-    if (Object.prototype.hasOwnProperty.call(project.assets, record.id)) continue;
+    const currentProject = options.getProject?.() ?? project;
+    if (currentProject.id !== repository.projectId) {
+      pendingAssetIds.push(record.id);
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(currentProject.assets, record.id)) continue;
     try {
       await repository.remove(record.id, "release-and-remove");
       removedAssetIds.push(record.id);

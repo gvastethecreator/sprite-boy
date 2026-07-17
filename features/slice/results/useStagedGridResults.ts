@@ -37,6 +37,7 @@ export interface UseStagedGridResultsOptions {
   readonly recipe: GridSplitRecipeV1 | null;
   readonly client?: GridProcessingClient;
   readonly rasterize?: SliceSourceRasterizer;
+  readonly commit?: (snapshot: StagedGridResultsSnapshot) => Promise<boolean>;
 }
 
 export interface StagedGridResultsController {
@@ -44,6 +45,7 @@ export interface StagedGridResultsController {
   readonly canProcess: boolean;
   readonly process: () => Promise<boolean>;
   readonly retry: () => Promise<boolean>;
+  readonly commit?: () => Promise<boolean>;
   readonly cancel: () => void;
   readonly clear: () => void;
   readonly select: (index: number | null) => void;
@@ -213,6 +215,11 @@ export function useStagedGridResults(options: UseStagedGridResultsOptions): Stag
     publish(selectStagedGridOutput(stateRef.current, index));
   }, [publish]);
 
+  const commit = useCallback(async (): Promise<boolean> => {
+    if (!options.commit || stateRef.current.status !== "succeeded") return false;
+    return options.commit(stateRef.current);
+  }, [options.commit]);
+
   useEffect(() => {
     clear();
     return () => {
@@ -298,8 +305,9 @@ export function useStagedGridResults(options: UseStagedGridResultsOptions): Stag
     canProcess: options.sourceSnapshot.status === "ready" && options.sourceSnapshot.source !== null && options.recipe !== null,
     process,
     retry,
+    commit,
     cancel,
     clear,
     select,
-  }), [cancel, clear, options.recipe, options.sourceSnapshot, process, retry, select, state]);
+  }), [cancel, clear, commit, options.recipe, options.sourceSnapshot, process, retry, select, state]);
 }

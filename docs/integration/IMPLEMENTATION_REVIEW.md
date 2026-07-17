@@ -1879,7 +1879,7 @@ para ejecutar el journey completo con undo/save/export.
   y warnings sólo cuando aportan una decisión. El tray limita el montaje a 48
   thumbnails por página y ofrece paginación para grids grandes; el layout
   conserva scroll horizontal local para outputs y no crea overflow del Studio.
-- **Evidencia:** contrato, hook y componente pasan `10/10` casos enfocados; build
+- **Evidencia:** contrato, hook y componente pasan `11/11` casos enfocados; build
   Vite, typecheck, oxlint y diff-check están verdes. Chrome productivo a
   `1440×900` importa una fixture 2×4, procesa ocho outputs con el Worker real,
   selecciona el segundo tile, mantiene `0` errores console/network/HTTP,
@@ -1891,6 +1891,52 @@ para ejecutar el journey completo con undo/save/export.
   `rAF → setTimeout`, el cap de outputs y el contrato fail-closed.
 - **Límite honesto:** el tray sólo mantiene outputs staged en memoria; todavía
   no crea `Region`/`Asset`, no persiste provenance y no exporta, que son G6-03/G7.
+
+### G6-03 — Commit transaccional de staged outputs
+
+- **Contrato:** `commitStagedGridResults` exige un snapshot `succeeded` no vacío,
+  comprueba que el `sourceAssetId` staged coincide con el `AssetRecord` canónico
+  del `ProjectStore` y prepara un único `regions.commitRecipe`. Las recetas sin
+  transformaciones mantienen Regions sobre el Asset fuente; chroma/crop/pixel
+  codifican cada superficie como PNG en `AssetRepository` y enlazan cada Region
+  al Asset derivado.
+- **Rollback:** antes de persistir se comprueban owner de repositorio, colisiones
+  de IDs en proyecto y destinos binarios. Si `put`, encode, cancelación o el
+  dispatch canónico falla, el helper re-inspecciona revision, ownership y
+  provenance antes de eliminar Assets creados en orden inverso; expone
+  `cleanup-failed`/`ownership-uncertain` cuando no puede demostrar que el remove
+  es seguro. El resultado de repository se valida contra el ID solicitado antes
+  de continuar.
+- **Evidencia:** `tests/integration/commitStagedGridResults.test.ts` cubre
+  source-backed (sin puts), derived (2 puts/2 Regions), rechazo del dispatch con
+  cleanup completo, undo del historial, repositorio cross-project, colisiones de
+  IDs, put tardío con escritura efectiva, reemplazo concurrente del source y
+  mutación no relacionada durante el procesamiento; el foco total G6 pasa
+  `18/18`, además
+  de typecheck, oxlint y diff-check. Artifact:
+  `artifacts/quality/GRID/2026-07-16/g6-03-commit.json`.
+- **Límite honesto:** el helper ya es transaccional en memoria + repositorio y
+  el bind/reload canónico está cerrado en G6-04; la jornada browser completa
+  process→commit→save→reload→undo queda en G6-05.
+
+### G6-04 — Source binding canónico y reconstrucción durable
+
+- **Import:** `importSliceSource` persiste el Blob en el `AssetRepository`,
+  registra `asset.import + workspace.update` en un único batch con
+  `selectedAssetId`, y el Grid usa ese ID canónico en lugar del fingerprint de
+  `src`. Owner, colisiones, cancelación y late writes tienen límites seguros.
+- **Reload:** `restoreCanonicalSliceSource` lee el Blob del repositorio, valida
+  owner/selección y permite rehidratar el `ImageBitmap` de Slice sin generar
+  URLs runtime. `AppLayout` usa ese puente al reabrir el workspace Slice y
+  conserva el source Asset durante reemplazos/rollback.
+- **Evidencia:** `importSliceSource.test.ts` cubre import/undo, cross-project,
+  colisión y late-write; `gridSourcePersistence.test.ts` demuestra checkpoint
+  autosave, codec round-trip, recipe→source binding, Regions con provenance y
+  restauración del Blob. Son `4/4` casos G6-04 y la batería enfocada G6 queda
+  en `22/22`; artifacts:
+  `artifacts/quality/GRID/2026-07-16/g6-04-source-persistence.json`.
+- **Límite honesto:** queda cerrar la jornada browser completa process→commit→
+  save→reload→undo como G6-05 antes de declarar el Slice durable end-to-end.
 
 ## Frontiers abiertos
 

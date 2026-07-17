@@ -1,0 +1,59 @@
+{
+  "status": "pass",
+  "viewport": [
+    1440,
+    900
+  ],
+  "initial": {
+    "hash": "#/studio/slice",
+    "workspace": "slice",
+    "nav": [
+      {
+        "label": "Slice",
+        "href": "#/studio/slice",
+        "visible": true,
+        "current": "page"
+      },
+      {
+        "label": "Compose",
+        "href": "#/studio/compose",
+        "visible": true,
+        "current": null
+      },
+      {
+        "label": "Animate",
+        "href": "#/studio/animate",
+        "visible": true,
+        "current": null
+      },
+      {
+        "label": "Collision",
+        "href": "#/studio/collision",
+        "visible": true,
+        "current": null
+      },
+      {
+        "label": "Export",
+        "href": "#/studio/export",
+        "visible": true,
+        "current": null
+      }
+    ]
+  },
+  "routes": [
+    "slice",
+    "compose",
+    "collision",
+    "compose-back",
+    "compose-reload",
+    "export-palette"
+  ],
+  "final": {
+    "hash": "#/studio/export",
+    "workspace": "export",
+    "currentLabel": "Export",
+    "paletteOpen": false
+  },
+  "consoleErrors": [],
+  "exceptions": []
+}

@@ -1,0 +1,62 @@
+{
+  "status": "pass",
+  "routes": [
+    {
+      "workspace": "slice",
+      "hash": "#/studio/slice",
+      "focusWorkspace": "slice"
+    },
+    {
+      "workspace": "compose",
+      "hash": "#/studio/compose",
+      "focusWorkspace": "compose"
+    },
+    {
+      "workspace": "animate",
+      "hash": "#/studio/animate",
+      "focusWorkspace": "animate"
+    },
+    {
+      "workspace": "collision",
+      "hash": "#/studio/collision",
+      "focusWorkspace": "collision"
+    },
+    {
+      "workspace": "export",
+      "hash": "#/studio/export",
+      "focusWorkspace": "export"
+    }
+  ],
+  "modalGuard": {
+    "hash": "#/studio/export",
+    "settingsOpen": true
+  },
+  "help": {
+    "collisionDocumented": true,
+    "preferencesDocumented": true,
+    "inertHitboxClipboardDocumented": false,
+    "primaryLabels": 15
+  },
+  "palette": {
+    "count": 15,
+    "hash": "#/studio/export",
+    "paletteOpen": true,
+    "inputFocused": true
+  },
+  "editableGuard": {
+    "hash": "#/studio/slice",
+    "tag": "INPUT",
+    "type": "number"
+  },
+  "canvas": {
+    "focusWorkspace": "slice",
+    "zoomBeforeReset": "125%",
+    "zoomAfterReset": "100%"
+  },
+  "snapshot": {
+    "title": "Export Spritesheet",
+    "dialogOpen": true
+  },
+  "consoleErrors": [],
+  "exceptions": []
+}

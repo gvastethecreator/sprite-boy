@@ -172,6 +172,16 @@ export function SliceResultsTray({ controller }: SliceResultsTrayProps) {
             <Play size={11} aria-hidden="true" />
             {state.status === "succeeded" ? "Process again" : "Process slices"}
           </button>
+          {state.status === "succeeded" && controller.commit ? (
+            <button
+              type="button"
+              aria-label="Commit slices"
+              onClick={() => void controller.commit?.()}
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-200 hover:bg-emerald-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            >
+              Commit slices
+            </button>
+          ) : null}
           {state.outputs.length > 0 ? (
             <button
               type="button"
