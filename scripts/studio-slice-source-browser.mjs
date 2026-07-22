@@ -240,8 +240,18 @@ async function nudgeGridColumn(client) {
 export async function runSliceSourceBrowser(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const chromePath = resolveChromeExecutable(options);
-  const port = await allocatePort();
-  const baseUrl = `http://${HOST}:${port}`;
+  const serverMode = options.serverMode ?? "preview";
+  if (serverMode !== "preview" && serverMode !== "dev") {
+    throw new TypeError("Slice source browser server mode is invalid.");
+  }
+  const externalBaseUrl = typeof options.baseUrl === "string" && options.baseUrl.trim().length > 0
+    ? new URL(options.baseUrl)
+    : null;
+  if (externalBaseUrl && externalBaseUrl.protocol !== "http:" && externalBaseUrl.protocol !== "https:") {
+    throw new TypeError("Slice source browser base URL is invalid.");
+  }
+  const port = externalBaseUrl ? null : await allocatePort();
+  const baseUrl = externalBaseUrl?.origin ?? `http://${HOST}:${port}`;
   const profileDirectory = mkdtempSync(join(tmpdir(), "sprite-boy-slice-source-chrome-"));
   let preview;
   let chrome;
@@ -249,8 +259,10 @@ export async function runSliceSourceBrowser(options = {}) {
   let journeyStep = "browser startup";
 
   return runWithBrowserRuntimeDeadline(async () => {
-    preview = spawnViteServer(cwd, port, "preview");
-    await waitForPreview(baseUrl, preview);
+    if (port !== null) {
+      preview = spawnViteServer(cwd, port, serverMode);
+      await waitForPreview(baseUrl, preview);
+    }
     chrome = spawn(chromePath, [
       "--headless=new",
       "--disable-background-networking",
@@ -295,7 +307,8 @@ export async function runSliceSourceBrowser(options = {}) {
     journeyStep = "initial dropzone";
     await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
     await waitForSliceSourceDropzone(client, 12_000, 3);
-    await client.waitForNetworkIdle();
+    // Vite dev keeps its HMR transport open for the page lifetime.
+    if (serverMode === "preview") await client.waitForNetworkIdle();
 
     journeyStep = "initial source import";
     await selectPng(client, "browser-source.png", 64, 32);
@@ -450,7 +463,9 @@ export async function runSliceSourceBrowserCli(io = {}) {
   const stderr = io.stderr ?? process.stderr;
   try {
     const result = await runSliceSourceBrowser({
+      baseUrl: process.env.STUDIO_SLICE_SOURCE_BASE_URL,
       screenshotPath: process.env.STUDIO_SLICE_SOURCE_SCREENSHOT,
+      serverMode: process.env.STUDIO_SLICE_SOURCE_SERVER_MODE,
     });
     stdout.write(`${JSON.stringify(result)}\n`);
     return result.status === "pass" ? 0 : 1;

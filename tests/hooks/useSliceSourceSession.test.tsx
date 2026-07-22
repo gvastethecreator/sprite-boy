@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { StrictMode, type PropsWithChildren } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { useSliceSourceSession } from "../../features/slice/source/useSourceSession";
@@ -18,7 +19,41 @@ function sourceFile(): SourceFileInput {
   };
 }
 
+const strictWrapper = ({ children }: PropsWithChildren) => <StrictMode>{children}</StrictMode>;
+
 describe("useSliceSourceSession", () => {
+  it("keeps the source session alive through the StrictMode effect replay", async () => {
+    const close = vi.fn();
+    const decoder = {
+      decode: vi.fn(async () => ({
+        image: { kind: "strict-test-image" },
+        width: 8,
+        height: 4,
+        close,
+      })),
+    };
+    const { result, unmount } = renderHook(
+      () => useSliceSourceSession({ decoder }),
+      { wrapper: strictWrapper },
+    );
+
+    await act(async () => {
+      await result.current.select(sourceFile());
+    });
+
+    expect(decoder.decode).toHaveBeenCalledOnce();
+    expect(result.current.snapshot).toMatchObject({
+      status: "ready",
+      disposed: false,
+      metadata: { name: "sheet.png", width: 8, height: 4 },
+    });
+    expect(close).not.toHaveBeenCalled();
+    unmount();
+    expect(close).not.toHaveBeenCalled();
+    await act(async () => Promise.resolve());
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it("publishes the owned session snapshot and releases its decoded resource on unmount", async () => {
     const close = vi.fn();
     const decoder = {
@@ -42,6 +77,8 @@ describe("useSliceSourceSession", () => {
     expect(close).not.toHaveBeenCalled();
 
     unmount();
+    expect(close).not.toHaveBeenCalled();
+    await act(async () => Promise.resolve());
     expect(close).toHaveBeenCalledTimes(1);
   });
 });

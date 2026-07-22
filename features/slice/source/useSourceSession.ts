@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   createSourceSession,
@@ -28,13 +28,25 @@ export function useSliceSourceSession(
   options: SourceSessionOptions = {},
 ): SliceSourceSessionBinding {
   const [session] = useState<SourceSession>(() => createSourceSession(options));
+  const lifecycleGenerationRef = useRef(0);
   const snapshot = useSyncExternalStore(
     useCallback((listener: () => void) => session.subscribe(listener), [session]),
     useCallback(() => session.getSnapshot(), [session]),
     useCallback(() => session.getSnapshot(), [session]),
   );
 
-  useEffect(() => () => session.dispose(), [session]);
+  useEffect(() => {
+    const lifecycleGeneration = ++lifecycleGenerationRef.current;
+    return () => {
+      // StrictMode and Fast Refresh can replay an effect cleanup/setup while
+      // preserving hook state. Defer terminal disposal so a replayed setup can
+      // keep the same live session; a real unmount has no setup to cancel it.
+      queueMicrotask(() => {
+        if (lifecycleGenerationRef.current !== lifecycleGeneration) return;
+        session.dispose();
+      });
+    };
+  }, [session]);
 
   const select = useCallback(
     (input: SourceSelectionInput, selectOptions?: SourceSelectOptions) =>
