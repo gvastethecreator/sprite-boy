@@ -2,15 +2,13 @@ import { useState, useCallback } from "react";
 import {
   ToastData,
   ExportModalState,
-  GenerationModalState,
-  GenerationPanelState,
   ViewportState,
 } from "../types";
 import { uiFeedback } from "../utils/uiFeedback";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-/** Central UI state: toasts, modals, loading, viewport, generation panel. */
+/** Central UI state: toasts, modals, loading and viewport. */
 export function useUIController() {
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,25 +25,11 @@ export function useUIController() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [exportModal, setExportModal] = useState<ExportModalState>({ isOpen: false, type: null });
-  const [generationModal, setGenerationModal] = useState<GenerationModalState>({
-    isOpen: false,
-    targetSlotIndex: null,
-  });
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
-
   // Feature UI States (Transferred from ProjectController for cleanliness)
   const [isEyedropperActive, setIsEyedropperActive] = useState(false);
   const [eyedropperColor, setEyedropperColor] = useState<string | null>(null);
   const [isMagicWandActive, setIsMagicWandActive] = useState(false);
   const [wandTolerance, setWandTolerance] = useState(30);
-
-  // Panel States
-  const [genPanel, setGenPanel] = useState<GenerationPanelState>({
-    model: "gemini-3-pro-image-preview",
-    prompt: "",
-    mode: "variation",
-    contextSlots: [null, null, null],
-  });
 
   const [bgPreviewBlobUrl, setBgPreviewBlobUrl] = useState<string | null>(null);
 
@@ -68,9 +52,7 @@ export function useUIController() {
     setIsSettingsOpen(false);
     setIsHelpOpen(false);
     setExportModal((prev) => ({ ...prev, isOpen: false }));
-    setGenerationModal((prev) => ({ ...prev, isOpen: false }));
     setIsCommandPaletteOpen(false);
-    setAnalysisResult(null);
     setIsEyedropperActive(false);
   };
 
@@ -92,12 +74,6 @@ export function useUIController() {
     setIsCommandPaletteOpen,
     exportModal,
     setExportModal,
-    generationModal,
-    setGenerationModal,
-    analysisResult,
-    setAnalysisResult,
-    genPanel,
-    setGenPanel,
     bgPreviewBlobUrl,
     setBgPreviewBlobUrl,
     isEyedropperActive,

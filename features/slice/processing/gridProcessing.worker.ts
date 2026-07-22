@@ -7,7 +7,7 @@ import {
 import { trimGridCell } from "../../../core/processing/gridProcessingCrop";
 import { inferAutoGridLayout } from "../../../core/processing/gridProcessingDetection";
 import {
-  buildManualGrid,
+  buildManualGridFromBoundaries,
   getScaledDimensions,
 } from "../../../core/processing/gridProcessingGeometry";
 import {
@@ -167,7 +167,14 @@ function createLayout(
       origin: "manual",
       rows: request.recipe.layout.rows,
       cols: request.recipe.layout.cols,
-      cells: buildManualGrid(width, height, request.recipe.layout.rows, request.recipe.layout.cols),
+      cells: buildManualGridFromBoundaries(
+        width,
+        height,
+        request.recipe.layout.rows,
+        request.recipe.layout.cols,
+        request.recipe.layout.rowBoundaries,
+        request.recipe.layout.columnBoundaries,
+      ),
       warnings: [],
     };
   }

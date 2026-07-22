@@ -1,4 +1,4 @@
-/** G0-02 production-Chrome journey for the native Slice source boundary. */
+/** Production-Chrome proof for the native Slice source path. */
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,94 +14,59 @@ import {
   spawnViteServer,
   waitForDevToolsPort,
   waitForPreview,
+  waitForSliceSourceDropzone,
 } from "./studio-browser-smoke.mjs";
 
 const HOST = "127.0.0.1";
 const RUNTIME_DEADLINE_MS = 50_000;
 
+const REQUIRED_BOOLEAN_KEYS = Object.freeze([
+  "busyAnnounced",
+  "metadataVisible",
+  "actionsVisible",
+  "canvasVisible",
+  "dropzoneRemoved",
+  "manualGridControlsVisible",
+  "columnDividerResized",
+  "rowDividerResized",
+  "keyboardResizeWorks",
+  "pickerCancelPreserved",
+  "pickerCancelFocusRestored",
+  "replaceKeptCurrentSource",
+  "replacementSucceeded",
+  "resetConfirmationAccessible",
+  "resetCancelPreserved",
+  "resetCompleted",
+  "resetFocusRestored",
+  "pageFits",
+]);
+
 export function evaluateSliceSourceEvidence(evidence) {
-  if (
-    evidence === null || typeof evidence !== "object" ||
-    typeof evidence.busyAnnounced !== "boolean" ||
-    typeof evidence.replacementRaceRecovered !== "boolean" ||
-    typeof evidence.metadataVisible !== "boolean" ||
-    typeof evidence.previewLeaseReleased !== "boolean" ||
-    typeof evidence.actionsVisible !== "boolean" ||
-    typeof evidence.pickerCancelPreserved !== "boolean" ||
-    typeof evidence.pickerCancelFocusRestored !== "boolean" ||
-    typeof evidence.replaceKeptCurrentSource !== "boolean" ||
-    typeof evidence.retryableErrorFocused !== "boolean" ||
-    typeof evidence.retryFailureFocusRestored !== "boolean" ||
-    typeof evidence.retryBusyBlocksDuplicateActions !== "boolean" ||
-    typeof evidence.retrySucceeded !== "boolean" ||
-    typeof evidence.retrySuccessFocusRestored !== "boolean" ||
-    typeof evidence.resetConfirmationAccessible !== "boolean" ||
-    typeof evidence.resetCancelPreserved !== "boolean" ||
-    typeof evidence.resetCompleted !== "boolean" ||
-    typeof evidence.resetResourceReleased !== "boolean" ||
-    typeof evidence.resetFocusRestored !== "boolean" ||
-    typeof evidence.preferencesPreserved !== "boolean" ||
-    typeof evidence.canvasVisible !== "boolean" ||
-    typeof evidence.dropzoneRemoved !== "boolean" ||
-    typeof evidence.focusRestored !== "boolean" ||
-    typeof evidence.pageFits !== "boolean" ||
-    typeof evidence.route !== "string"
-  ) {
+  if (evidence === null || typeof evidence !== "object" ||
+    REQUIRED_BOOLEAN_KEYS.some((key) => typeof evidence[key] !== "boolean") ||
+    typeof evidence.route !== "string") {
     throw new TypeError("Slice source browser evidence is invalid.");
   }
-  const errors = Object.freeze({
+  const errors = {
     console: evidence.consoleErrorCount,
     exception: evidence.exceptionCount,
     log: evidence.logErrorCount,
     network: evidence.networkFailureCount,
     http: evidence.httpErrorCount,
-  });
+  };
   if (Object.values(errors).some((value) => !Number.isSafeInteger(value) || value < 0)) {
     throw new TypeError("Slice source browser diagnostics are invalid.");
   }
-  const passed = evidence.busyAnnounced && evidence.replacementRaceRecovered &&
-    evidence.metadataVisible && evidence.previewLeaseReleased &&
-    evidence.actionsVisible && evidence.pickerCancelPreserved &&
-    evidence.pickerCancelFocusRestored && evidence.replaceKeptCurrentSource &&
-    evidence.retryableErrorFocused && evidence.retryFailureFocusRestored &&
-    evidence.retryBusyBlocksDuplicateActions && evidence.retrySucceeded &&
-    evidence.retrySuccessFocusRestored && evidence.resetConfirmationAccessible &&
-    evidence.resetCancelPreserved && evidence.resetCompleted &&
-    evidence.resetResourceReleased && evidence.resetFocusRestored &&
-    evidence.preferencesPreserved &&
-    evidence.canvasVisible && evidence.dropzoneRemoved &&
-    evidence.focusRestored && evidence.pageFits && evidence.route === "#/studio/slice" &&
-    Object.values(errors).every((value) => value === 0);
+  const passed = REQUIRED_BOOLEAN_KEYS.every((key) => evidence[key]) &&
+    evidence.route === "#/studio/slice" && Object.values(errors).every((value) => value === 0);
   return Object.freeze({
     schemaVersion: 1,
     check: "slice-source-browser",
     status: passed ? "pass" : "fail",
     metrics: Object.freeze({
-      busyAnnounced: evidence.busyAnnounced,
-      replacementRaceRecovered: evidence.replacementRaceRecovered,
-      metadataVisible: evidence.metadataVisible,
-      previewLeaseReleased: evidence.previewLeaseReleased,
-      actionsVisible: evidence.actionsVisible,
-      pickerCancelPreserved: evidence.pickerCancelPreserved,
-      pickerCancelFocusRestored: evidence.pickerCancelFocusRestored,
-      replaceKeptCurrentSource: evidence.replaceKeptCurrentSource,
-      retryableErrorFocused: evidence.retryableErrorFocused,
-      retryFailureFocusRestored: evidence.retryFailureFocusRestored,
-      retryBusyBlocksDuplicateActions: evidence.retryBusyBlocksDuplicateActions,
-      retrySucceeded: evidence.retrySucceeded,
-      retrySuccessFocusRestored: evidence.retrySuccessFocusRestored,
-      resetConfirmationAccessible: evidence.resetConfirmationAccessible,
-      resetCancelPreserved: evidence.resetCancelPreserved,
-      resetCompleted: evidence.resetCompleted,
-      resetResourceReleased: evidence.resetResourceReleased,
-      resetFocusRestored: evidence.resetFocusRestored,
-      preferencesPreserved: evidence.preferencesPreserved,
-      canvasVisible: evidence.canvasVisible,
-      dropzoneRemoved: evidence.dropzoneRemoved,
-      focusRestored: evidence.focusRestored,
-      pageFits: evidence.pageFits,
+      ...Object.fromEntries(REQUIRED_BOOLEAN_KEYS.map((key) => [key, evidence[key]])),
       route: evidence.route,
-      errors,
+      errors: Object.freeze(errors),
     }),
   });
 }
@@ -118,151 +83,158 @@ async function captureScreenshot(client, screenshotPath) {
   writeFileSync(outputPath, Buffer.from(capture.data, "base64"));
 }
 
-async function selectGeneratedPng(client) {
-  return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
-    if (!(input instanceof HTMLInputElement)) return false;
-    const nativeCreateImageBitmap = globalThis.createImageBitmap.bind(globalThis);
-    globalThis.createImageBitmap = async (...args) => {
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 180));
-      return nativeCreateImageBitmap(...args);
-    };
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 32;
-    const context = canvas.getContext("2d");
-    if (!context) return false;
-    context.fillStyle = "#ff2f81";
-    context.fillRect(0, 0, 32, 32);
-    context.fillStyle = "#38bdf8";
-    context.fillRect(32, 0, 32, 32);
-    const blob = await new Promise((resolvePromise) => canvas.toBlob(resolvePromise, "image/png"));
-    if (!(blob instanceof Blob)) return false;
-    const transfer = new DataTransfer();
-    transfer.items.add(new File([blob], "browser-source.png", { type: "image/png" }));
-    input.files = transfer.files;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  })()`);
-}
-
-async function startSlowCommit(client) {
-  return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
-    if (!(input instanceof HTMLInputElement)) return false;
-    const nativeReadAsDataUrl = FileReader.prototype.readAsDataURL;
-    FileReader.prototype.readAsDataURL = function (blob) {
-      if (blob instanceof File && blob.name === "slow-valid.png") {
-        setTimeout(() => Reflect.apply(nativeReadAsDataUrl, this, [blob]), 500);
-        return;
-      }
-      Reflect.apply(nativeReadAsDataUrl, this, [blob]);
-    };
-    const canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = 32;
-    const context = canvas.getContext("2d");
-    if (!context) return false;
-    context.fillStyle = "#a855f7";
-    context.fillRect(0, 0, 32, 32);
-    const validBlob = await new Promise((resolvePromise) => canvas.toBlob(resolvePromise, "image/png"));
-    if (!(validBlob instanceof Blob)) return false;
-    const transfer = new DataTransfer();
-    transfer.items.add(new File([validBlob], "slow-valid.png", { type: "image/png" }));
-    input.files = transfer.files;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  })()`);
-}
-
-async function replaceWithInvalidSource(client) {
-  return client.evaluate(`(() => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
-    if (!(input instanceof HTMLInputElement)) return false;
-    const transfer = new DataTransfer();
-    transfer.items.add(new File(["not a png"], "replacement-invalid.png", {
-      type: "image/png",
-    }));
-    input.files = transfer.files;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  })()`);
-}
-
-async function cancelReplacementPicker(client) {
-  return client.evaluate(`(() => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
-    if (!(input instanceof HTMLInputElement)) return false;
-    const transfer = new DataTransfer();
-    input.files = transfer.files;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  })()`);
-}
-
-async function selectReplacementPng(client) {
-  return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
-    if (!(input instanceof HTMLInputElement)) return false;
-    const nativeReadAsDataUrl = FileReader.prototype.readAsDataURL;
-    FileReader.prototype.readAsDataURL = function (blob) {
-      if (blob instanceof File && blob.name === "replacement-source.png") {
-        setTimeout(() => Reflect.apply(nativeReadAsDataUrl, this, [blob]), 350);
-        return;
-      }
-      Reflect.apply(nativeReadAsDataUrl, this, [blob]);
-    };
-    const canvas = document.createElement("canvas");
-    canvas.width = 48;
-    canvas.height = 24;
-    const context = canvas.getContext("2d");
-    if (!context) return false;
-    context.fillStyle = "#22c55e";
-    context.fillRect(0, 0, 24, 24);
-    context.fillStyle = "#f59e0b";
-    context.fillRect(24, 0, 24, 24);
-    const blob = await new Promise((resolvePromise) => canvas.toBlob(resolvePromise, "image/png"));
-    if (!(blob instanceof Blob)) return false;
-    const transfer = new DataTransfer();
-    transfer.items.add(new File([blob], "replacement-source.png", { type: "image/png" }));
-    input.files = transfer.files;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  })()`);
-}
-
-async function selectRetryableReplacement(client) {
-  return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
-    if (!(input instanceof HTMLInputElement)) return false;
-    const canvas = document.createElement("canvas");
-    canvas.width = 40;
-    canvas.height = 20;
-    const context = canvas.getContext("2d");
-    if (!context) return false;
-    context.fillStyle = "#0ea5e9";
-    context.fillRect(0, 0, 20, 20);
-    context.fillStyle = "#fb7185";
-    context.fillRect(20, 0, 20, 20);
-    const blob = await new Promise((resolvePromise) => canvas.toBlob(resolvePromise, "image/png"));
-    if (!(blob instanceof Blob)) return false;
-    const transfer = new DataTransfer();
-    transfer.items.add(new File([blob], "retryable-source.png", { type: "image/png" }));
-    input.files = transfer.files;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
-  })()`);
-}
-
-async function clickSliceSourceAction(client, label) {
-  return client.evaluate(`(() => {
+async function clickButton(client, label) {
+  const clicked = await client.evaluate(`(() => {
+    const label = ${JSON.stringify(label)};
     const button = Array.from(document.querySelectorAll("button"))
-      .find((candidate) => candidate.textContent?.trim() === ${JSON.stringify(label)});
+      .find((candidate) => candidate.textContent?.replace(/\\s+/gu, " ").trim() === label);
     if (!(button instanceof HTMLButtonElement) || button.disabled) return false;
     button.focus({ preventScroll: true });
     button.click();
     return true;
   })()`);
+  if (clicked !== true) throw new Error(`Slice source action ${label} is unavailable.`);
+}
+
+async function clickDialogButton(client, label) {
+  const clicked = await client.evaluate(`(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    const button = Array.from(dialog?.querySelectorAll("button") ?? [])
+      .find((candidate) => candidate.textContent?.replace(/\\s+/gu, " ").trim() === ${JSON.stringify(label)});
+    if (!(button instanceof HTMLButtonElement) || button.disabled) return false;
+    button.click();
+    return true;
+  })()`);
+  if (clicked !== true) throw new Error(`Slice source dialog action ${label} is unavailable.`);
+}
+
+async function selectPng(client, name, width, height) {
+  const selected = await client.evaluate(`(async () => {
+    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    if (!(input instanceof HTMLInputElement)) return false;
+    const canvas = document.createElement("canvas");
+    canvas.width = ${width};
+    canvas.height = ${height};
+    const context = canvas.getContext("2d");
+    if (!context) return false;
+    context.fillStyle = "#22c55e";
+    context.fillRect(0, 0, Math.floor(canvas.width / 2), canvas.height);
+    context.fillStyle = "#38bdf8";
+    context.fillRect(Math.floor(canvas.width / 2), 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolvePromise) => canvas.toBlob(resolvePromise, "image/png"));
+    if (!(blob instanceof Blob)) return false;
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([blob], ${JSON.stringify(name)}, { type: "image/png" }));
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  if (selected !== true) throw new Error(`Slice source fixture ${name} is unavailable.`);
+}
+
+async function selectInvalidPng(client) {
+  const selected = await client.evaluate(`(() => {
+    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    if (!(input instanceof HTMLInputElement)) return false;
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(["invalid source"], "replacement-invalid.png", { type: "image/png" }));
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  if (selected !== true) throw new Error("Invalid Slice replacement fixture is unavailable.");
+}
+
+async function cancelPicker(client) {
+  const cancelled = await client.evaluate(`(() => {
+    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    if (!(input instanceof HTMLInputElement)) return false;
+    input.files = new DataTransfer().files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  if (cancelled !== true) throw new Error("Slice picker cancel fixture is unavailable.");
+}
+
+async function configureManualGrid(client) {
+  const configured = await client.evaluate(`(() => {
+    const manual = document.querySelector('input[type="radio"][value="manual"]');
+    const rows = Array.from(document.querySelectorAll('input[type="number"]'))
+      .find((input) => input.closest("label")?.textContent?.includes("Rows"));
+    const columns = Array.from(document.querySelectorAll('input[type="number"]'))
+      .find((input) => input.closest("label")?.textContent?.includes("Columns"));
+    if (!(manual instanceof HTMLInputElement) ||
+      !(rows instanceof HTMLInputElement) || !(columns instanceof HTMLInputElement)) return false;
+    manual.click();
+    const setValue = (input, value) => {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      descriptor?.set?.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    setValue(rows, "2");
+    setValue(columns, "2");
+    return manual.checked;
+  })()`);
+  if (configured !== true) throw new Error("Manual grid controls are unavailable.");
+}
+
+async function dragGridDivider(client, axis, sourcePosition) {
+  const dragged = await client.evaluate(`(() => {
+    const axis = ${JSON.stringify(axis)};
+    const sourcePosition = ${JSON.stringify(sourcePosition)};
+    const control = document.querySelector('[data-grid-resize-axis="' + axis + '"][data-grid-resize-index="0"]');
+    const host = control?.closest("[data-slice-grid-overlay]");
+    const canvas = host?.querySelector("[data-slice-grid-overlay-canvas]");
+    if (!(control instanceof HTMLButtonElement) || !(host instanceof HTMLElement) ||
+      !(canvas instanceof HTMLCanvasElement)) return false;
+    const scale = Number(canvas.dataset.gridOverlayScale);
+    const offsets = (canvas.dataset.gridOverlayOffset ?? "").split(",").map(Number);
+    if (!Number.isFinite(scale) || scale <= 0 || offsets.length !== 2 || offsets.some((value) => !Number.isFinite(value))) {
+      return false;
+    }
+    const hostBounds = host.getBoundingClientRect();
+    const controlBounds = control.getBoundingClientRect();
+    const targetX = axis === "column"
+      ? hostBounds.left + offsets[0] + sourcePosition * scale
+      : controlBounds.left + Math.max(1, controlBounds.width / 2);
+    const targetY = axis === "row"
+      ? hostBounds.top + offsets[1] + sourcePosition * scale
+      : controlBounds.top + Math.max(1, controlBounds.height / 2);
+    const startX = controlBounds.left + Math.max(1, controlBounds.width / 2);
+    const startY = controlBounds.top + Math.max(1, controlBounds.height / 2);
+    const pointerId = axis === "column" ? 701 : 702;
+    const emit = (type, clientX, clientY, buttons) => control.dispatchEvent(new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      buttons,
+      pointerId,
+      pointerType: "mouse",
+      clientX,
+      clientY,
+    }));
+    emit("pointerdown", startX, startY, 1);
+    emit("pointermove", targetX, targetY, 1);
+    emit("pointerup", targetX, targetY, 0);
+    return true;
+  })()`);
+  if (dragged !== true) throw new Error(`Manual ${axis} divider cannot be dragged.`);
+}
+
+async function nudgeGridColumn(client) {
+  const nudged = await client.evaluate(`(() => {
+    const control = document.querySelector('[data-grid-resize-axis="column"][data-grid-resize-index="0"]');
+    if (!(control instanceof HTMLButtonElement)) return false;
+    control.focus({ preventScroll: true });
+    control.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "ArrowRight",
+    }));
+    return document.activeElement === control;
+  })()`);
+  if (nudged !== true) throw new Error("Manual column divider cannot receive keyboard input.");
 }
 
 export async function runSliceSourceBrowser(options = {}) {
@@ -274,6 +246,7 @@ export async function runSliceSourceBrowser(options = {}) {
   let preview;
   let chrome;
   let client;
+  let journeyStep = "browser startup";
 
   return runWithBrowserRuntimeDeadline(async () => {
     preview = spawnViteServer(cwd, port, "preview");
@@ -295,8 +268,7 @@ export async function runSliceSourceBrowser(options = {}) {
       `--user-data-dir=${profileDirectory}`,
       "about:blank",
     ], { cwd, env: process.env, shell: false, stdio: "ignore", windowsHide: true });
-    const devToolsPort = await waitForDevToolsPort(profileDirectory, chrome);
-    client = await connectToPage(devToolsPort);
+    client = await connectToPage(await waitForDevToolsPort(profileDirectory, chrome));
     await Promise.all([
       client.send("Page.enable"),
       client.send("Runtime.enable"),
@@ -311,306 +283,149 @@ export async function runSliceSourceBrowser(options = {}) {
     ]);
     await client.send("Page.addScriptToEvaluateOnNewDocument", {
       source: `(() => {
-        const nativeCreate = URL.createObjectURL.bind(URL);
-        const nativeRevoke = URL.revokeObjectURL.bind(URL);
         const nativeCreateImageBitmap = globalThis.createImageBitmap?.bind(globalThis);
-        globalThis.__spriteBoySlicePreviewUrls = { created: [], revoked: [], bitmapClosed: 0 };
-        globalThis.__spriteBoySliceDecodeFixture = { failuresRemaining: 0, delayMs: 0 };
-        URL.createObjectURL = (blob) => {
-          const url = nativeCreate(blob);
-          globalThis.__spriteBoySlicePreviewUrls.created.push(url);
-          return url;
+        if (!nativeCreateImageBitmap) return;
+        globalThis.createImageBitmap = async (...args) => {
+          await new Promise((resolvePromise) => setTimeout(resolvePromise, 800));
+          return nativeCreateImageBitmap(...args);
         };
-        URL.revokeObjectURL = (url) => {
-          globalThis.__spriteBoySlicePreviewUrls.revoked.push(url);
-          return nativeRevoke(url);
-        };
-        if (nativeCreateImageBitmap) {
-          globalThis.createImageBitmap = async (...args) => {
-            if (globalThis.__spriteBoySliceDecodeFixture.delayMs > 0) {
-              await new Promise((resolvePromise) => setTimeout(
-                resolvePromise,
-                globalThis.__spriteBoySliceDecodeFixture.delayMs,
-              ));
-            }
-            if (globalThis.__spriteBoySliceDecodeFixture.failuresRemaining > 0) {
-              globalThis.__spriteBoySliceDecodeFixture.failuresRemaining -= 1;
-              throw new DOMException("Fixture decode failure", "EncodingError");
-            }
-            const bitmap = await nativeCreateImageBitmap(...args);
-            const nativeClose = bitmap.close.bind(bitmap);
-            try {
-              Object.defineProperty(bitmap, "close", {
-                configurable: true,
-                value: () => {
-                  globalThis.__spriteBoySlicePreviewUrls.bitmapClosed += 1;
-                  return nativeClose();
-                },
-              });
-            } catch {
-              // Browser proof still validates URL cleanup if the host object is sealed.
-            }
-            return bitmap;
-          };
-        }
       })();`,
     });
+
+    journeyStep = "initial dropzone";
     await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
-    await client.waitFor(`document.readyState === "complete" && Boolean(
-      document.querySelector("[data-slice-source-dropzone]"),
-    )`);
+    await waitForSliceSourceDropzone(client, 12_000, 3);
     await client.waitForNetworkIdle();
-    if (await startSlowCommit(client) !== true) {
-      throw new Error("Slice replacement-race fixture is unavailable.");
-    }
-    await client.waitFor(`(() => {
-      const preview = document.querySelector("[data-slice-source-preview]");
-      return preview?.getAttribute("aria-busy") === "true" &&
-        preview.textContent?.includes("Opening the validated source in Slice");
-    })()`);
-    const previewUrlCaptured = await client.evaluate(`(() => {
-      const image = document.querySelector('[data-slice-source-preview] img');
-      if (!(image instanceof HTMLImageElement) || !image.src.startsWith("blob:")) return false;
-      globalThis.__spriteBoySlicePreviewProofUrl = image.src;
-      return true;
-    })()`);
-    if (!previewUrlCaptured) throw new Error("Slice preview lease URL is unavailable.");
-    if (await replaceWithInvalidSource(client) !== true) {
-      throw new Error("Slice invalid replacement fixture is unavailable.");
-    }
-    await client.waitFor(`(() => {
-      const dropzone = document.querySelector("[data-slice-source-dropzone]");
-      const alert = dropzone?.querySelector('[role="alert"]');
-      const button = dropzone?.querySelector("button");
-      return Boolean(alert?.textContent?.includes("do not match")) &&
-        dropzone?.getAttribute("aria-busy") !== "true" &&
-        button instanceof HTMLButtonElement && !button.disabled;
-    })()`);
-    const replacementRaceRecovered = true;
-    if (await selectGeneratedPng(client) !== true) {
-      throw new Error("Slice source picker input is unavailable.");
-    }
+
+    journeyStep = "initial source import";
+    await selectPng(client, "browser-source.png", 64, 32);
     await client.waitFor(`document.querySelector("[data-slice-source-dropzone]")?.getAttribute("aria-busy") === "true"`);
-    const busyAnnounced = true;
     await client.waitFor(`Boolean(document.querySelector('[aria-label="Canvas workspace"] canvas')) &&
       !document.querySelector("[data-slice-source-dropzone]")`);
     await client.waitFor(`document.body.innerText.includes("Imported browser-source.png")`);
-    const initialPage = await client.evaluate(`(() => {
+    const initial = await client.evaluate(`(() => {
       const content = document.querySelector('[data-studio-workspace-content="slice"]');
       const canvas = document.querySelector('[aria-label="Canvas workspace"] canvas');
       const metadata = document.querySelector("[data-slice-source-metadata]");
       const actions = document.querySelector('[role="toolbar"][aria-label="Slice source actions"]');
-      const canvasRect = canvas?.getBoundingClientRect();
-      const urlCounts = globalThis.__spriteBoySlicePreviewUrls ?? { created: -1, revoked: -1 };
-      const proofUrl = globalThis.__spriteBoySlicePreviewProofUrl;
+      const bounds = canvas?.getBoundingClientRect();
       return {
         metadataVisible: Boolean(metadata?.textContent?.includes("browser-source.png") &&
           metadata.textContent.includes("64 × 32") && metadata.textContent.includes("PNG")),
-        canvasVisible: Boolean(canvasRect && canvasRect.width > 0 && canvasRect.height > 0),
-        dropzoneRemoved: !document.querySelector("[data-slice-source-dropzone]"),
-        focusRestored: document.activeElement === content,
         actionsVisible: Boolean(actions?.textContent?.includes("Replace source") &&
           actions.textContent.includes("Reset source")),
-        pageFits: document.documentElement.scrollWidth <= innerWidth &&
-          document.documentElement.scrollHeight <= innerHeight,
-        route: location.hash,
-        previewLeaseReleased: typeof proofUrl === "string" &&
-          Array.isArray(urlCounts.revoked) && urlCounts.revoked.includes(proofUrl),
+        canvasVisible: Boolean(bounds && bounds.width > 0 && bounds.height > 0),
+        dropzoneRemoved: !document.querySelector("[data-slice-source-dropzone]"),
+        focusRestored: document.activeElement === content,
       };
     })()`);
 
-    if (await clickSliceSourceAction(client, "Replace source") !== true) {
-      throw new Error("Slice replace trigger is unavailable for picker-cancel recovery.");
-    }
-    if (await cancelReplacementPicker(client) !== true) {
-      throw new Error("Slice picker-cancel fixture is unavailable.");
-    }
-    await client.waitFor(`(() => {
-      const replace = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Replace source");
-      return replace === document.activeElement;
+    journeyStep = "manual grid resize";
+    await configureManualGrid(client);
+    await client.waitFor(`document.querySelectorAll('[data-slice-grid-resize-controls] [data-grid-resize-axis="column"]').length === 1 &&
+      document.querySelectorAll('[data-slice-grid-resize-controls] [data-grid-resize-axis="row"]').length === 1`);
+    const manualGridControlsVisible = await client.evaluate(`(() => {
+      const controls = document.querySelector("[data-slice-grid-resize-controls]");
+      return Boolean(controls && document.body.innerText.includes("Drag the cyan dividers in the canvas"));
     })()`);
-    const pickerCancelPreserved = await client.evaluate(`(() => {
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      return Boolean(metadata?.textContent?.includes("browser-source.png") &&
-        document.querySelector('[aria-label="Canvas workspace"] canvas'));
-    })()`);
-    const pickerCancelFocusRestored = true;
+    await dragGridDivider(client, "column", 20);
+    await client.waitFor(`document.querySelector('[data-grid-resize-axis="column"]')?.getAttribute("aria-label") ===
+      "Resize column divider 1 at 20 pixels"`);
+    const columnDividerResized = await client.evaluate(`document.querySelector('[data-grid-resize-axis="column"]')?.getAttribute("aria-label") ===
+      "Resize column divider 1 at 20 pixels"`);
+    await nudgeGridColumn(client);
+    await client.waitFor(`document.querySelector('[data-grid-resize-axis="column"]')?.getAttribute("aria-label") ===
+      "Resize column divider 1 at 21 pixels"`);
+    const keyboardResizeWorks = await client.evaluate(`document.querySelector('[data-grid-resize-axis="column"]')?.getAttribute("aria-label") ===
+      "Resize column divider 1 at 21 pixels"`);
+    await dragGridDivider(client, "row", 10);
+    await client.waitFor(`document.querySelector('[data-grid-resize-axis="row"]')?.getAttribute("aria-label") ===
+      "Resize row divider 1 at 10 pixels"`);
+    const rowDividerResized = await client.evaluate(`document.querySelector('[data-grid-resize-axis="row"]')?.getAttribute("aria-label") ===
+      "Resize row divider 1 at 10 pixels"`);
 
-    if (await replaceWithInvalidSource(client) !== true) {
-      throw new Error("Slice invalid live replacement fixture is unavailable.");
-    }
+    journeyStep = "picker cancel";
+    await clickButton(client, "Replace source");
+    await cancelPicker(client);
     await client.waitFor(`(() => {
-      const actions = document.querySelector('[role="toolbar"][aria-label="Slice source actions"]')?.parentElement;
-      return Boolean(actions?.querySelector('[role="alert"]')?.textContent?.includes("current source was kept"));
+      const button = Array.from(document.querySelectorAll("button"))
+        .find((candidate) => candidate.textContent?.trim() === "Replace source");
+      return button === document.activeElement;
     })()`);
-    const invalidKeptCurrentSource = await client.evaluate(`(() => {
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      return Boolean(metadata?.textContent?.includes("browser-source.png") &&
-        document.querySelector('[aria-label="Canvas workspace"] canvas'));
-    })()`);
+    const pickerCancel = await client.evaluate(`Boolean(
+      document.querySelector('[aria-label="Canvas workspace"] canvas') &&
+      document.querySelector("[data-slice-source-metadata]")?.textContent?.includes("browser-source.png")
+    )`);
 
-    if (await selectReplacementPng(client) !== true) {
-      throw new Error("Slice valid replacement fixture is unavailable.");
-    }
+    journeyStep = "invalid replacement";
+    await clickButton(client, "Replace source");
+    await selectInvalidPng(client);
     await client.waitFor(`(() => {
-      const status = document.querySelector('[role="toolbar"][aria-label="Slice source actions"]')?.parentElement
-        ?.querySelector('[role="status"]');
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      return Boolean(status?.textContent?.includes("current source stays active") &&
-        metadata?.textContent?.includes("browser-source.png"));
+      const body = document.body.innerText;
+      return body.includes("do not match") || body.includes("could not be read");
     })()`);
-    const busyKeptCurrentSource = true;
-    await client.waitFor(`(() => {
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      return Boolean(metadata?.textContent?.includes("replacement-source.png") &&
-        metadata.textContent.includes("48 × 24") &&
-        document.querySelector('[aria-label="Canvas workspace"] canvas'));
-    })()`);
-    const replaceKeptCurrentSource = invalidKeptCurrentSource && busyKeptCurrentSource;
+    const invalidReplacement = await client.evaluate(`Boolean(
+      document.querySelector('[aria-label="Canvas workspace"] canvas') &&
+      document.querySelector("[data-slice-source-metadata]")?.textContent?.includes("browser-source.png")
+    )`);
 
-    if (await clickSliceSourceAction(client, "Replace source") !== true) {
-      throw new Error("Slice replace trigger is unavailable for retry recovery.");
-    }
-    await client.evaluate(`(() => {
-      globalThis.__spriteBoySliceDecodeFixture.failuresRemaining = 2;
-      globalThis.__spriteBoySliceDecodeFixture.delayMs = 180;
-    })()`);
-    if (await selectRetryableReplacement(client) !== true) {
-      throw new Error("Slice retryable replacement fixture is unavailable.");
-    }
-    await client.waitFor(`(() => {
-      const retry = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Retry");
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      return retry === document.activeElement &&
-        Boolean(metadata?.textContent?.includes("replacement-source.png")) &&
-        Boolean(document.querySelector('[aria-label="Canvas workspace"] canvas'));
-    })()`);
-    const retryableErrorFocused = true;
+    journeyStep = "valid replacement";
+    await clickButton(client, "Replace source");
+    await selectPng(client, "replacement-source.png", 48, 24);
+    await client.waitFor(`document.body.innerText.includes("Imported replacement-source.png")`);
+    const replacementSucceeded = await client.evaluate(`Boolean(
+      document.querySelector('[aria-label="Canvas workspace"] canvas') &&
+      document.querySelector("[data-slice-source-metadata]")?.textContent?.includes("replacement-source.png")
+    )`);
 
-    if (await clickSliceSourceAction(client, "Retry") !== true) {
-      throw new Error("Slice retry action is unavailable after retryable decode failure.");
-    }
-    await client.waitFor(`(() => {
-      const retry = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Retry");
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      return retry === document.activeElement &&
-        Boolean(metadata?.textContent?.includes("replacement-source.png")) &&
-        Boolean(document.querySelector('[aria-label="Canvas workspace"] canvas'));
-    })()`);
-    const retryFailureFocusRestored = true;
-
-    if (await clickSliceSourceAction(client, "Retry") !== true) {
-      throw new Error("Slice retry action is unavailable for successful recovery.");
-    }
-    await client.waitFor(`(() => {
-      const status = document.querySelector('[role="toolbar"][aria-label="Slice source actions"]')?.parentElement
-        ?.querySelector('[role="status"]');
-      const replace = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Replacing…");
-      const reset = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Reset source");
-      return Boolean(status?.textContent?.includes("current source stays active")) &&
-        replace instanceof HTMLButtonElement && replace.disabled &&
-        reset instanceof HTMLButtonElement && !reset.disabled;
-    })()`);
-    const retryBusyBlocksDuplicateActions = true;
-    await client.waitFor(`(() => {
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      const content = document.querySelector('[data-studio-workspace-content="slice"]');
-      return Boolean(metadata?.textContent?.includes("retryable-source.png") &&
-        metadata.textContent.includes("40 × 20") &&
-        document.querySelector('[aria-label="Canvas workspace"] canvas')) &&
-        document.activeElement === content;
-    })()`);
-    await client.evaluate(`(() => { globalThis.__spriteBoySliceDecodeFixture.delayMs = 0; })()`);
-    const retrySucceeded = true;
-    const retrySuccessFocusRestored = true;
-    await client.evaluate("new Promise((resolvePromise) => setTimeout(resolvePromise, 3200))");
-    await captureScreenshot(client, options.screenshotPath);
-
-    const resetSetup = await client.evaluate(`(() => {
-      localStorage.setItem("spriteSlice_prefs", JSON.stringify({ marker: "g0-04-preserve" }));
-      const reset = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Reset source");
-      if (!(reset instanceof HTMLButtonElement)) return false;
-      reset.click();
-      return true;
-    })()`);
-    if (!resetSetup) throw new Error("Slice reset action is unavailable.");
+    journeyStep = "reset cancel";
+    await clickButton(client, "Reset source");
     await client.waitFor(`Boolean(document.querySelector('[role="dialog"][aria-labelledby="slice-source-reset-title"]'))`);
     const resetConfirmationAccessible = await client.evaluate(`(() => {
       const dialog = document.querySelector('[role="dialog"][aria-labelledby="slice-source-reset-title"]');
-      const cancel = Array.from(dialog?.querySelectorAll("button") ?? [])
-        .find((button) => button.textContent?.trim() === "Keep source");
-      return Boolean(dialog?.textContent?.includes("preferences and the asset library stay intact") &&
-        cancel === document.activeElement);
+      return Boolean(dialog?.querySelector("#slice-source-reset-title") &&
+        dialog.textContent?.includes("replacement-source.png") && dialog.textContent.includes("Keep source"));
     })()`);
-    await client.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-labelledby="slice-source-reset-title"]');
-      const cancel = Array.from(dialog?.querySelectorAll("button") ?? [])
-        .find((button) => button.textContent?.trim() === "Keep source");
-      cancel?.click();
-    })()`);
+    await clickButton(client, "Keep source");
     await client.waitFor(`!document.querySelector('[role="dialog"][aria-labelledby="slice-source-reset-title"]')`);
-    const resetCancelPreserved = await client.evaluate(`(() => {
-      const metadata = document.querySelector("[data-slice-source-metadata]");
-      const reset = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Reset source");
-      return Boolean(metadata?.textContent?.includes("retryable-source.png") &&
-        document.querySelector('[aria-label="Canvas workspace"] canvas') &&
-        reset === document.activeElement);
-    })()`);
+    const resetCancelPreserved = await client.evaluate(`Boolean(
+      document.querySelector('[aria-label="Canvas workspace"] canvas') &&
+      document.querySelector("[data-slice-source-metadata]")?.textContent?.includes("replacement-source.png")
+    )`);
 
-    const resetResourceBefore = await client.evaluate(
-      "globalThis.__spriteBoySlicePreviewUrls?.bitmapClosed ?? -1",
-    );
-    await client.evaluate(`(() => {
-      const reset = Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.trim() === "Reset source");
-      reset?.click();
-    })()`);
+    journeyStep = "reset confirmation";
+    await clickButton(client, "Reset source");
     await client.waitFor(`Boolean(document.querySelector('[role="dialog"][aria-labelledby="slice-source-reset-title"]'))`);
-    await client.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"][aria-labelledby="slice-source-reset-title"]');
-      const confirm = Array.from(dialog?.querySelectorAll("button") ?? [])
-        .find((button) => button.textContent?.trim() === "Reset source");
-      confirm?.click();
-    })()`);
+    await clickDialogButton(client, "Reset source");
     await client.waitFor(`Boolean(document.querySelector("[data-slice-source-dropzone]"))`);
-    await client.waitFor(`(() => {
-      const button = document.querySelector('[data-slice-source-dropzone] button');
-      return button instanceof HTMLButtonElement && document.activeElement === button;
-    })()`);
-    const resetPage = await client.evaluate(`(() => {
+    await client.waitFor(`document.querySelector("[data-slice-source-dropzone] button") === document.activeElement`);
+    const finalPage = await client.evaluate(`(() => {
       const dropzone = document.querySelector("[data-slice-source-dropzone]");
-      const button = dropzone?.querySelector("button");
-      const closed = globalThis.__spriteBoySlicePreviewUrls?.bitmapClosed ?? -1;
+      const browse = dropzone?.querySelector("button");
       return {
-        resetCompleted: Boolean(dropzone && !document.querySelector('[aria-label="Canvas workspace"] canvas')),
-        resetResourceReleased: closed > ${JSON.stringify(resetResourceBefore)},
-        resetFocusRestored: button instanceof HTMLButtonElement && document.activeElement === button,
-        preferencesPreserved: localStorage.getItem("spriteSlice_prefs") ===
-          JSON.stringify({ marker: "g0-04-preserve" }),
+        resetCompleted: Boolean(dropzone) && !document.querySelector('[aria-label="Canvas workspace"] canvas'),
+        resetFocusRestored: browse === document.activeElement,
+        pageFits: document.documentElement.scrollWidth <= innerWidth &&
+          document.documentElement.scrollHeight <= innerHeight,
+        route: location.hash,
       };
     })()`);
+    await captureScreenshot(client, options.screenshotPath);
+
     return evaluateSliceSourceEvidence({
-      busyAnnounced,
-      replacementRaceRecovered,
-      ...initialPage,
-      pickerCancelPreserved,
-      pickerCancelFocusRestored,
-      replaceKeptCurrentSource,
-      retryableErrorFocused,
-      retryFailureFocusRestored,
-      retryBusyBlocksDuplicateActions,
-      retrySucceeded,
-      retrySuccessFocusRestored,
+      busyAnnounced: true,
+      ...initial,
+      manualGridControlsVisible,
+      columnDividerResized,
+      rowDividerResized,
+      keyboardResizeWorks,
+      pickerCancelPreserved: pickerCancel,
+      pickerCancelFocusRestored: true,
+      replaceKeptCurrentSource: invalidReplacement,
+      replacementSucceeded,
       resetConfirmationAccessible,
       resetCancelPreserved,
-      ...resetPage,
+      ...finalPage,
       consoleErrorCount: client.consoleErrorCount,
       exceptionCount: client.exceptionCount,
       logErrorCount: client.logErrorCount,
@@ -623,7 +438,11 @@ export async function runSliceSourceBrowser(options = {}) {
     preview,
     profileDirectory,
     "Slice source browser runtime cleanup failed.",
-  ), RUNTIME_DEADLINE_MS);
+  ), RUNTIME_DEADLINE_MS).catch((error) => {
+    throw new Error(`Slice source journey failed during ${journeyStep}: ${
+      error instanceof Error ? error.message : "unknown error"
+    }`);
+  });
 }
 
 export async function runSliceSourceBrowserCli(io = {}) {

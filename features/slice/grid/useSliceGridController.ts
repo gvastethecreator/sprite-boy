@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { GridSplitRecipeV1 } from "../../../core/project";
-import { buildManualGrid } from "../../../core/processing/gridProcessingGeometry";
+import { buildManualGridFromBoundaries } from "../../../core/processing/gridProcessingGeometry";
 import { validateGridLayoutSource } from "../../../core/processing/gridLayoutValidation";
 import type {
   GridProcessingRectV1,
@@ -15,6 +15,7 @@ import type {
 import {
   serializeGridRecipeLayout,
   setGridLayoutMode,
+  setManualGridBoundary,
   setManualGridLayout,
   type GridLayoutDraft,
   type GridLayoutMode,
@@ -88,6 +89,8 @@ export interface SliceGridController {
   readonly setMode: (mode: GridLayoutMode) => void;
   readonly setManualRowsInput: (value: string) => void;
   readonly setManualColsInput: (value: string) => void;
+  readonly setManualRowBoundary?: (index: number, sourceY: number) => boolean;
+  readonly setManualColumnBoundary?: (index: number, sourceX: number) => boolean;
   readonly setCropThreshold: (value: number) => boolean;
   readonly setCropPadding: (value: number) => boolean;
   readonly resetCrop: () => boolean;
@@ -168,7 +171,14 @@ function manualLayout(
     origin: "manual" as const,
     rows: draft.manual.rows,
     cols: draft.manual.cols,
-    cells: buildManualGrid(dimensions.width, dimensions.height, draft.manual.rows, draft.manual.cols),
+    cells: buildManualGridFromBoundaries(
+      dimensions.width,
+      dimensions.height,
+      draft.manual.rows,
+      draft.manual.cols,
+      draft.manual.rowBoundaries,
+      draft.manual.columnBoundaries,
+    ),
     warnings: Object.freeze([]),
     recipeLayout: serializeGridRecipeLayout(draft, dimensions),
   });
@@ -461,6 +471,36 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     updateManual(rowsInputRef.current, value);
   }, [updateManual]);
 
+  const updateBoundary = useCallback((
+    axis: "row" | "column",
+    index: number,
+    boundary: number,
+  ): boolean => {
+    const currentSource = sourceRef.current;
+    if (!currentSource || draftRef.current.mode !== "manual") return false;
+    const result = setManualGridBoundary(
+      draftRef.current,
+      axis,
+      index,
+      boundary,
+      currentSource.dimensions,
+    );
+    if (!result.ok) {
+      setValidationIssues(result.issues);
+      return false;
+    }
+    if (!commitDraft(result.value)) return false;
+    setValidationIssues([]);
+    return true;
+  }, [commitDraft]);
+
+  const setManualRowBoundary = useCallback((index: number, sourceY: number): boolean => (
+    updateBoundary("row", index, sourceY)
+  ), [updateBoundary]);
+  const setManualColumnBoundary = useCallback((index: number, sourceX: number): boolean => (
+    updateBoundary("column", index, sourceX)
+  ), [updateBoundary]);
+
   const effectiveLayout = useMemo(() => {
     if (!source) return null;
     if (draft.mode !== "manual") return detectedLayout;
@@ -577,6 +617,8 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     setMode,
     setManualRowsInput: updateRows,
     setManualColsInput: updateCols,
+    setManualRowBoundary,
+    setManualColumnBoundary,
     setCropThreshold,
     setCropPadding,
     resetCrop,
@@ -624,6 +666,8 @@ export function useSliceGridController(options: UseSliceGridControllerOptions): 
     status,
     setCropPadding,
     setCropThreshold,
+    setManualColumnBoundary,
+    setManualRowBoundary,
     updateCols,
     updateRows,
     validationIssues,

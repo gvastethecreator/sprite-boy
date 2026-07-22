@@ -200,7 +200,15 @@ export interface GridSplitRecipeV1 {
   sourceAssetId: EntityId;
   layout:
     | { mode: "auto" }
-    | { mode: "manual"; rows: number; cols: number };
+    | {
+        mode: "manual";
+        rows: number;
+        cols: number;
+        /** Internal source-pixel dividers written after a user resizes the grid. */
+        rowBoundaries?: readonly number[];
+        /** Internal source-pixel dividers written after a user resizes the grid. */
+        columnBoundaries?: readonly number[];
+      };
   crop: { threshold: number; padding: number };
   chroma: {
     enabled: boolean;

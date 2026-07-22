@@ -132,6 +132,40 @@ describe("useSliceGridController integration (G2-05)", () => {
     expect(result.current.pixel.palette).toEqual(["#000000", "#ffffff"]);
   });
 
+  it("commits canvas divider resizes into the same persisted manual recipe", async () => {
+    const commits: SliceGridRecipeStateV1[] = [];
+    const { result } = renderHook(() => useSliceGridController(options({
+      onCommitState: (state: SliceGridRecipeStateV1) => commits.push(state),
+    })));
+    await act(async () => Promise.resolve());
+
+    act(() => result.current.setMode("manual"));
+    act(() => result.current.setManualRowsInput("3"));
+    act(() => result.current.setManualColsInput("4"));
+    act(() => expect(result.current.setManualColumnBoundary?.(0, 2)).toBe(true));
+    act(() => expect(result.current.setManualRowBoundary?.(1, 7)).toBe(true));
+
+    expect(result.current.recipe.layout).toEqual({
+      mode: "manual",
+      rows: 3,
+      cols: 4,
+      rowBoundaries: [2, 7],
+      columnBoundaries: [2, 6, 9],
+    });
+    expect(result.current.effectiveLayout?.cells.slice(0, 4)).toEqual([
+      { x: 0, y: 0, width: 2, height: 2 },
+      { x: 2, y: 0, width: 4, height: 2 },
+      { x: 6, y: 0, width: 3, height: 2 },
+      { x: 9, y: 0, width: 3, height: 2 },
+    ]);
+    expect(commits.at(-1)?.manual).toEqual({
+      rows: 3,
+      cols: 4,
+      rowBoundaries: [2, 7],
+      columnBoundaries: [2, 6, 9],
+    });
+  });
+
   it("commits crop controls into the same recipe state and resets without a no-op history entry", async () => {
     const commits: SliceGridRecipeStateV1[] = [];
     const { result } = renderHook(() => useSliceGridController(options({

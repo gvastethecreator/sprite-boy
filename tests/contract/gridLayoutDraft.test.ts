@@ -6,6 +6,7 @@ import {
   createGridLayoutDraft,
   serializeGridRecipeLayout,
   setGridLayoutMode,
+  setManualGridBoundary,
   setManualGridLayout,
   validateGridLayoutDraft,
   type GridLayoutValidationResult,
@@ -64,6 +65,43 @@ describe("G2-01 grid layout draft", () => {
     expect(Reflect.ownKeys(manualLayout)).toEqual(["mode", "rows", "cols"]);
     expect(Object.isFrozen(autoLayout)).toBe(true);
     expect(Object.isFrozen(manualLayout)).toBe(true);
+  });
+
+  it("persists independently resized source-pixel dividers without changing legacy uniform recipes", () => {
+    const manual = setGridLayoutMode(createGridLayoutDraft(SOURCE, { rows: 2, cols: 3 }), "manual", SOURCE);
+    if (!manual.ok) throw new Error("Expected manual draft.");
+    const column = setManualGridBoundary(manual.value, "column", 0, 20, SOURCE);
+    if (!column.ok) throw new Error("Expected column divider edit.");
+    const row = setManualGridBoundary(column.value, "row", 0, 10, SOURCE);
+    if (!row.ok) throw new Error("Expected row divider edit.");
+
+    expect(row.value).toEqual({
+      mode: "manual",
+      manual: {
+        rows: 2,
+        cols: 3,
+        rowBoundaries: [10],
+        columnBoundaries: [20, 64],
+      },
+    });
+    expect(serializeGridRecipeLayout(row.value, SOURCE)).toEqual({
+      mode: "manual",
+      rows: 2,
+      cols: 3,
+      rowBoundaries: [10],
+      columnBoundaries: [20, 64],
+    });
+  });
+
+  it("rejects malformed, crossing and out-of-range source-pixel dividers", () => {
+    expect(invalidCodes(validateGridLayoutDraft({
+      mode: "manual",
+      manual: { rows: 2, cols: 3, rowBoundaries: [10], columnBoundaries: [64, 64] },
+    }, SOURCE))).toEqual(["layout.manual.columnBoundaries:invalid-boundaries"]);
+    expect(invalidCodes(validateGridLayoutDraft({
+      mode: "manual",
+      manual: { rows: 2, cols: 3, rowBoundaries: [32], columnBoundaries: [20, 96] },
+    }, SOURCE))).toEqual(["layout.manual.rowBoundaries:invalid-boundaries", "layout.manual.columnBoundaries:invalid-boundaries"]);
   });
 
   it.each([

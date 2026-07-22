@@ -8,8 +8,6 @@ import SettingsModal from "../overlays/SettingsModal";
 import HelpModal from "../overlays/HelpModal";
 import ToastContainer from "../overlays/ToastContainer";
 import CommandPalette from "../overlays/CommandPalette";
-import GenerationModal from "../overlays/GenerationModal";
-import AnalysisModal from "../overlays/AnalysisModal";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { useProject } from "../../contexts/ProjectContext";
 import { useCanonicalProject } from "../../contexts/CanonicalProjectContext";
@@ -180,9 +178,6 @@ const AppLayout: React.FC = () => {
     handleGenerateCode,
     showToast,
     handleDeleteSelection,
-    generationModal,
-    analysisResult,
-    setAnalysisResult,
     handleExportZip,
     handleExportGif,
     handleSetMode,
@@ -283,7 +278,7 @@ const AppLayout: React.FC = () => {
           signal: controller.signal,
         });
         const file = new File([restored.blob], restored.asset.name, { type: restored.asset.mimeType });
-        const snapshot = await selectSourceSessionRef.current(file);
+        const snapshot = await selectSourceSessionRef.current(file, { signal: controller.signal });
         if (snapshot.status !== "ready") throw new Error("The saved source could not be decoded.");
         await handleUploadRef.current(file, { signal: controller.signal });
         if (controller.signal.aborted || sourceImportGenerationRef.current !== generation) return;
@@ -744,6 +739,30 @@ const AppLayout: React.FC = () => {
     setSourceActionError(null);
   }, [cancelSliceCommit, cancelSourceCommit, resetSourceSession]);
 
+  /** Clear the persisted Slice selection while retaining the asset library entry. */
+  const clearCanonicalSliceSourceSelection = useCallback((): boolean => {
+    const selectedAssetId = canonical.store.getSnapshot().project.workspace.selectedAssetId;
+    if (!selectedAssetId) {
+      setCanonicalSliceSourceId(null);
+      return true;
+    }
+    const result = canonical.store.dispatch({
+      command: { type: "workspace.update", patch: { selectedAssetId: undefined } },
+      metadata: {
+        commandId: `slice-source-reset-selection:${selectedAssetId}`,
+        origin: "user",
+        history: "ignore",
+        issuedAt: new Date().toISOString(),
+      },
+    });
+    if (!result.result.ok) {
+      showToast("The Slice source selection could not be cleared.", "error");
+      return false;
+    }
+    setCanonicalSliceSourceId(null);
+    return true;
+  }, [canonical.store, showToast]);
+
   const commandRegistry = useMemo(() => createStudioCommandRegistry({
     newProject: async () => {
       setResetSourceDialogOpen(false);
@@ -1017,24 +1036,26 @@ const AppLayout: React.FC = () => {
   }, [clearSourceWorkflow, handleLoadProject]);
 
   const confirmResetSliceSource = useCallback((): void => {
+    if (!clearCanonicalSliceSourceSelection()) return;
     focusDropzoneAfterResetRef.current = true;
     setResetSourceDialogOpen(false);
     clearSourceWorkflow();
     handleResetSliceSource();
     setStudioError(null);
     navigate("slice");
-  }, [clearSourceWorkflow, handleResetSliceSource, navigate]);
+  }, [clearCanonicalSliceSourceSelection, clearSourceWorkflow, handleResetSliceSource, navigate]);
 
   useEffect(() => {
     if (
       !focusDropzoneAfterResetRef.current || slicerImage ||
-      sourceSessionSnapshot.status !== "idle"
+      sourceSessionSnapshot.status !== "idle" ||
+      activeWorkspace !== "slice" || workspaceState.kind !== "empty"
     ) return;
     const target = dropzoneBrowseButtonRef.current;
     if (!target) return;
     focusDropzoneAfterResetRef.current = false;
     target.focus({ preventScroll: true });
-  }, [slicerImage, sourceSessionSnapshot.status]);
+  }, [activeWorkspace, slicerImage, sourceSessionSnapshot.status, workspaceState.kind]);
 
   const visibleSourceError = sourceActionError ?? (
     sourceSessionSnapshot.status === "error" ? sourceSessionSnapshot.error : null
@@ -1103,12 +1124,10 @@ const AppLayout: React.FC = () => {
       isSettingsOpen ||
       isHelpOpen ||
       exportModal.isOpen ||
-      generationModal.isOpen ||
       isCommandPaletteOpen ||
       isResetSourceDialogOpen ||
       compactPanel !== null ||
-      isJobCenterOpen ||
-      !!analysisResult,
+      isJobCenterOpen,
     activeAnimationId,
   });
 
@@ -1283,6 +1302,8 @@ const AppLayout: React.FC = () => {
                     sliceGridOverlay={{
                       sourceDimensions: sliceGridController.sourceDimensions,
                       effectiveLayout: sliceGridController.effectiveLayout,
+                      onResizeRowBoundary: sliceGridController.setManualRowBoundary,
+                      onResizeColumnBoundary: sliceGridController.setManualColumnBoundary,
                     }}
                   />
                 </SliceSourceCanvasFrame>
@@ -1437,7 +1458,6 @@ const AppLayout: React.FC = () => {
           />
         </React.Suspense>
       ) : null}
-      <GenerationModal />
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -1445,11 +1465,6 @@ const AppLayout: React.FC = () => {
         onUpdatePreferences={setPreferences}
       />
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-      <AnalysisModal
-        isOpen={!!analysisResult}
-        onClose={() => setAnalysisResult(null)}
-        analysisResult={analysisResult}
-      />
     </div>
   );
 };

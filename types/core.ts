@@ -117,5 +117,10 @@ export interface ProjectState {
 export interface SliceGridRecipeStateV1 {
   readonly version: 1;
   readonly recipe: GridSplitRecipeV1;
-  readonly manual: Readonly<{ rows: number; cols: number }>;
+  readonly manual: Readonly<{
+    rows: number;
+    cols: number;
+    rowBoundaries?: readonly number[];
+    columnBoundaries?: readonly number[];
+  }>;
 }

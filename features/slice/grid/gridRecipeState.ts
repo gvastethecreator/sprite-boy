@@ -1,5 +1,8 @@
 import type { GridSplitRecipeV1 } from "../../../core/project";
-import { assertGridRecipeLayout } from "../../../core/processing/gridLayoutValidation";
+import {
+  assertGridLayoutDraft,
+  assertGridRecipeLayout,
+} from "../../../core/processing/gridLayoutValidation";
 import { GRID_PROCESSING_LIMITS } from "../../../core/processing/gridProcessingProtocol";
 import type { GridLayoutDraft, GridLayoutSourceDimensions } from "./gridLayoutDraft";
 import { serializeGridRecipeLayout } from "./gridLayoutDraft";
@@ -133,6 +136,41 @@ function copyRecipe(value: unknown, source: GridLayoutSourceDimensions): GridSpl
   });
 }
 
+function copyManualState(
+  value: unknown,
+  source: GridLayoutSourceDimensions,
+): GridLayoutDraft["manual"] | null {
+  const manual = dataRecord(value, ["rows", "cols"]) ??
+    dataRecord(value, ["rows", "cols", "rowBoundaries", "columnBoundaries"]);
+  if (!manual) return null;
+  try {
+    return assertGridLayoutDraft({ mode: "manual", manual }, source).manual;
+  } catch {
+    return null;
+  }
+}
+
+function sameBoundaries(
+  left: readonly number[] | undefined,
+  right: readonly number[] | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function copyManual(manual: GridLayoutDraft["manual"]): SliceGridRecipeStateV1["manual"] {
+  return Object.freeze({
+    rows: manual.rows,
+    cols: manual.cols,
+    ...(manual.rowBoundaries && manual.columnBoundaries
+      ? {
+          rowBoundaries: Object.freeze([...manual.rowBoundaries]),
+          columnBoundaries: Object.freeze([...manual.columnBoundaries]),
+        }
+      : {}),
+  });
+}
+
 export function createDefaultSliceGridRecipeState(
   sourceAssetId: string,
   source: GridLayoutSourceDimensions,
@@ -165,17 +203,16 @@ export function hydrateSliceGridRecipeState(
   const state = dataRecord(value, ["version", "recipe", "manual"]);
   if (!state || state.version !== 1) return null;
   const recipe = copyRecipe(state.recipe, source);
-  const manual = dataRecord(state.manual, ["rows", "cols"]);
-  if (!recipe || !manual ||
-    !canonicalInteger(manual.rows, 1, source.height) ||
-    !canonicalInteger(manual.cols, 1, source.width) ||
-    manual.rows * manual.cols > GRID_PROCESSING_LIMITS.maxResultCount) return null;
+  const manual = copyManualState(state.manual, source);
+  if (!recipe || !manual) return null;
   if (recipe.layout.mode === "manual" &&
-    (recipe.layout.rows !== manual.rows || recipe.layout.cols !== manual.cols)) return null;
+    (recipe.layout.rows !== manual.rows || recipe.layout.cols !== manual.cols ||
+      !sameBoundaries(recipe.layout.rowBoundaries, manual.rowBoundaries) ||
+      !sameBoundaries(recipe.layout.columnBoundaries, manual.columnBoundaries))) return null;
   return Object.freeze({
     version: 1 as const,
     recipe,
-    manual: Object.freeze({ rows: manual.rows, cols: manual.cols }),
+    manual: copyManual(manual),
   });
 }
 
@@ -192,7 +229,7 @@ export function updateSliceGridRecipeLayout(
   return Object.freeze({
     version: 1 as const,
     recipe: Object.freeze({ ...state.recipe, layout }),
-    manual: Object.freeze({ rows: draft.manual.rows, cols: draft.manual.cols }),
+    manual: copyManual(draft.manual),
   });
 }
 
@@ -273,9 +310,20 @@ export function updateSliceGridRecipePixel(
 }
 
 export function serializeSliceGridRecipeState(state: SliceGridRecipeStateV1): string {
+  const maxBoundary = (value: readonly number[] | undefined): number => value?.at(-1) ?? 0;
   const hydrated = hydrateSliceGridRecipeState(state, {
-    width: Math.max(state.manual.cols, state.recipe.layout.mode === "manual" ? state.recipe.layout.cols : 1),
-    height: Math.max(state.manual.rows, state.recipe.layout.mode === "manual" ? state.recipe.layout.rows : 1),
+    width: Math.max(
+      state.manual.cols,
+      maxBoundary(state.manual.columnBoundaries) + 1,
+      state.recipe.layout.mode === "manual" ? state.recipe.layout.cols : 1,
+      state.recipe.layout.mode === "manual" ? maxBoundary(state.recipe.layout.columnBoundaries) + 1 : 1,
+    ),
+    height: Math.max(
+      state.manual.rows,
+      maxBoundary(state.manual.rowBoundaries) + 1,
+      state.recipe.layout.mode === "manual" ? state.recipe.layout.rows : 1,
+      state.recipe.layout.mode === "manual" ? maxBoundary(state.recipe.layout.rowBoundaries) + 1 : 1,
+    ),
   });
   if (!hydrated) throw new TypeError("Slice grid recipe state is invalid.");
   return JSON.stringify(hydrated);

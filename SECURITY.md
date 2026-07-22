@@ -25,12 +25,12 @@ The following are in scope:
 
 - Code execution via the canvas/image pipelines (e.g. crafted PNG/JSON uploads).
 - Cross-site scripting or content injection in exported files (PNG, JSON, Phaser 3, Godot, ZIP, GIF).
-- Credential or API key leakage. Note: the Gemini API key is requested at runtime and stored only in `sessionStorage`; it is never bundled, committed, or written to disk by the app.
+- Credential or local project-data leakage.
 - Dependency vulnerabilities reported via `bun audit` or GitHub Dependabot.
 
 ## Out of Scope
 
-- Vulnerabilities in third-party services (Google AI Studio, GitHub Pages, etc.).
+- Vulnerabilities in third-party services (GitHub Pages, etc.).
 - Issues that require the user to already have compromised local access.
 
 ## Notes

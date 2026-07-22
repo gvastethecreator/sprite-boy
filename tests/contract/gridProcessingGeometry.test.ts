@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildManualGrid,
+  buildManualGridFromBoundaries,
   calculateReductionRatio,
   getDetectionGeometry,
   getScaledDimensions,
@@ -32,6 +33,31 @@ describe("G1-02 grid processing geometry", () => {
     ]);
     expect(Object.isFrozen(cells)).toBe(true);
     expect(cells.every(Object.isFrozen)).toBe(true);
+  });
+
+  it("uses explicit source-pixel dividers for every row and column", () => {
+    expect(buildManualGridFromBoundaries(
+      12,
+      8,
+      3,
+      3,
+      [2, 7],
+      [3, 9],
+    )).toEqual([
+      { x: 0, y: 0, width: 3, height: 2 },
+      { x: 3, y: 0, width: 6, height: 2 },
+      { x: 9, y: 0, width: 3, height: 2 },
+      { x: 0, y: 2, width: 3, height: 5 },
+      { x: 3, y: 2, width: 6, height: 5 },
+      { x: 9, y: 2, width: 3, height: 5 },
+      { x: 0, y: 7, width: 3, height: 1 },
+      { x: 3, y: 7, width: 6, height: 1 },
+      { x: 9, y: 7, width: 3, height: 1 },
+    ]);
+  });
+
+  it("retains the legacy uniform geometry when dividers are absent", () => {
+    expect(buildManualGridFromBoundaries(7, 5, 2, 3)).toEqual(buildManualGrid(7, 5, 2, 3));
   });
 
   it("covers seeded valid sources exactly without zero cells, gaps, overlap or out-of-bounds geometry", () => {
@@ -127,6 +153,8 @@ describe("G1-02 grid processing geometry", () => {
     expect(() => buildManualGrid(2, 2, 3, 1)).toThrow(TypeError);
     expect(() => buildManualGrid(2, 2, 1, 3)).toThrow(TypeError);
     expect(() => buildManualGrid(100, 100, 65, 65)).toThrow(TypeError);
+    expect(() => buildManualGridFromBoundaries(10, 10, 2, 2, [5], [5, 7])).toThrow(TypeError);
+    expect(() => buildManualGridFromBoundaries(10, 10, 2, 2, [5], [0])).toThrow(TypeError);
     expect(() => calculateReductionRatio(10, 10, 11, 1)).toThrow(TypeError);
     expect(() => calculateReductionRatio(10, 10, 1, 11)).toThrow(TypeError);
     expect(() => getScaledDimensions(10, 10, 4_097)).toThrow(TypeError);

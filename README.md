@@ -5,10 +5,9 @@ A web-based sprite sheet editor, animation sequencer, and sprite composition too
 ## Features
 
 - **Builder Mode** – Compose sprite sheets by placing assets on a grid or freeform canvas
-- **Slicer Tools** – Auto-detect sprites via BFS, grid-based slicing, background removal (chroma/luma key)
+- **Slicer Tools** – Auto-detect sprites via BFS, dynamic manual grids with canvas divider resizing, and background removal (chroma/luma key)
 - **Animation Editor** – Keyframe-based sequencer with real-time preview, onion skinning, and dual-view playback
 - **Collision Editor** – Define hitboxes (hurtbox, hitbox, solid, trigger) per frame
-- **AI Generation** – Gemini 3 Pro/Flash + Imagen 4 integration for sprite generation and variation
 - **Export** – PNG, spritesheet ZIP, GIF, and code export (JSON, Phaser 3, Godot)
 - **Persistent Storage** – IndexedDB-backed asset library with default SVG assets
 
@@ -116,7 +115,7 @@ bun run lint:log    # → logs/lint.log
 │   ├── useKeyboardShortcuts.ts  # Global keyboard handlers
 │   └── domains/
 │       ├── useAnimationLogic.ts # Animation CRUD + playback
-│       ├── useBuilderLogic.ts   # Asset/slot management + AI
+│       ├── useBuilderLogic.ts   # Asset/slot management
 │       └── useSlicerLogic.ts    # Grid slicing + sprite detection
 ├── types/
 │   ├── core.ts             # Domain models (Frame, Animation, etc.)
@@ -127,7 +126,6 @@ bun run lint:log    # → logs/lint.log
 │   ├── algorithms.ts       # Grid generation, sprite detection, BG removal
 │   ├── renderUtils.ts      # CanvasRenderer static class
 │   ├── canvasMath.ts       # Resize handles, snapping, grid math
-│   ├── aiService.ts        # Gemini/Imagen API wrapper
 │   ├── exportFormats.ts    # JSON/Phaser/Godot exporters
 │   ├── db.ts               # IndexedDB persistence
 │   ├── uiFeedback.ts       # Synthesized audio feedback
@@ -137,18 +135,6 @@ bun run lint:log    # → logs/lint.log
 ├── scripts/                # Build/log utilities
 ├── docs/                   # Architecture & design documentation
 └── .vscode/tasks.json      # VS Code task definitions
-```
-
-## Environment Variables
-
-| Variable         | Description                                      |
-| ---------------- | ------------------------------------------------ |
-| `GEMINI_API_KEY` | Google AI Studio API key for generation features |
-
-Create a `.env` file at the project root:
-
-```env
-GEMINI_API_KEY=your_api_key_here
 ```
 
 ## VS Code Tasks

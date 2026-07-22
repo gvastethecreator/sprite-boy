@@ -41,12 +41,59 @@ function requireSourceDimensions(width: number, height: number): GridProcessingD
   return { width: safeWidth, height: safeHeight };
 }
 
-/** Builds exact source-space cells in row-major order. Last row/column absorb integer remainder. */
-export function buildManualGrid(
+/** Returns internal dividers for the legacy uniform grid layout. */
+export function createUniformGridBoundaries(
+  totalLength: number,
+  segments: number,
+): readonly number[] {
+  const safeLength = requireInteger(totalLength, 1, GRID_PROCESSING_LIMITS.maxDimension, "totalLength");
+  const safeSegments = requireInteger(segments, 1, GRID_PROCESSING_LIMITS.maxResultCount, "segments");
+  if (safeSegments > safeLength) {
+    throw new TypeError("Grid segments cannot create zero-sized cells.");
+  }
+  const cellLength = Math.floor(safeLength / safeSegments);
+  const boundaries = Array.from(
+    { length: safeSegments - 1 },
+    (_, index) => (index + 1) * cellLength,
+  );
+  return Object.freeze(boundaries);
+}
+
+function resolveGridBoundaries(
+  totalLength: number,
+  segments: number,
+  value: readonly number[] | undefined,
+  label: string,
+): readonly number[] {
+  const fallback = createUniformGridBoundaries(totalLength, segments);
+  if (value === undefined) return fallback;
+  if (!Array.isArray(value) || value.length !== segments - 1) {
+    throw new TypeError(`${label} must contain one divider for each internal grid edge.`);
+  }
+  const boundaries: number[] = [];
+  let previous = 0;
+  for (const boundary of value) {
+    const safeBoundary = requireInteger(boundary, 1, totalLength - 1, label);
+    if (safeBoundary <= previous) {
+      throw new TypeError(`${label} must be strictly increasing.`);
+    }
+    boundaries.push(safeBoundary);
+    previous = safeBoundary;
+  }
+  return Object.freeze(boundaries);
+}
+
+/**
+ * Builds source-space cells from optional internal dividers. Missing dividers
+ * retain the prior equal-size grid behavior for stored legacy recipes.
+ */
+export function buildManualGridFromBoundaries(
   totalWidth: number,
   totalHeight: number,
   rows: number,
   cols: number,
+  rowBoundaries?: readonly number[],
+  columnBoundaries?: readonly number[],
 ): readonly GridProcessingRectV1[] {
   const dimensions = requireSourceDimensions(totalWidth, totalHeight);
   const safeRows = requireInteger(rows, 1, GRID_PROCESSING_LIMITS.maxResultCount, "rows");
@@ -59,23 +106,41 @@ export function buildManualGrid(
     throw new TypeError("Grid rows and columns cannot create zero-sized or excessive cells.");
   }
 
-  const cellWidth = Math.floor(dimensions.width / safeCols);
-  const cellHeight = Math.floor(dimensions.height / safeRows);
+  const verticalEdges = Object.freeze([
+    0,
+    ...resolveGridBoundaries(dimensions.width, safeCols, columnBoundaries, "columnBoundaries"),
+    dimensions.width,
+  ]);
+  const horizontalEdges = Object.freeze([
+    0,
+    ...resolveGridBoundaries(dimensions.height, safeRows, rowBoundaries, "rowBoundaries"),
+    dimensions.height,
+  ]);
   const cells: GridProcessingRectV1[] = [];
   for (let row = 0; row < safeRows; row += 1) {
-    const y = row * cellHeight;
-    const height = row === safeRows - 1 ? dimensions.height - y : cellHeight;
+    const y = horizontalEdges[row]!;
+    const height = horizontalEdges[row + 1]! - y;
     for (let column = 0; column < safeCols; column += 1) {
-      const x = column * cellWidth;
+      const x = verticalEdges[column]!;
       cells.push(Object.freeze({
         x,
         y,
-        width: column === safeCols - 1 ? dimensions.width - x : cellWidth,
+        width: verticalEdges[column + 1]! - x,
         height,
       }));
     }
   }
   return Object.freeze(cells);
+}
+
+/** Builds exact source-space cells in row-major order. Last row/column absorb integer remainder. */
+export function buildManualGrid(
+  totalWidth: number,
+  totalHeight: number,
+  rows: number,
+  cols: number,
+): readonly GridProcessingRectV1[] {
+  return buildManualGridFromBoundaries(totalWidth, totalHeight, rows, cols);
 }
 
 /** Scales so the longest output side equals maxSide. Pixel-stage use may intentionally upscale. */

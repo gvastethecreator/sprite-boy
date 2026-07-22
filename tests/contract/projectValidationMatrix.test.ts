@@ -263,6 +263,29 @@ describe("StudioProjectV1 hostile validation matrix", () => {
     record(auto.processingRecipes["recipe-grid"]).layout = { mode: "auto" };
     expect(validateStudioProject(auto).valid).toBe(true);
 
+    const customDividers = cloneFixture();
+    record(customDividers.processingRecipes["recipe-grid"]).layout = {
+      mode: "manual",
+      rows: 2,
+      cols: 3,
+      rowBoundaries: [10],
+      columnBoundaries: [20, 40],
+    };
+    expect(validateStudioProject(customDividers).valid).toBe(true);
+
+    const crossingDividers = cloneFixture();
+    record(crossingDividers.processingRecipes["recipe-grid"]).layout = {
+      mode: "manual",
+      rows: 2,
+      cols: 3,
+      rowBoundaries: [10],
+      columnBoundaries: [20, 20],
+    };
+    expectDiagnostics(crossingDividers, [[
+      "INVALID_NUMBER",
+      "$.processingRecipes.recipe-grid.layout.columnBoundaries[1]",
+    ]]);
+
     const malformed = cloneFixture();
     const malformedRecipe = record(malformed.processingRecipes["recipe-grid"]);
     malformedRecipe.layout = { mode: "runtime" };

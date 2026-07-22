@@ -141,6 +141,26 @@ function freezeRect(value: GridProcessingRectV1, label: string): GridProcessingR
   return Object.freeze({ x: value.x, y: value.y, width: value.width, height: value.height });
 }
 
+function cloneBoundaries(
+  value: unknown,
+  expectedLength: number,
+  label: string,
+): readonly number[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length !== expectedLength) {
+    throw invalid(`${label} has an invalid divider count.`);
+  }
+  const boundaries: number[] = [];
+  let previous = 0;
+  for (const boundary of value) {
+    assertPositiveInteger(boundary, label);
+    if (boundary <= previous) throw invalid(`${label} must be strictly increasing.`);
+    boundaries.push(boundary);
+    previous = boundary;
+  }
+  return Object.freeze(boundaries);
+}
+
 function cloneRecipe(recipe: GridSplitRecipeV1): Readonly<GridSplitRecipeV1> {
   if (!isRecord(recipe) || recipe.kind !== "grid-split" || recipe.version !== 1) {
     throw invalid("recipe shape is unsupported.");
@@ -157,7 +177,25 @@ function cloneRecipe(recipe: GridSplitRecipeV1): Readonly<GridSplitRecipeV1> {
     : (() => {
         assertPositiveInteger(layout.rows, "recipe.layout.rows");
         assertPositiveInteger(layout.cols, "recipe.layout.cols");
-        return Object.freeze({ mode: "manual" as const, rows: layout.rows, cols: layout.cols });
+        const rowBoundaries = cloneBoundaries(
+          layout.rowBoundaries,
+          layout.rows - 1,
+          "recipe.layout.rowBoundaries",
+        );
+        const columnBoundaries = cloneBoundaries(
+          layout.columnBoundaries,
+          layout.cols - 1,
+          "recipe.layout.columnBoundaries",
+        );
+        if ((rowBoundaries === undefined) !== (columnBoundaries === undefined)) {
+          throw invalid("recipe.layout dividers must be provided together.");
+        }
+        return Object.freeze({
+          mode: "manual" as const,
+          rows: layout.rows,
+          cols: layout.cols,
+          ...(rowBoundaries && columnBoundaries ? { rowBoundaries, columnBoundaries } : {}),
+        });
       })();
   if (!isRecord(recipe.crop) || typeof recipe.crop.threshold !== "number" ||
     !Number.isFinite(recipe.crop.threshold) || recipe.crop.threshold < 0 || recipe.crop.threshold > 100) {

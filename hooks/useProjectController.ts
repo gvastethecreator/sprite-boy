@@ -19,7 +19,6 @@ import { useBuilderLogic, DEFAULT_SLOT_DATA, RATIO_PRESETS } from "./domains/use
 import { useExportLogic } from "./domains/useExportLogic";
 import { usePersistence } from "./domains/usePersistence";
 import { getAllAssets } from "../utils/db";
-import { analyzeImageBlob } from "../utils/lazyFeatureModules";
 
 const INITIAL_STATE: ProjectState = {
   imageMeta: null,
@@ -646,18 +645,6 @@ export function useProjectController() {
     notify("Frame removed", "info");
   };
 
-  const handleAnalyzeSheet = async (blob: Blob) => {
-    ui.setIsLoading(true);
-    ui.setLoadingMessage("Gemini analysis...");
-    try {
-      ui.setAnalysisResult(await analyzeImageBlob(blob));
-    } catch {
-      notify("Analysis failed", "error");
-    } finally {
-      ui.setIsLoading(false);
-    }
-  };
-
   const handlePreviewBackground = (color: string, tolerance: number, softness: number) => {
     cancelLegacyBackgroundOperations();
     const operation = new AbortController();
@@ -702,48 +689,6 @@ export function useProjectController() {
     });
   };
 
-  const handleRunAIProjectGen = async () => {
-    const contextImages = ui.genPanel.contextSlots
-      .filter((s) => s !== null)
-      .map((s) => s!.previewSrc);
-
-    await builderLogic.runGeneration(
-      ui.genPanel.prompt,
-      contextImages,
-      null,
-      setSelectedIndex,
-      ui.genPanel.model,
-      ui.genPanel.mode,
-    );
-  };
-
-  const handleDropContextToAI = (idx: number, type: "asset" | "keyframe" | "frame", id: string) => {
-    let src = "";
-    if (type === "asset") {
-      src = project.builderAssets.find((a) => a.id === id)?.src || "";
-    } else if (type === "frame") {
-      const frame = project.frames.find((f) => f.id === parseInt(id));
-      if (frame && project.imageMeta) src = project.imageMeta.src;
-    } else {
-      const anim = project.animations.find((a) => a.keyframes.some((kf) => kf.uid === id));
-      if (anim) {
-        const kf = anim.keyframes.find((kf) => kf.uid === id);
-        if (kf && project.imageMeta) src = project.imageMeta.src;
-      }
-    }
-    if (src) {
-      const newContext = [...ui.genPanel.contextSlots];
-      newContext[idx] = { id: idx, type, dataId: id, previewSrc: src };
-      ui.setGenPanel({ ...ui.genPanel, contextSlots: newContext });
-    }
-  };
-
-  const handleClearAIContext = (idx: number) => {
-    const newContext = [...ui.genPanel.contextSlots];
-    newContext[idx] = null;
-    ui.setGenPanel({ ...ui.genPanel, contextSlots: newContext });
-  };
-
   const setBuilderCanvas = (size: BuilderCanvasSize | null) => {
     setProject((prev) => ({ ...prev, builderCanvas: size }));
   };
@@ -757,27 +702,6 @@ export function useProjectController() {
       const frame = project.frames[selectedIndex];
       if (frame) handleDeleteFrame(frame.id);
     }
-  };
-
-  const handleGenerateSlot = (
-    slotIndex: number,
-    prompt: string,
-    _contextType: string,
-    contextAssetId?: string,
-  ) => {
-    const contextImages: string[] = [];
-    if (contextAssetId) {
-      const asset = project.builderAssets.find((a) => a.id === contextAssetId);
-      if (asset) contextImages.push(asset.src);
-    }
-    builderLogic.runGeneration(
-      prompt,
-      contextImages,
-      slotIndex,
-      setSelectedIndex,
-      ui.genPanel.model,
-      ui.genPanel.mode,
-    );
   };
 
   const initializeSliceGridState = useCallback((state: NonNullable<ProjectState["sliceGrid"]>) => {
@@ -847,7 +771,6 @@ export function useProjectController() {
     handleRemoveBackground,
     handlePreviewBackground,
     handleCancelPreview,
-    handleAnalyzeSheet,
     handleExportZip: exportLogic.handleExportZip,
     handleExportGif: exportLogic.handleExportGif,
     handleDeleteFrame,
@@ -861,12 +784,8 @@ export function useProjectController() {
         builderLogic.handleUpdateSlot(idx, data);
       }
     },
-    handleRunAIProjectGen,
-    handleDropContextToAI,
-    handleClearAIContext,
     setBuilderCanvas,
     handleDeleteSelection,
     handleGenerateCode: exportLogic.handleGenerateCode,
-    handleGenerateSlot,
   };
 }

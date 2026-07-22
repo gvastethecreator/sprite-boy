@@ -2,8 +2,6 @@ import {
   ProjectState,
   SlotData,
   UserPreferences,
-  AIModelId,
-  AIGenerationMode,
   BuilderAsset,
 } from "../../types";
 import { cropImage } from "../../utils/algorithms";
@@ -43,7 +41,7 @@ export const DEFAULT_SLOT_DATA = (idx: number, assetId: string): SlotData => ({
   flipY: false,
 });
 
-/** Builder mode: canvas CRUD, slot management, asset library, AI generation. */
+/** Builder mode: canvas CRUD, slot management and asset library. */
 export function useBuilderLogic(
   project: ProjectState,
   setProject: (cb: (prev: ProjectState) => ProjectState) => void,
@@ -169,50 +167,6 @@ export function useBuilderLogic(
     }
   };
 
-  const runGeneration = async (
-    prompt: string,
-    contextImages: string[],
-    targetSlotIdx: number | null,
-    setSelectedIndex: (n: number) => void,
-    model: AIModelId,
-    mode: AIGenerationMode,
-  ) => {
-    setIsLoading(true);
-    setLoadingMessage("AI Generating...");
-    try {
-      const { generateSprite } = await import("../../utils/aiService");
-      const newDataUrl = await generateSprite(contextImages, prompt, model, mode);
-      const blob = dataURIToBlob(newDataUrl);
-      const newId = generateId();
-      const assetMetadata = { name: `AI: ${prompt.substring(0, 10)}...`, width: 100, height: 100 };
-
-      await addAsset(assetMetadata, newId, blob);
-
-      const newAsset: BuilderAsset = {
-        ...assetMetadata,
-        id: newId,
-        src: URL.createObjectURL(blob),
-      };
-
-      setProject((prev) => ({
-        ...prev,
-        builderAssets: [...prev.builderAssets, newAsset],
-      }));
-
-      if (targetSlotIdx !== null) {
-        handleUpdateSlot(targetSlotIdx, DEFAULT_SLOT_DATA(targetSlotIdx, newId));
-        setSelectedIndex(targetSlotIdx);
-      }
-      showToast("Generation complete", "success");
-      if (preferences.soundEnabled) uiFeedback.play("success");
-    } catch (e: any) {
-      showToast("Gen error: " + (e.message || "Unknown"), "error");
-    } finally {
-      setIsLoading(false);
-      setLoadingMessage("");
-    }
-  };
-
   const handleSmartFillSlot = (
     slotIndex: number,
     gridCols: number,
@@ -232,7 +186,6 @@ export function useBuilderLogic(
     handleUpdateSlot,
     handleUpdateSlotEphemeral,
     handleFrameToAsset,
-    runGeneration,
     handleSmartFillSlot,
     handleSwapSlots,
   };

@@ -1,9 +1,11 @@
 import type { GridSplitRecipeV1 } from "../../../core/project";
+import { createUniformGridBoundaries } from "../../../core/processing/gridProcessingGeometry";
 import {
   assertGridLayoutDraft,
   type GridLayoutDraft,
   type GridLayoutValidationResult,
   validateGridLayoutDraft,
+  validateGridLayoutSource,
 } from "../../../core/processing/gridLayoutValidation";
 
 export {
@@ -47,6 +49,41 @@ export function setManualGridLayout(
   return validateGridLayoutDraft({ mode: current.value.mode, manual }, source);
 }
 
+export type GridManualBoundaryAxis = "row" | "column";
+
+/**
+ * Updates one internal manual divider in source pixels. A legacy uniform
+ * layout gains explicit dividers only when the user first resizes it.
+ */
+export function setManualGridBoundary(
+  value: unknown,
+  axis: GridManualBoundaryAxis,
+  index: number,
+  boundary: number,
+  source: unknown,
+): GridLayoutValidationResult {
+  const current = validateGridLayoutDraft(value, source);
+  if (!current.ok) return current;
+  const sourceResult = validateGridLayoutSource(source);
+  if (!sourceResult.ok) return sourceResult;
+
+  const rows = current.value.manual.rows;
+  const cols = current.value.manual.cols;
+  const rowBoundaries = current.value.manual.rowBoundaries
+    ? [...current.value.manual.rowBoundaries]
+    : [...createUniformGridBoundaries(sourceResult.value.height, rows)];
+  const columnBoundaries = current.value.manual.columnBoundaries
+    ? [...current.value.manual.columnBoundaries]
+    : [...createUniformGridBoundaries(sourceResult.value.width, cols)];
+  const target = axis === "row" ? rowBoundaries : columnBoundaries;
+  if (!Number.isSafeInteger(index) || index < 0 || index >= target.length) return current;
+  target[index] = boundary;
+  return validateGridLayoutDraft({
+    mode: current.value.mode,
+    manual: { rows, cols, rowBoundaries, columnBoundaries },
+  }, source);
+}
+
 /** Exact GridSplitRecipeV1 layout payload consumed by processing workers. */
 export function serializeGridRecipeLayout(
   value: unknown,
@@ -55,5 +92,15 @@ export function serializeGridRecipeLayout(
   const draft = assertGridLayoutDraft(value, source);
   return draft.mode === "auto"
     ? Object.freeze({ mode: "auto" as const })
-    : Object.freeze({ mode: "manual" as const, rows: draft.manual.rows, cols: draft.manual.cols });
+    : Object.freeze({
+        mode: "manual" as const,
+        rows: draft.manual.rows,
+        cols: draft.manual.cols,
+        ...(draft.manual.rowBoundaries && draft.manual.columnBoundaries
+          ? {
+              rowBoundaries: Object.freeze([...draft.manual.rowBoundaries]),
+              columnBoundaries: Object.freeze([...draft.manual.columnBoundaries]),
+            }
+          : {}),
+      });
 }

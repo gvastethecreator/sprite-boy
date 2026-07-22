@@ -5,6 +5,10 @@ export type GridLayoutMode = "auto" | "manual";
 export interface GridManualLayoutDraft {
   readonly rows: number;
   readonly cols: number;
+  /** Optional internal source-pixel dividers. Omitted values retain the legacy uniform layout. */
+  readonly rowBoundaries?: readonly number[];
+  /** Optional internal source-pixel dividers. Omitted values retain the legacy uniform layout. */
+  readonly columnBoundaries?: readonly number[];
 }
 
 /** UI state retains the manual selection even while automatic detection is active. */
@@ -20,7 +24,13 @@ export interface GridLayoutSourceDimensions {
 
 export type GridRecipeLayoutV1 =
   | { readonly mode: "auto" }
-  | { readonly mode: "manual"; readonly rows: number; readonly cols: number };
+  | {
+      readonly mode: "manual";
+      readonly rows: number;
+      readonly cols: number;
+      readonly rowBoundaries?: readonly number[];
+      readonly columnBoundaries?: readonly number[];
+    };
 
 export type GridLayoutValidationPath =
   | "source"
@@ -30,13 +40,16 @@ export type GridLayoutValidationPath =
   | "layout.mode"
   | "layout.manual"
   | "layout.manual.rows"
-  | "layout.manual.cols";
+  | "layout.manual.cols"
+  | "layout.manual.rowBoundaries"
+  | "layout.manual.columnBoundaries";
 
 export type GridLayoutValidationCode =
   | "invalid-object"
   | "invalid-keys"
   | "invalid-mode"
   | "invalid-integer"
+  | "invalid-boundaries"
   | "source-pixel-limit"
   | "exceeds-source"
   | "result-count-limit";
@@ -62,6 +75,12 @@ type DataRecord = Record<string, unknown>;
 const EXPECTED_SOURCE_KEYS = Object.freeze(["width", "height"] as const);
 const EXPECTED_LAYOUT_KEYS = Object.freeze(["mode", "manual"] as const);
 const EXPECTED_MANUAL_KEYS = Object.freeze(["rows", "cols"] as const);
+const EXPECTED_MANUAL_BOUNDARY_KEYS = Object.freeze([
+  "rows",
+  "cols",
+  "rowBoundaries",
+  "columnBoundaries",
+] as const);
 
 function issue(
   code: GridLayoutValidationCode,
@@ -147,6 +166,39 @@ function isCanonicalInteger(value: unknown, minimum: number, maximum: number): v
     && value <= maximum;
 }
 
+function hasManualKeys(record: DataRecord): boolean {
+  return hasExactKeys(record, EXPECTED_MANUAL_KEYS) ||
+    hasExactKeys(record, EXPECTED_MANUAL_BOUNDARY_KEYS);
+}
+
+function readBoundaryArray(
+  value: unknown,
+  count: number,
+  limit: number,
+  path: "layout.manual.rowBoundaries" | "layout.manual.columnBoundaries",
+): { readonly value: readonly number[] } | { readonly issue: GridLayoutValidationIssue } {
+  try {
+    if (!Array.isArray(value) || Reflect.ownKeys(value).length !== count + 1) {
+      return { issue: issue("invalid-boundaries", path, "Grid dividers must be a dense numeric array.") };
+    }
+    const boundaries: number[] = [];
+    let previous = 0;
+    for (let index = 0; index < count; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      const boundary = descriptor && "value" in descriptor ? descriptor.value : undefined;
+      if (!descriptor?.enumerable || !("value" in descriptor) ||
+        !isCanonicalInteger(boundary, 1, limit - 1) || boundary <= previous) {
+        return { issue: issue("invalid-boundaries", path, "Grid dividers must be increasing source pixels.") };
+      }
+      boundaries.push(boundary);
+      previous = boundary;
+    }
+    return { value: Object.freeze(boundaries) };
+  } catch {
+    return { issue: issue("invalid-boundaries", path, "Grid dividers must be a dense numeric array.") };
+  }
+}
+
 export function validateGridLayoutSource(
   value: unknown,
 ): { readonly ok: true; readonly value: GridLayoutSourceDimensions }
@@ -202,8 +254,8 @@ export function validateGridLayoutDraft(value: unknown, sourceValue: unknown): G
   if (!manual) return invalidResult(...issues, issue(
     "invalid-object", "layout.manual", "Manual grid values must be a plain data object.",
   ));
-  if (!hasExactKeys(manual, EXPECTED_MANUAL_KEYS)) return invalidResult(...issues, issue(
-    "invalid-keys", "layout.manual", "Manual grid values must contain only rows and columns.",
+  if (!hasManualKeys(manual)) return invalidResult(...issues, issue(
+    "invalid-keys", "layout.manual", "Manual grid values must contain rows, columns, and paired dividers.",
   ));
 
   if (!isCanonicalInteger(manual.rows, 1, GRID_PROCESSING_LIMITS.maxResultCount)) {
@@ -223,13 +275,42 @@ export function validateGridLayoutDraft(value: unknown, sourceValue: unknown): G
   }
   if (issues.length > 0) return invalidResult(...issues);
 
+  let rowBoundaries: readonly number[] | undefined;
+  let columnBoundaries: readonly number[] | undefined;
+  if (Object.prototype.hasOwnProperty.call(manual, "rowBoundaries")) {
+    const rowsResult = readBoundaryArray(
+      manual.rowBoundaries,
+      rows - 1,
+      source.value.height,
+      "layout.manual.rowBoundaries",
+    );
+    const columnsResult = readBoundaryArray(
+      manual.columnBoundaries,
+      cols - 1,
+      source.value.width,
+      "layout.manual.columnBoundaries",
+    );
+    if ("issue" in rowsResult) issues.push(rowsResult.issue);
+    else rowBoundaries = rowsResult.value;
+    if ("issue" in columnsResult) issues.push(columnsResult.issue);
+    else columnBoundaries = columnsResult.value;
+  }
+  if (issues.length > 0) return invalidResult(...issues);
+
   if (!isDataCloneSafe(value)) return invalidResult(issue(
     "invalid-object", "layout", "Grid layout must be a plain data object.",
   ));
 
   return Object.freeze({
     ok: true as const,
-    value: Object.freeze({ mode: layout.mode as GridLayoutMode, manual: Object.freeze({ rows, cols }) }),
+    value: Object.freeze({
+      mode: layout.mode as GridLayoutMode,
+      manual: Object.freeze({
+        rows,
+        cols,
+        ...(rowBoundaries && columnBoundaries ? { rowBoundaries, columnBoundaries } : {}),
+      }),
+    }),
   });
 }
 
@@ -252,13 +333,34 @@ export function assertGridRecipeLayout(value: unknown, source: unknown): GridRec
     assertGridLayoutDraft({ mode: "auto", manual: { rows: 1, cols: 1 } }, source);
     return Object.freeze({ mode: "auto" as const });
   }
-  if (layout.mode === "manual" && hasExactKeys(layout, ["mode", "rows", "cols"])) {
+  if (layout.mode === "manual" &&
+    (hasExactKeys(layout, ["mode", "rows", "cols"]) ||
+      hasExactKeys(layout, ["mode", "rows", "cols", "rowBoundaries", "columnBoundaries"]))) {
     if (!isDataCloneSafe(value)) throw new TypeError("Invalid grid recipe layout.");
     const draft = assertGridLayoutDraft(
-      { mode: "manual", manual: { rows: layout.rows, cols: layout.cols } },
+      {
+        mode: "manual",
+        manual: {
+          rows: layout.rows,
+          cols: layout.cols,
+          ...(Object.prototype.hasOwnProperty.call(layout, "rowBoundaries")
+            ? { rowBoundaries: layout.rowBoundaries, columnBoundaries: layout.columnBoundaries }
+            : {}),
+        },
+      },
       source,
     );
-    return Object.freeze({ mode: "manual" as const, rows: draft.manual.rows, cols: draft.manual.cols });
+    return Object.freeze({
+      mode: "manual" as const,
+      rows: draft.manual.rows,
+      cols: draft.manual.cols,
+      ...(draft.manual.rowBoundaries && draft.manual.columnBoundaries
+        ? {
+            rowBoundaries: Object.freeze([...draft.manual.rowBoundaries]),
+            columnBoundaries: Object.freeze([...draft.manual.columnBoundaries]),
+          }
+        : {}),
+    });
   }
   throw new TypeError("Invalid grid recipe layout.");
 }

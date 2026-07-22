@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { AppMode } from "../../types";
 import {
   Monitor,
@@ -10,12 +10,10 @@ import {
   Layers,
   Film,
   CheckCircle2,
-  Sparkles,
 } from "lucide-react";
 import SlicerTools from "../panels/left/SlicerTools";
 import BgRemovalTool from "../panels/left/BgRemovalTool";
 import AnimationList from "../panels/left/AnimationList";
-import GenerationPanel from "../panels/right/GenerationPanel";
 import NumberControl from "../common/NumberControl";
 import { useProject } from "../../contexts/ProjectContext";
 
@@ -179,41 +177,19 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace, irregularTool
     handlePreviewBackground,
     handleCancelPreview,
     isPreviewActive,
-    handleDropContextToAI,
-    handleClearAIContext,
-    handleRunAIProjectGen,
     isEyedropperActive,
     setIsEyedropperActive,
     eyedropperColor,
-    genPanel,
-    setGenPanel,
   } = useProject();
 
-  const [leftActiveTab, setLeftActiveTab] = useState<"tools" | "ai">("tools");
   const hasWorkspace = !!builderCanvas || !!slicerImage;
   const hasSourceImage = !!slicerImage;
   const selectedFrame = selectedIndex !== null ? frames[selectedIndex] : null;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="flex items-center gap-1 p-1 bg-white/5 border-b border-white/5">
-        <button
-          onClick={() => setLeftActiveTab("tools")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded text-[10px] font-bold uppercase transition-all ${leftActiveTab === "tools" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}
-        >
-          <Monitor size={12} /> Tools
-        </button>
-        <button
-          onClick={() => setLeftActiveTab("ai")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded text-[10px] font-bold uppercase transition-all ${leftActiveTab === "ai" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}
-        >
-          <Sparkles size={12} /> AI Creator
-        </button>
-      </div>
-
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {leftActiveTab === "tools" ? (
-          !hasWorkspace ? (
+        {!hasWorkspace ? (
             <div className="p-4 animate-fade-in">
               <div className="bg-accent/10 border border-accent/20 p-6 rounded-xl text-center space-y-3">
                 <PlusSquare size={32} className="mx-auto text-accent opacity-50" />
@@ -224,7 +200,7 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace, irregularTool
                 </p>
               </div>
             </div>
-          ) : (
+        ) : (
             <>
               <SlicerTools
                 currentMode={currentMode}
@@ -258,17 +234,6 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace, irregularTool
                 hasImage={hasSourceImage}
               />
             </>
-          )
-        ) : (
-          <div className="animate-fade-in h-full">
-            <GenerationPanel
-              state={genPanel}
-              setState={setGenPanel}
-              onDrop={handleDropContextToAI}
-              onClear={handleClearAIContext}
-              onRun={handleRunAIProjectGen}
-            />
-          </div>
         )}
       </div>
     </div>

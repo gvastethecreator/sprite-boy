@@ -85,8 +85,6 @@ export interface RightSidebarProps {
   setOnionSkin?: (config: OnionSkinConfig) => void;
   templateConfig?: TemplateConfig;
   setTemplateConfig?: (config: TemplateConfig) => void;
-  genPanel?: GenerationPanelState;
-  setGenPanel?: (state: GenerationPanelState) => void;
   currentAspectRatio?: string;
   onSetAspectRatio?: (ratio: string) => void;
 }
@@ -103,37 +101,6 @@ export interface ExportModalState {
   isOpen: boolean;
   type: ExportType;
   animationId?: string;
-}
-
-export interface GenerationModalState {
-  isOpen: boolean;
-  targetSlotIndex: number | null;
-  contextAssetId?: string;
-}
-
-export interface GenerationContextSlot {
-  id: number;
-  type: "asset" | "keyframe" | "slot" | "frame";
-  dataId: string;
-  previewSrc: string;
-}
-
-export type AIModelId =
-  | "gemini-3-pro-image-preview"
-  | "gemini-2.5-flash-image"
-  | "imagen-4.0-generate-001";
-export type AIGenerationMode =
-  | "new_image"
-  | "variation"
-  | "inbetween"
-  | "edit_context"
-  | "full_sheet";
-
-export interface GenerationPanelState {
-  model: AIModelId;
-  prompt: string;
-  mode: AIGenerationMode;
-  contextSlots: (GenerationContextSlot | null)[];
 }
 
 export interface ToastData {

@@ -148,36 +148,26 @@ describe("initial bundle policy", () => {
       release: { initialJsGzipBytes: 180_000 },
     });
     expect(Object.keys(DEFERRED_FEATURE_CHUNK_PATTERNS)).toEqual([
-      "ai",
       "gif",
-      "zip",
       "exportModal",
     ]);
     expect(validateDeferredFeatureChunks([
       "index-A.js",
-      "aiService-B.js",
       "gifshot-C.js",
-      "jszip.min-D.js",
       "ExportModal-E.js",
     ], ["/assets/index-A.js"])).toEqual([
-      { feature: "ai", path: "/assets/aiService-B.js" },
       { feature: "gif", path: "/assets/gifshot-C.js" },
-      { feature: "zip", path: "/assets/jszip.min-D.js" },
       { feature: "exportModal", path: "/assets/ExportModal-E.js" },
     ]);
     expect(() => validateDeferredFeatureChunks([
       "index-A.js",
-      "aiService-B.js",
       "gifshot-C.js",
-      "jszip.min-D.js",
     ], ["/assets/index-A.js"])).toThrow(/boundary/);
     expect(() => validateDeferredFeatureChunks([
       "index-A.js",
-      "aiService-B.js",
       "gifshot-C.js",
-      "jszip.min-D.js",
       "ExportModal-E.js",
-    ], ["/assets/index-A.js", "/assets/aiService-B.js"])).toThrow(/boundary/);
+    ], ["/assets/index-A.js", "/assets/gifshot-C.js"])).toThrow(/boundary/);
     expect(evaluateBundleEvidence({
       initialChunkCount: 1,
       initialJsBytes: 529_204,
@@ -213,9 +203,7 @@ describe("initial bundle policy", () => {
     });
     const assetNames = [
       "index-A.js",
-      "aiService-B.js",
       "gifshot-C.js",
-      "jszip.min-D.js",
       "ExportModal-E.js",
     ];
     expect(runBundleCheck("ratchet", {
@@ -228,7 +216,7 @@ describe("initial bundle policy", () => {
         initialChunkCount: 1,
         initialJsBytes: 15,
         initialJsGzipBytes: 100,
-        deferredFeatureChunkCount: 4,
+        deferredFeatureChunkCount: 2,
       },
     });
     expect(spawn).toHaveBeenCalledWith(

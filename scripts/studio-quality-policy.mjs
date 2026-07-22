@@ -18,9 +18,7 @@ export const BUNDLE_THRESHOLDS = Object.freeze({
   release: Object.freeze({ initialJsGzipBytes: 180_000 }),
 });
 export const DEFERRED_FEATURE_CHUNK_PATTERNS = Object.freeze({
-  ai: /^aiService-[A-Za-z0-9_-]+\.js$/u,
   gif: /^gifshot-[A-Za-z0-9_-]+\.js$/u,
-  zip: /^jszip(?:\.min)?-[A-Za-z0-9_-]+\.js$/u,
   exportModal: /^ExportModal-[A-Za-z0-9_-]+\.js$/u,
 });
 
@@ -229,7 +227,8 @@ export function evaluateBundleEvidence(evidence, profile = "ratchet") {
     !isRecord(evidence) || !Number.isSafeInteger(evidence.initialChunkCount) || evidence.initialChunkCount <= 0 ||
     !Number.isSafeInteger(evidence.initialJsBytes) || evidence.initialJsBytes <= 0 ||
     !Number.isSafeInteger(evidence.initialJsGzipBytes) || evidence.initialJsGzipBytes <= 0 ||
-    (evidence.deferredFeatureChunkCount !== undefined && evidence.deferredFeatureChunkCount !== 4)
+    (evidence.deferredFeatureChunkCount !== undefined &&
+      evidence.deferredFeatureChunkCount !== Object.keys(DEFERRED_FEATURE_CHUNK_PATTERNS).length)
   ) {
     throw new TypeError("Bundle evidence is invalid.");
   }

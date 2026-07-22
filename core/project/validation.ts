@@ -803,7 +803,17 @@ function validateRecipe(
   if (!isRecord(item.layout)) {
     push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "layout"), "Recipe layout is required.", id);
   } else if (item.layout.mode === "manual") {
-    validateAllowedKeys(item.layout, ["mode", "rows", "cols"], pathFor(path, "layout"), diagnostics, id);
+    const hasRowBoundaries = Object.prototype.hasOwnProperty.call(item.layout, "rowBoundaries");
+    const hasColumnBoundaries = Object.prototype.hasOwnProperty.call(item.layout, "columnBoundaries");
+    validateAllowedKeys(
+      item.layout,
+      hasRowBoundaries || hasColumnBoundaries
+        ? ["mode", "rows", "cols", "rowBoundaries", "columnBoundaries"]
+        : ["mode", "rows", "cols"],
+      pathFor(path, "layout"),
+      diagnostics,
+      id,
+    );
     const counts: number[] = [];
     for (const key of ["rows", "cols"] as const) {
       const value = item.layout[key];
@@ -830,6 +840,43 @@ function validateRecipe(
         `Grid cells must not exceed ${GRID_PROCESSING_LIMITS.maxResultCount}.`,
         id,
       );
+    }
+    if (hasRowBoundaries !== hasColumnBoundaries) {
+      push(
+        diagnostics,
+        "INVALID_DOCUMENT",
+        pathFor(path, "layout"),
+        "Row and column dividers must be provided together.",
+        id,
+      );
+    } else if (hasRowBoundaries && counts.length === 2) {
+      const validateBoundaries = (
+        value: unknown,
+        expectedLength: number,
+        key: "rowBoundaries" | "columnBoundaries",
+      ): void => {
+        const dividerPath = pathFor(pathFor(path, "layout"), key);
+        if (!Array.isArray(value) || value.length !== expectedLength) {
+          push(diagnostics, "INVALID_DOCUMENT", dividerPath, "Grid dividers have an invalid length.", id);
+          return;
+        }
+        let previous = 0;
+        for (let index = 0; index < value.length; index += 1) {
+          const divider = value[index];
+          if (!Number.isSafeInteger(divider) || divider <= previous) {
+            push(
+              diagnostics,
+              "INVALID_NUMBER",
+              `${dividerPath}[${index}]`,
+              "Grid dividers must be increasing positive integers.",
+              id,
+            );
+          }
+          if (Number.isSafeInteger(divider) && divider > previous) previous = divider;
+        }
+      };
+      validateBoundaries(item.layout.rowBoundaries, counts[0]! - 1, "rowBoundaries");
+      validateBoundaries(item.layout.columnBoundaries, counts[1]! - 1, "columnBoundaries");
     }
   } else if (item.layout.mode !== "auto") {
     push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "layout"), "Recipe layout mode is unsupported.", id);

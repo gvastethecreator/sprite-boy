@@ -38,6 +38,8 @@ export interface CanvasAreaProps {
   readonly sliceGridOverlay?: Readonly<{
     sourceDimensions: GridLayoutSourceDimensions | null;
     effectiveLayout: EffectiveGridLayout | null;
+    onResizeRowBoundary?: (index: number, sourceY: number) => boolean;
+    onResizeColumnBoundary?: (index: number, sourceX: number) => boolean;
   }> | null;
   readonly canonicalRegionTool?: CanonicalRegionToolInteraction | null;
 }
@@ -595,6 +597,8 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
           <SliceGridOverlay
             sourceDimensions={sliceGridOverlay.sourceDimensions}
             effectiveLayout={sliceGridOverlay.effectiveLayout}
+            onResizeRowBoundary={sliceGridOverlay.onResizeRowBoundary}
+            onResizeColumnBoundary={sliceGridOverlay.onResizeColumnBoundary}
             transform={viewport}
           />
         ) : null}

@@ -43,6 +43,40 @@ describe("Slice grid recipe state (G2-05)", () => {
     expect(Object.isFrozen(automatic.recipe.layout)).toBe(true);
   });
 
+  it("round-trips custom manual dividers through the persisted recipe state", () => {
+    const state = updateSliceGridRecipeLayout(
+      createDefaultSliceGridRecipeState("asset-sheet", SOURCE),
+      {
+        mode: "manual",
+        manual: {
+          rows: 3,
+          cols: 4,
+          rowBoundaries: [2, 6],
+          columnBoundaries: [3, 5, 9],
+        },
+      },
+      SOURCE,
+    );
+
+    expect(state.recipe.layout).toEqual({
+      mode: "manual",
+      rows: 3,
+      cols: 4,
+      rowBoundaries: [2, 6],
+      columnBoundaries: [3, 5, 9],
+    });
+    expect(state.manual).toEqual({
+      rows: 3,
+      cols: 4,
+      rowBoundaries: [2, 6],
+      columnBoundaries: [3, 5, 9],
+    });
+    expect(hydrateSliceGridRecipeState(
+      JSON.parse(serializeSliceGridRecipeState(state)),
+      SOURCE,
+    )).toEqual(state);
+  });
+
   it("round-trips JSON exactly and rejects contradictory or accessor-backed state", () => {
     const manual = updateSliceGridRecipeLayout(
       createDefaultSliceGridRecipeState("asset-sheet", SOURCE),

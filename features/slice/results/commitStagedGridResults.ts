@@ -117,7 +117,17 @@ function cloneRecipe(recipe: GridSplitRecipeV1, id: string, name: string, timest
     sourceAssetId: recipe.sourceAssetId,
     layout: recipe.layout.mode === "auto"
       ? { mode: "auto" }
-      : { mode: "manual", rows: recipe.layout.rows, cols: recipe.layout.cols },
+      : {
+          mode: "manual",
+          rows: recipe.layout.rows,
+          cols: recipe.layout.cols,
+          ...(recipe.layout.rowBoundaries && recipe.layout.columnBoundaries
+            ? {
+                rowBoundaries: [...recipe.layout.rowBoundaries],
+                columnBoundaries: [...recipe.layout.columnBoundaries],
+              }
+            : {}),
+        },
     crop: { threshold: recipe.crop.threshold, padding: recipe.crop.padding },
     chroma: {
       enabled: recipe.chroma.enabled,

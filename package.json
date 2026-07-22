@@ -32,7 +32,6 @@
   "dependencies": {
     "@fontsource/archivo": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
-    "@google/genai": "^1.52.0",
     "@gsap/react": "^2.1.2",
     "gifshot": "^0.4.5",
     "gsap": "^3.15.0",

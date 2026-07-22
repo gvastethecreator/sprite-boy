@@ -193,6 +193,11 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
           <p className="text-[10px] leading-relaxed text-textMuted/75">
             Manual values stay saved when Auto is selected.
           </p>
+          {controller.draft.mode === "manual" && (
+            <p className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-2 text-[10px] leading-relaxed text-cyan-100/80">
+              Drag the cyan dividers in the canvas to size each row and column. Focus a divider and use arrow keys for pixel changes; Shift moves 10 pixels.
+            </p>
+          )}
         </div>
 
         <fieldset className="space-y-4 border-t border-white/5 pt-4" disabled={cropDisabled}>

@@ -1,27 +1,17 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useBuilderLogic } from "../../hooks/domains/useBuilderLogic";
 import { useExportLogic } from "../../hooks/domains/useExportLogic";
-import { analyzeImageBlob } from "../../utils/lazyFeatureModules";
 import {
   AppMode,
-  DEFAULT_PREFERENCES,
   type GridConfig,
   type ProjectState,
 } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   addAsset: vi.fn().mockResolvedValue(undefined),
-  analyzeImage: vi.fn().mockResolvedValue({ summary: "two rows" }),
   createGif: vi.fn(),
   generateAsync: vi.fn().mockResolvedValue(new Blob(["zip"])),
-  generateSprite: vi.fn().mockResolvedValue("data:image/png;base64,cGl4ZWw="),
   zipFile: vi.fn(),
-}));
-
-vi.mock("../../utils/aiService", () => ({
-  analyzeImage: mocks.analyzeImage,
-  generateSprite: mocks.generateSprite,
 }));
 
 vi.mock("../../utils/db", () => ({
@@ -74,90 +64,14 @@ function project(overrides: Partial<ProjectState> = {}): ProjectState {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.addAsset.mockResolvedValue(undefined);
-  mocks.analyzeImage.mockResolvedValue({ summary: "two rows" });
   mocks.generateAsync.mockResolvedValue(new Blob(["zip"]));
-  mocks.generateSprite.mockResolvedValue("data:image/png;base64,cGl4ZWw=");
   mocks.createGif.mockImplementation((_options, callback) => callback({
     error: false,
     image: "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA==",
   }));
 });
 
-describe("lazy feature modules", () => {
-  it("loads AI generation on demand and commits the generated asset", async () => {
-    let current = project();
-    const setProject = vi.fn((update: (previous: ProjectState) => ProjectState) => {
-      current = update(current);
-    });
-    const setLoading = vi.fn();
-    const setMessage = vi.fn();
-    const notify = vi.fn();
-    const selected = vi.fn();
-    const { result } = renderHook(() => useBuilderLogic(
-      current,
-      setProject,
-      setProject,
-      { ...DEFAULT_PREFERENCES, soundEnabled: false },
-      notify,
-      setLoading,
-      setMessage,
-    ));
-
-    expect(mocks.generateSprite).not.toHaveBeenCalled();
-    await act(() => result.current.runGeneration(
-      "walk cycle",
-      [],
-      null,
-      selected,
-      "gemini-2.5-flash-image",
-      "new_image",
-    ));
-
-    expect(mocks.generateSprite).toHaveBeenCalledWith(
-      [],
-      "walk cycle",
-      "gemini-2.5-flash-image",
-      "new_image",
-    );
-    expect(mocks.addAsset).toHaveBeenCalledOnce();
-    expect(current.builderAssets).toHaveLength(1);
-    expect(setLoading.mock.calls).toEqual([[true], [false]]);
-    expect(notify).toHaveBeenCalledWith("Generation complete", "success");
-  });
-
-  it("contains a lazy AI failure and always releases loading state", async () => {
-    mocks.generateSprite.mockRejectedValueOnce(new Error("provider unavailable"));
-    let current = project();
-    const setProject = vi.fn((update: (previous: ProjectState) => ProjectState) => {
-      current = update(current);
-    });
-    const setLoading = vi.fn();
-    const notify = vi.fn();
-    const { result } = renderHook(() => useBuilderLogic(
-      current,
-      setProject,
-      setProject,
-      { ...DEFAULT_PREFERENCES, soundEnabled: false },
-      notify,
-      setLoading,
-      vi.fn(),
-    ));
-
-    await act(() => result.current.runGeneration(
-      "walk cycle",
-      [],
-      null,
-      vi.fn(),
-      "gemini-2.5-flash-image",
-      "new_image",
-    ));
-
-    expect(mocks.addAsset).not.toHaveBeenCalled();
-    expect(current.builderAssets).toEqual([]);
-    expect(setLoading.mock.calls).toEqual([[true], [false]]);
-    expect(notify).toHaveBeenCalledWith("Gen error: provider unavailable", "error");
-  });
-
+describe("deferred export feature modules", () => {
   it("loads ZIP and GIF codecs only from their export actions", async () => {
     const state = project({
       frames: [{ id: 1, x: 0, y: 0, w: 16, h: 16, hidden: false }],
@@ -206,11 +120,4 @@ describe("lazy feature modules", () => {
     click.mockRestore();
   });
 
-  it("reads the input before loading AI analysis and returns its result", async () => {
-    const result = await analyzeImageBlob(new Blob(["sprite"], { type: "image/png" }));
-
-    expect(mocks.analyzeImage).toHaveBeenCalledOnce();
-    expect(mocks.analyzeImage.mock.calls[0]?.[0]).toMatch(/^data:image\/png;base64,/u);
-    expect(result).toEqual({ summary: "two rows" });
-  });
 });

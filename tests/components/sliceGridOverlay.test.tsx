@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SliceGridOverlay } from "../../features/slice/grid/SliceGridOverlay";
@@ -137,5 +137,35 @@ describe("G2-04 SliceGridOverlay", () => {
       />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("exposes manual divider controls that resize in source pixels", () => {
+    const onResizeColumnBoundary = vi.fn(() => true);
+    const onResizeRowBoundary = vi.fn(() => true);
+    const { container } = render(
+      <div style={{ position: "relative", width: 300, height: 180 }}>
+        <SliceGridOverlay
+          sourceDimensions={Object.freeze({ width: 7, height: 3 })}
+          effectiveLayout={layout}
+          transform={Object.freeze({ scale: 10, offset: Object.freeze({ x: 5, y: 7 }) })}
+          onResizeColumnBoundary={onResizeColumnBoundary}
+          onResizeRowBoundary={onResizeRowBoundary}
+        />
+      </div>,
+    );
+    const host = container.querySelector<HTMLElement>("[data-slice-grid-overlay]")!;
+    const control = container.querySelector<HTMLButtonElement>(
+      '[data-grid-resize-axis="column"][data-grid-resize-index="0"]',
+    )!;
+
+    expect(host).not.toHaveAttribute("aria-hidden");
+    expect(container.querySelector("[data-slice-grid-resize-controls]")).toBeInTheDocument();
+    fireEvent.keyDown(control, { key: "ArrowRight" });
+    expect(onResizeColumnBoundary).toHaveBeenLastCalledWith(0, 4);
+
+    fireEvent.pointerDown(control, { button: 0, pointerId: 1, clientX: 55, clientY: 20 });
+    expect(onResizeColumnBoundary).toHaveBeenLastCalledWith(0, 5);
+    fireEvent.pointerMove(control, { pointerId: 1, clientX: 65, clientY: 20 });
+    expect(onResizeColumnBoundary).toHaveBeenLastCalledWith(0, 6);
   });
 });

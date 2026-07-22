@@ -123,7 +123,17 @@ function captureInput(source: unknown, recipe: unknown): {
     sourceAssetId: inputRecipe.sourceAssetId,
     layout: inputRecipe.layout.mode === "auto"
       ? Object.freeze({ mode: "auto" as const })
-      : Object.freeze({ mode: "manual" as const, rows: inputRecipe.layout.rows, cols: inputRecipe.layout.cols }),
+      : Object.freeze({
+          mode: "manual" as const,
+          rows: inputRecipe.layout.rows,
+          cols: inputRecipe.layout.cols,
+          ...(inputRecipe.layout.rowBoundaries && inputRecipe.layout.columnBoundaries
+            ? {
+                rowBoundaries: Object.freeze([...inputRecipe.layout.rowBoundaries]),
+                columnBoundaries: Object.freeze([...inputRecipe.layout.columnBoundaries]),
+              }
+            : {}),
+        }),
     crop: Object.freeze({ threshold: inputRecipe.crop.threshold, padding: inputRecipe.crop.padding }),
     chroma: Object.freeze({ ...inputRecipe.chroma }),
     pixel: Object.freeze({

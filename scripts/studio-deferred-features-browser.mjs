@@ -1,4 +1,4 @@
-/** Production Chrome journey proving the Export modal and optional AI/ZIP/GIF chunks load on demand. */
+/** Production Chrome journey proving the Export modal and GIF chunk load on demand. */
 import { spawn } from "node:child_process";
 import {
   mkdirSync,
@@ -104,7 +104,7 @@ export function evaluateDeferredFeatureEvidence(evidence, chunkPaths) {
     Object.values(finalFeatureRequests).every((count) => count === 1) &&
     Object.values(errors).every((count) => count === 0) &&
     evidence.zipSucceeded === true && evidence.gifSucceeded === true &&
-    evidence.aiFailureContained === true && evidence.pageFits && evidence.dialogVisible &&
+    evidence.pageFits && evidence.dialogVisible &&
     evidence.finalRoute === "#/studio/export";
   return Object.freeze({
     schemaVersion: 1,
@@ -115,7 +115,6 @@ export function evaluateDeferredFeatureEvidence(evidence, chunkPaths) {
       finalFeatureRequests: Object.freeze(finalFeatureRequests),
       zipSucceeded: evidence.zipSucceeded === true,
       gifSucceeded: evidence.gifSucceeded === true,
-      aiFailureContained: evidence.aiFailureContained === true,
       pageFits: evidence.pageFits,
       dialogVisible: evidence.dialogVisible,
       finalRoute: evidence.finalRoute,
@@ -188,19 +187,6 @@ async function seedExportFixture(client) {
   })()`);
   if (!loaded) throw new Error("Browser fixture input is unavailable.");
   await waitForText(client, "Project loaded");
-}
-
-async function navigateWorkspace(client, workspaceId) {
-  const changed = await client.evaluate(`(() => {
-    const target = document.querySelector('[data-workspace-id=${JSON.stringify(workspaceId)}]');
-    if (!(target instanceof HTMLElement)) return false;
-    target.click();
-    return true;
-  })()`);
-  if (!changed) throw new Error("Browser workspace target is unavailable.");
-  await client.waitFor(`location.hash === ${JSON.stringify(`#/studio/${workspaceId}`)} && Boolean(
-    document.querySelector(${JSON.stringify(`[data-studio-workspace-content="${workspaceId}"]`)}),
-  )`);
 }
 
 async function captureScreenshot(client, screenshotPath) {
@@ -292,41 +278,6 @@ export async function runDeferredFeatureBrowser(options = {}) {
     await client.waitFor(`document.body.innerText.includes("GIF Exported")`, 30_000);
     await delay(250);
 
-    await navigateWorkspace(client, "slice");
-    const preparedAi = await client.evaluate(`(() => {
-      sessionStorage.setItem("sprite-boy-gemini-api-key", "browser-fixture-key");
-      const nativeFetch = globalThis.fetch.bind(globalThis);
-      globalThis.fetch = (input, init) => {
-        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-        if (url.includes("generativelanguage.googleapis.com")) {
-          return Promise.reject(new Error("Browser fixture provider unavailable."));
-        }
-        return nativeFetch(input, init);
-      };
-      const aiTab = Array.from(document.querySelectorAll("button")).find(
-        (button) => button.textContent?.includes("AI Creator"),
-      );
-      if (!(aiTab instanceof HTMLButtonElement)) return false;
-      aiTab.click();
-      return true;
-    })()`);
-    if (!preparedAi) throw new Error("AI Creator browser tab is unavailable.");
-    await waitForText(client, "Run Generator");
-    const prompted = await client.evaluate(`(() => {
-      const prompt = document.querySelector("textarea");
-      if (!(prompt instanceof HTMLTextAreaElement)) return false;
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
-      if (!setter) return false;
-      setter.call(prompt, "Browser deferred feature proof");
-      prompt.dispatchEvent(new Event("input", { bubbles: true }));
-      return true;
-    })()`);
-    if (!prompted) throw new Error("AI prompt browser control is unavailable.");
-    await clickButton(client, "Run Generator");
-    await client.waitFor(`document.body.innerText.includes("Gen error:")`, 30_000);
-    await delay(250);
-
-    await navigateWorkspace(client, "export");
     await clickButton(client, "Individual PNGs (.zip)");
     await waitForText(client, "Generate & Download ZIP");
     await client.waitFor(`(() => {
@@ -349,7 +300,6 @@ export async function runDeferredFeatureBrowser(options = {}) {
       finalRequestPaths: requestedPaths.slice(),
       zipSucceeded: true,
       gifSucceeded: true,
-      aiFailureContained: true,
       ...finalPage,
       consoleErrorCount: client.consoleErrorCount,
       exceptionCount: client.exceptionCount,
