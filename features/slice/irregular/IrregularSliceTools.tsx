@@ -74,8 +74,10 @@ export function IrregularSliceTools({
 }: IrregularSliceToolsProps) {
   const regions = project.rootOrder.regionIds
     .map((id) => project.regions[id])
-    .filter((region): region is NonNullable<typeof region> => Boolean(region));
-  const selectedRegion = selectedRegionId ? project.regions[selectedRegionId] : undefined;
+    .filter((region): region is NonNullable<typeof region> => Boolean(region) && region.assetId === sourceAssetId);
+  const selectedRegion = selectedRegionId
+    ? regions.find((region) => region.id === selectedRegionId)
+    : undefined;
   const hasSource = sourceAssetId !== null;
 
   return (
@@ -138,8 +140,8 @@ export function IrregularSliceTools({
                 </label>
               ))}
             </div>
-            <button type="button" disabled={!hasSource || busy} onClick={onCreateManual} className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 text-[10px] font-bold text-accent hover:bg-accent/15 disabled:opacity-40"><Plus size={13} aria-hidden="true" /> Create from bounds / canvas</button>
-            <p className="text-[9px] leading-4 text-textMuted">Drag on the source canvas or edit exact source-space bounds.</p>
+            <button type="button" disabled={!hasSource || busy} onClick={onCreateManual} className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 text-[10px] font-bold text-accent hover:bg-accent/15 disabled:opacity-40"><Plus size={13} aria-hidden="true" /> Create from coordinates</button>
+            <p className="text-[9px] leading-4 text-textMuted">Drag an empty part of the canvas to add a slice. Drag a saved box to move it; use its handles to resize it. Arrow keys adjust by 1 px, Shift by 10 px.</p>
             {selectedRegion ? (
               <div className="space-y-2 rounded-lg border border-white/10 bg-black/20 p-2">
                 <p className="truncate text-[10px] font-bold text-textMain">{selectedRegion.name ?? selectedRegion.id}</p>
@@ -153,7 +155,7 @@ export function IrregularSliceTools({
               </div>
             ) : null}
             <div className="max-h-28 space-y-1 overflow-auto" aria-label="Region list">
-              {regions.map((region) => <button key={region.id} type="button" aria-pressed={selectedRegionId === region.id} onClick={() => onSelectRegion(region.id)} className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[9px] ${selectedRegionId === region.id ? "bg-accent/15 text-accent" : "text-textMuted hover:bg-white/5"}`}><span className="truncate">{region.name ?? region.id}</span><span className="font-mono">{region.bounds.width}×{region.bounds.height}</span></button>)}
+              {regions.map((region) => <button key={region.id} type="button" aria-pressed={selectedRegionId === region.id} onClick={() => onSelectRegion(region.id)} className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[9px] ${selectedRegionId === region.id ? "bg-accent/15 text-accent" : "text-textMuted hover:bg-white/5"}`}><span className="truncate">{region.name ?? region.id}</span><span className="shrink-0 font-mono">{region.bounds.x},{region.bounds.y} · {region.bounds.width}×{region.bounds.height}</span></button>)}
             </div>
           </div>
         )}

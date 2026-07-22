@@ -258,6 +258,11 @@ const AppLayout: React.FC = () => {
     setIrregularError(null);
   }, [canonicalProject.workspace.selectedAssetId, canonicalProject.id]);
   useEffect(() => {
+    if (!irregularRegionId) return;
+    const selected = canonicalProject.regions[irregularRegionId];
+    if (selected) setManualRegionDraft({ ...selected.bounds });
+  }, [canonicalProject.regions, irregularRegionId]);
+  useEffect(() => {
     setDurableGridCommitUndo(readDurableGridCommitUndo(canonicalProject.id));
   }, [canonicalProject.id]);
   const sliceGridSourceAssetId = canonicalSliceSourceId;
@@ -436,19 +441,26 @@ const AppLayout: React.FC = () => {
       showToast(message, "error");
     }
   }, [canonical.store, canonicalSliceSourceId, dispatchIrregularCommand, manualRegionDraft, showToast]);
-  const applyManualRegion = useCallback((): void => {
-    if (!irregularRegionId) return;
+  const commitManualRegionBounds = useCallback((regionId: string, bounds: ManualRegionDraft): boolean => {
     try {
       const command = adaptManualRegionIntentToProjectCommand(canonical.store.getSnapshot().project, {
-        type: "resize", regionId: irregularRegionId, bounds: manualRegionDraft,
+        type: "resize", regionId, bounds,
       });
-      if (command && dispatchIrregularCommand(command, `manual-region-resize:${irregularRegionId}`)) setManualRegionDraft({ ...manualRegionDraft });
+      if (command && !dispatchIrregularCommand(command, `manual-region-resize:${regionId}`)) return false;
+      setIrregularRegionId(regionId);
+      setManualRegionDraft({ ...bounds });
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "The Region bounds could not be applied.";
       setIrregularError(message);
       showToast(message, "error");
+      return false;
     }
-  }, [canonical.store, dispatchIrregularCommand, irregularRegionId, manualRegionDraft, showToast]);
+  }, [canonical.store, dispatchIrregularCommand, showToast]);
+  const applyManualRegion = useCallback((): void => {
+    if (!irregularRegionId) return;
+    commitManualRegionBounds(irregularRegionId, manualRegionDraft);
+  }, [commitManualRegionBounds, irregularRegionId, manualRegionDraft]);
   const deleteManualRegion = useCallback((): void => {
     if (!irregularRegionId) return;
     try {
@@ -502,17 +514,38 @@ const AppLayout: React.FC = () => {
     setManualRegionDraft(bounds);
     createManualRegion(bounds);
   }, [createManualRegion]);
+  const selectManualRegion = useCallback((regionId: string): void => {
+    setIrregularRegionId(regionId);
+    const region = canonical.store.getSnapshot().project.regions[regionId];
+    if (region) setManualRegionDraft({ ...region.bounds });
+  }, [canonical.store]);
+  const manualOverlayRegions = useMemo(() => {
+    if (!canonicalSliceSourceId) return [];
+    return canonicalProject.rootOrder.regionIds
+      .map((regionId) => canonicalProject.regions[regionId])
+      .filter((region): region is NonNullable<typeof region> => Boolean(region) && region.assetId === canonicalSliceSourceId)
+      .map((region) => ({
+        id: region.id,
+        ...(region.name ? { name: region.name } : {}),
+        bounds: region.bounds,
+        ...(region.hidden === undefined ? {} : { hidden: region.hidden }),
+      }));
+  }, [canonicalProject.regions, canonicalProject.rootOrder.regionIds, canonicalSliceSourceId]);
   const canonicalRegionTool = useMemo<CanonicalRegionToolInteraction | null>(() => {
     if (activeWorkspace !== "slice" || !sliceGridController.sourceDimensions) return null;
     return {
       mode: irregularToolMode,
       sourceWidth: sliceGridController.sourceDimensions.width,
       sourceHeight: sliceGridController.sourceDimensions.height,
+      regions: manualOverlayRegions,
+      selectedRegionId: irregularRegionId,
       onWandSeed: handleWandSeed,
       onManualCommit: handleManualCanvasCommit,
+      onManualBoundsCommit: commitManualRegionBounds,
+      onSelectRegion: selectManualRegion,
       onCancel: clearWandSelection,
     };
-  }, [activeWorkspace, clearWandSelection, handleManualCanvasCommit, handleWandSeed, irregularToolMode, sliceGridController.sourceDimensions]);
+  }, [activeWorkspace, clearWandSelection, commitManualRegionBounds, handleManualCanvasCommit, handleWandSeed, irregularRegionId, irregularToolMode, manualOverlayRegions, selectManualRegion, sliceGridController.sourceDimensions]);
   const sliceCommitBusyRef = useRef(false);
   const sliceCommitControllerRef = useRef<AbortController | null>(null);
   const sliceCommitProjectIdRef = useRef<string | null>(null);
@@ -1086,11 +1119,7 @@ const AppLayout: React.FC = () => {
       onDuplicateRegion={duplicateManualRegion}
       onToggleHidden={toggleManualRegionHidden}
       onConvertToAsset={() => void convertManualRegionToAsset()}
-      onSelectRegion={(regionId) => {
-        setIrregularRegionId(regionId);
-        const region = canonicalProject.regions[regionId];
-        if (region) setManualRegionDraft({ ...region.bounds });
-      }}
+      onSelectRegion={selectManualRegion}
     />
   ) : null;
   const cancelActiveCanonicalTool = useCallback((): boolean => {
@@ -1300,7 +1329,7 @@ const AppLayout: React.FC = () => {
                     canonicalCanvasOwnership={canonicalCanvasOwnership}
                     onCanonicalPickColor={sliceGridController.setChromaColor}
                     canonicalRegionTool={canonicalRegionTool}
-                    sliceGridOverlay={{
+                    sliceGridOverlay={irregularToolMode === "manual" ? null : {
                       sourceDimensions: sliceGridController.sourceDimensions,
                       effectiveLayout: sliceGridController.effectiveLayout,
                       onResizeRowBoundary: sliceGridController.setManualRowBoundary,

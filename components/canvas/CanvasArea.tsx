@@ -21,14 +21,23 @@ import {
   type EffectiveGridLayout,
   type GridLayoutSourceDimensions,
 } from "../../features/slice/grid";
-import { mapWandClientPointToSource, type WandSeedPoint } from "../../features/slice/irregular";
+import {
+  ManualRegionOverlay,
+  mapWandClientPointToSource,
+  type ManualRegionOverlayRegion,
+  type WandSeedPoint,
+} from "../../features/slice/irregular";
 
 export interface CanonicalRegionToolInteraction {
   readonly mode: "wand" | "manual" | null;
   readonly sourceWidth: number;
   readonly sourceHeight: number;
+  readonly regions?: readonly ManualRegionOverlayRegion[];
+  readonly selectedRegionId?: string | null;
   readonly onWandSeed?: (seed: WandSeedPoint, pixels: Uint8ClampedArray) => void;
   readonly onManualCommit?: (bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }) => void;
+  readonly onManualBoundsCommit?: (regionId: string, bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }) => void;
+  readonly onSelectRegion?: (regionId: string) => void;
   readonly onCancel?: () => void;
 }
 
@@ -113,6 +122,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
   const localInputRef = useRef<HTMLInputElement>(null);
   const [manualDragStart, setManualDragStart] = useState<WandSeedPoint | null>(null);
   const [manualDragBounds, setManualDragBounds] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const manualDragBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // --- Extracted hooks ---
   const { isSpacePressed, modifiers } = useCanvasKeyboard({
@@ -196,6 +206,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
         event.preventDefault();
         setManualDragStart(null);
         setManualDragBounds(null);
+        manualDragBoundsRef.current = null;
         canonicalRegionTool.onCancel?.();
       };
       window.addEventListener("keydown", onKeyDown);
@@ -203,6 +214,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     }
     setManualDragStart(null);
     setManualDragBounds(null);
+    manualDragBoundsRef.current = null;
     return undefined;
   }, [canonicalRegionTool]);
   const handleCanonicalPickColor = React.useCallback((hex: string) => {
@@ -457,8 +469,10 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
               const pixels = readSourcePixels();
               if (pixels) canonicalRegionTool.onWandSeed?.(seed, pixels);
             } else {
+              const bounds = clampBounds(seed, seed);
               setManualDragStart(seed);
-              setManualDragBounds(clampBounds(seed, seed));
+              setManualDragBounds(bounds);
+              manualDragBoundsRef.current = bounds;
             }
             return;
           }
@@ -467,16 +481,21 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
         onMouseMove={(event) => {
           if (manualDragStart && canonicalRegionTool?.mode === "manual") {
             const point = sourcePointFromClient(event.clientX, event.clientY);
-            if (point) setManualDragBounds(clampBounds(manualDragStart, point));
+            if (point) {
+              const bounds = clampBounds(manualDragStart, point);
+              setManualDragBounds(bounds);
+              manualDragBoundsRef.current = bounds;
+            }
             return;
           }
           mouse.handleMouseMove(event);
         }}
         onMouseUp={() => {
           if (manualDragStart && canonicalRegionTool?.mode === "manual") {
-            if (manualDragBounds) canonicalRegionTool.onManualCommit?.(manualDragBounds);
+            if (manualDragBoundsRef.current) canonicalRegionTool.onManualCommit?.(manualDragBoundsRef.current);
             setManualDragStart(null);
             setManualDragBounds(null);
+            manualDragBoundsRef.current = null;
             return;
           }
           mouse.handleMouseUp();
@@ -485,6 +504,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
           if (manualDragStart) {
             setManualDragStart(null);
             setManualDragBounds(null);
+            manualDragBoundsRef.current = null;
           }
           mouse.handleMouseUp();
         }}
@@ -602,10 +622,21 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
             transform={viewport}
           />
         ) : null}
+        {canonicalRegionTool?.mode === "manual" ? (
+          <ManualRegionOverlay
+            sourceDimensions={{ width: canonicalRegionTool.sourceWidth, height: canonicalRegionTool.sourceHeight }}
+            regions={canonicalRegionTool.regions ?? []}
+            selectedRegionId={canonicalRegionTool.selectedRegionId ?? null}
+            transform={viewport}
+            onSelectRegion={(regionId) => canonicalRegionTool.onSelectRegion?.(regionId)}
+            onCommitBounds={(regionId, bounds) => canonicalRegionTool.onManualBoundsCommit?.(regionId, bounds)}
+          />
+        ) : null}
         {manualDragBounds ? (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute border border-accent bg-accent/15"
+            data-manual-region-draft=""
+            className="pointer-events-none absolute z-40 border-2 border-amber-300 bg-amber-300/15"
             style={{
               left: viewport.offset.x + manualDragBounds.x * viewport.scale,
               top: viewport.offset.y + manualDragBounds.y * viewport.scale,
