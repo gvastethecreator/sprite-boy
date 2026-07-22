@@ -125,6 +125,44 @@ describe("useStagedGridResults (G6-02)", () => {
     expect(hook.current.state.outputs[0]?.surface.pixels).not.toBe(result().outputs[0]!.surface.pixels);
   });
 
+  it("waits for the Grid recipe to adopt the canonical source before enabling processing", async () => {
+    const process = vi.fn(async () => result());
+    const client = { process } as unknown as GridProcessingClient;
+    const rasterize: SliceSourceRasterizer = vi.fn(async () => ({
+      width: 2,
+      height: 2,
+      format: "rgba8" as const,
+      colorSpace: "srgb" as const,
+      pixels: new ArrayBuffer(16),
+    }));
+    const transientRecipe = { ...recipe, sourceAssetId: "slice-source:1:2x2" };
+    const { result: hook, rerender } = renderHook(
+      ({ currentRecipe }) => useStagedGridResults({
+        sourceSnapshot: readySnapshot(),
+        recipe: currentRecipe,
+        requiredSourceAssetId: "asset-hook",
+        client,
+        rasterize,
+      }),
+      { initialProps: { currentRecipe: transientRecipe } },
+    );
+
+    expect(hook.current.canProcess).toBe(false);
+    await act(async () => {
+      expect(await hook.current.process()).toBe(false);
+    });
+    expect(rasterize).not.toHaveBeenCalled();
+    expect(process).not.toHaveBeenCalled();
+
+    rerender({ currentRecipe: recipe });
+    expect(hook.current.canProcess).toBe(true);
+    await act(async () => {
+      expect(await hook.current.process()).toBe(true);
+    });
+    expect(rasterize).toHaveBeenCalledOnce();
+    expect(process).toHaveBeenCalledOnce();
+  });
+
   it("cancels the active processing request and clears stale staged outputs", async () => {
     let rejectProcess: ((error: unknown) => void) | null = null;
     const process = vi.fn(({ signal }: { signal?: AbortSignal }) => new Promise<GridProcessingResultV1>((_resolve, reject) => {

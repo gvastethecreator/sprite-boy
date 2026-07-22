@@ -35,6 +35,12 @@ export type SliceSourceRasterizer = (
 export interface UseStagedGridResultsOptions {
   readonly sourceSnapshot: SourceSessionSnapshot;
   readonly recipe: GridSplitRecipeV1 | null;
+  /**
+   * Canonical source identity that must own the recipe before processing can
+   * start. Source import publishes decoded pixels before the durable Asset id
+   * reaches the Grid recipe, so this closes that short stale-recipe window.
+   */
+  readonly requiredSourceAssetId?: string | null;
   readonly client?: GridProcessingClient;
   readonly rasterize?: SliceSourceRasterizer;
   readonly commit?: (snapshot: StagedGridResultsSnapshot) => Promise<boolean>;
@@ -172,6 +178,15 @@ function sourceKey(snapshot: SourceSessionSnapshot): string {
   return `${snapshot.generation}:${snapshot.status}:${snapshot.metadata?.width ?? 0}x${snapshot.metadata?.height ?? 0}`;
 }
 
+function recipeMatchesRequiredSource(
+  recipe: GridSplitRecipeV1 | null,
+  requiredSourceAssetId: string | null | undefined,
+): boolean {
+  if (requiredSourceAssetId === undefined) return recipe !== null;
+  return typeof requiredSourceAssetId === "string" && requiredSourceAssetId.length > 0 &&
+    recipe?.sourceAssetId === requiredSourceAssetId;
+}
+
 function releaseWorkerResult(result: { readonly outputs: readonly { readonly surface: { readonly pixels: ArrayBuffer } }[] }): void {
   for (const output of result.outputs) {
     try {
@@ -191,8 +206,10 @@ export function useStagedGridResults(options: UseStagedGridResultsOptions): Stag
   const abortRef = useRef<AbortController | null>(null);
   const sourceSnapshotRef = useRef(options.sourceSnapshot);
   const recipeRef = useRef(options.recipe);
+  const requiredSourceAssetIdRef = useRef(options.requiredSourceAssetId);
   sourceSnapshotRef.current = options.sourceSnapshot;
   recipeRef.current = options.recipe;
+  requiredSourceAssetIdRef.current = options.requiredSourceAssetId;
   stateRef.current = state;
 
   const publish = useCallback((next: StagedGridResultsSnapshot): void => {
@@ -228,11 +245,12 @@ export function useStagedGridResults(options: UseStagedGridResultsOptions): Stag
       abortRef.current = null;
       disposeStagedGridResults(stateRef.current);
     };
-  }, [clear, options.recipe ? JSON.stringify(options.recipe) : "", sourceKey(options.sourceSnapshot)]);
+  }, [clear, options.recipe ? JSON.stringify(options.recipe) : "", options.requiredSourceAssetId, sourceKey(options.sourceSnapshot)]);
 
   const process = useCallback(async (): Promise<boolean> => {
     const snapshot = sourceSnapshotRef.current;
     const recipe = recipeRef.current;
+    if (!recipeMatchesRequiredSource(recipe, requiredSourceAssetIdRef.current)) return false;
     if (snapshot.status !== "ready" || snapshot.source === null || recipe === null) {
       publish(failStagedGridProcessing(stateRef.current, {
         code: "invalid-input",
@@ -302,12 +320,13 @@ export function useStagedGridResults(options: UseStagedGridResultsOptions): Stag
 
   return useMemo(() => Object.freeze({
     state,
-    canProcess: options.sourceSnapshot.status === "ready" && options.sourceSnapshot.source !== null && options.recipe !== null,
+    canProcess: options.sourceSnapshot.status === "ready" && options.sourceSnapshot.source !== null &&
+      recipeMatchesRequiredSource(options.recipe, options.requiredSourceAssetId),
     process,
     retry,
     commit,
     cancel,
     clear,
     select,
-  }), [cancel, clear, commit, options.recipe, options.sourceSnapshot, process, retry, select, state]);
+  }), [cancel, clear, commit, options.recipe, options.requiredSourceAssetId, options.sourceSnapshot, process, retry, select, state]);
 }

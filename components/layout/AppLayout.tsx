@@ -598,6 +598,7 @@ const AppLayout: React.FC = () => {
   const sliceResultsController = useStagedGridResults({
     sourceSnapshot: sourceSessionSnapshot,
     recipe: sliceGridController.recipe,
+    requiredSourceAssetId: canonicalSliceSourceId,
     commit: commitSliceResults,
   });
   const canonicalSliceSourceAvailable = sliceGridController.sourceDimensions !== null;
