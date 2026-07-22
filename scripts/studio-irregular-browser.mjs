@@ -1,6 +1,6 @@
 /** S1-04/S1-06 production-Chrome journey for irregular Slice regions. */
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -32,7 +32,17 @@ async function pause(client, milliseconds) {
   await client.evaluate(`new Promise((resolve) => setTimeout(resolve, ${milliseconds}))`);
 }
 
-async function selectSource(client) {
+async function selectSource(client, sourcePath) {
+  if (sourcePath) {
+    const documentNode = await client.send("DOM.getDocument", { depth: 0 });
+    const input = await client.send("DOM.querySelector", {
+      nodeId: documentNode.root.nodeId,
+      selector: 'input[accept="image/png,image/jpeg,image/webp"]',
+    });
+    if (!input.nodeId) return false;
+    await client.send("DOM.setFileInputFiles", { files: [sourcePath], nodeId: input.nodeId });
+    return true;
+  }
   return client.evaluate(`(async () => {
     const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
     if (!(input instanceof HTMLInputElement)) return false;
@@ -57,6 +67,64 @@ async function selectSource(client) {
     input.dispatchEvent(new Event("change", { bubbles: true }));
     return true;
   })()`);
+}
+
+async function dragSourceBounds(client, startRatio, endRatio) {
+  const points = await client.evaluate(`(() => {
+    const region = document.querySelector('[data-manual-region-id]');
+    const canvas = document.querySelector('[data-studio-source-canvas]');
+    if (!(region instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) return null;
+    const values = (region.dataset.manualRegionBounds ?? "").split(",").map(Number);
+    const source = (canvas.dataset.canvasContentSize ?? "").split("x").map(Number);
+    const rect = region.getBoundingClientRect();
+    if (values.length !== 4 || source.length !== 2 || values.some((value) => !Number.isFinite(value)) || source.some((value) => !Number.isFinite(value))) return null;
+    const scale = rect.width / values[2];
+    const offsetX = rect.left - values[0] * scale;
+    const offsetY = rect.top - values[1] * scale;
+    return {
+      start: { x: offsetX + source[0] * ${startRatio.x} * scale, y: offsetY + source[1] * ${startRatio.y} * scale },
+      end: { x: offsetX + source[0] * ${endRatio.x} * scale, y: offsetY + source[1] * ${endRatio.y} * scale },
+    };
+  })()`);
+  if (!points) return false;
+  await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.start.x, y: points.start.y, button: "none" });
+  await client.send("Input.dispatchMouseEvent", { type: "mousePressed", x: points.start.x, y: points.start.y, button: "left", buttons: 1, clickCount: 1 });
+  await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.end.x, y: points.end.y, button: "left", buttons: 1 });
+  await client.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: points.end.x, y: points.end.y, button: "left", buttons: 0, clickCount: 1 });
+  return true;
+}
+
+async function dragSelectedRegion(client, selector, deltaSourceX, deltaSourceY) {
+  const drag = await client.evaluate(`(() => {
+    const target = document.querySelector(${JSON.stringify(selector)});
+    const region = target?.closest('[data-manual-region-id]');
+    if (!(target instanceof HTMLElement) || !(region instanceof HTMLElement)) return null;
+    const values = (region.dataset.manualRegionBounds ?? "").split(",").map(Number);
+    const rect = region.getBoundingClientRect();
+    if (values.length !== 4 || values.some((value) => !Number.isFinite(value)) || values[2] < 1) return null;
+    const scale = rect.width / values[2];
+    const targetRect = target.getBoundingClientRect();
+    const start = { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 };
+    return { start, end: { x: start.x + ${deltaSourceX} * scale, y: start.y + ${deltaSourceY} * scale } };
+  })()`);
+  if (!drag) return false;
+  await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: drag.start.x, y: drag.start.y, button: "none" });
+  await client.send("Input.dispatchMouseEvent", { type: "mousePressed", x: drag.start.x, y: drag.start.y, button: "left", buttons: 1, clickCount: 1 });
+  await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: drag.end.x, y: drag.end.y, button: "left", buttons: 1 });
+  await client.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: drag.end.x, y: drag.end.y, button: "left", buttons: 0, clickCount: 1 });
+  return true;
+}
+
+async function readManualRegions(client) {
+  return client.evaluate(`(() => [...document.querySelectorAll('[data-manual-region-id]')].map((region) => ({
+    id: region.getAttribute('data-manual-region-id'),
+    bounds: (region.getAttribute('data-manual-region-bounds') ?? '').split(',').map(Number),
+    selected: region.querySelector('[data-manual-region-move]')?.getAttribute('aria-pressed') === 'true',
+  })))()`);
+}
+
+async function readManualInputs(client) {
+  return client.evaluate(`(() => Object.fromEntries([...document.querySelectorAll('[aria-label="Manual region controls"] input[type="number"]')].map((input) => [input.getAttribute('aria-label'), Number(input.value)])))()`);
 }
 
 async function clickSelector(client, selector) {
@@ -169,16 +237,26 @@ async function readCanonical(client) {
 export async function runIrregularBrowserGate(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const screenshotPath = resolve(cwd, options.screenshotPath ?? SCREENSHOT);
-  const port = await allocatePort();
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const manualScreenshotPath = options.manualScreenshotPath ? resolve(cwd, options.manualScreenshotPath) : null;
+  const serverMode = options.serverMode ?? "preview";
+  if (serverMode !== "preview" && serverMode !== "dev") throw new TypeError("Irregular browser server mode is invalid.");
+  const externalBaseUrl = typeof options.baseUrl === "string" && options.baseUrl.trim().length > 0
+    ? new URL(options.baseUrl)
+    : null;
+  const port = externalBaseUrl ? null : await allocatePort();
+  const baseUrl = externalBaseUrl?.origin ?? `http://127.0.0.1:${port}`;
+  const sourcePath = options.sourcePath ? resolve(cwd, options.sourcePath) : null;
+  if (sourcePath && !existsSync(sourcePath)) throw new Error(`Irregular source file does not exist: ${sourcePath}`);
   const profile = mkdtempSync(join(tmpdir(), "sprite-boy-s1-irregular-browser-"));
   let vite;
   let chrome;
   let client;
   let stage = "launch";
   try {
-    vite = spawnViteServer(cwd, port, "preview");
-    await waitForPreview(baseUrl, vite);
+    if (port !== null) {
+      vite = spawnViteServer(cwd, port, serverMode);
+      await waitForPreview(baseUrl, vite);
+    }
     chrome = spawn(resolveChromeExecutable(options), [
       "--headless=new", "--disable-background-networking", "--disable-background-timer-throttling",
       "--disable-backgrounding-occluded-windows", "--disable-component-update", "--disable-default-apps",
@@ -200,7 +278,7 @@ export async function runIrregularBrowserGate(options = {}) {
     stage = "navigate";
     await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
     await waitForSliceSourceDropzone(client);
-    if (await selectSource(client) !== true) throw new Error("Source fixture could not be selected.");
+    if (await selectSource(client, sourcePath) !== true) throw new Error("Source fixture could not be selected.");
     await client.waitFor(`document.querySelector('[data-slice-results-tray] [role="status"]')?.textContent?.includes("Ready to process")`, 60_000);
     await client.waitFor(`Boolean(document.querySelector('[aria-labelledby="irregular-slice-tools-title"]'))`, 60_000);
     await pause(client, 400);
@@ -214,10 +292,67 @@ export async function runIrregularBrowserGate(options = {}) {
     for (const [label, value] of [["Region x", 20], ["Region y", 20], ["Region width", 80], ["Region height", 80]]) {
       if (!await setNumber(client, label, value)) throw new Error(`${label} input unavailable.`);
     }
-    if (!await clickByText(client, '[aria-label="Manual region controls"]', "Create from bounds")) throw new Error("Manual create action unavailable.");
+    if (!await clickByText(client, '[aria-label="Manual region controls"]', "Create from coordinates")) throw new Error("Manual create action unavailable.");
     await client.waitFor(`document.querySelector('[aria-labelledby="irregular-slice-tools-title"]')?.textContent?.includes("1 regions")`, 30_000);
     const afterManual = await client.evaluate(`(() => ({ regions: document.querySelectorAll('[aria-label="Region list"] button').length, selected: document.querySelector('[aria-label="Region list"] button[aria-pressed="true"]')?.textContent?.trim() ?? null }))()`);
     if (afterManual.regions !== 1) throw new Error(`Manual region was not created: ${JSON.stringify(afterManual)}`);
+
+    stage = "manual-canvas-create";
+    if (!await dragSourceBounds(client, { x: 0.35, y: 0.2 }, { x: 0.63, y: 0.62 })) throw new Error("Manual canvas drag was unavailable.");
+    await client.waitFor(`document.querySelectorAll('[data-manual-region-id]').length === 2`, 30_000);
+    const afterCanvasCreate = await readManualRegions(client);
+    if (afterCanvasCreate.length !== 2 || !afterCanvasCreate[1]?.selected) throw new Error(`Canvas Region was not created or selected: ${JSON.stringify(afterCanvasCreate)}`);
+    const canvasRegionId = afterCanvasCreate[1].id;
+    const createdBounds = afterCanvasCreate[1].bounds;
+
+    stage = "manual-canvas-move";
+    if (!await dragSelectedRegion(client, '[data-manual-region-move][aria-pressed="true"]', 12, 8)) throw new Error("Selected Region move handle was unavailable.");
+    await client.waitFor(`document.querySelector('[data-manual-region-id=${JSON.stringify(canvasRegionId)}]')?.getAttribute('data-manual-region-bounds') !== ${JSON.stringify(createdBounds.join(","))}`, 20_000);
+    const afterCanvasMove = await readManualRegions(client);
+
+    stage = "manual-canvas-resize";
+    const movedBounds = afterCanvasMove.find((region) => region.selected)?.bounds;
+    if (!movedBounds || !await dragSelectedRegion(client, '[data-manual-region-resize="se"]', 18, 11)) throw new Error("Selected Region resize handle was unavailable.");
+    await client.waitFor(`document.querySelector('[data-manual-region-id=${JSON.stringify(canvasRegionId)}]')?.getAttribute('data-manual-region-bounds') !== ${JSON.stringify(movedBounds.join(","))}`, 20_000);
+    const afterCanvasResize = await readManualRegions(client);
+    const resizedBounds = afterCanvasResize.find((region) => region.selected)?.bounds;
+    if (!resizedBounds || resizedBounds[2] <= movedBounds[2] || resizedBounds[3] <= movedBounds[3]) {
+      throw new Error(`Canvas Region did not resize in both axes: ${JSON.stringify({ movedBounds, resizedBounds })}`);
+    }
+    const manualInputs = await readManualInputs(client);
+    if (manualInputs["Region x"] !== resizedBounds[0] || manualInputs["Region y"] !== resizedBounds[1]
+      || manualInputs["Region width"] !== resizedBounds[2] || manualInputs["Region height"] !== resizedBounds[3]) {
+      throw new Error(`Manual coordinate inputs did not follow the canvas resize: ${JSON.stringify({ manualInputs, resizedBounds })}`);
+    }
+
+    stage = "manual-canvas-undo-redo";
+    let manualUndoSteps = 0;
+    for (; manualUndoSteps < 5; manualUndoSteps += 1) {
+      if (!await clickSelector(client, 'button[data-command-id="edit.undo"]')) throw new Error("Manual resize undo was unavailable.");
+      await pause(client, 350);
+      const undoSnapshot = await readManualRegions(client);
+      if (undoSnapshot.find((region) => region.id === canvasRegionId)?.bounds.join(",") === movedBounds.join(",")) {
+        manualUndoSteps += 1;
+        break;
+      }
+    }
+    const boundsAfterUndo = (await readManualRegions(client)).find((region) => region.id === canvasRegionId)?.bounds.join(",") ?? null;
+    if (manualUndoSteps < 1 || boundsAfterUndo !== movedBounds.join(",")) throw new Error("Manual resize was not reachable in canonical undo history.");
+    let manualRedoSteps = 0;
+    let afterManualUndoRedo = await readManualRegions(client);
+    for (; manualRedoSteps < 5; manualRedoSteps += 1) {
+      const redoEnabled = await client.evaluate(`document.querySelector('button[data-command-id="edit.redo"]')?.disabled === false`);
+      if (!redoEnabled || !await clickSelector(client, 'button[data-command-id="edit.redo"]')) throw new Error("Manual resize redo was unavailable.");
+      await pause(client, 350);
+      afterManualUndoRedo = await readManualRegions(client);
+      if (afterManualUndoRedo.find((region) => region.id === canvasRegionId)?.bounds.join(",") === resizedBounds.join(",")) {
+        manualRedoSteps += 1;
+        break;
+      }
+    }
+    if (afterManualUndoRedo.find((region) => region.id === canvasRegionId)?.bounds.join(",") !== resizedBounds.join(",")) {
+      throw new Error(`Manual resize redo did not restore its bounds: ${JSON.stringify(afterManualUndoRedo)}`);
+    }
 
     stage = "wand-select";
     if (!await clickByText(client, '[aria-labelledby="irregular-slice-tools-title"] [role="tablist"]', "Wand")) throw new Error("Wand tool tab unavailable.");
@@ -267,9 +402,15 @@ export async function runIrregularBrowserGate(options = {}) {
     if (!beforeReload || beforeReload.regionCount < 1) throw new Error(`Project checkpoint did not contain irregular regions: ${JSON.stringify(beforeReload)}`);
     await client.send("Page.reload", { ignoreCache: true });
     await client.waitFor(`document.readyState === "complete" && Boolean(document.querySelector('[aria-labelledby="irregular-slice-tools-title"]'))`, 60_000);
-    await client.waitFor(`document.querySelector('[aria-labelledby="irregular-slice-tools-title"]')?.textContent?.includes("1 regions")`, 30_000);
+    await client.waitFor(`document.querySelector('[aria-labelledby="irregular-slice-tools-title"]')?.textContent?.includes(${JSON.stringify(`${beforeReload.regionCount} regions`)})`, 30_000);
     const afterReload = await readCanonical(client);
     if (!afterReload || afterReload.regionCount < 1) throw new Error(`Region persistence failed: ${JSON.stringify({ beforeReload, afterReload })}`);
+    if (!await clickByText(client, '[aria-labelledby="irregular-slice-tools-title"] [role="tablist"]', "Manual")) throw new Error("Manual controls could not be restored after reload.");
+    await client.waitFor(`document.querySelectorAll('[data-manual-region-id]').length >= ${beforeReload.regionCount}`, 30_000);
+    if (!await clickSelector(client, '[aria-label="Region list"] button:last-child')) throw new Error("Reloaded manual Region could not be selected.");
+    await client.waitFor(`document.querySelectorAll('[data-manual-region-resize]').length === 8`, 10_000);
+    const afterReloadRegions = await readManualRegions(client);
+    const manualScreenshot = manualScreenshotPath ? await capture(client, manualScreenshotPath) : null;
 
     stage = "export";
     await installDownloadProbe(client);
@@ -296,7 +437,7 @@ export async function runIrregularBrowserGate(options = {}) {
       && Object.values(errors).every((value) => value === 0);
     if (!passed) throw new Error(`Irregular browser evidence failed closed: ${JSON.stringify({ afterReload, downloads, accessibility, layout, errors })}`);
     stage = "accepted";
-    return { schemaVersion: 1, check: "irregular-slice-browser", status: "pass", afterManual, wand, beforeReload, afterReload, exportShell, downloads, accessibility, layout, screenshot, errors };
+    return { schemaVersion: 1, check: "irregular-slice-browser", status: "pass", sourcePath, afterManual, afterCanvasCreate, afterCanvasMove, afterCanvasResize, manualInputs, manualUndoSteps, manualRedoSteps, afterManualUndoRedo, wand, beforeReload, afterReload, afterReloadRegions, manualScreenshot, exportShell, downloads, accessibility, layout, screenshot, errors };
   } catch (error) {
     let detail = null;
     try {
@@ -308,7 +449,7 @@ export async function runIrregularBrowserGate(options = {}) {
         hasIrregularTools: Boolean(document.querySelector('[aria-labelledby="irregular-slice-tools-title"]')),
         toolTabs: [...document.querySelectorAll('[aria-labelledby="irregular-slice-tools-title"] [role="tab"]')].map((button) => ({ text: button.textContent?.trim(), selected: button.getAttribute("aria-selected") })),
         manualPanels: document.querySelectorAll('[aria-label="Manual region controls"]').length,
-        manualButton: (() => { const button = [...document.querySelectorAll('[aria-label="Manual region controls"] button')].find((candidate) => candidate.textContent?.includes("Create from bounds")); return button ? { disabled: button.hasAttribute("disabled"), text: button.textContent?.trim() } : null; })(),
+        manualButton: (() => { const button = [...document.querySelectorAll('[aria-label="Manual region controls"] button')].find((candidate) => candidate.textContent?.includes("Create from coordinates")); return button ? { disabled: button.hasAttribute("disabled"), text: button.textContent?.trim() } : null; })(),
         regionSummary: document.querySelector('[aria-labelledby="irregular-slice-tools-title"]')?.textContent?.slice(0, 160) ?? null,
         alerts: [...document.querySelectorAll('[role="alert"]')].map((node) => node.textContent?.trim()).filter(Boolean),
         canvas: (() => { const canvas = document.querySelector('[data-studio-source-canvas]'); if (!(canvas instanceof HTMLCanvasElement)) return null; const rect = canvas.getBoundingClientRect(); return { rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, content: canvas.dataset.canvasContentSize ?? null, ownership: canvas.dataset.canonicalCanvasOwnership ?? null }; })(),
@@ -331,7 +472,13 @@ export async function runIrregularBrowserGate(options = {}) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
-    process.stdout.write(`${JSON.stringify(await runIrregularBrowserGate())}\n`);
+    process.stdout.write(`${JSON.stringify(await runIrregularBrowserGate({
+      baseUrl: process.env.STUDIO_IRREGULAR_BASE_URL,
+      manualScreenshotPath: process.env.STUDIO_IRREGULAR_MANUAL_SCREENSHOT,
+      screenshotPath: process.env.STUDIO_IRREGULAR_SCREENSHOT,
+      serverMode: process.env.STUDIO_IRREGULAR_SERVER_MODE,
+      sourcePath: process.env.STUDIO_IRREGULAR_SOURCE_PATH,
+    }))}\n`);
   } catch (error) {
     process.stderr.write(`${JSON.stringify({ schemaVersion: 1, check: "irregular-slice-browser", status: "fail", message: error instanceof Error ? error.message : "unknown" })}\n`);
     process.exitCode = 1;

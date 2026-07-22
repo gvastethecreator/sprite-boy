@@ -277,9 +277,9 @@ export function detectIrregularRegions(
 
       while (head < tail) {
         if ((head & CANCELLATION_CHECK_MASK) === 0) throwIfCancelled(isCancelled);
-        const current = frontier[head++]!;
-        const currentX = current % dimensions.width;
-        const currentY = Math.floor(current / dimensions.width);
+        const current: number = frontier[head++]!;
+        const currentX: number = current % dimensions.width;
+        const currentY: number = Math.floor(current / dimensions.width);
         pixelCount += 1;
         if (currentX < minX) minX = currentX;
         if (currentX > maxX) maxX = currentX;
@@ -287,8 +287,8 @@ export function detectIrregularRegions(
         if (currentY > maxY) maxY = currentY;
 
         for (let direction = 0; direction < dx.length; direction += 1) {
-          const nextX = currentX + dx[direction]!;
-          const nextY = currentY + dy[direction]!;
+          const nextX: number = currentX + dx[direction]!;
+          const nextY: number = currentY + dy[direction]!;
           if (
             nextX < 0 || nextX >= dimensions.width ||
             nextY < 0 || nextY >= dimensions.height

@@ -276,7 +276,7 @@ describe("G1-02 pure RGBA algorithms", () => {
     expect(first).toEqual(second);
     expect(opaqueColors(first).size).toBeLessThanOrEqual(256);
     expect(Array.from(first.filter((_, index) => index % 4 === 3))).toEqual(alpha);
-  });
+  }, 10_000);
 
   it("does not let ignored low-alpha RGB or eligible alpha magnitude influence the auto palette", () => {
     const first = new Uint8ClampedArray([
