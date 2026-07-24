@@ -20,7 +20,7 @@ import { useProject } from "../../contexts/ProjectContext";
 const SectionHeader = ({
   title,
   icon: Icon,
-  colorClass = "text-accent",
+  colorClass = "text-textMuted",
   action,
 }: {
   title: string;
@@ -28,10 +28,10 @@ const SectionHeader = ({
   colorClass?: string;
   action?: React.ReactNode;
 }) => (
-  <div className="h-12 bg-white/5 flex items-center justify-between px-4 shrink-0 select-none border-b border-white/5 backdrop-blur-md">
+  <div className="flex h-10 shrink-0 select-none items-center justify-between border-b border-white/8 bg-panelHeader/95 px-3">
     <div className="flex items-center gap-2">
-      {Icon && <Icon size={18} className={colorClass} />}
-      <span className="text-sm font-bold text-textMain tracking-wide">{title}</span>
+      {Icon && <Icon size={14} className={colorClass} />}
+      <span className="text-[11px] font-semibold tracking-wide text-textMain">{title}</span>
     </div>
     {action}
   </div>
@@ -42,44 +42,40 @@ const ViewTools: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-panel-gradient">
-      <SectionHeader title="Presentation" icon={Monitor} colorClass="text-blue-400" />
+      <SectionHeader title="Export view" icon={Monitor} />
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-        <div className="space-y-3">
-          <label className="text-[10px] font-bold text-textMuted uppercase tracking-widest">
-            Layout Style
-          </label>
-          <div className="space-y-2">
+      <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-3">
+        <div className="space-y-2">
+          <label className="studio-section-label">Layout</label>
+          <div className="space-y-1.5">
             {[
-              { id: "full", label: "Consolidated Sheet", icon: ImageIcon },
-              { id: "grid_only", label: "Reference Grid", icon: Grid3X3 },
-              { id: "numbered", label: "Indexed View", icon: Layout },
+              { id: "full", label: "Full sheet", icon: ImageIcon },
+              { id: "grid_only", label: "Grid only", icon: Grid3X3 },
+              { id: "numbered", label: "Numbered", icon: Layout },
             ].map((opt) => (
               <button
                 key={opt.id}
                 onClick={() => setTemplateConfig({ ...templateConfig, viewType: opt.id as any })}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-medium transition-all duration-200 border ${templateConfig.viewType === opt.id ? "bg-accent/10 border-accent/40 text-textMain shadow-glow-sm" : "bg-black/20 border-white/5 text-textMuted hover:bg-white/5"}`}
+                className={`flex w-full items-center justify-between rounded-md border px-3 py-2.5 text-xs font-medium transition-colors ${templateConfig.viewType === opt.id ? "border-accent/40 bg-accent/10 text-textMain shadow-glow-sm" : "border-white/8 bg-black/20 text-textMuted hover:bg-white/5"}`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <opt.icon
-                    size={16}
-                    className={templateConfig.viewType === opt.id ? "text-accent" : ""}
+                    size={14}
+                    className={templateConfig.viewType === opt.id ? "text-textMain" : ""}
                   />
                   {opt.label}
                 </div>
                 {templateConfig.viewType === opt.id && (
-                  <CheckCircle2 size={14} className="text-accent" />
+                  <CheckCircle2 size={13} className="text-textMain" />
                 )}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="space-y-4 pt-4 border-t border-white/5">
-          <label className="text-[10px] font-bold text-textMuted uppercase tracking-widest">
-            Aesthetics
-          </label>
-          <div className="space-y-4 bg-black/20 p-4 rounded-xl border border-white/5 shadow-inner-depth">
+        <div className="space-y-2 border-t border-white/6 pt-3">
+          <label className="studio-section-label">Style</label>
+          <div className="space-y-3 rounded-md border border-white/8 bg-black/20 p-3 shadow-inner-depth">
             <div className="flex items-center justify-between">
               <span className="text-xs text-textMuted">Background</span>
                 <input
@@ -89,11 +85,11 @@ const ViewTools: React.FC = () => {
                 onChange={(e) =>
                   setTemplateConfig({ ...templateConfig, backgroundColor: e.target.value })
                 }
-                className="w-8 h-8 rounded-lg border-0 p-0 overflow-hidden cursor-pointer"
+                className="h-7 w-7 cursor-pointer overflow-hidden rounded border-0 p-0"
               />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-textMuted">Grid Color</span>
+              <span className="text-xs text-textMuted">Grid</span>
                 <input
                   type="color"
                   aria-label="Grid color"
@@ -101,49 +97,47 @@ const ViewTools: React.FC = () => {
                 onChange={(e) =>
                   setTemplateConfig({ ...templateConfig, gridColor: e.target.value })
                 }
-                className="w-8 h-8 rounded-lg border-0 p-0 overflow-hidden cursor-pointer"
+                className="h-7 w-7 cursor-pointer overflow-hidden rounded border-0 p-0"
               />
             </div>
             <NumberControl
-              label="Line Width"
+              label="Line"
               value={templateConfig.gridWidth || 1}
               onChange={(v) => setTemplateConfig({ ...templateConfig, gridWidth: v })}
               min={1}
               max={10}
-              labelClassName="w-20"
+              labelClassName="w-16"
             />
           </div>
         </div>
 
-        <div className="space-y-4 pt-4 border-t border-white/5">
-          <label className="text-[10px] font-bold text-textMuted uppercase tracking-widest">
-            Master Exports
-          </label>
-          <div className="grid grid-cols-1 gap-2">
+        <div className="space-y-2 border-t border-white/6 pt-3">
+          <label className="studio-section-label">Exports</label>
+          <div className="grid grid-cols-1 gap-1.5">
             <button
               onClick={() => setExportModal({ isOpen: true, type: "zip" })}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-textMain transition-all active:scale-95 shadow-3d"
+              className="flex w-full items-center gap-2.5 rounded-md border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-semibold text-textMain transition-colors hover:bg-white/10"
             >
-              <Layers size={16} className="text-blue-400" /> Individual PNGs (.zip)
+              <Layers size={14} className="text-textMuted" /> PNG sequence (.zip)
             </button>
             <button
               onClick={() => setExportModal({ isOpen: true, type: "gif" })}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-textMain transition-all active:scale-95 shadow-3d"
+              className="flex w-full items-center gap-2.5 rounded-md border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-semibold text-textMain transition-colors hover:bg-white/10"
             >
-              <Film size={16} className="text-purple-400" /> Animation Sequence (.gif)
+              <Film size={14} className="text-textMuted" /> Animation (.gif)
             </button>
           </div>
         </div>
       </div>
 
-      <div className="p-4 bg-surface/50 border-t border-white/10 backdrop-blur-md">
+      <div className="border-t border-white/8 bg-surface/40 p-3">
         <button
           type="button"
           data-studio-action="export-snapshot"
           onClick={() => setExportModal({ isOpen: true, type: "png" })}
-          className="w-full py-4 bg-accent hover:bg-accentHover text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-glow active:scale-95 transition-all"
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-accent py-2.5 text-xs font-semibold text-white shadow-glow transition-colors hover:bg-accentHover"
         >
-          <Camera size={18} /> Download Snapshot (PNG)
+          <Camera size={15} /> Snapshot PNG
         </button>
       </div>
     </div>
@@ -190,14 +184,10 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace, irregularTool
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {!hasWorkspace ? (
-            <div className="p-4 animate-fade-in">
-              <div className="bg-accent/10 border border-accent/20 p-6 rounded-xl text-center space-y-3">
-                <PlusSquare size={32} className="mx-auto text-accent opacity-50" />
-                <p className="text-xs text-textMuted leading-relaxed font-medium">
-                  No Workspace Active.
-                  <br />
-                  Import an image or initialize a blank canvas.
-                </p>
+            <div className="animate-fade-in p-3">
+              <div className="space-y-2 rounded-md border border-white/8 bg-surface/50 p-4 text-center">
+                <PlusSquare size={22} className="mx-auto text-textMuted opacity-70" />
+                <p className="text-[11px] font-medium text-textMuted">No source</p>
               </div>
             </div>
         ) : (

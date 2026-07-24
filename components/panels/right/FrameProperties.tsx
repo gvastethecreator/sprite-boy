@@ -20,7 +20,7 @@ const FrameProperties: React.FC<FramePropertiesProps> = ({
   onToAsset,
 }) => (
   <>
-    <SectionHeader title="Source Frame" icon={Grid} colorClass="text-green-400" />
+    <SectionHeader title="Frame" icon={Grid} />
     <Section>
       <div className="grid grid-cols-2 gap-4">
         <NumberControl

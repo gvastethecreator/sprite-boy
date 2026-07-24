@@ -81,26 +81,23 @@ export function IrregularSliceTools({
   const hasSource = sourceAssetId !== null;
 
   return (
-    <section aria-labelledby="irregular-slice-tools-title" className="border-t border-white/10 bg-panel/70">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <div>
-          <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-textMuted">S1 tools</p>
-          <h2 id="irregular-slice-tools-title" className="mt-1 text-xs font-bold text-textMain">Irregular regions</h2>
-        </div>
-        <span className="rounded-full border border-white/10 px-2 py-1 font-mono text-[9px] text-textMuted">{regions.length} regions</span>
+    <section aria-labelledby="irregular-slice-tools-title" className="border-t border-white/8 bg-panel/80">
+      <div className="flex h-10 items-center justify-between border-b border-white/8 px-3">
+        <h2 id="irregular-slice-tools-title" className="text-[11px] font-semibold tracking-wide text-textMain">
+          Irregular regions
+        </h2>
+        <span className="font-mono text-[10px] text-textMuted">{regions.length}</span>
       </div>
 
-      <div className="space-y-3 p-4">
-        <div role="tablist" aria-label="Irregular region tool" className="grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-          <button type="button" role="tab" aria-selected={toolMode === "wand"} onClick={() => onToolModeChange("wand")} className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md text-[10px] font-bold uppercase ${toolMode === "wand" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}>
+      <div className="space-y-3 p-3">
+        <div role="tablist" aria-label="Irregular region tool" className="grid grid-cols-2 gap-1 rounded-md border border-white/10 bg-black/20 p-0.5">
+          <button type="button" role="tab" aria-selected={toolMode === "wand"} onClick={() => onToolModeChange("wand")} className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded text-[10px] font-semibold ${toolMode === "wand" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}>
             <Wand2 size={12} aria-hidden="true" /> Wand
           </button>
-          <button type="button" role="tab" aria-selected={toolMode === "manual"} onClick={() => onToolModeChange("manual")} className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md text-[10px] font-bold uppercase ${toolMode === "manual" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}>
+          <button type="button" role="tab" aria-selected={toolMode === "manual"} onClick={() => onToolModeChange("manual")} className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded text-[10px] font-semibold ${toolMode === "manual" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}>
             <MousePointer2 size={12} aria-hidden="true" /> Manual
           </button>
         </div>
-
-        {!hasSource ? <p className="text-[10px] leading-4 text-textMuted">Import a canonical source to activate region tools.</p> : null}
 
         {toolMode === "wand" ? (
           <div className="space-y-3" role="tabpanel" aria-label="Magic wand controls">
@@ -123,9 +120,9 @@ export function IrregularSliceTools({
               </select>
             </label>
             <div className="rounded-lg border border-white/10 bg-black/20 p-2">
-              {selection.components.length > 0 ? <WandSelectionProbe selection={selection} title="Current wand selection" /> : <p className="py-6 text-center text-[10px] text-textMuted">Click the source canvas to select a component.</p>}
+              {selection.components.length > 0 ? <WandSelectionProbe selection={selection} title="Current wand selection" /> : <p className="py-4 text-center text-[10px] text-textMuted">No selection</p>}
               <div className="mt-2 flex items-center justify-between text-[9px] text-textMuted">
-                <span>{selection.components.length} selected · {selection.mask?.pixelCount ?? 0} px</span>
+                <span>{selection.components.length} · {selection.mask?.pixelCount ?? 0} px</span>
                 <button type="button" onClick={onCancelSelection} disabled={selection.components.length === 0} className="rounded-md px-2 py-1 font-bold text-textMuted hover:bg-white/10 hover:text-textMain disabled:opacity-40">Clear</button>
               </div>
             </div>
@@ -140,8 +137,7 @@ export function IrregularSliceTools({
                 </label>
               ))}
             </div>
-            <button type="button" disabled={!hasSource || busy} onClick={onCreateManual} className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 text-[10px] font-bold text-accent hover:bg-accent/15 disabled:opacity-40"><Plus size={13} aria-hidden="true" /> Create from coordinates</button>
-            <p className="text-[9px] leading-4 text-textMuted">Drag an empty part of the canvas to add a slice. Drag a saved box to move it; use its handles to resize it. Arrow keys adjust by 1 px, Shift by 10 px.</p>
+            <button type="button" disabled={!hasSource || busy} onClick={onCreateManual} className="inline-flex min-h-8 w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 text-[10px] font-semibold text-accent hover:bg-accent/15 disabled:opacity-40"><Plus size={13} aria-hidden="true" /> Create region</button>
             {selectedRegion ? (
               <div className="space-y-2 rounded-lg border border-white/10 bg-black/20 p-2">
                 <p className="truncate text-[10px] font-bold text-textMain">{selectedRegion.name ?? selectedRegion.id}</p>

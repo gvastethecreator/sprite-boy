@@ -32,7 +32,7 @@ const SectionHeader = ({
 
 const CollisionTools: React.FC<CollisionToolsProps> = (props) => (
   <aside className="h-full flex flex-col bg-panel">
-    <SectionHeader title="Collision Tools" icon={Target} colorClass="text-red-400" />
+    <SectionHeader title="Collision" icon={Target} />
     <div className="p-3 space-y-3">
       {props.selectedFrame ? (
         <>

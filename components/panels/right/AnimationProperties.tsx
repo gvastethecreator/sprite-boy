@@ -42,7 +42,7 @@ const AnimationProperties: React.FC<AnimationPropertiesProps> = (props) => {
 
   return (
     <>
-      <SectionHeader title="Sequence Config" icon={Film} colorClass="text-purple-400" />
+      <SectionHeader title="Sequence" icon={Film} />
       <Section>
         <PropRow label="Name">
           <TextInput
@@ -69,7 +69,7 @@ const AnimationProperties: React.FC<AnimationPropertiesProps> = (props) => {
 
       {props.onionSkin && props.setOnionSkin && (
         <>
-          <SectionHeader title="Onion Skin" icon={Layers} colorClass="text-orange-400" />
+          <SectionHeader title="Onion skin" icon={Layers} />
           <Section>
             <Checkbox
               label="Enable"
@@ -91,7 +91,7 @@ const AnimationProperties: React.FC<AnimationPropertiesProps> = (props) => {
         </>
       )}
 
-      <SectionHeader title="Keyframe Inspector" icon={Crosshair} colorClass="text-blue-400" />
+      <SectionHeader title="Keyframe" icon={Crosshair} />
       <Section>
         {activeKf ? (
           <div className="space-y-6">

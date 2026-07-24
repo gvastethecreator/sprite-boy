@@ -76,12 +76,12 @@ export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ contro
   };
 
   const summary = draft.enabled
-    ? `Chroma key on: ${draft.color}, tolerance ${draft.tolerance}%, smoothness ${draft.smoothness}%, spill ${draft.spill}%.`
-    : "Chroma key off. Source pixels remain unchanged by this stage.";
+    ? `On · ${draft.color} · tolerance ${draft.tolerance}% · smooth ${draft.smoothness}% · spill ${draft.spill}%`
+    : "Chroma key off";
 
   return (
     <fieldset
-      className="space-y-4 border-t border-white/5 pt-4"
+      className="space-y-3 border-t border-white/6 pt-3"
       disabled={disabled}
       data-slice-chroma-controls=""
       data-chroma-enabled={draft.enabled ? "true" : "false"}
@@ -91,17 +91,10 @@ export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ contro
       data-chroma-spill={draft.spill}
     >
       <legend className="sr-only">Chroma key</legend>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2">
-          <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-textMuted">
-              Chroma key
-            </h3>
-            <p className="mt-1 text-[9px] leading-relaxed text-textMuted/70">
-              Remove a keyed background before crop and pixel processing.
-            </p>
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="shrink-0 text-textMuted" aria-hidden="true" />
+          <h3 className="studio-section-label">Chroma key</h3>
         </div>
         <button
           type="button"
@@ -116,7 +109,7 @@ export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ contro
               spill: 0,
             });
           }}
-          className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-[9px] font-bold text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-35"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 text-[9px] font-semibold text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-35"
         >
           <RotateCcw size={11} aria-hidden="true" /> Reset
         </button>
@@ -210,9 +203,9 @@ export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ contro
         aria-label="Chroma preview summary"
         aria-live="polite"
         aria-atomic="true"
-        className="rounded-xl border border-white/5 bg-black/20 p-3 text-[10px] leading-relaxed text-textMuted"
+        className="rounded-md border border-white/6 bg-black/20 px-2.5 py-2 font-mono text-[10px] text-textMuted"
       >
-        {disabled ? "Chroma settings are available when the source grid is ready." : summary}
+        {disabled ? "No source" : summary}
       </div>
     </fieldset>
   );

@@ -76,30 +76,30 @@ const EMPTY_STATE_DEFINITIONS: Readonly<Record<StudioWorkspaceId, EmptyStateDefi
   Object.freeze({
     slice: Object.freeze({
       title: "Bring in a spritesheet",
-      description: "Import PNG, JPEG or WebP source art to detect and refine sprite regions.",
+      description: "PNG, JPEG or WebP.",
       primaryAction: Object.freeze({ commandId: "asset.import", label: "Import source art" }),
     }),
     compose: Object.freeze({
       title: "Start a composition",
-      description: "Import artwork to create the first canvas and arrange reusable sprite layers.",
+      description: "Import art or open a Slice region.",
       primaryAction: Object.freeze({ commandId: "asset.import", label: "Import artwork" }),
       secondaryAction: Object.freeze({ commandId: "workspace.open.slice", label: "Go to Slice" }),
     }),
     animate: Object.freeze({
       title: "Add artwork before animating",
-      description: "Create a source or composition first, then sequence frames from the Animate tools.",
+      description: "Need a source or composition first.",
       primaryAction: Object.freeze({ commandId: "asset.import", label: "Import artwork" }),
       secondaryAction: Object.freeze({ commandId: "workspace.open.compose", label: "Go to Compose" }),
     }),
     collision: Object.freeze({
       title: "Create frames before hitboxes",
-      description: "Collision shapes attach to sliced frames. Prepare at least one frame in Slice.",
+      description: "Collision shapes attach to sliced frames.",
       primaryAction: Object.freeze({ commandId: "workspace.open.slice", label: "Go to Slice" }),
       secondaryAction: Object.freeze({ commandId: "asset.import", label: "Import source art" }),
     }),
     export: Object.freeze({
       title: "Build something to export",
-      description: "Import or compose artwork before validating and packaging project outputs.",
+      description: "Import or compose art first.",
       primaryAction: Object.freeze({ commandId: "asset.import", label: "Import artwork" }),
       secondaryAction: Object.freeze({ commandId: "workspace.open.compose", label: "Go to Compose" }),
     }),

@@ -116,31 +116,28 @@ export function SliceSourceMetadataBar({
       aria-label="Slice source metadata"
       data-slice-source-metadata=""
       className={[
-        "flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-panel/75 px-4",
-        compact ? "py-2" : "py-3",
+        "flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/8 bg-panel/90 px-3",
+        compact ? "py-1.5" : "py-2",
       ].join(" ")}
     >
       <div className="min-w-0">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-textMuted">
-          Source preview
-        </p>
-        <p className="truncate text-sm font-bold text-textMain">{metadata?.name ?? "Slice source"}</p>
+        <p className="truncate text-xs font-semibold text-textMain">{metadata?.name ?? "Slice source"}</p>
       </div>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-4">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
         {metadata ? (
-          <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-textMuted">
-            <div className="flex gap-1.5">
-              <dt>Dimensions</dt>
-              <dd className="font-bold text-textMain">{metadata.width} × {metadata.height}</dd>
+          <dl className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-textMuted">
+            <div className="flex gap-1">
+              <dt className="sr-only">Dimensions</dt>
+              <dd className="font-semibold text-textMain">{metadata.width} × {metadata.height}</dd>
             </div>
-            <div className="flex gap-1.5">
-              <dt>Size</dt>
-              <dd className="font-bold text-textMain">{formatSourceByteSize(metadata.size)}</dd>
+            <div className="flex gap-1">
+              <dt className="sr-only">Size</dt>
+              <dd className="font-semibold text-textMain">{formatSourceByteSize(metadata.size)}</dd>
             </div>
-            <div className="flex gap-1.5">
-              <dt>Format</dt>
+            <div className="flex gap-1">
+              <dt className="sr-only">Format</dt>
               <dd
-                className="font-bold text-textMain"
+                className="font-semibold text-textMain"
                 data-format-confidence={metadata.formatConfidence}
               >
                 {metadata.formatLabel}

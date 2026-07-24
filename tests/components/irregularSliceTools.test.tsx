@@ -47,7 +47,7 @@ describe("IrregularSliceTools (S1-04)", () => {
     expect(screen.getByRole("spinbutton", { name: "Region width" })).toBeInTheDocument();
     fireEvent.change(screen.getByRole("spinbutton", { name: "Region width" }), { target: { value: "12" } });
     expect(value.onManualDraftChange).toHaveBeenCalledWith({ width: 12 });
-    fireEvent.click(screen.getByRole("button", { name: /Create from coordinates/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Create region/i }));
     expect(value.onCreateManual).toHaveBeenCalledOnce();
   });
 });

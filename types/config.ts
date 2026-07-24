@@ -38,7 +38,8 @@ export interface UserPreferences {
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
   theme: "dark",
-  accentColor: "0 0 0",
+  /** Indigo reads on zinc panels with white label text; black fails as a primary CTA. */
+  accentColor: "99 102 241",
   uiDensity: "comfortable",
   autoSaveGrid: true,
   showTooltips: true,

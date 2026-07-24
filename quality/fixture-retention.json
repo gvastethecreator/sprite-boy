@@ -38,6 +38,22 @@
       "sha256": "6ea892e5f4e219b08c649022a3b292fceb8a3c61e1edf6e6ddd557c569bc9cd8"
     },
     {
+      "path": "tests/contract/fixtures/gridProcessingGoldenInputs.ts",
+      "kind": "grid-processing-golden-inputs",
+      "owner": "G1/G2",
+      "mode": "text-lf",
+      "bytes": 6093,
+      "sha256": "28ca757e8f045b67037da0f665d6dda2ae5498e0d601c466113f19bebece8f83"
+    },
+    {
+      "path": "tests/contract/fixtures/gridProcessingGoldenManifestV1.ts",
+      "kind": "grid-processing-golden-manifest",
+      "owner": "G1/G2",
+      "mode": "text-lf",
+      "bytes": 10603,
+      "sha256": "1b2c61622183e21c7eeb2bf60e491f80dccd219f5dbd6efd13662f93085b670e"
+    },
+    {
       "path": "tests/contract/fixtures/legacyProjectV0.ts",
       "kind": "sanitized-legacy-project",
       "owner": "F0/F3",

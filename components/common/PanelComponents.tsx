@@ -3,18 +3,18 @@ import React from "react";
 export const SectionHeader = ({
   title,
   icon: Icon,
-  colorClass = "text-accent",
+  colorClass = "text-textMain",
   action,
 }: {
   title: string;
-  icon?: any;
+  icon?: React.ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
   colorClass?: string;
   action?: React.ReactNode;
 }) => (
-  <div className="flex items-center justify-between gap-2 px-4 py-3 bg-white/5 border-b border-white/5 mt-0 sticky top-0 z-10 backdrop-blur-md shrink-0">
-    <div className="flex items-center gap-2">
-      {Icon && <Icon size={18} className={colorClass} />}
-      <span className="text-sm font-bold text-textMain uppercase tracking-wider text-shadow-sm">
+  <div className="sticky top-0 z-10 flex h-10 shrink-0 items-center justify-between gap-2 border-b border-white/8 bg-panelHeader/95 px-3 backdrop-blur-sm">
+    <div className="flex min-w-0 items-center gap-2">
+      {Icon ? <Icon size={14} className={colorClass} aria-hidden={true} /> : null}
+      <span className="truncate text-[11px] font-semibold tracking-wide text-textMain">
         {title}
       </span>
     </div>
@@ -29,15 +29,15 @@ export const Section = ({
   children?: React.ReactNode;
   className?: string;
 }) => (
-  <div className={`p-4 space-y-5 border-b border-white/5 last:border-0 ${className}`}>
+  <div className={`space-y-3 border-b border-white/6 p-3 last:border-0 ${className}`}>
     {children}
   </div>
 );
 
 export const PropRow = ({ label, children }: { label: string; children?: React.ReactNode }) => (
-  <div className="flex items-center justify-between gap-3 h-9">
-    <span className="text-xs font-medium text-textMuted w-24 shrink-0 truncate">{label}</span>
-    <div className="flex-1 min-w-0">{children}</div>
+  <div className="flex h-8 items-center justify-between gap-3">
+    <span className="w-20 shrink-0 truncate text-[11px] font-medium text-textMuted">{label}</span>
+    <div className="min-w-0 flex-1">{children}</div>
   </div>
 );
 
@@ -51,7 +51,7 @@ export const TextInput = ({
 }) => (
   <input
     type="text"
-    className="w-full input-deep border-none rounded-lg text-sm px-3 py-2 outline-none transition-all focus:ring-1 focus:ring-accent"
+    className="input-deep w-full rounded-md border-none px-2.5 py-1.5 text-xs outline-none transition-all focus:ring-1 focus:ring-accent"
     value={value}
     onChange={(e) => onChange(e.target.value)}
     onKeyDown={(e) => e.stopPropagation()}
@@ -69,11 +69,11 @@ export const Checkbox = ({
   checked: boolean;
   onChange: (v: boolean) => void;
 }) => (
-  <label className="flex items-center gap-3 cursor-pointer select-none py-2 group w-full hover:bg-white/5 rounded-lg px-2 -ml-2 transition-colors">
+  <label className="group -ml-1 flex w-full cursor-pointer select-none items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-white/5">
     <div
-      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shadow-inner-depth ${checked ? "bg-accent border-accent" : "bg-black/40 border-white/20 group-hover:border-white/40"}`}
+      className={`flex h-4 w-4 items-center justify-center rounded border shadow-inner-depth transition-colors ${checked ? "border-accent bg-accent" : "border-white/20 bg-black/40 group-hover:border-white/40"}`}
     >
-      {checked && <div className="w-2.5 h-2.5 bg-white rounded-[1px] shadow-sm" />}
+      {checked ? <div className="h-2 w-2 rounded-[1px] bg-white shadow-sm" /> : null}
     </div>
     <input
       type="checkbox"
@@ -81,6 +81,11 @@ export const Checkbox = ({
       onChange={(e) => onChange(e.target.checked)}
       className="hidden"
     />
-    <span className="text-sm font-medium text-textMuted group-hover:text-textMain">{label}</span>
+    <span className="text-xs font-medium text-textMuted group-hover:text-textMain">{label}</span>
   </label>
+);
+
+/** Compact field group label used in inspectors. */
+export const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+  <span className="studio-section-label block">{children}</span>
 );

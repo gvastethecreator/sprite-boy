@@ -130,15 +130,14 @@ export function SliceResultsTray({ controller }: SliceResultsTrayProps) {
     <section
       aria-label="Staged slice results"
       data-slice-results-tray=""
-      className="shrink-0 border-t border-white/10 bg-panel/95 px-3 py-2.5 shadow-[0_-12px_28px_rgba(0,0,0,0.16)]"
+      className="shrink-0 border-t border-white/8 bg-panel px-3 py-2 shadow-[0_-8px_20px_rgba(0,0,0,0.18)]"
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <StatusIcon status={state.status} />
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-textMuted">Slices</p>
-            <p role="status" aria-live="polite" className="truncate text-xs font-semibold text-textMain">{statusLabel(controller)}</p>
-          </div>
+          <p role="status" aria-live="polite" className="min-w-0 truncate text-xs font-semibold text-textMain">
+            {statusLabel(controller)}
+          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           {isProcessing ? (

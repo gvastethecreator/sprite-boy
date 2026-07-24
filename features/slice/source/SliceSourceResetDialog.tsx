@@ -35,9 +35,8 @@ export function SliceSourceResetDialog({
         <h2 id="slice-source-reset-title" className="text-lg font-bold text-textMain">
           Reset the Slice source?
         </h2>
-        <p className="mt-2 text-sm leading-6 text-textMuted">
-          {sourceName ? `“${sourceName}”` : "The current source"}, its detected frames and
-          source-derived canvas data will be cleared. Studio preferences and the asset library stay intact.
+        <p className="mt-2 text-xs leading-5 text-textMuted">
+          Clears {sourceName ? `“${sourceName}”` : "the source"} and derived frames. Preferences and the asset library stay intact.
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button

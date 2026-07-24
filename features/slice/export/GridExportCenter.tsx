@@ -129,13 +129,11 @@ export function GridExportCenter({ project, revision, repository, onOpenCompose,
   };
 
   return (
-    <section data-grid-export-center aria-labelledby="grid-export-title" className="flex h-full min-h-0 flex-col bg-workspace p-4 sm:p-6">
-      <div className="mx-auto flex w-full max-w-5xl min-h-0 flex-1 flex-col gap-4">
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-textMuted">Export Center</p>
-            <h1 id="grid-export-title" className="mt-1 text-xl font-bold tracking-tight text-textMain">Grid slices</h1>
-            <p className="mt-1 text-xs leading-5 text-textMuted">Download one PNG or a ZIP with manifest and provenance.</p>
+    <section data-grid-export-center aria-labelledby="grid-export-title" className="flex h-full min-h-0 flex-col bg-workspace p-4 sm:p-5">
+      <div className="mx-auto flex w-full max-w-4xl min-h-0 flex-1 flex-col gap-3">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 id="grid-export-title" className="text-lg font-semibold tracking-tight text-textMain">Grid slices</h1>
           </div>
           <div className="flex items-center gap-2">
             {busy ? (
@@ -178,9 +176,10 @@ export function GridExportCenter({ project, revision, repository, onOpenCompose,
               </div>
             </div>
             <aside className="flex min-h-0 flex-col rounded-xl border border-white/10 bg-panel/70 p-4">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-textMuted">Selected region</p>
-              <h2 className="mt-2 truncate text-base font-bold text-textMain">{selected?.name ?? "None"}</h2>
-              <p className="mt-1 text-xs text-textMuted">{selected ? `${selected.bounds.width}×${selected.bounds.height}px` : "Choose a tile"}</p>
+              <h2 className="truncate text-base font-semibold text-textMain">{selected?.name ?? "None"}</h2>
+              {selected ? (
+                <p className="mt-1 font-mono text-xs text-textMuted">{selected.bounds.width}×{selected.bounds.height}</p>
+              ) : null}
               <div className="mt-auto grid gap-2 pt-6">
                 <button type="button" aria-label="Download PNG" onClick={() => void exportOne()} disabled={!selected || busy !== null} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-white/15 bg-surface px-3 text-xs font-bold text-textMain hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                   {busy === "one" ? <LoaderCircle size={13} className="animate-spin" aria-hidden="true" /> : <Download size={13} aria-hidden="true" />}

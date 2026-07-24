@@ -7,7 +7,6 @@ import {
   FileImage,
   Layers,
   Film,
-  Sparkles,
   Loader2,
 } from "lucide-react";
 import { CodeFormat } from "../../types";
@@ -156,11 +155,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
                 <Layers size={40} className="text-accent" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-textMain">Individual Frames Package</h3>
-                <p className="text-sm text-textMuted mt-2 max-w-md mx-auto leading-relaxed">
-                  We will extract each frame as a standalone transparent PNG and package them into a
-                  single ZIP file for easy engine importing.
-                </p>
+                <h3 className="text-lg font-bold text-textMain">PNG sequence (ZIP)</h3>
               </div>
               <div className="flex justify-center gap-3 pt-4">
                 <button onClick={onClose} className="px-5 py-2.5 text-xs font-bold text-textMuted">
@@ -203,13 +198,6 @@ const ExportModal: React.FC<ExportModalProps> = ({
                     ))
                   )}
                 </select>
-              </div>
-
-              <div className="bg-purple-900/10 border border-purple-500/20 p-4 rounded-xl">
-                <p className="text-xs text-purple-300 leading-relaxed">
-                  <Sparkles size={12} className="inline mr-1 mb-0.5" /> GIFs will be exported with
-                  the FPS set in the animation config. Ensure you have keyframes defined.
-                </p>
               </div>
 
               <div className="flex justify-end gap-3 pt-4">

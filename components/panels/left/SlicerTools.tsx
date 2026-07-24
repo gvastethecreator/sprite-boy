@@ -35,7 +35,7 @@ interface SlicerToolsProps {
 const SectionHeader = ({
   title,
   icon: Icon,
-  colorClass = "text-accent",
+  colorClass = "text-textMuted",
   action,
 }: {
   title: string;
@@ -43,10 +43,10 @@ const SectionHeader = ({
   colorClass?: string;
   action?: React.ReactNode;
 }) => (
-  <div className="h-10 bg-white/5 flex items-center justify-between px-4 shrink-0 select-none border-b border-white/5 backdrop-blur-md">
+  <div className="flex h-10 shrink-0 select-none items-center justify-between border-b border-white/8 bg-panelHeader/95 px-3">
     <div className="flex items-center gap-2">
-      {Icon && <Icon size={16} className={colorClass} />}
-      <span className="text-[11px] font-bold text-textMuted uppercase tracking-wider">{title}</span>
+      {Icon && <Icon size={14} className={colorClass} />}
+      <span className="text-[11px] font-semibold tracking-wide text-textMain">{title}</span>
     </div>
     {action}
   </div>
@@ -60,20 +60,20 @@ const SlicerTools: React.FC<SlicerToolsProps> = (props) => {
   return (
     <div className="shrink-0 flex flex-col border-b border-white/5 bg-panel-gradient">
       <SectionHeader
-        title={isBuilder ? "Canvas Geometry" : "Slicing Strategy"}
+        title={isBuilder ? "Canvas" : "Slice"}
         icon={isBuilder ? Monitor : Scissors}
       />
 
-      <div className="p-4 space-y-5">
+      <div className="space-y-4 p-3">
         {!isBuilder && props.showLegacySliceControls !== false && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <button
               onClick={props.onAutoSlice}
               disabled={props.isLoading || !hasImageOrCanvas}
-              className="w-full py-3 btn-primary rounded-xl text-xs font-bold flex items-center justify-center gap-2 superellipse disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
+              className="btn-primary flex w-full items-center justify-center gap-2 rounded-md py-2.5 text-xs font-semibold transition-all disabled:opacity-50 disabled:grayscale"
             >
-              <Wand2 size={16} className={props.isLoading ? "animate-spin" : ""} />
-              {props.isLoading ? "Analyzing..." : "Auto-Detect Sprites"}
+              <Wand2 size={14} className={props.isLoading ? "animate-spin" : ""} />
+              {props.isLoading ? "Analyzing…" : "Auto-detect"}
             </button>
 
             <div

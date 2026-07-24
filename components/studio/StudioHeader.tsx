@@ -270,15 +270,15 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   };
 
   return (
-    <header className="relative z-50 flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-panel px-2 sm:px-4">
-      <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
-        <div className="flex shrink-0 items-center gap-2.5 select-none" aria-label="SpriteBoy Studio">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-surface text-accent">
-            <LayoutGrid size={18} strokeWidth={1.8} />
+    <header className="relative z-50 flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-panel px-2 sm:px-3">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
+        <div className="flex shrink-0 select-none items-center gap-2" aria-label="SpriteBoy Studio">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-surface text-textMain">
+            <LayoutGrid size={15} strokeWidth={1.8} />
           </div>
-          <div className="hidden flex-col justify-center sm:flex">
-            <span className="text-sm font-bold leading-none tracking-tight text-textMain">SpriteBoy</span>
-            <span className="font-mono text-[10px] text-textMuted/70">Studio</span>
+          <div className="hidden items-baseline gap-1.5 sm:flex">
+            <span className="text-sm font-semibold leading-none tracking-tight text-textMain">SpriteBoy</span>
+            <span className="text-[10px] font-medium text-textMuted/80">Studio</span>
           </div>
         </div>
 
@@ -517,7 +517,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         )}
       </div>
 
-      <nav aria-label="Studio workspaces" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-lg border border-white/5 bg-surface/50 p-1 backdrop-blur-sm xl:flex">
+      <nav aria-label="Studio workspaces" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 rounded-md border border-white/8 bg-surface/60 p-0.5 xl:flex">
         {STUDIO_WORKSPACES.map((workspace) => {
           const Icon = WORKSPACE_ICONS[workspace.id];
           const commandId = workspace.commandId;
@@ -533,14 +533,14 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
               title={disabled ? state.reason : workspace.description}
               onClick={(event) => executeWorkspace(event, commandId)}
               className={[
-                "relative inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                "relative inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                 activeWorkspace === workspace.id
-                  ? "bg-accent text-white shadow-sm"
+                  ? "bg-white/12 text-textMain shadow-sm"
                   : "text-textMuted hover:bg-white/5 hover:text-textMain",
                 disabled ? "pointer-events-none opacity-35" : "",
               ].join(" ")}
             >
-              <Icon size={14} strokeWidth={1.8} />
+              <Icon size={13} strokeWidth={1.8} />
               {workspace.label}
             </a>
           );

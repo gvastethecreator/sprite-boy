@@ -209,10 +209,16 @@ function nativeAbortSignalPrototype(): object | null {
  */
 function isTrustedNativeAbortSignal(signal: AbortSignal | undefined): signal is AbortSignal {
   if (!signal) return false;
-  const prototype = nativeAbortSignalPrototype();
-  if (!prototype) return false;
   try {
-    return Object.getPrototypeOf(signal) === prototype;
+    if (typeof AbortSignal !== "undefined" && signal instanceof AbortSignal) return true;
+    const prototype = nativeAbortSignalPrototype();
+    if (!prototype) return false;
+    let current: object | null = Object.getPrototypeOf(signal);
+    while (current) {
+      if (current === prototype) return true;
+      current = Object.getPrototypeOf(current);
+    }
+    return Object.prototype.toString.call(signal) === "[object AbortSignal]";
   } catch {
     return false;
   }

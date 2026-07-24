@@ -18,7 +18,6 @@ import {
   Target,
   Shield,
   Zap,
-  Info,
   FlipHorizontal,
   FlipVertical,
   GripHorizontal,
@@ -231,7 +230,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   if (currentMode === AppMode.COLLISION) {
     return (
       <aside className="h-full flex flex-col bg-panel border-l border-white/5 overflow-hidden">
-        <SectionHeader title="Collision Box" icon={Target} colorClass="text-red-500" />
+        <SectionHeader title="Hitbox" icon={Target} />
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
           {selectedFrame ? (
             <div className="space-y-6 animate-fade-in">
@@ -273,13 +272,6 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                 </div>
               </div>
 
-              <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl flex gap-3">
-                <Info size={16} className="text-yellow-500 shrink-0" />
-                <p className="text-[10px] text-yellow-200/80 leading-relaxed">
-                  Collision metadata allows your game engine to detect interactions. Export as JSON
-                  to link these regions to your physics logic.
-                </p>
-              </div>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-textMuted opacity-30 text-center py-20">
@@ -578,7 +570,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   return (
     <aside className="h-full flex flex-col items-center justify-center p-8 text-center bg-panel border-l border-white/5 opacity-40">
       <Box size={48} className="mb-4 text-textMuted stroke-1" />
-      <p className="text-[10px] font-bold uppercase tracking-widest">Select workspace resource</p>
+      <p className="text-[10px] font-semibold text-textMuted">No selection</p>
     </aside>
   );
 };

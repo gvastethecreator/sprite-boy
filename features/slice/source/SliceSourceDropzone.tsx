@@ -18,13 +18,13 @@ function isBusy(snapshot: SourceSessionSnapshot): boolean {
 }
 
 function statusCopy(snapshot: SourceSessionSnapshot, committing: boolean): string {
-  if (committing) return "Opening the validated source in Slice…";
+  if (committing) return "Opening the validated source…";
   switch (snapshot.status) {
     case "validating": return "Checking file type, signature and size…";
-    case "decoding": return "Decoding source pixels safely…";
-    case "ready": return "Source validated. Preparing the Slice workspace…";
+    case "decoding": return "Decoding pixels…";
+    case "ready": return "Source validated. Preparing workspace…";
     case "error": return `${snapshot.error.message} ${snapshot.error.retryable
-      ? "Try the same validated file again, or choose another image."
+      ? "Try again, or choose another image."
       : "Choose another image to continue."}`;
     case "idle": return "PNG, JPEG or WebP · maximum 10 MiB";
   }
@@ -48,7 +48,7 @@ export function SliceSourceDropzone({
   const inactive = disabled || busy;
   const dragActive = dragDepth > 0 && !inactive;
   const titleId = "slice-source-dropzone-title";
-  const descriptionId = "slice-source-dropzone-description";
+  const statusId = "slice-source-dropzone-status";
 
   useEffect(() => {
     mountedRef.current = true;
@@ -81,9 +81,6 @@ export function SliceSourceDropzone({
   const invokeSelection = (input: SourceSelectionInput): void => {
     setBoundaryError(null);
     try {
-      // Never pass an arbitrary rejection value into state.  Browser adapters
-      // are allowed to reject with host objects (or Error instances), neither
-      // of which is a safe React child.
       Promise.resolve(onSelect(input)).catch(() => containBoundaryFailure());
     } catch {
       containBoundaryFailure();
@@ -122,7 +119,7 @@ export function SliceSourceDropzone({
   return (
     <section
       aria-labelledby={titleId}
-      aria-describedby={descriptionId}
+      aria-describedby={statusId}
       aria-busy={busy || undefined}
       data-slice-source-dropzone=""
       data-drop-active={dragActive || undefined}
@@ -139,41 +136,40 @@ export function SliceSourceDropzone({
         setDragDepth((depth) => Math.max(0, depth - 1));
       }}
       onDrop={handleDrop}
-      className="absolute inset-0 flex items-center justify-center overflow-y-auto bg-workspace p-5 sm:p-8"
+      className="absolute inset-0 flex items-center justify-center overflow-y-auto bg-workspace p-4 sm:p-6"
     >
       <div
+        onClick={(event) => {
+          if (inactive) return;
+          if ((event.target as HTMLElement).closest("button")) return;
+          invokeBrowse();
+        }}
         className={[
-          "w-full max-w-2xl rounded-2xl border bg-panel/90 p-6 text-center shadow-modal backdrop-blur-md transition-colors sm:p-9",
+          "studio-empty-card max-w-lg cursor-pointer transition-colors hover:border-white/16",
           dragActive
             ? "border-accent bg-accent/10 shadow-glow"
             : snapshot.status === "error"
               ? "border-amber-400/45"
-              : "border-white/10",
+              : "",
         ].join(" ")}
       >
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-surface text-accent">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-surface text-textMain">
           {busy ? (
-            <LoaderCircle className="motion-safe:animate-spin" size={30} aria-hidden="true" />
+            <LoaderCircle className="motion-safe:animate-spin text-textMuted" size={24} aria-hidden="true" />
           ) : snapshot.status === "error" ? (
-            <AlertTriangle className="text-amber-400" size={30} aria-hidden="true" />
+            <AlertTriangle className="text-amber-400" size={24} aria-hidden="true" />
           ) : dragActive ? (
-            <FileImage size={30} aria-hidden="true" />
+            <FileImage size={24} aria-hidden="true" />
           ) : (
-            <UploadCloud size={30} aria-hidden="true" />
+            <UploadCloud size={24} aria-hidden="true" />
           )}
         </div>
 
-        <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-textMuted">
-          Slice workspace
-        </p>
-        <h1 id={titleId} className="text-xl font-bold tracking-tight text-textMain sm:text-2xl">
+        <h1 id={titleId} className="text-lg font-semibold tracking-tight text-textMain sm:text-xl">
           {dragActive ? "Drop the spritesheet here" : "Bring in a spritesheet"}
         </h1>
-        <p id={descriptionId} className="mx-auto mt-3 max-w-lg text-sm leading-6 text-textMuted">
-          Import source art once, then detect, refine and commit sprite regions without leaving Studio.
-        </p>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           <button
             ref={(node) => {
               localBrowseButtonRef.current = node;
@@ -182,9 +178,9 @@ export function SliceSourceDropzone({
             type="button"
             disabled={inactive}
             onClick={invokeBrowse}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-xs font-bold text-white shadow-glow hover:bg-accentHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white shadow-glow hover:bg-accentHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
-            <FileImage size={15} aria-hidden="true" />
+            <FileImage size={14} aria-hidden="true" />
             Choose source image
           </button>
           {snapshot.status === "error" && snapshot.error.retryable && onRetry ? (
@@ -193,7 +189,7 @@ export function SliceSourceDropzone({
               type="button"
               disabled={inactive}
               onClick={invokeRetry}
-              className="min-h-11 rounded-lg border border-white/10 bg-surface px-5 py-2.5 text-xs font-bold text-textMain hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-45"
+              className="min-h-10 rounded-md border border-white/10 bg-surface px-4 py-2 text-xs font-semibold text-textMain hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-45"
             >
               Try again
             </button>
@@ -201,10 +197,11 @@ export function SliceSourceDropzone({
         </div>
 
         <p
+          id={statusId}
           role={snapshot.status === "error" || boundaryError ? "alert" : "status"}
           aria-live={snapshot.status === "error" || boundaryError ? "assertive" : "polite"}
           className={[
-            "mx-auto mt-5 min-h-5 max-w-lg text-xs",
+            "mx-auto mt-4 min-h-5 max-w-sm text-[11px]",
             snapshot.status === "error" || boundaryError ? "text-amber-300" : "text-textMuted",
           ].join(" ")}
         >

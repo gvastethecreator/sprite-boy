@@ -23,6 +23,7 @@ interface SettingsModalProps {
 }
 
 const COLORS = [
+  { name: "Indigo", value: "99 102 241", class: "bg-indigo-500" },
   { name: "Blue", value: "15 100 210", class: "bg-blue-600" },
   { name: "Purple", value: "139 92 246", class: "bg-purple-600" },
   { name: "Green", value: "34 197 94", class: "bg-green-600" },
@@ -83,12 +84,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
         <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar bg-app">
           <section>
-            <h3 className="text-xs text-textMuted font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Palette size={14} /> Appearance
+            <h3 className="studio-section-label mb-3 flex items-center gap-2">
+              <Palette size={12} /> Appearance
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-textMain block mb-2 font-medium">Theme Mode</label>
+                <label className="mb-2 block text-xs font-medium text-textMain">Theme</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => onUpdatePreferences({ ...preferences, theme: "dark" })}

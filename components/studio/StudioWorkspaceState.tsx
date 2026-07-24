@@ -63,7 +63,7 @@ function ResolutionButton({
         if (!disabled) onExecute(action.commandId);
       }}
       className={[
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold",
+        "inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-xs font-semibold",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40",
         primary
           ? "bg-accent text-white shadow-glow hover:bg-accentHover"
@@ -96,31 +96,28 @@ export function StudioWorkspaceStateView({
       aria-busy={isLoading || undefined}
       role={isError ? "alert" : isLoading ? "status" : undefined}
       aria-live={isError ? "assertive" : isLoading ? "polite" : undefined}
-      className="absolute inset-0 flex items-center justify-center overflow-y-auto bg-workspace p-5 sm:p-8"
+      className="absolute inset-0 flex items-center justify-center overflow-y-auto bg-workspace p-4 sm:p-6"
     >
-      <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-panel/85 p-6 text-center shadow-modal backdrop-blur-md sm:p-8">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-surface text-accent">
+      <div className="studio-empty-card">
+        <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-surface text-textMain">
           {isLoading ? (
-            <LoaderCircle className="motion-safe:animate-spin" size={28} aria-hidden="true" />
+            <LoaderCircle className="motion-safe:animate-spin text-textMuted" size={22} aria-hidden="true" />
           ) : isError ? (
-            <AlertTriangle className="text-amber-400" size={28} aria-hidden="true" />
+            <AlertTriangle className="text-amber-400" size={22} aria-hidden="true" />
           ) : (
-            <WorkspaceIcon size={28} strokeWidth={1.6} aria-hidden="true" />
+            <WorkspaceIcon size={22} strokeWidth={1.6} aria-hidden="true" />
           )}
         </div>
 
-        <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-textMuted">
-          {state.workspaceLabel} workspace
-        </p>
-        <h1 id={titleId} className="text-xl font-bold tracking-tight text-textMain sm:text-2xl">
+        <h1 id={titleId} className="text-lg font-semibold tracking-tight text-textMain sm:text-xl">
           {state.title}
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-textMuted">
+        <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-textMuted">
           {state.description}
         </p>
 
         {state.kind === "empty" ? (
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <ResolutionButton
               action={state.primaryAction}
               registry={registry}
@@ -140,7 +137,7 @@ export function StudioWorkspaceStateView({
         ) : null}
 
         {state.kind === "error" ? (
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             {state.retryCommandId ? (
               <ResolutionButton
                 action={{ commandId: state.retryCommandId, label: "Try again" }}
@@ -154,7 +151,7 @@ export function StudioWorkspaceStateView({
               <button
                 type="button"
                 onClick={onDismissError}
-                className="min-h-10 rounded-lg border border-white/10 bg-surface px-4 py-2 text-xs font-bold text-textMain hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="min-h-10 rounded-md border border-white/10 bg-surface px-4 py-2 text-xs font-semibold text-textMain hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Dismiss
               </button>

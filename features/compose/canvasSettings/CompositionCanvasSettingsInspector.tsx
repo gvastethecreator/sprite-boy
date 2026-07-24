@@ -192,19 +192,16 @@ export function CompositionCanvasSettingsInspector({
     <form
       ref={formRef}
       aria-label="Canvas settings"
-      className={`flex min-h-0 flex-col gap-4 overflow-y-auto p-4 text-textMain ${className}`}
+      className={`custom-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto p-3 text-textMain ${className}`}
       onSubmit={submit}
       onReset={(event) => {
         event.preventDefault();
         reloadLatest();
       }}
     >
-      <div className="flex items-center gap-2">
-        <Maximize2 size={15} className="text-accent" aria-hidden="true" />
-        <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider">Canvas</h3>
-          <p className="mt-0.5 text-[10px] text-textMuted">Dimensions and export background</p>
-        </div>
+      <div className="flex h-8 items-center gap-2">
+        <Maximize2 size={14} className="text-textMuted" aria-hidden="true" />
+        <h3 className="text-[11px] font-semibold tracking-wide">Canvas</h3>
       </div>
 
       <div className="flex min-h-28 items-center justify-center rounded-xl border border-white/10 bg-black/20 p-3" aria-label="Canvas preview">

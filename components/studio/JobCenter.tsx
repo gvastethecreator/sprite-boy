@@ -159,15 +159,12 @@ export function JobCenter({ store, runner, retryJob = null }: JobCenterProps) {
       ) : null}
 
       {entries.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-12 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-surface text-textMuted">
-            <Activity size={21} strokeWidth={1.7} aria-hidden="true" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-6 py-10 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-surface text-textMuted">
+            <Activity size={18} strokeWidth={1.7} aria-hidden="true" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-textMain">No jobs yet</h3>
-            <p className="mt-1 max-w-64 text-xs leading-5 text-textMuted">
-              Processing, generation and export activity will appear here.
-            </p>
+            <h3 className="text-xs font-semibold text-textMain">No jobs yet</h3>
           </div>
         </div>
       ) : (

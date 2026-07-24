@@ -88,16 +88,16 @@ export const SlicePixelControls: React.FC<SlicePixelControlsProps> = ({ controll
   };
 
   const summary = !draft.enabled
-    ? "Pixel stage off. Source dimensions and colors remain unchanged."
+    ? "Pixel stage off"
     : draft.palette
-      ? `Fixed ${fixedPreset?.label ?? "custom"} palette: ${draft.palette.length} colors at ${draft.size}px.`
+      ? `Fixed ${fixedPreset?.label ?? "custom"} · ${draft.palette.length} colors · ${draft.size}px`
       : draft.quantize
-        ? `Auto palette: up to ${draft.colors} colors at ${draft.size}px.`
-        : `Pixel resize only at ${draft.size}px. Palette quantization is off.`;
+        ? `Auto · ≤${draft.colors} colors · ${draft.size}px`
+        : `Resize ${draft.size}px · no quantize`;
 
   return (
     <fieldset
-      className="space-y-4 border-t border-white/5 pt-4"
+      className="space-y-3 border-t border-white/6 pt-3"
       disabled={disabled}
       data-slice-pixel-controls=""
       data-pixel-enabled={draft.enabled ? "true" : "false"}
@@ -106,17 +106,10 @@ export const SlicePixelControls: React.FC<SlicePixelControlsProps> = ({ controll
       data-pixel-mode={paletteMode}
     >
       <legend className="sr-only">Pixel processing</legend>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2">
-          <Grid3X3 size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-textMuted">
-              Pixel processing
-            </h3>
-            <p className="mt-1 text-[9px] leading-relaxed text-textMuted/70">
-              Snap each cell with nearest-neighbor resize and a reproducible palette.
-            </p>
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Grid3X3 size={13} className="shrink-0 text-textMuted" aria-hidden="true" />
+          <h3 className="studio-section-label">Pixel</h3>
         </div>
         <button
           type="button"
@@ -125,7 +118,7 @@ export const SlicePixelControls: React.FC<SlicePixelControlsProps> = ({ controll
           onClick={() => {
             if (controller.resetPixel()) setDraft(DEFAULT_PIXEL);
           }}
-          className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-[9px] font-bold text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-35"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 text-[9px] font-semibold text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-35"
         >
           <RotateCcw size={11} aria-hidden="true" /> Reset
         </button>
@@ -159,7 +152,6 @@ export const SlicePixelControls: React.FC<SlicePixelControlsProps> = ({ controll
             <option value={draft.size}>{draft.size}px custom</option>
           )}
         </select>
-        <span className="block text-[9px] font-normal uppercase tracking-wider text-textMuted/70">Custom exact size · 1–4096</span>
         <input
           type="number"
           min={1}
@@ -167,6 +159,7 @@ export const SlicePixelControls: React.FC<SlicePixelControlsProps> = ({ controll
           step={1}
           inputMode="numeric"
           aria-label="Custom pixel target size"
+          title="Custom size 1–4096"
           value={sizeDraft}
           onChange={(event) => setSizeDraft(event.currentTarget.value)}
           onBlur={() => {
@@ -262,8 +255,8 @@ export const SlicePixelControls: React.FC<SlicePixelControlsProps> = ({ controll
         </label>
       )}
 
-      <div id={`${id}-summary`} aria-label="Pixel processing summary" aria-live="polite" aria-atomic="true" className="rounded-xl border border-white/5 bg-black/20 p-3 text-[10px] leading-relaxed text-textMuted">
-        {disabled ? "Pixel settings are available when the source grid is ready." : summary}
+      <div id={`${id}-summary`} aria-label="Pixel processing summary" aria-live="polite" aria-atomic="true" className="rounded-md border border-white/6 bg-black/20 px-2.5 py-2 font-mono text-[10px] text-textMuted">
+        {disabled ? "No source" : summary}
       </div>
     </fieldset>
   );

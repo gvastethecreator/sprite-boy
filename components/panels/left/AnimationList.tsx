@@ -106,8 +106,7 @@ const AnimationList: React.FC<AnimationListProps> = ({
       ) : (
         <div className="h-full flex flex-col items-center justify-center p-6 text-center text-textMuted opacity-40">
           <Clapperboard size={40} className="mb-4 stroke-1" />
-          <p className="text-sm font-medium text-textMain">No animations yet</p>
-          <p className="text-xs mt-1">Click + to create one</p>
+          <p className="text-sm font-medium text-textMain">No animations</p>
         </div>
       )}
     </div>

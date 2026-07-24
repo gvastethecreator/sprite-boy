@@ -92,30 +92,23 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
       data-grid-crop-padding={cropDraft.padding}
       data-grid-crop-enabled={cropDraft.threshold > 0 ? "true" : "false"}
     >
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-white/5 bg-white/5 px-4">
-        <Grid3X3 size={17} className="text-accent" aria-hidden="true" />
-        <div className="min-w-0">
-          <h2 className="text-sm font-bold tracking-wide text-textMain">Grid</h2>
-          <p className="truncate text-[9px] uppercase tracking-wider text-textMuted">
-            Slice layout
-          </p>
-        </div>
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/8 bg-panelHeader/95 px-3">
+        <Grid3X3 size={14} className="text-textMuted" aria-hidden="true" />
+        <h2 className="text-[11px] font-semibold tracking-wide text-textMain">Grid</h2>
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto p-4 custom-scrollbar">
-        <fieldset className="space-y-3">
-          <legend className="text-[10px] font-bold uppercase tracking-widest text-textMuted">
-            Layout mode
-          </legend>
+      <div className="flex-1 space-y-4 overflow-y-auto p-3 custom-scrollbar">
+        <fieldset className="space-y-2">
+          <legend className="studio-section-label">Layout</legend>
           <div
             role="radiogroup"
             aria-label="Grid layout mode"
-            className="grid grid-cols-2 gap-2 rounded-xl border border-white/5 bg-black/20 p-1.5"
+            className="grid grid-cols-2 gap-1 rounded-md border border-white/8 bg-black/20 p-0.5"
           >
             {(["auto", "manual"] as const).map((mode) => (
               <label
                 key={mode}
-                className={`cursor-pointer rounded-lg px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wider transition-colors focus-within:ring-2 focus-within:ring-accent ${
+                className={`cursor-pointer rounded px-3 py-1.5 text-center text-[10px] font-semibold transition-colors focus-within:ring-2 focus-within:ring-accent ${
                   controller.draft.mode === mode
                     ? "bg-accent text-white shadow-glow-sm"
                     : "text-textMuted hover:bg-white/5 hover:text-textMain"
@@ -135,11 +128,9 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
           </div>
         </fieldset>
 
-        <div className="space-y-3 border-t border-white/5 pt-4">
+        <div className="space-y-2 border-t border-white/6 pt-3">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-textMuted">
-              Manual layout
-            </h3>
+            <h3 className="studio-section-label">Manual</h3>
             {controller.sourceDimensions && (
               <span className="font-mono text-[9px] text-textMuted/70">
                 {controller.sourceDimensions.width} × {controller.sourceDimensions.height}px
@@ -190,29 +181,14 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
               )}
             </label>
           </div>
-          <p className="text-[10px] leading-relaxed text-textMuted/75">
-            Manual values stay saved when Auto is selected.
-          </p>
-          {controller.draft.mode === "manual" && (
-            <p className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-2 text-[10px] leading-relaxed text-cyan-100/80">
-              Drag the cyan dividers in the canvas to size each row and column. Focus a divider and use arrow keys for pixel changes; Shift moves 10 pixels.
-            </p>
-          )}
         </div>
 
-        <fieldset className="space-y-4 border-t border-white/5 pt-4" disabled={cropDisabled}>
+        <fieldset className="space-y-3 border-t border-white/6 pt-3" disabled={cropDisabled}>
           <legend className="sr-only">Crop</legend>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2">
-              <Scissors size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-              <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-textMuted">
-                  Crop
-                </h3>
-                <p className="mt-1 text-[9px] leading-relaxed text-textMuted/70">
-                  Trim transparent borders inside each cell.
-                </p>
-              </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Scissors size={13} className="shrink-0 text-textMuted" aria-hidden="true" />
+              <h3 className="studio-section-label">Crop</h3>
             </div>
             <button
               type="button"
@@ -225,7 +201,7 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
                       padding: controller.cropPreview.padding,
                     });
               }}
-              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-[9px] font-bold text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-35"
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 text-[9px] font-semibold text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-35"
             >
               <RotateCcw size={11} aria-hidden="true" /> Reset
             </button>
@@ -294,13 +270,13 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
             aria-label="Crop preview summary"
             aria-live="polite"
             aria-atomic="true"
-            className="rounded-xl border border-white/5 bg-black/20 p-3 text-[10px] leading-relaxed text-textMuted"
+            className="rounded-md border border-white/6 bg-black/20 px-2.5 py-2 font-mono text-[10px] text-textMuted"
           >
             {controller.cropPreview.cellCount === 0
-              ? "Crop preview is available when the source grid is ready."
+              ? "Crop waits until the source grid is ready."
               : cropDraft.threshold > 0
-                ? `Preview: ${controller.cropPreview.cellCount} ${controller.cropPreview.cellCount === 1 ? "cell" : "cells"} use ${cropDraft.threshold}% alpha threshold and ${cropDraft.padding}px padding. Reduction is measured after processing.`
-                : `Auto crop is off. ${controller.cropPreview.cellCount} ${controller.cropPreview.cellCount === 1 ? "cell keeps" : "cells keep"} the original bounds.`}
+                ? `${controller.cropPreview.cellCount} ${controller.cropPreview.cellCount === 1 ? "cell" : "cells"} use ${cropDraft.threshold}% alpha threshold · ${cropDraft.padding}px pad · Reduction is measured after processing.`
+                : `Auto crop is off · ${controller.cropPreview.cellCount} ${controller.cropPreview.cellCount === 1 ? "cell" : "cells"}`}
           </div>
         </fieldset>
 
@@ -347,23 +323,22 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
             {controller.status === "detecting" ? (
               <div className="flex items-center gap-2 text-[10px] text-textMuted">
                 <LoaderCircle size={14} className="animate-spin text-accent" aria-hidden="true" />
-                Detecting grid… Manual mode remains available.
+                Detecting grid…
               </div>
             ) : controller.status === "fallback" ? (
-              <div className="flex gap-2 text-[10px] leading-relaxed text-amber-100">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-300" aria-hidden="true" />
-                No repeated grid was detected. Auto will use the safe 1 × 1 fallback.
+              <div className="flex items-center gap-2 text-[10px] text-amber-100">
+                <AlertTriangle size={14} className="shrink-0 text-amber-300" aria-hidden="true" />
+                Safe 1 × 1 fallback
               </div>
             ) : controller.status === "detected" && detected ? (
-              <div className="flex gap-2 text-[10px] leading-relaxed text-textMain">
-                <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" aria-hidden="true" />
+              <div className="flex items-center gap-2 text-[10px] text-textMain">
+                <CheckCircle2 size={14} className="shrink-0 text-emerald-400" aria-hidden="true" />
                 <span>
-                  Detected <strong>{detected.rows} rows × {detected.cols} columns</strong>
-                  {` (${cells} cells).`}
+                  Detected {detected.rows} rows × {detected.cols} columns ({cells} cells)
                 </span>
               </div>
             ) : (
-              <p className="text-[10px] text-textMuted">Choose a source to detect its grid.</p>
+              <p className="text-[10px] text-textMuted">No source</p>
             )}
             </>
           )}

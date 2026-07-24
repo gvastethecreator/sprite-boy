@@ -215,7 +215,7 @@ export function ComposeBootstrapWorkspace({
   return (
     <section
       aria-labelledby="compose-bootstrap-title"
-      className="flex h-full min-h-0 flex-col overflow-y-auto bg-workspace p-4 sm:p-6"
+      className="flex h-full min-h-0 flex-col overflow-y-auto bg-workspace p-4 sm:p-5"
       onDragEnter={(event) => {
         if (interactionDisabled) return;
         event.preventDefault();
@@ -236,29 +236,26 @@ export function ComposeBootstrapWorkspace({
         if (file && !interactionDisabled) void importFile(file);
       }}
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-textMuted">
-              Compose workspace
-            </p>
-            <h1 id="compose-bootstrap-title" className="text-xl font-bold tracking-tight text-textMain">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 id="compose-bootstrap-title" className="truncate text-lg font-semibold tracking-tight text-textMain">
               {composition ? composition.name : "Start a composition"}
             </h1>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-textMuted">
-              {composition
-                ? `${composition.width} × ${composition.height} · ${composition.layerIds.length} ${composition.layerIds.length === 1 ? "layer" : "layers"}`
-                : "Import an image or open a canonical Asset or Region. SpriteBoy creates the first layer without duplicating source bytes."}
-            </p>
+            {composition ? (
+              <p className="mt-0.5 font-mono text-[11px] text-textMuted">
+                {composition.width} × {composition.height} · {composition.layerIds.length} {composition.layerIds.length === 1 ? "layer" : "layers"}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
             disabled={interactionDisabled}
             onClick={() => fileInputRef.current?.click()}
-            className="btn-primary inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait disabled:opacity-55"
+            className="btn-primary inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md px-3.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait disabled:opacity-55"
           >
-            {busy || disabled ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" /> : <Upload size={15} aria-hidden="true" />}
-            {disabled ? "Loading project…" : busy ? "Importing…" : composition ? "Import another image" : "Import image"}
+            {busy || disabled ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" /> : <Upload size={14} aria-hidden="true" />}
+            {disabled ? "Loading…" : busy ? "Importing…" : composition ? "Import image" : "Import image"}
           </button>
           <input
             ref={fileInputRef}
@@ -276,8 +273,8 @@ export function ComposeBootstrapWorkspace({
 
         <div
           className={[
-            "rounded-2xl border border-dashed p-4 transition-colors sm:p-5",
-            dragActive ? "border-accent bg-accent/10" : "border-white/15 bg-panel/55",
+            "rounded-lg border border-dashed p-3 transition-colors sm:p-4",
+            dragActive ? "border-accent bg-accent/10" : "border-white/12 bg-panel/70",
           ].join(" ")}
         >
           {sources.length === 0 ? (
@@ -285,20 +282,19 @@ export function ComposeBootstrapWorkspace({
               type="button"
               disabled={interactionDisabled}
               onClick={() => fileInputRef.current?.click()}
-              className="flex min-h-48 w-full flex-col items-center justify-center rounded-xl text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+              className="flex min-h-40 w-full flex-col items-center justify-center rounded-md text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
             >
-              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-surface text-accent">
-                <ImageIcon size={25} aria-hidden="true" />
+              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-surface text-textMain">
+                <ImageIcon size={20} aria-hidden="true" />
               </span>
-              <span className="text-sm font-bold text-textMain">Drop a PNG, JPEG or WebP</span>
-              <span className="mt-1 text-[11px] text-textMuted">Up to 10 MB · decoded dimensions are validated</span>
+              <span className="text-sm font-semibold text-textMain">Drop PNG, JPEG or WebP</span>
             </button>
           ) : (
             <div>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-textMain">
-                  <Layers3 size={15} className="text-accent" aria-hidden="true" />
-                  Project sources
+              <div className="mb-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-textMain">
+                  <Layers3 size={14} className="text-textMuted" aria-hidden="true" />
+                  Sources
                 </div>
                 <span className="font-mono text-[10px] text-textMuted">{sources.length}</span>
               </div>
@@ -309,14 +305,14 @@ export function ComposeBootstrapWorkspace({
                       type="button"
                       disabled={interactionDisabled}
                       onClick={() => openSource(item.source)}
-                      className="group flex min-h-20 w-full items-center gap-3 rounded-xl border border-white/10 bg-surface p-3 text-left transition-colors hover:border-accent/50 hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                      className="group flex min-h-16 w-full items-center gap-2.5 rounded-md border border-white/10 bg-surface p-2.5 text-left transition-colors hover:border-white/20 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/25 text-textMuted group-hover:text-accent">
-                        <ImageIcon size={17} aria-hidden="true" />
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-black/25 text-textMuted group-hover:text-textMain">
+                        <ImageIcon size={16} aria-hidden="true" />
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate text-xs font-bold text-textMain">{item.name}</span>
-                        <span className="mt-1 block font-mono text-[9px] uppercase tracking-wider text-textMuted">
+                        <span className="block truncate text-xs font-semibold text-textMain">{item.name}</span>
+                        <span className="mt-0.5 block font-mono text-[10px] text-textMuted">
                           {sourceLabel(item.source)} · {item.dimensions}
                         </span>
                       </span>
@@ -329,14 +325,9 @@ export function ComposeBootstrapWorkspace({
         </div>
 
         {composition ? (
-          <div className="flex items-start gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-emerald-100">
-            <CheckCircle2 size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <div>
-              <p className="text-xs font-bold">Composition graph ready</p>
-              <p className="mt-0.5 text-[10px] leading-4 text-emerald-100/75">
-                The selected source, layer order and canvas settings now live in the canonical project.
-              </p>
-            </div>
+          <div className="flex items-center gap-2 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-emerald-100">
+            <CheckCircle2 size={15} className="shrink-0" aria-hidden="true" />
+            <p className="text-xs font-semibold">Composition graph ready</p>
           </div>
         ) : null}
 
@@ -347,22 +338,22 @@ export function ComposeBootstrapWorkspace({
             role={feedback.kind === "error" ? "alert" : "status"}
             aria-label={feedback.message}
             className={[
-              "flex items-start gap-2 rounded-xl border p-3 text-xs",
+              "flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
               feedback.kind === "error"
                 ? "border-red-400/30 bg-red-400/10 text-red-100"
                 : "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
             ].join(" ")}
           >
             {feedback.kind === "error"
-              ? <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-              : <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden="true" />}
+              ? <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+              : <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden="true" />}
             <span className="min-w-0 flex-1">{feedback.message}</span>
             {feedback.cleanupAssetId ? (
               <button
                 type="button"
                 disabled={interactionDisabled}
                 onClick={() => void retryCleanup(feedback.cleanupAssetId as EntityId)}
-                className="shrink-0 rounded-md border border-current/30 px-2 py-1 text-[10px] font-bold hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current disabled:opacity-50"
+                className="shrink-0 rounded-md border border-current/30 px-2 py-1 text-[10px] font-semibold hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current disabled:opacity-50"
               >
                 Retry cleanup
               </button>
