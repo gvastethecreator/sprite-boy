@@ -266,19 +266,29 @@ export async function runDeferredFeatureBrowser(options = {}) {
     const initialRequestPaths = requestedPaths.slice();
 
     await seedExportFixture(client);
-    await clickButton(client, "PNG sequence (.zip)");
+    // Accept either legacy copy or current Export sidebar polish labels.
+    const zipOpened =
+      (await client.evaluate(clickButtonExpression("PNG sequence (.zip)"))) === true ||
+      (await client.evaluate(clickButtonExpression("Individual PNGs (.zip)"))) === true;
+    if (!zipOpened) throw new Error("Browser action ZIP export is unavailable.");
     await waitForText(client, "Generate & Download ZIP");
     await clickButton(client, "Generate & Download ZIP");
     await client.waitFor(`document.body.innerText.includes("ZIP downloaded")`);
     await delay(250);
 
-    await clickButton(client, "Animation (.gif)");
+    const gifOpened =
+      (await client.evaluate(clickButtonExpression("Animation (.gif)"))) === true ||
+      (await client.evaluate(clickButtonExpression("Animation Sequence (.gif)"))) === true;
+    if (!gifOpened) throw new Error("Browser action GIF export is unavailable.");
     await waitForText(client, "Export GIF");
     await clickButton(client, "Export GIF");
     await client.waitFor(`document.body.innerText.includes("GIF Exported")`, 30_000);
     await delay(250);
 
-    await clickButton(client, "PNG sequence (.zip)");
+    const zipReopened =
+      (await client.evaluate(clickButtonExpression("PNG sequence (.zip)"))) === true ||
+      (await client.evaluate(clickButtonExpression("Individual PNGs (.zip)"))) === true;
+    if (!zipReopened) throw new Error("Browser action ZIP export is unavailable.");
     await waitForText(client, "Generate & Download ZIP");
     await client.waitFor(`(() => {
       const title = document.querySelector("#studio-export-title");
