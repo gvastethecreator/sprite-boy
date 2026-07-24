@@ -78,7 +78,6 @@ import {
   restoreCanonicalSliceSource,
 } from "../../features/slice/source/importSliceSource";
 import GridExportCenter from "../../features/slice/export/GridExportCenter";
-import { openCompositionFromSource } from "../../features/compose/project/compositionEntry";
 import {
   clearDurableGridCommitUndo,
   durableGridCommitMatchesProject,
@@ -88,7 +87,13 @@ import {
 } from "../../features/slice/results/durableGridCommitUndo";
 import ComposeBootstrapWorkspace from "../../features/compose/project/ComposeBootstrapWorkspace";
 import CompositionCanvasSettingsInspector from "../../features/compose/canvasSettings/CompositionCanvasSettingsInspector";
+import { handoffRegionToCompose } from "../../features/slice/handoff/sliceToComposeHandoff";
 import StudioWorkspaceErrorBoundary from "../studio/StudioWorkspaceErrorBoundary";
+import { DUAL_ENGINE_FREEZE_ACTIVE } from "../../core/studio/dualEngineFreeze";
+
+const CollisionWorkspacePanel = React.lazy(
+  () => import("../../features/collision/CollisionWorkspacePanel"),
+);
 
 const LEGACY_MODE_BY_WORKSPACE = {
   slice: AppMode.BUILDER,
@@ -600,8 +605,9 @@ const AppLayout: React.FC = () => {
     }
   }, [cancelSliceCommit, canonicalProject.id]);
   const openGridRegionInCompose = useCallback((regionId: string): void => {
-    const result = openCompositionFromSource(canonical.store, {
-      source: { type: "region", id: regionId },
+    void DUAL_ENGINE_FREEZE_ACTIVE;
+    const result = handoffRegionToCompose(canonical.store, {
+      regionId,
       commandId: `grid-compose-${regionId}`,
       issuedAt: new Date().toISOString(),
     });
@@ -1277,6 +1283,10 @@ const AppLayout: React.FC = () => {
                 onCleanupDebtChange={canonical.reportAssetCleanupDebt}
                 onCompositionReady={() => navigate("compose")}
               />
+            ) : activeWorkspace === "collision" ? (
+              <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading collision…</div>}>
+                <CollisionWorkspacePanel />
+              </React.Suspense>
             ) : activeWorkspace === "slice" && !slicerImage && sourceSessionSnapshot.status === "ready" ? (
               <SliceSourcePreview
                 snapshot={sourceSessionSnapshot}

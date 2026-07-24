@@ -266,19 +266,19 @@ export async function runDeferredFeatureBrowser(options = {}) {
     const initialRequestPaths = requestedPaths.slice();
 
     await seedExportFixture(client);
-    await clickButton(client, "Individual PNGs (.zip)");
+    await clickButton(client, "PNG sequence (.zip)");
     await waitForText(client, "Generate & Download ZIP");
     await clickButton(client, "Generate & Download ZIP");
     await client.waitFor(`document.body.innerText.includes("ZIP downloaded")`);
     await delay(250);
 
-    await clickButton(client, "Animation Sequence (.gif)");
+    await clickButton(client, "Animation (.gif)");
     await waitForText(client, "Export GIF");
     await clickButton(client, "Export GIF");
     await client.waitFor(`document.body.innerText.includes("GIF Exported")`, 30_000);
     await delay(250);
 
-    await clickButton(client, "Individual PNGs (.zip)");
+    await clickButton(client, "PNG sequence (.zip)");
     await waitForText(client, "Generate & Download ZIP");
     await client.waitFor(`(() => {
       const title = document.querySelector("#studio-export-title");
