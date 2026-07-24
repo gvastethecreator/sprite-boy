@@ -15,7 +15,7 @@ A web-based sprite sheet editor, animation sequencer, and sprite composition too
 
 | Layer           | Tool                                |
 | --------------- | ----------------------------------- |
-| Runtime         | React 19 + TypeScript 6             |
+| Runtime         | React 19 + TypeScript 7             |
 | Bundler         | Vite 8 (Rolldown)                   |
 | Styling         | Tailwind CSS 4 (design-token based) |
 | Animation       | GSAP 3, CSS keyframes               |
@@ -87,54 +87,40 @@ bun run test:log    # → logs/test.log
 bun run lint:log    # → logs/lint.log
 ```
 
+## Dual stack (short)
+
+The app runs **two** project stacks during migration:
+
+1. **Canonical** (`core/`, `features/`, `CanonicalProjectProvider`) — durable Studio V1 graph, package codec, jobs, Slice/Compose.
+2. **Legacy host** (`useProjectController`, `ProjectContext`, `utils/*` bridges) — builder/slicer/animation panels still on `FrameData`. **Do not grow durable logic here** (see `AGENTS.md`).
+
+Workspaces: Slice · Compose · Animate · Collision · Export (hash navigation via `core/studio/workspaceRegistry`).
+
 ## Project Structure
 
 ```
-├── index.html              # Entry HTML
-├── index.tsx               # React root mount
-├── index.css               # Tailwind v4 theme + custom utilities
-├── App.tsx                 # App shell (ProjectProvider → AppLayout)
-├── vite.config.ts          # Vite 8 + React + Tailwind config
-├── vitest.config.ts        # Vitest test runner config
-├── .oxlintrc.json          # OXC linter rules
+├── index.html / index.tsx / index.css
+├── App.tsx                 # StudioLocalStores → CanonicalProject → ProjectProvider → AppLayout
+├── AGENTS.md               # Agent/human dual-stack map + commands
+├── core/                   # Project engine, stores, persistence, render, export, processing
+├── features/
+│   ├── slice/              # Source session, grid pipeline, irregular tools, grid export
+│   ├── compose/            # Composition bootstrap + canvas settings
+│   └── collision/          # Canonical collision surface (in progress)
 ├── components/
-│   ├── AppLayout.tsx       # Master layout, modals, resizable timeline
-│   ├── Header.tsx          # Brand, file/edit menus, mode tabs
-│   ├── CanvasArea.tsx      # Canvas rendering + interaction logic
-│   ├── LeftSidebar.tsx     # Mode-dependent tool panels
-│   ├── RightSidebar.tsx    # Inspector (frame, animation, slot props)
-│   ├── Timeline.tsx        # Keyframe sequencer with drag & drop
-│   ├── common/             # Shared UI primitives
-│   └── panels/             # Left/right sidebar panel implementations
-├── contexts/
-│   └── ProjectContext.tsx   # Global state provider
-├── hooks/
-│   ├── useProjectController.ts  # Central state orchestrator
-│   ├── useUIController.ts       # Toast, modal, viewport state
-│   ├── useUndo.ts               # 50-step undo/redo history
-│   ├── useKeyboardShortcuts.ts  # Global keyboard handlers
-│   └── domains/
-│       ├── useAnimationLogic.ts # Animation CRUD + playback
-│       ├── useBuilderLogic.ts   # Asset/slot management
-│       └── useSlicerLogic.ts    # Grid slicing + sprite detection
-├── types/
-│   ├── core.ts             # Domain models (Frame, Animation, etc.)
-│   ├── enums.ts            # AppMode, HitboxType, DragMode
-│   ├── config.ts           # GridConfig, UserPreferences
-│   └── ui.ts               # Viewport, sidebar, modal types
-├── utils/
-│   ├── algorithms.ts       # Grid generation, sprite detection, BG removal
-│   ├── renderUtils.ts      # CanvasRenderer static class
-│   ├── canvasMath.ts       # Resize handles, snapping, grid math
-│   ├── exportFormats.ts    # JSON/Phaser/Godot exporters
-│   ├── db.ts               # IndexedDB persistence
-│   ├── uiFeedback.ts       # Synthesized audio feedback
-│   ├── imageWorker.ts      # Web Worker for pixel operations
-│   └── defaultAssets.ts    # Inline SVG placeholder assets
-├── tests/                  # Vitest test suites
-├── scripts/                # Build/log utilities
-├── docs/                   # Architecture & design documentation
-└── .vscode/tasks.json      # VS Code task definitions
+│   ├── layout/             # AppLayout, sidebars, timeline panel
+│   ├── canvas/             # CanvasArea, toolbar, status
+│   ├── studio/             # StudioHeader, JobCenter, dialogs, workspace chrome
+│   ├── overlays/           # Export, Settings, Help, palette, toasts
+│   ├── panels/             # Left/right inspectors
+│   └── common/             # Shared controls
+├── contexts/               # CanonicalProject, StudioStore, legacy Project
+├── hooks/                  # Legacy controller + canvas hooks (freeze durable growth)
+├── types/                  # Legacy host types + enums
+├── utils/                  # Legacy algorithms, renderUtils, db, exportFormats
+├── tests/                  # Vitest contract/hooks/components/integration
+├── scripts/                # studio-gates and quality smoke
+└── docs/                   # ADRs under architecture/; integration ledger under integration/
 ```
 
 ## VS Code Tasks
