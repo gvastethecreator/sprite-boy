@@ -133,7 +133,12 @@ export function revokeBlobUrls(urls: Iterable<string>): void {
   }
 }
 
-/** Lightweight history key: never embeds multi-MB image payloads. */
+/**
+ * Lightweight history key for ProjectState.
+ * Fingerprints every durable structural field so useUndo does not treat
+ * keyframe/hitbox/slot/free-object property edits as no-ops.
+ * Never embeds multi-MB image payloads (data:/blob: use length+prefix only).
+ */
 export function projectStateHistoryKey(state: ProjectState): string {
   const srcKey = (src: string | undefined): string => {
     if (!src) return "";
@@ -141,36 +146,71 @@ export function projectStateHistoryKey(state: ProjectState): string {
     if (src.startsWith("blob:")) return `b:${src.length}:${src.slice(-24)}`;
     return `s:${src.length}:${src.slice(0, 48)}`;
   };
+  const num = (value: unknown): string =>
+    typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+  const bool = (value: unknown): string => (value ? "1" : "0");
+
   const frames = state.frames
-    .map(
-      (f) =>
-        `${f.id}:${f.x},${f.y},${f.w},${f.h},${f.hidden ? 1 : 0},${f.hitboxes?.length ?? 0}`,
-    )
+    .map((f) => {
+      const boxes = (f.hitboxes ?? [])
+        .map(
+          (h) =>
+            `${h.id}:${h.type}:${num(h.x)},${num(h.y)},${num(h.w)},${num(h.h)}:${h.tag ?? ""}`,
+        )
+        .join(",");
+      return `${f.id}:${num(f.x)},${num(f.y)},${num(f.w)},${num(f.h)}:${bool(f.hidden)}:[${boxes}]`;
+    })
     .join(";");
   const assets = state.builderAssets
-    .map((a) => `${a.id}:${a.name}:${a.width}x${a.height}:${srcKey(a.src)}`)
+    .map((a) => `${a.id}:${a.name}:${num(a.width)}x${num(a.height)}:${srcKey(a.src)}`)
     .join(";");
   const anims = state.animations
-    .map(
-      (a) =>
-        `${a.id}:${a.name}:${a.fps}:${a.loop ? 1 : 0}:${a.keyframes.length}`,
-    )
+    .map((a) => {
+      const kfs = a.keyframes
+        .map(
+          (k) =>
+            `${k.uid}:${num(k.sourceIndex)}:${num(k.pivotX)},${num(k.pivotY)}:${num(k.rotation)}:${num(k.scaleX)},${num(k.scaleY)}:${num(k.opacity)}`,
+        )
+        .join(",");
+      return `${a.id}:${a.name}:${num(a.fps)}:${bool(a.loop)}:[${kfs}]`;
+    })
     .join(";");
   const slots = Object.keys(state.builderSlots)
     .sort((a, b) => Number(a) - Number(b))
-    .map((k) => `${k}:${state.builderSlots[Number(k)]?.assetId ?? ""}`)
+    .map((k) => {
+      const s = state.builderSlots[Number(k)];
+      if (!s) return `${k}:`;
+      return [
+        k,
+        s.assetId,
+        s.fitMode,
+        s.alignment,
+        num(s.scaleX),
+        num(s.scaleY),
+        bool(s.lockAspect),
+        num(s.rotation),
+        num(s.opacity),
+        num(s.offsetX),
+        num(s.offsetY),
+        bool(s.flipX),
+        bool(s.flipY),
+      ].join(":");
+    })
     .join(";");
   const free = state.builderFreeObjects
-    .map((o) => `${o.id}:${o.assetId}:${o.x},${o.y},${o.w},${o.h}`)
+    .map(
+      (o) =>
+        `${o.id}:${o.assetId}:${num(o.x)},${num(o.y)},${num(o.w)},${num(o.h)}:${num(o.rotation)}:${bool(o.flipX)}:${bool(o.flipY)}:${num(o.opacity)}:${num(o.zIndex)}`,
+    )
     .join(";");
   const meta = state.imageMeta
-    ? `${state.imageMeta.name}:${state.imageMeta.width}x${state.imageMeta.height}:${srcKey(state.imageMeta.src)}`
+    ? `${state.imageMeta.name}:${num(state.imageMeta.width)}x${num(state.imageMeta.height)}:${srcKey(state.imageMeta.src)}`
     : "";
   const canvas = state.builderCanvas
-    ? `${state.builderCanvas.width}x${state.builderCanvas.height}`
+    ? `${num(state.builderCanvas.width)}x${num(state.builderCanvas.height)}`
     : "";
   const slice = state.sliceGrid
-    ? `sg:${state.sliceGrid.version}:${state.sliceGrid.manual.rows}x${state.sliceGrid.manual.cols}`
+    ? `sg:${state.sliceGrid.version}:${state.sliceGrid.manual.rows}x${state.sliceGrid.manual.cols}:${(state.sliceGrid.manual.rowBoundaries ?? []).join(",")}:${(state.sliceGrid.manual.columnBoundaries ?? []).join(",")}:${JSON.stringify(state.sliceGrid.recipe)}`
     : "";
   return [meta, canvas, frames, assets, anims, slots, free, state.aspectRatio ?? "", slice].join(
     "|",

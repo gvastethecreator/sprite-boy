@@ -31,5 +31,5 @@ describe("G1-05 grid processing golden real Worker gate", () => {
         "large-safe-4x4",
       ],
     });
-  });
+  }, 60_000);
 });

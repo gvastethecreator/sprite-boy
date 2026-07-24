@@ -13,7 +13,7 @@ import {
   projectStateHistoryKey,
   HOST_MAX_IMAGE_PIXELS,
 } from "../../utils/hostProjectPolicy";
-import { DEFAULT_PREFERENCES } from "../../types";
+import { DEFAULT_PREFERENCES, HitboxType, type ProjectState } from "../../types";
 import {
   missingAssetIdsForCache,
   pruneAssetCacheEntries,
@@ -23,7 +23,6 @@ import {
   workerTransferListForPayload,
 } from "../../utils/algorithms";
 import { projectStateHistoryKey as historyKey } from "../../utils/hostProjectPolicy";
-import type { ProjectState } from "../../types";
 
 const emptyProject = (): ProjectState => ({
   imageMeta: null,
@@ -147,6 +146,85 @@ describe("hostProjectPolicy", () => {
     const c = emptyProject();
     c.imageMeta = { src: huge, width: 1, height: 1, name: "a", fileSize: 1 };
     expect(projectStateHistoryKey(c)).toBe(keyA);
+  });
+
+  it("history key changes when keyframe, hitbox, slot, or free-object fields change without count change", () => {
+    const base = emptyProject();
+    base.frames = [{
+      id: 1,
+      x: 0,
+      y: 0,
+      w: 8,
+      h: 8,
+      hitboxes: [{ id: "h1", x: 0, y: 0, w: 4, h: 4, type: HitboxType.HITBOX, tag: "body" }],
+    }];
+    base.animations = [{
+      id: "a1",
+      name: "walk",
+      fps: 12,
+      loop: true,
+      keyframes: [
+        { uid: "k1", sourceIndex: 0, pivotX: 0.5, pivotY: 0.5 },
+        { uid: "k2", sourceIndex: 1, pivotX: 0.5, pivotY: 0.5 },
+      ],
+    }];
+    base.builderSlots = {
+      0: {
+        gridIndex: 0,
+        assetId: "asset",
+        fitMode: "fit",
+        alignment: "center",
+        scaleX: 1,
+        scaleY: 1,
+        lockAspect: true,
+        rotation: 0,
+        opacity: 1,
+        offsetX: 0,
+        offsetY: 0,
+        flipX: false,
+        flipY: false,
+      },
+    };
+    base.builderFreeObjects = [{
+      id: "f1",
+      assetId: "asset",
+      x: 0,
+      y: 0,
+      w: 8,
+      h: 8,
+      rotation: 0,
+      flipX: false,
+      flipY: false,
+      opacity: 1,
+      zIndex: 0,
+    }];
+    const root = projectStateHistoryKey(base);
+
+    const kfEdit = structuredClone(base);
+    kfEdit.animations[0].keyframes[0].sourceIndex = 3;
+    expect(projectStateHistoryKey(kfEdit)).not.toBe(root);
+
+    const orderEdit = structuredClone(base);
+    orderEdit.animations[0].keyframes = [
+      orderEdit.animations[0].keyframes[1],
+      orderEdit.animations[0].keyframes[0],
+    ];
+    expect(projectStateHistoryKey(orderEdit)).not.toBe(root);
+
+    const hitEdit = structuredClone(base);
+    hitEdit.frames[0].hitboxes![0].x = 2;
+    hitEdit.frames[0].hitboxes![0].tag = "head";
+    expect(projectStateHistoryKey(hitEdit)).not.toBe(root);
+
+    const slotEdit = structuredClone(base);
+    slotEdit.builderSlots[0].opacity = 0.4;
+    slotEdit.builderSlots[0].flipX = true;
+    expect(projectStateHistoryKey(slotEdit)).not.toBe(root);
+
+    const freeEdit = structuredClone(base);
+    freeEdit.builderFreeObjects[0].rotation = 90;
+    freeEdit.builderFreeObjects[0].zIndex = 5;
+    expect(projectStateHistoryKey(freeEdit)).not.toBe(root);
   });
 
   it("enforces host pixel caps", () => {
