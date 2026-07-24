@@ -2,16 +2,19 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { usePersistence } from "../../hooks/domains/usePersistence";
+import { parseLegacyProjectFile } from "../../utils/hostProjectPolicy";
 import type { AppMode, GridConfig, ProjectState, TemplateConfig } from "../../types";
 
-const project = {
+const projectPayload = {
   imageMeta: null,
   frames: [],
   builderSlots: {},
   builderFreeObjects: [],
   animations: [],
-  selectedIndex: null,
-} as unknown as ProjectState;
+  builderAssets: [],
+};
+const project = projectPayload as unknown as ProjectState;
+const sanitizedProject = parseLegacyProjectFile({ project: projectPayload }).project;
 
 function dependencies() {
   return {
@@ -44,7 +47,7 @@ describe("usePersistence project load boundary", () => {
     });
 
     expect(loaded).toBe(true);
-    expect(deps.setProject).toHaveBeenCalledWith(project);
+    expect(deps.setProject).toHaveBeenCalledWith(sanitizedProject);
     expect(deps.notify).toHaveBeenCalledWith("Project loaded", "success");
   });
 

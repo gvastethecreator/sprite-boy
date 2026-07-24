@@ -26,6 +26,7 @@ export const REPRO_BUN_VERSION = "1.3.14";
 export const REPRO_NODE_MAJOR = 24;
 export const REPRO_TIMEOUT_MS = 120_000;
 export const EXPECTED_OVERRIDES = Object.freeze({
+  "brace-expansion": "5.0.7",
   protobufjs: "7.6.5",
   undici: "7.28.0",
   ws: "8.21.1",

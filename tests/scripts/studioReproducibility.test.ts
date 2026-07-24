@@ -35,6 +35,7 @@ const EXPECTED_INSTALL_ARGV = [
 const EXPECTED_TIMEOUT_MS = 120_000;
 const PINNED_BUN_RUNTIME = { runtimeVersion: "1.3.14", execPath: "C:/bun.exe" };
 const EXPECTED_OVERRIDES = {
+  "brace-expansion": "5.0.7",
   protobufjs: "7.6.5",
   undici: "7.28.0",
   ws: "8.21.1",

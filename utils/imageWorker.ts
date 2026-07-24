@@ -252,7 +252,17 @@ self.onmessage = async (e) => {
       default:
         throw new Error("Unknown worker command");
     }
-    self.postMessage({ type: "SUCCESS", id, result });
+    const transfer: Transferable[] = [];
+    if (
+      result &&
+      typeof result === "object" &&
+      !Array.isArray(result) &&
+      "buffer" in result &&
+      (result as { buffer?: unknown }).buffer instanceof ArrayBuffer
+    ) {
+      transfer.push((result as { buffer: ArrayBuffer }).buffer);
+    }
+    self.postMessage({ type: "SUCCESS", id, result }, transfer);
   } catch (err: any) {
     self.postMessage({ type: "ERROR", id, error: err.message });
   }

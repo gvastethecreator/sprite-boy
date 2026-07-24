@@ -8,6 +8,11 @@ import {
 } from "../../types";
 import { CanvasRenderer } from "../../utils/renderUtils";
 import type { CanvasContentDimensions } from "./canvasOwnership";
+import {
+  missingAssetIdsForCache,
+  pruneAssetCacheEntries,
+} from "../../utils/hostAssetCache";
+import { hostCanvasNeedsContinuousPaint } from "../../utils/hostProjectPolicy";
 
 interface RenderLoopDeps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -16,6 +21,8 @@ interface RenderLoopDeps {
   stateRef: React.MutableRefObject<any>;
   slicerImgObj: HTMLImageElement | null;
   assetCache: Record<string, HTMLImageElement>;
+  /** Filled by the loop so layout/ref updates can request a single paint. */
+  invalidateRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 /** Loads the slicer image into an HTMLImageElement when imageMeta changes. */
@@ -37,20 +44,22 @@ export function useImageLoader(imageMeta: ImageMeta | null) {
   return slicerImgObj;
 }
 
-/** Keeps a cache of loaded HTMLImageElements for builder assets. */
-/** Maintains an HTMLImageElement cache keyed by asset ID. */
+/** Maintains an HTMLImageElement cache keyed by asset ID; prunes deleted ids. */
 export function useAssetCache(builderAssets: BuilderAsset[] | undefined) {
   const [assetCache, setAssetCache] = useState<Record<string, HTMLImageElement>>({});
 
   useEffect(() => {
-    builderAssets?.forEach((a) => {
-      if (!assetCache[a.id]) {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = a.src;
-        img.onload = () => setAssetCache((prev) => ({ ...prev, [a.id]: img }));
-      }
-    });
+    setAssetCache((prev) => pruneAssetCacheEntries(prev, builderAssets));
+  }, [builderAssets]);
+
+  useEffect(() => {
+    const missing = missingAssetIdsForCache(assetCache, builderAssets);
+    for (const a of missing) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = a.src;
+      img.onload = () => setAssetCache((prev) => ({ ...prev, [a.id]: img }));
+    }
   }, [builderAssets, assetCache]);
 
   return assetCache;
@@ -94,64 +103,100 @@ export function useCanvasResize(
   return canvasDims;
 }
 
-/** Runs the requestAnimationFrame render loop. */
-/** Drives the requestAnimationFrame render loop via CanvasRenderer. */
+/**
+ * Dirty/invalidation canvas paint via CanvasRenderer.
+ * Idle: no perpetual rAF. Continuous only while playback/drag needs frames.
+ * Call invalidateRef.current() after updating propsRef/stateRef.
+ */
 export function useRenderLoop(deps: RenderLoopDeps) {
-  const { canvasRef, propsRef, stateRef, slicerImgObj, assetCache } = deps;
+  const { canvasRef, propsRef, stateRef, slicerImgObj, assetCache, invalidateRef } = deps;
   const canvasDims = useCanvasResize(canvasRef, deps.containerRef);
 
   useEffect(() => {
-    let rid: number;
-    const loop = () => {
+    let rid = 0;
+    let cancelled = false;
+    let dirty = true;
+
+    const paintOnce = (): void => {
       const c = canvasRef.current;
       const p = propsRef.current;
       const s = stateRef.current;
-      if (c && canvasDims.w > 0) {
-        const ctx = c.getContext("2d");
-        if (ctx) {
-          const dpr = window.devicePixelRatio || 1;
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.scale(dpr, dpr);
-          CanvasRenderer.render({
-            ctx,
-            width: p.canvasContentDimensions.width,
-            height: p.canvasContentDimensions.height,
-            scale: s.viewport.scale,
-            offset: s.viewport.offset,
-            currentMode: p.currentMode,
-            slicerImgObj,
-            assetCache,
-            frames: p.frames,
-            builderSlots: p.builderSlots || {},
-            activeAnimation: p.activeAnimation || null,
-            gridConfig: p.gridConfig,
-            builderGrid: p.builderGrid || p.gridConfig,
-            templateConfig: p.templateConfig,
-            onionSkin: p.onionSkin,
-            selectedFrameIndex: p.selectedFrameIndex,
-            playbackFrameIndex: p.playbackFrameIndex || 0,
-            isPlaying: p.isPlaying || false,
-            isDraggingPivot: false,
-            tempPivot: null,
-            isHoveringBuilderSlot: s.dragHoverSlot,
-            draggingSlotIndex: s.dragStartSlot,
-            mousePos: s.mousePos,
-            selectedHitboxId: null,
-            isExport: false,
-            includeGridInExport: false,
-            dragSelectionRect: s.dragSelectionRect,
-            guides: [],
-            labelConfig: p.labelConfig,
-            isDragOverCanvas: s.isDragOverCanvas,
-            canonicalSliceOverlayActive: p.canonicalSliceOverlayActive === true,
-          });
-        }
-      }
-      rid = requestAnimationFrame(loop);
+      if (!c || canvasDims.w <= 0 || !p || !s) return;
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      CanvasRenderer.render({
+        ctx,
+        width: p.canvasContentDimensions?.width ?? canvasDims.w,
+        height: p.canvasContentDimensions?.height ?? canvasDims.h,
+        scale: s.viewport?.scale ?? 1,
+        offset: s.viewport?.offset ?? { x: 0, y: 0 },
+        currentMode: p.currentMode,
+        slicerImgObj,
+        assetCache,
+        frames: p.frames,
+        builderSlots: p.builderSlots || {},
+        activeAnimation: p.activeAnimation || null,
+        gridConfig: p.gridConfig,
+        builderGrid: p.builderGrid || p.gridConfig,
+        templateConfig: p.templateConfig,
+        onionSkin: p.onionSkin,
+        selectedFrameIndex: p.selectedFrameIndex,
+        playbackFrameIndex: p.playbackFrameIndex || 0,
+        isPlaying: p.isPlaying || false,
+        isDraggingPivot: false,
+        tempPivot: null,
+        isHoveringBuilderSlot: s.dragHoverSlot,
+        draggingSlotIndex: s.dragStartSlot,
+        mousePos: s.mousePos,
+        selectedHitboxId: null,
+        isExport: false,
+        includeGridInExport: false,
+        dragSelectionRect: s.dragSelectionRect,
+        guides: [],
+        labelConfig: p.labelConfig,
+        isDragOverCanvas: s.isDragOverCanvas,
+        canonicalSliceOverlayActive: p.canonicalSliceOverlayActive === true,
+      });
     };
-    rid = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rid);
-  }, [canvasDims, slicerImgObj, assetCache, canvasRef, propsRef, stateRef]);
+
+    const tick = (): void => {
+      if (cancelled) return;
+      rid = 0;
+      dirty = false;
+      paintOnce();
+      const p = propsRef.current;
+      const s = stateRef.current;
+      const continuous = hostCanvasNeedsContinuousPaint({
+        isPlaying: p?.isPlaying,
+        dragMode: s?.dragMode,
+        dragSelectionRect: s?.dragSelectionRect,
+        isDragOverCanvas: s?.isDragOverCanvas,
+        dragStartSlot: s?.dragStartSlot,
+      });
+      if (continuous || dirty) {
+        rid = requestAnimationFrame(tick);
+      }
+    };
+
+    const invalidate = (): void => {
+      dirty = true;
+      if (!rid && !cancelled) {
+        rid = requestAnimationFrame(tick);
+      }
+    };
+
+    if (invalidateRef) invalidateRef.current = invalidate;
+    invalidate();
+
+    return () => {
+      cancelled = true;
+      if (invalidateRef) invalidateRef.current = null;
+      if (rid) cancelAnimationFrame(rid);
+    };
+  }, [canvasDims, slicerImgObj, assetCache, canvasRef, propsRef, stateRef, invalidateRef]);
 
   return canvasDims;
 }

@@ -134,6 +134,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
 
   const propsRef = useRef<any>({});
   const stateRef = useRef<any>({});
+  const invalidateRef = useRef<(() => void) | null>(null);
 
   const sourceIntrinsicDimensions = slicerImgObj
     ? {
@@ -277,7 +278,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     return () => container.removeEventListener("wheel", onWheel);
   }, [mouse.handleWheel]);
 
-  // Keep refs in sync for the render loop (avoids stale closures in rAF)
+  // Keep refs in sync for the dirty render loop (invalidate schedules one paint)
   useLayoutEffect(() => {
     propsRef.current = {
       currentMode,
@@ -309,9 +310,18 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
       isDragOverCanvas: mouse.isDragOverCanvas,
       dragStartSlot: mouse.dragStartSlot,
     };
+    invalidateRef.current?.();
   });
 
-  useRenderLoop({ canvasRef, containerRef, propsRef, stateRef, slicerImgObj, assetCache });
+  useRenderLoop({
+    canvasRef,
+    containerRef,
+    propsRef,
+    stateRef,
+    slicerImgObj,
+    assetCache,
+    invalidateRef,
+  });
 
   const handleResetView = useAutoResetView(
     containerRef,
@@ -520,11 +530,8 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
                     className="text-textMuted group-hover:text-accent transition-colors"
                   />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-textMain">Import Spritesheet</h3>
-                  <p className="text-xs text-textMuted leading-relaxed">
-                    Start by slicing an existing image into individual frames.
-                  </p>
+                <div>
+                  <h3 className="text-lg font-bold text-textMain">Import spritesheet</h3>
                 </div>
                 <button
                   onClick={() => localInputRef.current?.click()}
@@ -549,11 +556,8 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
                   />
                 </div>
                 <div className="space-y-4 w-full">
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-bold text-textMain">Create Workspace</h3>
-                    <p className="text-xs text-textMuted leading-relaxed">
-                      Initialize a blank canvas for custom composition.
-                    </p>
+                  <div>
+                    <h3 className="text-lg font-bold text-textMain">Create workspace</h3>
                   </div>
 
                   <div className="space-y-3 pt-2">

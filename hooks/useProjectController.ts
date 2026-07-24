@@ -19,6 +19,15 @@ import { useBuilderLogic, DEFAULT_SLOT_DATA, RATIO_PRESETS } from "./domains/use
 import { useExportLogic } from "./domains/useExportLogic";
 import { usePersistence } from "./domains/usePersistence";
 import { getAllAssets } from "../utils/db";
+import {
+  assertHostImageDimensions,
+  clampUserPreferences,
+  collectOwnedBlobUrls,
+  mergeHydratedBuilderAssets,
+  parseHostUiState,
+  projectStateHistoryKey,
+  revokeBlobUrls,
+} from "../utils/hostProjectPolicy";
 
 const INITIAL_STATE: ProjectState = {
   imageMeta: null,
@@ -152,21 +161,17 @@ export function isSliceSourceSignalAborted(signal: AbortSignal | undefined): boo
 const loadPreferences = (): UserPreferences => {
   try {
     const stored = localStorage.getItem("spriteSlice_prefs");
-    if (stored) return { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) };
+    if (stored) return clampUserPreferences(JSON.parse(stored));
   } catch {}
-  return DEFAULT_PREFERENCES;
+  return { ...DEFAULT_PREFERENCES };
 };
 
 const loadUIState = () => {
   try {
     const stored = localStorage.getItem("spriteSlice_ui");
-    if (stored) return JSON.parse(stored);
+    if (stored) return parseHostUiState(JSON.parse(stored));
   } catch {}
-  return {
-    mode: AppMode.BUILDER,
-    slicerGrid: { rows: 2, cols: 2, marginX: 0, marginY: 0, paddingX: 0, paddingY: 0 },
-    builderGrid: { rows: 2, cols: 2, marginX: 0, marginY: 0, paddingX: 0, paddingY: 0 },
-  };
+  return parseHostUiState(null);
 };
 
 /** Top-level project orchestrator combining all domain hooks + undo. */
@@ -179,11 +184,12 @@ export function useProjectController() {
     redo,
     canUndo,
     canRedo,
-  } = useUndo<ProjectState>(INITIAL_STATE);
+  } = useUndo<ProjectState>(INITIAL_STATE, { historyKey: projectStateHistoryKey });
   const ui = useUIController();
   const projectRef = useRef(project);
   const backgroundPreviewUrlRef = useRef(ui.bgPreviewBlobUrl);
   const backgroundOperationRef = useRef<AbortController | null>(null);
+  const ownedAssetBlobUrlsRef = useRef<Set<string>>(new Set());
   projectRef.current = project;
   backgroundPreviewUrlRef.current = ui.bgPreviewBlobUrl;
   const uiState = loadUIState();
@@ -270,16 +276,24 @@ export function useProjectController() {
     notify,
   });
 
-  // Asynchronous asset loading from IndexedDB
+  // Asynchronous asset loading from IndexedDB (merge by id; track owned blob URLs)
   useEffect(() => {
+    let cancelled = false;
     const loadAssetsFromDB = async () => {
       try {
         const storedAssets = await getAllAssets();
+        if (cancelled) return;
         const assetsWithUrls = storedAssets.map((asset) => ({
           ...asset,
           src: URL.createObjectURL(asset.blob),
         }));
-        setProject((prev) => ({ ...prev, builderAssets: assetsWithUrls }));
+        for (const url of collectOwnedBlobUrls(assetsWithUrls)) {
+          ownedAssetBlobUrlsRef.current.add(url);
+        }
+        setProject((prev) => ({
+          ...prev,
+          builderAssets: mergeHydratedBuilderAssets(prev.builderAssets, assetsWithUrls),
+        }));
       } catch (error) {
         console.error("Failed to load assets from IndexedDB", error);
         notify("Could not load asset library.", "error");
@@ -288,15 +302,14 @@ export function useProjectController() {
 
     loadAssetsFromDB();
 
-    // Cleanup blob URLs on unmount
     return () => {
-      project.builderAssets.forEach((asset) => {
-        if (asset.src.startsWith("blob:")) {
-          URL.revokeObjectURL(asset.src);
-        }
-      });
+      cancelled = true;
+      revokeBlobUrls(ownedAssetBlobUrlsRef.current);
+      ownedAssetBlobUrlsRef.current.clear();
+      const live = projectRef.current.builderAssets;
+      revokeBlobUrls(collectOwnedBlobUrls(live));
     };
-  }, [setProject]); // Run only on mount
+  }, [setProject, notify]);
 
   const setPreferences = (newPrefs: UserPreferences) => {
     setPreferencesState(newPrefs);
@@ -438,6 +451,7 @@ export function useProjectController() {
           try {
             const width = image.width;
             const height = image.height;
+            assertHostImageDimensions(width, height);
             const newFrames = generateFramesFromGrid(width, height, defaultGrid);
             if (isSliceSourceSignalAborted(signal)) {
               onAbort();

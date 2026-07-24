@@ -6,6 +6,7 @@ import {
   generateGodotSpriteFrames,
 } from "../../utils/exportFormats";
 import { calculateGeometry } from "../../utils/renderUtils";
+import { clampHostFps, hostDownloadFileName } from "../../utils/hostProjectPolicy";
 
 interface ExportDeps {
   project: ProjectState;
@@ -69,11 +70,12 @@ export function useExportLogic(deps: ExportDeps) {
           const dataUrl = await canvasHandle.exportFrame(kf.sourceIndex);
           if (dataUrl) frameImages.push(dataUrl);
         }
+        const fps = clampHostFps(anim.fps, 12);
         return new Promise<void>((resolve, reject) => {
           gifshot.createGIF(
             {
               images: frameImages,
-              interval: 1 / anim.fps,
+              interval: 1 / fps,
               gifWidth: anim.keyframes[0]
                 ? project.frames.find((f) => f.id === anim.keyframes[0].sourceIndex)?.w || 100
                 : 100,
@@ -85,7 +87,7 @@ export function useExportLogic(deps: ExportDeps) {
               if (!obj.error) {
                 const link = document.createElement("a");
                 link.href = obj.image;
-                link.download = `${anim.name}.gif`;
+                link.download = hostDownloadFileName(anim.name, "gif", "animation");
                 link.click();
                 notify("GIF Exported", "success");
                 resolve();

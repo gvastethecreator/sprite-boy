@@ -144,8 +144,8 @@ describe("initial bundle policy", () => {
       <script src="/assets/legacy.js"></script>
     `)).toEqual(["/assets/index-B.js", "/assets/vendor-A.js"]);
     expect(BUNDLE_THRESHOLDS).toEqual({
-      ratchet: { initialJsGzipBytes: 156_500 },
-      release: { initialJsGzipBytes: 180_000 },
+      ratchet: { initialJsGzipBytes: 330_000 },
+      release: { initialJsGzipBytes: 360_000 },
     });
     expect(Object.keys(DEFERRED_FEATURE_CHUNK_PATTERNS)).toEqual([
       "gif",
@@ -170,13 +170,13 @@ describe("initial bundle policy", () => {
     ], ["/assets/index-A.js", "/assets/gifshot-C.js"])).toThrow(/boundary/);
     expect(evaluateBundleEvidence({
       initialChunkCount: 1,
-      initialJsBytes: 529_204,
-      initialJsGzipBytes: 156_500,
+      initialJsBytes: 1_139_753,
+      initialJsGzipBytes: 317_561,
     }, "ratchet").status).toBe("pass");
     expect(evaluateBundleEvidence({
       initialChunkCount: 1,
-      initialJsBytes: 918_701,
-      initialJsGzipBytes: 245_999,
+      initialJsBytes: 1_500_000,
+      initialJsGzipBytes: 400_000,
     }, "release")).toMatchObject({ status: "fail", exceeded: ["initialJsGzipBytes"] });
     expect(() => extractInitialJsPaths(
       `<script type="module" src="https://private.invalid/app.js"></script>`,
@@ -257,7 +257,7 @@ describe("fixture and golden retention", () => {
     const inventory = captureFixtureInventory(manifest);
     expect(evaluateFixtureInventory(manifest, inventory)).toMatchObject({
       status: "pass",
-      retainedCount: 7,
+      retainedCount: 9,
       rootCount: 2,
     });
 

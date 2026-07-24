@@ -8,8 +8,17 @@ interface HistoryState<T> {
 
 const MAX_HISTORY_STEPS = 50;
 
+export interface UseUndoOptions<T> {
+  /**
+   * Optional equality key. When provided, history stacking skips
+   * JSON.stringify of the full value (critical when T holds image payloads).
+   */
+  historyKey?: (value: T) => string;
+}
+
 /** Generic undo/redo hook with bounded history (max 50 steps). */
-export function useUndo<T>(initialPresent: T) {
+export function useUndo<T>(initialPresent: T, options?: UseUndoOptions<T>) {
+  const historyKey = options?.historyKey;
   const [state, setState] = useState<HistoryState<T>>({
     past: [],
     present: initialPresent,
@@ -53,8 +62,21 @@ export function useUndo<T>(initialPresent: T) {
     setState((currentState) => {
       const value = newPresent instanceof Function ? newPresent(currentState.present) : newPresent;
 
-      // DEEP EQUALITY CHECK (Simplified for project state objects)
-      if (JSON.stringify(value) === JSON.stringify(currentState.present)) return currentState;
+      if (historyKey) {
+        if (historyKey(value) === historyKey(currentState.present)) return currentState;
+      } else if (Object.is(value, currentState.present)) {
+        return currentState;
+      } else if (
+        // Default deep equality for small values only; ProjectState must pass historyKey
+        // so multi-MB image payloads are never JSON.stringified for history.
+        typeof value === "object" &&
+        value !== null &&
+        typeof currentState.present === "object" &&
+        currentState.present !== null &&
+        JSON.stringify(value) === JSON.stringify(currentState.present)
+      ) {
+        return currentState;
+      }
 
       const newPast = [...currentState.past, currentState.present];
       if (newPast.length > MAX_HISTORY_STEPS) {
@@ -67,7 +89,7 @@ export function useUndo<T>(initialPresent: T) {
         future: [],
       };
     });
-  }, []);
+  }, [historyKey]);
 
   const setEphemeral = useCallback((newPresent: T | ((curr: T) => T)) => {
     setState((currentState) => {

@@ -1,5 +1,6 @@
 import { FrameData, GridConfig } from "../types";
 import { calculateGeometry } from "./renderUtils";
+import { assertHostImageDimensions } from "./hostProjectPolicy";
 
 // --- CLIENT SIDE BRIDGE ---
 
@@ -11,17 +12,21 @@ const pendingPromises: Record<
   { resolve: Function; reject: Function; timer: ReturnType<typeof setTimeout> }
 > = {};
 
-function destroyWorker() {
+/** Exported for tests and forced recovery after timeout/crash. */
+export function destroyImageWorker(): void {
   if (workerInstance) {
     workerInstance.terminate();
     workerInstance = null;
   }
-  // Reject all pending promises
   for (const id of Object.keys(pendingPromises)) {
     pendingPromises[id].reject(new Error("Worker terminated"));
     clearTimeout(pendingPromises[id].timer);
     delete pendingPromises[id];
   }
+}
+
+function destroyWorker() {
+  destroyImageWorker();
 }
 
 function getWorker() {
@@ -38,23 +43,34 @@ function getWorker() {
     };
     workerInstance.onerror = (e) => {
       console.error("Worker crashed:", e.message);
-      destroyWorker(); // Will reject all pending and force re-creation on next call
+      destroyWorker();
     };
   }
   return workerInstance;
 }
 
-function runWorkerTask<T>(type: string, payload: any, transfer: Transferable[] = []): Promise<T> {
+/** Build transfer list for ArrayBuffer pixel payloads when ownership allows. */
+export function workerTransferListForPayload(payload: {
+  buffer?: ArrayBufferLike;
+}): Transferable[] {
+  const buffer = payload?.buffer;
+  if (buffer instanceof ArrayBuffer) return [buffer];
+  return [];
+}
+
+function runWorkerTask<T>(type: string, payload: any, transfer?: Transferable[]): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = Math.random().toString(36).substr(2);
+    const transferList = transfer ?? workerTransferListForPayload(payload);
     const timer = setTimeout(() => {
       if (pendingPromises[id]) {
         delete pendingPromises[id];
+        destroyWorker();
         reject(new Error(`Worker task "${type}" timed out after ${WORKER_TIMEOUT_MS}ms`));
       }
     }, WORKER_TIMEOUT_MS);
     pendingPromises[id] = { resolve, reject, timer };
-    getWorker().postMessage({ type, id, payload }, transfer);
+    getWorker().postMessage({ type, id, payload }, transferList);
   });
 }
 
@@ -63,10 +79,10 @@ function getImageData(img: HTMLImageElement): {
   height: number;
   data: Uint8ClampedArray;
 } {
+  assertHostImageDimensions(img.width, img.height);
   const canvas = document.createElement("canvas");
   canvas.width = img.width;
   canvas.height = img.height;
-  // willReadFrequently optimizes the canvas for heavy readback operations (like this)
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("Cannot get context");
   ctx.drawImage(img, 0, 0);
@@ -119,12 +135,13 @@ export async function detectSprites(
   threshold: number = 10,
 ): Promise<FrameData[]> {
   const { width, height, data } = getImageData(img);
-  return runWorkerTask<FrameData[]>("DETECT_SPRITES", {
+  const payload = {
     width,
     height,
     buffer: data.buffer,
     threshold,
-  });
+  };
+  return runWorkerTask<FrameData[]>("DETECT_SPRITES", payload, workerTransferListForPayload(payload));
 }
 
 /** Detects a single sprite at a specific pixel coordinate (runs in Worker). */
@@ -135,14 +152,19 @@ export async function detectSpriteAt(
   threshold: number = 10,
 ) {
   const { width, height, data } = getImageData(img);
-  return runWorkerTask<{ x: number; y: number; w: number; h: number } | null>("DETECT_ONE", {
+  const payload = {
     width,
     height,
     buffer: data.buffer,
     startX,
     startY,
     threshold,
-  });
+  };
+  return runWorkerTask<{ x: number; y: number; w: number; h: number } | null>(
+    "DETECT_ONE",
+    payload,
+    workerTransferListForPayload(payload),
+  );
 }
 
 /** Removes a target color from an image with tolerance and edge softness (runs in Worker). */
@@ -162,20 +184,26 @@ export async function removeBackground(
 
   const { width, height, data } = getImageData(img);
 
-  const result: any = await runWorkerTask("REMOVE_BG", {
+  const payload = {
     width,
     height,
     buffer: data.buffer,
     targetHex,
     tolerance,
     softness,
-  });
+  };
+  const result: any = await runWorkerTask(
+    "REMOVE_BG",
+    payload,
+    workerTransferListForPayload(payload),
+  );
 
   try {
-    // Create a COPY of the buffer to avoid detached buffer issues if reuse is attempted
-    const bufferCopy = result.buffer.slice(0);
+    const pixels = result.buffer instanceof ArrayBuffer
+      ? new Uint8ClampedArray(result.buffer)
+      : new Uint8ClampedArray(result.buffer.slice(0));
     const resultImageData = new ImageData(
-      new Uint8ClampedArray(bufferCopy),
+      pixels,
       result.width,
       result.height,
     );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ProjectState, SpriteAnimation, Keyframe, UserPreferences } from "../../types";
 import { uiFeedback } from "../../utils/uiFeedback";
+import { clampHostFps } from "../../utils/hostProjectPolicy";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -19,6 +20,7 @@ export function useAnimationLogic(
     if (isPlaying && activeAnimationId) {
       const anim = project.animations.find((a) => a.id === activeAnimationId);
       if (anim && anim.keyframes.length > 0) {
+        const fps = clampHostFps(anim.fps, preferences.defaultFps);
         interval = setInterval(() => {
           setPlaybackFrameIndex((prev) => {
             const next = prev + 1;
@@ -29,18 +31,18 @@ export function useAnimationLogic(
             }
             return next;
           });
-        }, 1000 / anim.fps);
+        }, 1000 / fps);
       }
     }
     return () => clearInterval(interval);
-  }, [isPlaying, activeAnimationId, project.animations]);
+  }, [isPlaying, activeAnimationId, project.animations, preferences.defaultFps]);
 
   const handleAddAnimation = () => {
     const id = generateId();
     const newAnim: SpriteAnimation = {
       id,
       name: `Anim ${project.animations.length + 1}`,
-      fps: preferences.defaultFps,
+      fps: clampHostFps(preferences.defaultFps, 12),
       loop: true,
       keyframes: [],
     };

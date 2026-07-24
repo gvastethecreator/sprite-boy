@@ -1,5 +1,9 @@
 import { useCallback } from "react";
 import { AppMode, ProjectState, GridConfig, TemplateConfig, OnionSkinConfig } from "../../types";
+import {
+  hostDownloadFileName,
+  parseLegacyProjectFile,
+} from "../../utils/hostProjectPolicy";
 
 interface PersistenceDeps {
   project: ProjectState;
@@ -42,7 +46,12 @@ export function usePersistence(deps: PersistenceDeps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `project_${project.imageMeta?.name || "studio"}_${Date.now()}.json`;
+    const base = hostDownloadFileName(
+      project.imageMeta?.name || "studio",
+      "json",
+      "studio",
+    ).replace(/\.json$/i, "");
+    link.download = `project_${base}_${Date.now()}.json`;
     link.click();
     URL.revokeObjectURL(url);
     notify("Project saved", "success");
@@ -77,22 +86,7 @@ export function usePersistence(deps: PersistenceDeps) {
             return;
           }
           const data: unknown = JSON.parse(result);
-          if (
-            data === null || typeof data !== "object" ||
-            !("project" in data) || !data.project || typeof data.project !== "object"
-          ) {
-            fail();
-            return;
-          }
-          const projectData = data as {
-            project: ProjectState;
-            ui?: Partial<{
-              slicerGrid: GridConfig;
-              builderGrid: GridConfig;
-              templateConfig: TemplateConfig;
-              currentMode: AppMode;
-            }>;
-          };
+          const projectData = parseLegacyProjectFile(data);
           setProject(projectData.project);
           if (projectData.ui) {
             if (projectData.ui.slicerGrid) setSlicerGrid(projectData.ui.slicerGrid);
