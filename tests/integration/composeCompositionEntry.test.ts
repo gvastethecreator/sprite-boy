@@ -82,8 +82,8 @@ describe("A1-01 Composition entry integration", () => {
       name: "hero-sheet.png",
       source: { type: "asset", id: "asset-sheet" },
       transform: {
-        x: 0,
-        y: 0,
+        x: 128,
+        y: 64,
         scaleX: 1,
         scaleY: 1,
         rotation: 0,
@@ -107,7 +107,7 @@ describe("A1-01 Composition entry integration", () => {
     expect(COMPOSITION_ENTRY_POLICY).toEqual({
       assetCanvas: "intrinsic-asset-dimensions",
       regionCanvas: "region-bounds-dimensions",
-      initialLayerTransform: "identity-at-canvas-origin",
+      initialLayerTransform: "source-centered-on-canvas",
       initialBackground: null,
     });
   });
@@ -138,6 +138,12 @@ describe("A1-01 Composition entry integration", () => {
     expect(project.layers[identity.layerId].source).toEqual({
       type: "region",
       id: "region-hero",
+    });
+    expect(project.layers[identity.layerId].transform).toMatchObject({
+      x: 64,
+      y: 64,
+      scaleX: 1,
+      scaleY: 1,
     });
     expect(project.workspace).toMatchObject({
       activeWorkspace: "compose",

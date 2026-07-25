@@ -80,6 +80,45 @@ describe("CompositionCanvasSettingsInspector", () => {
     expect(screen.queryByRole("button", { name: /Apply/i })).not.toBeInTheDocument();
   });
 
+  it("resets draft and conflict UI when compositionId changes without unmounting", async () => {
+    const project = structuredClone(studioProjectV1Fixture);
+    const source = project.compositions["composition-project"];
+    if (!source) throw new Error("Missing composition-project fixture");
+    project.compositions["composition-second"] = {
+      ...structuredClone(source),
+      id: "composition-second",
+      name: "Second composition",
+      owner: { type: "project" },
+      layerIds: [],
+      width: 320,
+      height: 180,
+    };
+    project.rootOrder.compositionIds.push("composition-second");
+    const { store } = createProjectStoreWithHistory(project, {
+      context: { nextId: () => "unused-id", now: () => NOW },
+    });
+
+    const { rerender } = render(
+      <CompositionCanvasSettingsInspector store={store} compositionId="composition-project" now={() => NOW} />,
+    );
+
+    const width = screen.getByRole("textbox", { name: /Width/i });
+    fireEvent.change(width, { target: { value: "640" } });
+    expect(width).toHaveValue("640");
+
+    // Unsaved draft against the first composition must not leak into a source switch.
+    rerender(
+      <CompositionCanvasSettingsInspector store={store} compositionId="composition-second" now={() => NOW} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: /Width/i })).toHaveValue("320");
+    });
+    expect(screen.getByRole("textbox", { name: /Height/i })).toHaveValue("180");
+    expect(screen.queryByText(/changed elsewhere/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it.each([
     ["clock", { now: () => { throw new Error("PRIVATE_NOW_SECRET"); } }],
     ["command id", { createCommandId: () => { throw new Error("PRIVATE_ID_SECRET"); } }],

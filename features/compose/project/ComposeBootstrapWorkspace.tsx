@@ -11,6 +11,7 @@ import type { AssetRepository } from "../../../core/assets";
 import type { EntityId } from "../../../core/project";
 import type { ProjectStore } from "../../../core/stores";
 import { useProjectStoreSelector } from "../../../hooks/useStudioStoreSelector";
+import { ComposeCanvasWorkspace } from "../canvas/ComposeCanvasWorkspace";
 import {
   importComposeAsset,
   retryComposeAssetCleanup,
@@ -236,7 +237,12 @@ export function ComposeBootstrapWorkspace({
         if (file && !interactionDisabled) void importFile(file);
       }}
     >
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-4">
+      <div
+        className={[
+          "mx-auto flex w-full flex-1 flex-col gap-4",
+          composition ? "max-w-6xl min-h-0" : "max-w-4xl justify-center",
+        ].join(" ")}
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 id="compose-bootstrap-title" className="truncate text-lg font-semibold tracking-tight text-textMain">
@@ -270,6 +276,15 @@ export function ComposeBootstrapWorkspace({
             }}
           />
         </div>
+
+        {composition ? (
+          <div
+            data-compose-canvas
+            className="flex min-h-[320px] flex-1 overflow-hidden rounded-lg border border-white/12 bg-panel/70"
+          >
+            <ComposeCanvasWorkspace store={store} assets={assets} />
+          </div>
+        ) : null}
 
         <div
           className={[

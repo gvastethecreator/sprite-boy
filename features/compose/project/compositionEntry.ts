@@ -33,7 +33,7 @@ export interface CompositionEntryDimensions {
 export const COMPOSITION_ENTRY_POLICY = Object.freeze({
   assetCanvas: "intrinsic-asset-dimensions",
   regionCanvas: "region-bounds-dimensions",
-  initialLayerTransform: "identity-at-canvas-origin",
+  initialLayerTransform: "source-centered-on-canvas",
   initialBackground: null,
 } as const);
 
@@ -470,8 +470,8 @@ function createInitialLayer(
     name: resolved.displayName,
     source: { type: resolved.source.type, id: resolved.source.id },
     transform: {
-      x: 0,
-      y: 0,
+      x: resolved.dimensions.width / 2,
+      y: resolved.dimensions.height / 2,
       scaleX: 1,
       scaleY: 1,
       rotation: 0,

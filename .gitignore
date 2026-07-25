@@ -35,6 +35,8 @@ Thumbs.db
 
 # Testing
 coverage/
+.snapshots/
+.scratch/agent-cli-delegation/
 
 # Vite
 .vite/

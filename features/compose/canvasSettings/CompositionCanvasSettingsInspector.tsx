@@ -63,6 +63,8 @@ export function CompositionCanvasSettingsInspector({
   const commandSequence = useRef(0);
   const feedbackRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  /** Tracks which composition the local draft/baseline belong to so a source switch resets cleanly. */
+  const boundCompositionIdRef = useRef(compositionId);
 
   const focusFeedbackSafely = () => {
     const focus = () => {
@@ -101,13 +103,33 @@ export function CompositionCanvasSettingsInspector({
     : "custom";
 
   useEffect(() => {
-    if (!selected.composition || !canonicalDraft) return;
-    if (!baseline) {
+    const compositionSwitched = boundCompositionIdRef.current !== compositionId;
+    if (compositionSwitched) {
+      boundCompositionIdRef.current = compositionId;
+    }
+
+    if (!selected.composition || !canonicalDraft) {
+      // Missing composition: drop inspector-owned state so a later valid id starts clean.
+      if (compositionSwitched) {
+        setBaseline(null);
+        setFeedback(null);
+        setExternalChange(false);
+      }
+      return;
+    }
+
+    // Active composition source changed (or first bind after missing): adopt the new canonical draft.
+    // Do not treat this as an external conflict against the previous composition's draft.
+    if (compositionSwitched || !baseline) {
       setDraft(canonicalDraft);
       setBaseline(createCompositionCanvasBaseline(selected.revision, selected.composition));
       setExternalChange(false);
+      if (compositionSwitched) {
+        setFeedback(null);
+      }
       return;
     }
+
     const canonicalChanged = baseline.width !== selected.composition.width ||
       baseline.height !== selected.composition.height ||
       baseline.background !== (selected.composition.background ?? null);
@@ -119,8 +141,9 @@ export function CompositionCanvasSettingsInspector({
       setExternalChange(false);
       return;
     }
+    // Same composition, dirty local draft, canonical moved elsewhere → true stale-draft conflict.
     setExternalChange(canonicalChanged);
-  }, [baseline, canonicalDraft, dirty, selected.composition, selected.revision]);
+  }, [baseline, canonicalDraft, compositionId, dirty, selected.composition, selected.revision]);
 
   const reloadLatest = () => {
     if (!selected.composition || !canonicalDraft) return;
