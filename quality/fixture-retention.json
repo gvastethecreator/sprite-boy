@@ -76,6 +76,14 @@
       "mode": "text-lf",
       "bytes": 8469,
       "sha256": "476c55ee886dca928e9f79fa6b0c69d50a29776b4ead2f0c260c68f767247dfd"
+    },
+    {
+      "path": "tests/contract/fixtures/videoFixtures.ts",
+      "kind": "video-media-fixture",
+      "owner": "V1",
+      "mode": "text-lf",
+      "bytes": 4885,
+      "sha256": "0e394bbfccb814722bac58dc2f3a31af49d296042b792da1fd31f1b10c48a002"
     }
   ]
 }

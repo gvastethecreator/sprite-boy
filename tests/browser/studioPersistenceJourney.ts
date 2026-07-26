@@ -398,11 +398,11 @@ async function createJourneyProject(
     },
   });
   if (
-    migrated.report.status !== "migrated" || migrated.report.reachedVersion !== 1 ||
-    migrated.report.appliedSteps.length !== 1 ||
+    migrated.report.status !== "migrated" || migrated.report.reachedVersion !== 2 ||
+    migrated.report.appliedSteps.length !== 2 ||
     migrated.report.issues.some(({ blocking }) => blocking)
   ) {
-    fail("F3-07 resolved legacy migration did not reach V1.");
+    fail("F3-07 resolved legacy migration did not reach the current schema.");
   }
   const project = structuredClone(migrated.document as StudioProject);
   const canonicalAsset = Object.values(project.assets)[0];

@@ -275,4 +275,141 @@ describe("IndexedDbAssetStorage full lifecycle", () => {
     expect(harness.metadata.size).toBe(0);
     expect(harness.blobs.size).toBe(0);
   });
+
+  it("verifies and backfills a legacy blob identity before publishing metadata", async () => {
+    const harness = createAssetIdbHarness();
+    const storage = new IndexedDbAssetStorage("project-legacy", { factory: harness.factory });
+    const blob = new Blob(["legacy"], { type: "image/png" });
+    const value = await assetRecord("asset-legacy", blob);
+    harness.blobs.set(value.identity.blobKey, {
+      blobKey: value.identity.blobKey,
+      blob,
+    });
+
+    await expect(storage.put(value.record, blob, undefined, value.identity)).resolves.toEqual({
+      current: value.record,
+      replacedBinary: false,
+      removedPreviousBlob: false,
+    });
+    expect(harness.blobs.get(value.identity.blobKey)).toMatchObject({
+      contentHash: value.identity.contentHash,
+      verificationHash: value.identity.verificationHash,
+      byteSize: value.identity.byteSize,
+    });
+  });
+
+  it.each(["incomplete", "invalid", "collision", "missing-blob"] as const)(
+    "preserves stored bytes when their identity is %s",
+    async (kind) => {
+      const harness = createAssetIdbHarness();
+      const storage = new IndexedDbAssetStorage("project-collision", { factory: harness.factory });
+      const blob = new Blob(["collision"], { type: "image/png" });
+      const value = await assetRecord("asset-collision", blob);
+      const stored: StoredAssetBlobEntry = {
+        blobKey: value.identity.blobKey,
+        contentHash: value.identity.contentHash,
+        verificationHash: value.identity.verificationHash,
+        byteSize: value.identity.byteSize,
+        blob,
+      };
+      if (kind === "incomplete") delete stored.verificationHash;
+      if (kind === "invalid") stored.contentHash = "invalid";
+      if (kind === "collision") stored.verificationHash = "0".repeat(128);
+      if (kind === "missing-blob") (stored as { blob: unknown }).blob = null;
+      if (kind === "missing-blob") {
+        delete stored.contentHash;
+        delete stored.verificationHash;
+        delete stored.byteSize;
+      }
+      harness.blobs.set(value.identity.blobKey, stored);
+
+      await expect(storage.put(value.record, blob, undefined, value.identity)).rejects.toMatchObject({
+        code: "ASSET_INTEGRITY_MISMATCH",
+        operation: "put",
+        assetId: value.record.id,
+      });
+      expect(harness.blobs.get(value.identity.blobKey)).toBe(stored);
+      expect(harness.metadata.size).toBe(0);
+    },
+  );
+
+  it("reports corrupt metadata, missing blobs and repairs a stored MIME view", async () => {
+    const harness = createAssetIdbHarness();
+    const storage = new IndexedDbAssetStorage("project-read-health", { factory: harness.factory });
+    const blob = new Blob(["healthy"], { type: "image/png" });
+    const value = await assetRecord("asset-health", blob);
+    await storage.put(value.record, blob, undefined, value.identity);
+
+    const metadataKey = metadataMapKey("project-read-health", value.record.id);
+    const entry = harness.metadata.get(metadataKey)!;
+    harness.metadata.set(metadataKey, {
+      ...entry,
+      record: { ...entry.record, media: { type: "binary" } },
+    });
+    await expect(storage.getMetadata(value.record.id)).rejects.toMatchObject({
+      code: "ASSET_INTEGRITY_MISMATCH",
+      operation: "get-metadata",
+    });
+    await expect(storage.list()).rejects.toMatchObject({
+      code: "ASSET_INTEGRITY_MISMATCH",
+      operation: "list",
+    });
+
+    harness.metadata.set(metadataKey, entry);
+    harness.blobs.delete(value.identity.blobKey);
+    await expect(storage.getBlob(value.record.id)).rejects.toMatchObject({
+      code: "ASSET_BLOB_MISSING",
+      operation: "get-blob",
+    });
+
+    harness.blobs.set(value.identity.blobKey, {
+      blobKey: value.identity.blobKey,
+      contentHash: value.identity.contentHash,
+      verificationHash: value.identity.verificationHash,
+      byteSize: value.identity.byteSize,
+      blob: new Blob(["healthy"], { type: "application/octet-stream" }),
+    });
+    const restored = await storage.getBlob(value.record.id);
+    expect(restored.type).toBe("image/png");
+    expect(await restored.text()).toBe("healthy");
+  });
+
+  it("aborts an in-flight readonly transaction through the caller signal", async () => {
+    const harness = createAssetIdbHarness();
+    const storage = new IndexedDbAssetStorage("project-abort", { factory: harness.factory });
+    const controller = new AbortController();
+    const pending = storage.list({ signal: controller.signal });
+    for (let turn = 0; turn < 10 && harness.transactions.length === 0; turn += 1) {
+      await Promise.resolve();
+    }
+    expect(harness.transactions).toHaveLength(1);
+    controller.abort("stop inventory");
+
+    await expect(pending).rejects.toMatchObject({
+      code: "ASSET_TRANSACTION_ABORTED",
+      operation: "list",
+    });
+  });
+
+  it("keeps shared old bytes when replacing one of two metadata owners", async () => {
+    const harness = createAssetIdbHarness();
+    const storage = new IndexedDbAssetStorage("project-shared", { factory: harness.factory });
+    const sharedBlob = new Blob(["shared"], { type: "image/png" });
+    const first = await assetRecord("asset-a", sharedBlob);
+    const secondRecord = { ...first.record, id: "asset-b", name: "asset-b" };
+    await storage.put(first.record, sharedBlob, undefined, first.identity);
+    await storage.put(secondRecord, sharedBlob, undefined, first.identity);
+
+    const replacementBlob = new Blob(["replacement"], { type: "image/png" });
+    const replacement = await assetRecord("asset-a", replacementBlob);
+    await expect(storage.put(replacement.record, replacementBlob, undefined, replacement.identity))
+      .resolves.toMatchObject({
+        current: replacement.record,
+        previous: first.record,
+        replacedBinary: true,
+        removedPreviousBlob: false,
+      });
+    expect(harness.blobs.has(first.identity.blobKey)).toBe(true);
+    expect(harness.blobs.has(replacement.identity.blobKey)).toBe(true);
+  });
 });

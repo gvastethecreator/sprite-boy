@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  ASSET_BLOB_KEY_INDEX,
+  ASSET_BLOB_STORE,
+  ASSET_METADATA_STORE,
+  ASSET_PROJECT_HASH_INDEX,
+  ASSET_PROJECT_INDEX,
   AssetRepositoryError,
   IndexedDbAssetStorage,
 } from "../../core/assets";
@@ -78,10 +83,92 @@ describe("IndexedDbAssetStorage preflight (F2-02)", () => {
     } as unknown as IDBFactory;
     expect(() => new IndexedDbAssetStorage("", { factory })).toThrow(AssetRepositoryError);
     const storage = new IndexedDbAssetStorage("project-storage", { factory });
+    await expect(storage.put({ ...record, id: "" }, new Blob()))
+      .rejects.toMatchObject({ code: "ASSET_INVALID_INPUT" });
     await expect(storage.put({ ...record, blobKey: "" }, new Blob()))
       .rejects.toMatchObject({ code: "ASSET_INVALID_INPUT" });
     await expect(storage.put(record, {} as Blob))
       .rejects.toMatchObject({ code: "ASSET_INVALID_INPUT" });
+    await expect(storage.put({ ...record, media: { type: "binary" } }, new Blob(["test"], { type: "image/png" })))
+      .rejects.toMatchObject({ code: "ASSET_INVALID_INPUT" });
+    await expect(storage.getMetadata("")).rejects.toMatchObject({ code: "ASSET_INVALID_INPUT" });
+    await expect(storage.getBlob("")).rejects.toMatchObject({ code: "ASSET_INVALID_INPUT" });
+    await expect(storage.remove("")).rejects.toMatchObject({ code: "ASSET_INVALID_INPUT" });
+  });
+
+  it("creates the v2 stores and indices during a fresh blocked upgrade", async () => {
+    const request = {} as IDBOpenDBRequest;
+    const createdStores: string[] = [];
+    const createdIndices: Array<{ name: string; keyPath: string | string[] }> = [];
+    const metadataStore = {
+      indexNames: { contains: () => false },
+      createIndex(name: string, keyPath: string | string[]) {
+        createdIndices.push({ name, keyPath });
+      },
+    } as unknown as IDBObjectStore;
+    const database = {
+      objectStoreNames: { contains: () => false },
+      createObjectStore(name: string) {
+        createdStores.push(name);
+        return name === ASSET_METADATA_STORE ? metadataStore : {} as IDBObjectStore;
+      },
+      close() {},
+    } as unknown as IDBDatabase;
+    const factory = { open: () => request } as unknown as IDBFactory;
+    const storage = new IndexedDbAssetStorage("project-upgrade", { factory });
+    const pending = storage.list();
+    Object.defineProperties(request, {
+      result: { configurable: true, value: database },
+      transaction: { configurable: true, value: {} as IDBTransaction },
+    });
+    (request.onupgradeneeded as unknown as (() => void))();
+    (request.onblocked as unknown as (() => void))();
+
+    await expect(pending).rejects.toMatchObject({
+      code: "ASSET_STORAGE_UNAVAILABLE",
+      operation: "open",
+    });
+    expect(createdStores).toEqual([ASSET_METADATA_STORE, ASSET_BLOB_STORE]);
+    expect(createdIndices).toEqual([
+      { name: ASSET_PROJECT_INDEX, keyPath: "projectId" },
+      { name: ASSET_PROJECT_HASH_INDEX, keyPath: ["projectId", "contentHash"] },
+      { name: ASSET_BLOB_KEY_INDEX, keyPath: "blobKey" },
+    ]);
+  });
+
+  it("normalizes synchronous open/delete failures and request errors", async () => {
+    const openFailure = new IndexedDbAssetStorage("project-open-error", {
+      factory: {
+        open() { throw new DOMException("open failed", "UnknownError"); },
+      } as unknown as IDBFactory,
+    });
+    await expect(openFailure.list()).rejects.toMatchObject({
+      code: "ASSET_STORAGE_UNAVAILABLE",
+      operation: "open",
+    });
+
+    const request = {} as IDBOpenDBRequest;
+    const requestFailure = new IndexedDbAssetStorage("project-request-error", {
+      factory: { open: () => request } as unknown as IDBFactory,
+    });
+    const pending = requestFailure.list();
+    Object.defineProperty(request, "error", {
+      configurable: true,
+      value: new DOMException("request failed", "UnknownError"),
+    });
+    (request.onerror as unknown as (() => void))();
+    await expect(pending).rejects.toMatchObject({ code: "ASSET_STORAGE_UNAVAILABLE" });
+
+    const destroyFailure = new IndexedDbAssetStorage("project-delete-error", {
+      factory: {
+        deleteDatabase() { throw new DOMException("delete failed", "UnknownError"); },
+      } as unknown as IDBFactory,
+    });
+    await expect(destroyFailure.destroy()).rejects.toMatchObject({
+      code: "ASSET_STORAGE_UNAVAILABLE",
+      operation: "dispose",
+    });
+    await expect(new IndexedDbAssetStorage("project-no-db", { factory: null }).destroy()).resolves.toBeUndefined();
   });
 
   it("invalidates and closes a connection that succeeds after close()", async () => {

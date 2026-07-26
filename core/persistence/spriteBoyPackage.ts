@@ -1,4 +1,4 @@
-import JSZip from "jszip";
+import type JSZip from "jszip";
 import {
   assertAssetRecordContentIdentity,
   computeAssetContentIdentity,
@@ -148,6 +148,27 @@ function packageError(
   options: SpriteBoyPackageErrorOptions = {},
 ): SpriteBoyPackageError {
   return new SpriteBoyPackageError(code, operation, message, options);
+}
+
+async function loadZipCodec(
+  operation: SpriteBoyPackageOperation,
+  signal?: AbortSignal,
+): Promise<typeof JSZip> {
+  try {
+    return await raceAbort(
+      import("jszip").then(({ default: codec }) => codec),
+      signal,
+      operation,
+    );
+  } catch (cause) {
+    if (isSpriteBoyPackageError(cause)) throw cause;
+    throw packageError(
+      operation === "import" ? "SPRITEBOY_PACKAGE_INVALID_ARCHIVE" : "SPRITEBOY_PACKAGE_PROJECT_INVALID",
+      operation,
+      "The portable package codec could not be loaded.",
+      { cause },
+    );
+  }
 }
 
 interface SignalLease {
@@ -540,7 +561,8 @@ async function exportSpriteBoyPackageNormalized(
     "export",
     options.signal,
   );
-  const zip = new JSZip();
+  const JSZipCodec = await loadZipCodec("export", options.signal);
+  const zip = new JSZipCodec();
   const blobEntries: SpriteBoyPackageBlobManifest[] = [];
   const blobBytes = new Map<string, Uint8Array>();
   for (const group of groups) {
@@ -1081,7 +1103,8 @@ async function importSpriteBoyPackageNormalized(
   preflightZipDirectory(bytes, maxEntries, maxUncompressedBytes);
   let zip: JSZip;
   try {
-    zip = await raceAbort(JSZip.loadAsync(bytes, { createFolders: false }), options.signal, "import");
+    const JSZipCodec = await loadZipCodec("import", options.signal);
+    zip = await raceAbort(JSZipCodec.loadAsync(bytes, { createFolders: false }), options.signal, "import");
   } catch (cause) {
     if (isSpriteBoyPackageError(cause)) throw cause;
     throw packageError(

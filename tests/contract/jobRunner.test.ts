@@ -611,4 +611,148 @@ describe("JobRunner", () => {
     runner.dispose();
     pending.resolve("ignored");
   });
+
+  it("rejects malformed runner dependencies and task error fields", () => {
+    const store = createJobStore();
+    const validHost = new ManualHost();
+
+    expect(() => createJobRunner(null as never)).toThrow(/options must be an object/);
+    expect(() => createJobRunner([] as never)).toThrow(/options must be an object/);
+    expect(() => createJobRunner({ store: null } as never)).toThrow(/requires a JobStore/);
+    expect(() => createJobRunner({ store: {} } as never)).toThrow(/requires a JobStore/);
+    expect(() => createJobRunner({
+      store: { kind: "other", dispatch: vi.fn(), getSnapshot: vi.fn() },
+    } as never)).toThrow(/requires a JobStore/);
+    expect(() => createJobRunner({
+      store: { kind: "job", dispatch: vi.fn() },
+    } as never)).toThrow(/requires a JobStore/);
+    expect(() => createJobRunner({ store, host: null } as never)).toThrow(/host must be an object/);
+    expect(() => createJobRunner({ store, host: [] } as never)).toThrow(/host must be an object/);
+    expect(() => createJobRunner({
+      store,
+      host: { setTimer: validHost.setTimer, clearTimer: validHost.clearTimer },
+    } as never)).toThrow(/host\.now/);
+    expect(() => createJobRunner({
+      store,
+      host: { now: validHost.now, setTimer: 1, clearTimer: validHost.clearTimer },
+    } as never)).toThrow(/host\.setTimer/);
+    expect(() => createJobRunner({
+      store,
+      host: { now: validHost.now, setTimer: validHost.setTimer, clearTimer: null },
+    } as never)).toThrow(/host\.clearTimer/);
+
+    expect(() => new JobTaskError("unknown" as never, "Safe.", false)).toThrow(/code is invalid/);
+    expect(() => new JobTaskError("runtime-failure", " ", false)).toThrow(/message must be non-empty/);
+    expect(() => new JobTaskError("runtime-failure", "Safe.", 1 as never)).toThrow(/must be boolean/);
+  });
+
+  it("rejects malformed run options, tasks and terminal messages", async () => {
+    const runner = createJobRunner({ store: createJobStore(), host: new ManualHost() });
+
+    expect(() => runner.run(queuedJob("job-no-task", null), null as never)).toThrow(/task must be a function/);
+    expect(() => runner.run(queuedJob("job-null-options", null), () => "no", null as never)).toThrow(/data object/);
+    expect(() => runner.run(queuedJob("job-array-options", null), () => "no", [] as never)).toThrow(/data object/);
+    expect(() => runner.run(
+      queuedJob("job-extra-option", null),
+      () => "no",
+      { signal: undefined, extra: true } as never,
+    )).toThrow(/unsupported field/);
+
+    const hiddenSignal = Object.defineProperty({}, "signal", {
+      value: new AbortController().signal,
+      enumerable: false,
+    });
+    expect(() => runner.run(
+      queuedJob("job-hidden-signal", null),
+      () => "no",
+      hiddenSignal as never,
+    )).toThrow(/enumerable data property/);
+    const getterSignal = Object.defineProperty({}, "signal", {
+      get: () => new AbortController().signal,
+      enumerable: true,
+    });
+    expect(() => runner.run(
+      queuedJob("job-getter-signal", null),
+      () => "no",
+      getterSignal as never,
+    )).toThrow(/enumerable data property/);
+
+    expect(runner.cancel("job-missing")).toBe(false);
+    const pending = deferred<string>();
+    const active = runner.run(queuedJob("job-message", null), () => pending.promise, { signal: undefined });
+    expect(() => active.cancel(" ")).toThrow(/message must be non-empty/);
+    expect(active.cancel("Stopped by test.")).toBe(true);
+    expect(active.cancel()).toBe(false);
+    await expect(active.result).resolves.toMatchObject({
+      status: "cancelled",
+      job: { error: { message: "Stopped by test." } },
+    });
+    pending.resolve("late");
+  });
+
+  it("falls back to canonical job time when the host clock is invalid, old or throws", async () => {
+    let call = 0;
+    const host: JobRunnerHost = {
+      now: () => {
+        call += 1;
+        if (call === 1) return "invalid";
+        if (call === 2) return "2025-01-01T00:00:00.000Z";
+        throw new Error("clock unavailable");
+      },
+      setTimer: () => 1,
+      clearTimer: vi.fn(),
+    };
+    const runner = createJobRunner({ store: createJobStore(), host });
+
+    const handle = runner.run(queuedJob("job-clock", null), ({ reportProgress }) => {
+      expect(reportProgress({ ratio: 0.5, phase: "clock" })).toBe(true);
+      return "done";
+    });
+
+    await expect(handle.result).resolves.toMatchObject({
+      status: "succeeded",
+      job: { startedAt: T0, updatedAt: T0, finishedAt: T0 },
+    });
+  });
+
+  it("turns timer setup failure into a safe result and tolerates cleanup failure", async () => {
+    const task = vi.fn(() => "must-not-run");
+    const failingTimerHost: JobRunnerHost = {
+      now: () => T1,
+      setTimer: () => {
+        throw new Error("timer unavailable");
+      },
+      clearTimer: vi.fn(),
+    };
+    const failed = createJobRunner({ store: createJobStore(), host: failingTimerHost })
+      .run(queuedJob("job-timer-failure"), task);
+
+    await expect(failed.result).resolves.toMatchObject({
+      status: "failed",
+      job: {
+        error: {
+          code: "runtime-failure",
+          message: "Job runner could not schedule timeout.",
+          retryable: true,
+        },
+      },
+    });
+    expect(task).not.toHaveBeenCalled();
+
+    const pending = deferred<string>();
+    const cleanupRunner = createJobRunner({
+      store: createJobStore(),
+      host: {
+        now: () => T1,
+        setTimer: () => 9,
+        clearTimer: () => {
+          throw new Error("cleanup unavailable");
+        },
+      },
+    });
+    const active = cleanupRunner.run(queuedJob("job-cleanup-failure"), () => pending.promise);
+    expect(active.cancel()).toBe(true);
+    await expect(active.result).resolves.toMatchObject({ status: "cancelled" });
+    pending.resolve("late");
+  });
 });

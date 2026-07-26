@@ -1,4 +1,3 @@
-import JSZip from "jszip";
 import {
   createExportFormatRegistry,
   createExportPort,
@@ -156,6 +155,7 @@ export function createGridExportPort(writer: ArtifactWriter, now?: () => string)
         }
         const bundle = (source as Extract<GridExportPayload, { kind: "bundle" }>).bundle;
         const regions = uniqueBundleRegions(bundle.regions);
+        const { default: JSZip } = await import("jszip");
         const zip = new JSZip();
         const manifest = createManifest({ ...bundle, regions });
         zip.file("manifest.json", JSON.stringify(manifest, null, 2));

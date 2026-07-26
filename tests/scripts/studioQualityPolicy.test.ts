@@ -257,7 +257,7 @@ describe("fixture and golden retention", () => {
     const inventory = captureFixtureInventory(manifest);
     expect(evaluateFixtureInventory(manifest, inventory)).toMatchObject({
       status: "pass",
-      retainedCount: 9,
+      retainedCount: 10,
       rootCount: 2,
     });
 
