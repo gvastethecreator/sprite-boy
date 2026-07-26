@@ -1557,7 +1557,12 @@ const AppLayout: React.FC = () => {
               />
             ) : (
               activeWorkspace === "slice"
-                ? <SlicePropertiesPanel controller={sliceGridController} />
+                ? <SlicePropertiesPanel
+                    controller={sliceGridController}
+                    store={canonical.store}
+                    assets={canonical.assets}
+                    onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                  />
                 : <RightSidebar />
             )}
           </StudioPanel>
@@ -1594,7 +1599,12 @@ const AppLayout: React.FC = () => {
               />
             ) : (
               activeWorkspace === "slice"
-                ? <SlicePropertiesPanel controller={sliceGridController} />
+                ? <SlicePropertiesPanel
+                    controller={sliceGridController}
+                    store={canonical.store}
+                    assets={canonical.assets}
+                    onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                  />
                 : <RightSidebar />
             )}
           </StudioPanel>

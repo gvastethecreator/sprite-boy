@@ -6,6 +6,7 @@ import {
 import {
   isBackgroundRemovalWorkerRequest,
   isBackgroundRemovalWorkerResponse,
+  readBackgroundRemovalRequestId,
 } from "../../features/slice/backgroundRemoval/backgroundRemovalProtocol";
 
 class FakeWorker {
@@ -62,6 +63,43 @@ describe("background removal worker boundary", () => {
       mask: new Blob(["mask"], { type: "image/png" }),
       output: new Blob(["output"], { type: "image/png" }),
     })).toBe(true);
+  });
+
+  it("rejects accessors without executing them and reads only a data request ID", () => {
+    const getter = vi.fn(() => "request-hostile");
+    const hostile = {
+      type: "run",
+      get requestId() {
+        return getter();
+      },
+      modelId: "birefnet-lite-512",
+      inputWidth: 512,
+      inputHeight: 512,
+      weights: new ArrayBuffer(8),
+      source: new Blob(["image"], { type: "image/png" }),
+    };
+    expect(isBackgroundRemovalWorkerRequest(hostile)).toBe(false);
+    expect(readBackgroundRemovalRequestId(hostile)).toBeNull();
+    expect(getter).not.toHaveBeenCalled();
+  });
+
+  it("rejects response accessors without executing them", () => {
+    const typeGetter = vi.fn(() => "progress");
+    const requestGetter = vi.fn(() => "request-hostile");
+    const hostile = {
+      get type() {
+        return typeGetter();
+      },
+      get requestId() {
+        return requestGetter();
+      },
+      phase: "decode",
+      ratio: 0.1,
+      message: "Hostile",
+    };
+    expect(isBackgroundRemovalWorkerResponse(hostile)).toBe(false);
+    expect(typeGetter).not.toHaveBeenCalled();
+    expect(requestGetter).not.toHaveBeenCalled();
   });
 
   it("returns progress and output, then terminates the isolated worker", async () => {

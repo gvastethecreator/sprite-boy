@@ -1,9 +1,10 @@
 /// <reference lib="webworker" />
 
-import * as ort from "onnxruntime-web/wasm";
+import type * as Ort from "onnxruntime-web/wasm";
 import { GRID_PROCESSING_LIMITS } from "../../../core/processing/gridProcessingLimits";
 import {
   isBackgroundRemovalWorkerRequest,
+  readBackgroundRemovalRequestId,
   type BackgroundRemovalProgressPhase,
   type BackgroundRemovalWorkerFailure,
   type BackgroundRemovalWorkerRequest,
@@ -26,7 +27,7 @@ function failure(requestId: string, code: BackgroundRemovalWorkerFailure["code"]
   return { type: "error", requestId, code, message };
 }
 
-function preprocess(bitmap: ImageBitmap, width: number, height: number): ort.Tensor {
+function preprocess(ort: typeof Ort, bitmap: ImageBitmap, width: number, height: number): Ort.Tensor {
   const canvas = new OffscreenCanvas(width, height);
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new TypeError("Image preprocessing is unavailable.");
@@ -56,7 +57,7 @@ function sigmoid(value: number): number {
 
 async function renderResults(
   bitmap: ImageBitmap,
-  tensor: ort.Tensor,
+  tensor: Ort.Tensor,
   modelWidth: number,
   modelHeight: number,
 ): Promise<{ mask: Blob; output: Blob }> {
@@ -111,7 +112,7 @@ async function renderResults(
 
 async function run(request: BackgroundRemovalWorkerRequest): Promise<void> {
   let bitmap: ImageBitmap | null = null;
-  let session: ort.InferenceSession | null = null;
+  let session: Ort.InferenceSession | null = null;
   try {
     progress(request.requestId, "decode", 0.05, "Decoding source image");
     try {
@@ -130,11 +131,13 @@ async function run(request: BackgroundRemovalWorkerRequest): Promise<void> {
       return;
     }
 
-    progress(request.requestId, "preprocess", 0.15, "Preparing model input");
-    const input = preprocess(bitmap, request.inputWidth, request.inputHeight);
-    progress(request.requestId, "load-model", 0.3, "Loading verified local model");
+    progress(request.requestId, "preprocess", 0.15, "Preparing model runtime");
+    const ort = await import("onnxruntime-web/wasm");
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.proxy = false;
+    const input = preprocess(ort, bitmap, request.inputWidth, request.inputHeight);
+    progress(request.requestId, "load-model", 0.3, "Loading verified local model");
+    let output: Ort.Tensor | null = null;
     try {
       session = await ort.InferenceSession.create(request.weights, {
         executionProviders: ["wasm"],
@@ -147,9 +150,14 @@ async function run(request: BackgroundRemovalWorkerRequest): Promise<void> {
       ) throw new TypeError("Model input or output names are invalid.");
       progress(request.requestId, "inference", 0.6, "Removing background");
       const outputs = await session.run({ input_image: input });
-      const output = outputs.output_image;
+      output = outputs.output_image ?? null;
       if (!output) throw new TypeError("Model inference returned no output image.");
-      progress(request.requestId, "render", 0.9, "Rendering mask and alpha");
+    } catch {
+      workerScope.postMessage(failure(request.requestId, "model-failed", "The local model could not complete background removal."));
+      return;
+    }
+    progress(request.requestId, "render", 0.9, "Rendering mask and alpha");
+    try {
       const rendered = await renderResults(bitmap, output, request.inputWidth, request.inputHeight);
       workerScope.postMessage({
         type: "success",
@@ -160,7 +168,7 @@ async function run(request: BackgroundRemovalWorkerRequest): Promise<void> {
         output: rendered.output,
       });
     } catch {
-      workerScope.postMessage(failure(request.requestId, "model-failed", "The local model could not complete background removal."));
+      workerScope.postMessage(failure(request.requestId, "render-failed", "The mask or alpha image could not be rendered."));
     }
   } catch {
     workerScope.postMessage(failure(request.requestId, "runtime-failed", "Background removal failed."));
@@ -171,7 +179,12 @@ async function run(request: BackgroundRemovalWorkerRequest): Promise<void> {
 }
 
 workerScope.addEventListener("message", (event: MessageEvent<unknown>) => {
-  if (!isBackgroundRemovalWorkerRequest(event.data)) return;
+  if (!isBackgroundRemovalWorkerRequest(event.data)) {
+    const requestId = readBackgroundRemovalRequestId(event.data);
+    if (requestId) {
+      workerScope.postMessage(failure(requestId, "runtime-failed", "Background removal request was invalid."));
+    }
+    return;
+  }
   void run(event.data);
 });
-

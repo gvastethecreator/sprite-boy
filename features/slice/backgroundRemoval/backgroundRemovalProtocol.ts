@@ -70,6 +70,27 @@ function validRequestId(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 160;
 }
 
+function isArrayBuffer(value: unknown): value is ArrayBuffer {
+  return value instanceof ArrayBuffer;
+}
+
+function isBlob(value: unknown): value is Blob {
+  return typeof Blob === "function"
+    && value instanceof Blob;
+}
+
+export function readBackgroundRemovalRequestId(value: unknown): string | null {
+  try {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(value, "requestId");
+    return descriptor && "value" in descriptor && validRequestId(descriptor.value)
+      ? descriptor.value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isBackgroundRemovalWorkerRequest(value: unknown): value is BackgroundRemovalWorkerRequest {
   const record = exactRecord(value, ["type", "requestId", "modelId", "inputWidth", "inputHeight", "weights", "source"]);
   return record?.type === "run"
@@ -77,19 +98,29 @@ export function isBackgroundRemovalWorkerRequest(value: unknown): value is Backg
     && record.modelId === "birefnet-lite-512"
     && record.inputWidth === 512
     && record.inputHeight === 512
-    && record.weights instanceof ArrayBuffer
+    && isArrayBuffer(record.weights)
     && record.weights.byteLength > 0
-    && typeof Blob === "function"
-    && record.source instanceof Blob
+    && isBlob(record.source)
     && record.source.size > 0;
 }
 
 export function isBackgroundRemovalWorkerResponse(value: unknown): value is BackgroundRemovalWorkerResponse {
-  const base = value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-  if (!base || !validRequestId(base.requestId)) return false;
-  if (base.type === "progress") {
+  let type: unknown;
+  let requestId: unknown;
+  try {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+    const typeDescriptor = Object.getOwnPropertyDescriptor(value, "type");
+    const requestIdDescriptor = Object.getOwnPropertyDescriptor(value, "requestId");
+    if (!typeDescriptor || !("value" in typeDescriptor) || !requestIdDescriptor || !("value" in requestIdDescriptor)) {
+      return false;
+    }
+    type = typeDescriptor.value;
+    requestId = requestIdDescriptor.value;
+  } catch {
+    return false;
+  }
+  if (!validRequestId(requestId)) return false;
+  if (type === "progress") {
     const record = exactRecord(value, ["type", "requestId", "phase", "ratio", "message"]);
     return Boolean(record)
       && ["decode", "preprocess", "load-model", "inference", "render"].includes(String(record?.phase))
@@ -99,16 +130,15 @@ export function isBackgroundRemovalWorkerResponse(value: unknown): value is Back
       && record.ratio <= 1
       && typeof record.message === "string";
   }
-  if (base.type === "success") {
+  if (type === "success") {
     const record = exactRecord(value, ["type", "requestId", "width", "height", "mask", "output"]);
     return Boolean(record)
       && Number.isSafeInteger(record?.width) && (record?.width as number) > 0
       && Number.isSafeInteger(record?.height) && (record?.height as number) > 0
-      && typeof Blob === "function"
-      && record?.mask instanceof Blob && record.mask.size > 0 && record.mask.type === "image/png"
-      && record?.output instanceof Blob && record.output.size > 0 && record.output.type === "image/png";
+      && isBlob(record?.mask) && record.mask.size > 0 && record.mask.type === "image/png"
+      && isBlob(record?.output) && record.output.size > 0 && record.output.type === "image/png";
   }
-  if (base.type === "error") {
+  if (type === "error") {
     const record = exactRecord(value, ["type", "requestId", "code", "message"]);
     return Boolean(record)
       && ["decode-failed", "model-failed", "render-failed", "runtime-failed"].includes(String(record?.code))
@@ -117,4 +147,3 @@ export function isBackgroundRemovalWorkerResponse(value: unknown): value is Back
   }
   return false;
 }
-

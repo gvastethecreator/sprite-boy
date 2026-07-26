@@ -33,7 +33,16 @@ export interface BackgroundRemovalResult {
 }
 
 export class BackgroundRemovalRuntimeError extends Error {
-  readonly code: "cancelled" | "invalid-input" | "timeout" | "worker-failed" | "invalid-response";
+  readonly code:
+    | "cancelled"
+    | "invalid-input"
+    | "timeout"
+    | "worker-failed"
+    | "invalid-response"
+    | "decode-failed"
+    | "model-failed"
+    | "render-failed"
+    | "runtime-failed";
 
   constructor(code: BackgroundRemovalRuntimeError["code"], message: string) {
     super(message);
@@ -119,7 +128,7 @@ export function runBackgroundRemoval(options: RunBackgroundRemovalOptions): Prom
         return;
       }
       if (event.data.type === "error") {
-        fail(new BackgroundRemovalRuntimeError("worker-failed", event.data.message));
+        fail(new BackgroundRemovalRuntimeError(event.data.code, event.data.message));
         return;
       }
       succeed(event.data);
@@ -148,4 +157,3 @@ export function runBackgroundRemoval(options: RunBackgroundRemovalOptions): Prom
     }
   });
 }
-
