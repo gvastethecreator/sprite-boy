@@ -11,12 +11,24 @@ import type {
   StudioControlPorts,
 } from "../../core/control/controlService";
 import type { WorkspaceId } from "../../core/project";
+import type { LocalModelServiceClient } from "../../core/models";
 import { navigateStudioWorkspace } from "../../components/studio/useStudioNavigation";
+
+export const BROWSER_STUDIO_CONTROL_SUPPORTED_COMMANDS = Object.freeze([
+  "capabilities.get",
+  "project.get",
+  "selection.get",
+  "workspace.navigate",
+  "model.status",
+  "jobs.list",
+  "jobs.cancel",
+] as const);
 
 export interface StudioControlPortDependencies {
   readonly projectStore: ProjectStore;
   readonly jobStore: JobStore;
   readonly jobRunner: JobRunner;
+  readonly models?: LocalModelServiceClient;
   readonly navigate: (workspaceId: WorkspaceId) => ProjectStoreDispatchResult;
 }
 
@@ -40,6 +52,18 @@ function unsupported(revision: number): StudioControlPortFailure {
       code: "unsupported-command",
       message: "This control command is not connected to the Studio yet.",
       retryable: false,
+    },
+  };
+}
+
+function serviceUnavailable(revision: number): StudioControlPortFailure {
+  return {
+    ok: false,
+    revision,
+    error: {
+      code: "internal",
+      message: "The local model service is unavailable.",
+      retryable: true,
     },
   };
 }
@@ -89,7 +113,29 @@ export function createBrowserStudioControlPorts(
     }),
     importAsset: (_params, context) => guard(context, unsupported),
     importVideo: (_params, context) => guard(context, unsupported),
-    getModelStatus: (_params, context) => guard(context, unsupported),
+    getModelStatus: async (params, context) => {
+      const currentRevision = revision();
+      if (context.signal.aborted) return cancelled(currentRevision);
+      if (!dependencies.models) return unsupported(currentRevision);
+      try {
+        const snapshot = await dependencies.models.list(context.signal);
+        if (context.signal.aborted) return cancelled(revision());
+        const model = snapshot.models.find((entry) => entry.id === params.modelId);
+        return model
+          ? { ok: true, revision: revision(), result: model }
+          : {
+              ok: false,
+              revision: revision(),
+              error: {
+                code: "not-found",
+                message: "The requested local model was not found.",
+                retryable: false,
+              },
+            };
+      } catch {
+        return context.signal.aborted ? cancelled(revision()) : serviceUnavailable(revision());
+      }
+    },
     setupModel: (_params, context) => guard(context, unsupported),
     listJobs: (context) => guard(context, (currentRevision) => ({
       ok: true,

@@ -84,6 +84,7 @@ describe("StudioControlService command routing", () => {
         protocolVersion: 1,
         maxRequestBytes: STUDIO_CONTROL_MAX_REQUEST_BYTES,
         commands: STUDIO_CONTROL_COMMANDS,
+        supportedCommands: STUDIO_CONTROL_COMMANDS,
         transport: "session",
       },
     });
@@ -92,6 +93,18 @@ describe("StudioControlService command routing", () => {
     expect(Object.isFrozen(response)).toBe(true);
     if (!response.ok) throw new Error("Expected a capabilities success response.");
     expect(Object.isFrozen(response.result)).toBe(true);
+  });
+
+  it("reports the commands the connected host can execute", async () => {
+    const supported = ["capabilities.get", "project.get", "model.status"] as const;
+    const service = createStudioControlService({ ports: createPorts(), supportedCommands: supported });
+
+    const response = await service.execute(request("capabilities.get", {}));
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: { commands: STUDIO_CONTROL_COMMANDS, supportedCommands: supported },
+    });
   });
 
   it.each([

@@ -26,7 +26,10 @@ import {
   useJobStore,
   useStudioJobRunner,
 } from "../../contexts/StudioStoreContext";
-import { createBrowserStudioControlPorts } from "./studioControlPorts";
+import {
+  BROWSER_STUDIO_CONTROL_SUPPORTED_COMMANDS,
+  createBrowserStudioControlPorts,
+} from "./studioControlPorts";
 
 const IDLE_SNAPSHOT: StudioControlBridgeClientSnapshot = Object.freeze({
   status: "idle",
@@ -79,16 +82,18 @@ export function StudioControlBridgeProvider({ children }: { readonly children: R
 
   const connect = useCallback(async (baseUrl: string, token: string): Promise<void> => {
     await disconnect();
-    const service = createStudioControlService({
-      ports: createBrowserStudioControlPorts(dependencies),
-    });
+    let service: StudioControlService | null = null;
     let client: StudioControlBridgeClient;
     let models: LocalModelServiceClient;
     try {
-      client = createStudioControlBridgeClient({ baseUrl, token, service });
       models = createLocalModelServiceClient({ baseUrl, token });
+      service = createStudioControlService({
+        ports: createBrowserStudioControlPorts({ ...dependencies, models }),
+        supportedCommands: BROWSER_STUDIO_CONTROL_SUPPORTED_COMMANDS,
+      });
+      client = createStudioControlBridgeClient({ baseUrl, token, service });
     } catch (error) {
-      service.dispose();
+      service?.dispose();
       throw error;
     }
     const unsubscribe = client.subscribe(() => setSnapshot(client.getSnapshot()));

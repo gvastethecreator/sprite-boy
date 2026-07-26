@@ -92,6 +92,7 @@ export interface StudioControlPorts {
 export interface StudioControlServiceOptions {
   readonly ports: StudioControlPorts;
   readonly maxIdempotencyEntries?: number;
+  readonly supportedCommands?: readonly StudioControlCommand[];
 }
 
 export interface StudioControlService {
@@ -217,20 +218,48 @@ function normalizePorts(value: unknown): NormalizedPorts {
 function normalizeOptions(options: unknown): {
   readonly ports: NormalizedPorts;
   readonly maxIdempotencyEntries: number;
+  readonly supportedCommands: readonly StudioControlCommand[];
 } {
   const record = readExactRecord(
     options,
     ["ports"],
-    ["maxIdempotencyEntries"],
+    ["maxIdempotencyEntries", "supportedCommands"],
     OPTIONS_ERROR,
   );
   const max = record.maxIdempotencyEntries ?? DEFAULT_MAX_IDEMPOTENCY_ENTRIES;
   if (!Number.isSafeInteger(max) || (max as number) < 1 || (max as number) > MAX_IDEMPOTENCY_ENTRIES) {
     throw new TypeError(OPTIONS_ERROR);
   }
+  const supported = record.supportedCommands ?? STUDIO_CONTROL_COMMANDS;
+  if (!Array.isArray(supported) || supported.length < 1 || supported.length > STUDIO_CONTROL_COMMANDS.length) {
+    throw new TypeError(OPTIONS_ERROR);
+  }
+  const supportedCommands: StudioControlCommand[] = [];
+  const keys = reflectOrThrow(() => Reflect.ownKeys(supported), OPTIONS_ERROR);
+  const expectedKeys = new Set<PropertyKey>([
+    "length",
+    ...Array.from({ length: supported.length }, (_, index) => String(index)),
+  ]);
+  if (keys.length !== expectedKeys.size || keys.some((key) => !expectedKeys.has(key))) {
+    throw new TypeError(OPTIONS_ERROR);
+  }
+  for (let index = 0; index < supported.length; index += 1) {
+    const descriptor = reflectOrThrow(
+      () => Object.getOwnPropertyDescriptor(supported, String(index)),
+      OPTIONS_ERROR,
+    );
+    if (!descriptor || !("value" in descriptor) || !(STUDIO_CONTROL_COMMANDS as readonly unknown[]).includes(descriptor.value)) {
+      throw new TypeError(OPTIONS_ERROR);
+    }
+    supportedCommands.push(descriptor.value as StudioControlCommand);
+  }
+  if (new Set(supportedCommands).size !== supportedCommands.length || !supportedCommands.includes("capabilities.get")) {
+    throw new TypeError(OPTIONS_ERROR);
+  }
   return Object.freeze({
     ports: normalizePorts(record.ports),
     maxIdempotencyEntries: max as number,
+    supportedCommands: Object.freeze(supportedCommands),
   });
 }
 
@@ -403,7 +432,7 @@ function settlePort(
 }
 
 export function createStudioControlService(options: StudioControlServiceOptions): StudioControlService {
-  const { ports, maxIdempotencyEntries } = normalizeOptions(options);
+  const { ports, maxIdempotencyEntries, supportedCommands } = normalizeOptions(options);
   const entries = new Map<string, IdempotencyEntry>();
   const completedOrder: string[] = [];
   let disposed = false;
@@ -446,6 +475,7 @@ export function createStudioControlService(options: StudioControlServiceOptions)
           protocolVersion: STUDIO_CONTROL_PROTOCOL_VERSION,
           maxRequestBytes: STUDIO_CONTROL_MAX_REQUEST_BYTES,
           commands: STUDIO_CONTROL_COMMANDS,
+          supportedCommands,
           transport: "session",
         },
       });

@@ -3,6 +3,7 @@ import { createEmptyStudioProject, type WorkspaceId } from "../../core/project";
 import { createJobRunner, type JobRunner } from "../../core/processing";
 import { createJobStore, createProjectStore } from "../../core/stores";
 import type { StudioControlPortContext } from "../../core/control/controlService";
+import type { LocalModelServiceClient } from "../../core/models";
 import { createBrowserStudioControlPorts } from "../../features/control/studioControlPorts";
 
 const NOW = "2026-07-26T00:00:00.000Z";
@@ -16,7 +17,7 @@ function context(signal = new AbortController().signal): StudioControlPortContex
   });
 }
 
-function runtime(cancel = false) {
+function runtime(cancel = false, models?: LocalModelServiceClient) {
   let identity = 0;
   const projectStore = createProjectStore(
     createEmptyStudioProject({ id: "project-control", now: NOW }),
@@ -51,7 +52,7 @@ function runtime(cancel = false) {
     jobRunner,
     cancelMock,
     navigate,
-    ports: createBrowserStudioControlPorts({ projectStore, jobStore, jobRunner, navigate }),
+    ports: createBrowserStudioControlPorts({ projectStore, jobStore, jobRunner, navigate, models }),
   };
 }
 
@@ -126,8 +127,8 @@ describe("browser Studio control ports", () => {
 
   it("returns typed unsupported failures for ports that still need host adapters", async () => {
     const value = runtime();
-    const response = await value.ports.getModelStatus(
-      { modelId: "birefnet-lite-512" },
+    const response = await value.ports.setupModel(
+      { modelId: "birefnet-lite-512", acceptLicense: false },
       context(),
     );
 
@@ -136,5 +137,34 @@ describe("browser Studio control ports", () => {
       revision: 0,
       error: { code: "unsupported-command", retryable: false },
     });
+  });
+
+  it("reads real local model status through the connected model service", async () => {
+    const model = {
+      id: "birefnet-lite-512" as const,
+      label: "BiRefNet Lite 512",
+      repositoryId: "studioludens/birefnet-lite-512",
+      revision: "a".repeat(40),
+      gated: false,
+      license: { id: "MIT", name: "MIT License", use: "permissive" as const, url: "https://example.test/model", acceptanceUrl: null },
+      runtime: { inputWidth: 512, inputHeight: 512, dtype: "fp16", preferredBackends: ["wasm" as const], minimumMemoryBytes: 1 },
+      status: { modelId: "birefnet-lite-512" as const, state: "ready" as const, verifiedBytes: 10, totalBytes: 10, problems: [] },
+      capacity: { state: "supported" as const, canInstall: true, requiredStorageBytes: 10, requiredMemoryBytes: 1, problems: [] },
+      job: null,
+    };
+    const models = {
+      list: vi.fn(async () => ({ version: 1 as const, models: [model] })),
+    } as unknown as LocalModelServiceClient;
+    const value = runtime(false, models);
+
+    await expect(value.ports.getModelStatus(
+      { modelId: "birefnet-lite-512" },
+      context(),
+    )).resolves.toMatchObject({
+      ok: true,
+      revision: 0,
+      result: { id: "birefnet-lite-512", status: { state: "ready" } },
+    });
+    expect(models.list).toHaveBeenCalledTimes(1);
   });
 });
