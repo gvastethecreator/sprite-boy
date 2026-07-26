@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactElement,
 } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
@@ -16,6 +17,7 @@ import {
   type SceneProjection,
 } from "../../../core/render";
 import type { ProjectStore } from "../../../core/stores";
+import type { DeepReadonly, ProjectStoreState, WorkspaceState } from "../../../core/stores";
 import { useWorkspaceStore } from "../../../contexts/StudioStoreContext";
 import {
   useProjectStoreSelector,
@@ -35,6 +37,15 @@ export interface ComposeCanvasWorkspaceProps {
   readonly assets: AssetRepository;
   readonly viewportFactory?: ComposeViewportFactory;
   readonly bitmapDecoder?: ComposeBitmapDecoder;
+  readonly projectionFactory?: (
+    project: DeepReadonly<ProjectStoreState>,
+    workspace: DeepReadonly<WorkspaceState>,
+  ) => SceneProjection;
+  readonly ariaLabel?: string | null;
+  readonly className?: string;
+  readonly hideDiagnostics?: boolean;
+  readonly transparentBackground?: boolean;
+  readonly style?: CSSProperties;
 }
 
 const MAX_BITMAP_CACHE = 8;
@@ -325,7 +336,18 @@ function createBitmapCache(options: {
 export function ComposeCanvasWorkspace(
   props: ComposeCanvasWorkspaceProps,
 ): ReactElement {
-  const { store, assets, viewportFactory, bitmapDecoder } = props;
+  const {
+    store,
+    assets,
+    viewportFactory,
+    bitmapDecoder,
+    projectionFactory,
+    ariaLabel = "Compose canvas",
+    className = "",
+    hideDiagnostics = false,
+    transparentBackground = false,
+    style,
+  } = props;
   const workspace = useWorkspaceStore();
   const projectRevision = useProjectStoreSelector(
     store,
@@ -400,10 +422,11 @@ export function ComposeCanvasWorkspace(
         canvas,
         resizeTarget,
         getProjection: () => {
-          const projection = createSceneProjection(
-            store.getSnapshot(),
-            workspace.getSnapshot(),
-          );
+          const projectSnapshot = store.getSnapshot();
+          const workspaceSnapshot = workspace.getSnapshot();
+          const projection = projectionFactory
+            ? projectionFactory(projectSnapshot, workspaceSnapshot)
+            : createSceneProjection(projectSnapshot, workspaceSnapshot);
           return shrinkProjectionToFit(
             projection,
             resizeTarget.clientWidth,
@@ -437,7 +460,7 @@ export function ComposeCanvasWorkspace(
       active = false;
       disposeLive();
     };
-  }, [store, assets, workspace, decode, factory, retryToken, disposeLive]);
+  }, [store, assets, workspace, decode, factory, projectionFactory, retryToken, disposeLive]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -465,8 +488,11 @@ export function ComposeCanvasWorkspace(
   }, [disposeLive]);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-workspace">
-      {errorMessage ? (
+    <div
+      className={`flex h-full min-h-0 w-full flex-col ${transparentBackground ? "bg-transparent" : "bg-workspace"} ${className}`}
+      style={style}
+    >
+      {errorMessage && !hideDiagnostics ? (
         <div
           role="alert"
           className="m-2 flex items-start gap-2 rounded border border-border/20 bg-surface px-3 py-2 text-sm text-textMain"
@@ -494,7 +520,8 @@ export function ComposeCanvasWorkspace(
       >
         <canvas
           ref={canvasRef}
-          aria-label="Compose canvas"
+          aria-label={ariaLabel ?? undefined}
+          aria-hidden={ariaLabel === null ? true : undefined}
           className="block h-full min-h-[240px] w-full"
         />
       </div>

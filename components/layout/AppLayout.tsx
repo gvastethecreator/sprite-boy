@@ -94,6 +94,7 @@ import {
 } from "../../features/slice/results/durableGridCommitUndo";
 import ComposeBootstrapWorkspace from "../../features/compose/project/ComposeBootstrapWorkspace";
 import CompositionCanvasSettingsInspector from "../../features/compose/canvasSettings/CompositionCanvasSettingsInspector";
+import AnimateFrameWorkspace from "../../features/animate/AnimateFrameWorkspace";
 import { handoffRegionToCompose } from "../../features/slice/handoff/sliceToComposeHandoff";
 import StudioWorkspaceErrorBoundary from "../studio/StudioWorkspaceErrorBoundary";
 import { DUAL_ENGINE_FREEZE_ACTIVE } from "../../core/studio/dualEngineFreeze";
@@ -684,7 +685,10 @@ const AppLayout: React.FC = () => {
   const canonicalComposition = canonicalCompositionId
     ? canonicalProject.compositions[canonicalCompositionId]
     : undefined;
-  const showLegacyPanels = hasWorkspace && activeWorkspace !== "compose";
+  const canonicalSequenceAvailable = canonicalProject.rootOrder.sequenceIds.some(
+    (id) => canonicalProject.sequences[id]?.celIds.some((celId) => canonicalProject.cels[celId]),
+  );
+  const showLegacyPanels = hasWorkspace && activeWorkspace !== "compose" && activeWorkspace !== "animate";
   const showComposeProperties = activeWorkspace === "compose" && Boolean(canonicalComposition);
   const hasStudioPanels = showLegacyPanels || showComposeProperties;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
@@ -908,7 +912,11 @@ const AppLayout: React.FC = () => {
       || canonical.persistenceState === "saving",
     canUndo: canonicalHistoryOwned ? (canonicalCanUndo || durableGridCommitAvailable) : canUndo,
     canRedo: canonicalHistoryOwned ? canonicalCanRedo : canRedo,
-    canvasAvailable: activeWorkspace === "compose" ? Boolean(canonicalComposition) : hasWorkspace,
+    canvasAvailable: activeWorkspace === "compose"
+      ? Boolean(canonicalComposition)
+      : activeWorkspace === "animate"
+        ? canonicalSequenceAvailable
+        : hasWorkspace,
   }), [
     activeWorkspace,
     canRedo,
@@ -919,6 +927,7 @@ const AppLayout: React.FC = () => {
     durableGridCommitAvailable,
     canonicalHistoryOwned,
     canonicalComposition,
+    canonicalSequenceAvailable,
     composeImportBusy,
     hasWorkspace,
     isLoading,
@@ -1441,6 +1450,12 @@ const AppLayout: React.FC = () => {
                 onCleanupDebtChange={canonical.reportAssetCleanupDebt}
                 onCompositionReady={() => navigate("compose")}
               />
+            ) : activeWorkspace === "animate" ? (
+              <AnimateFrameWorkspace
+                store={canonical.store}
+                assets={canonical.assets}
+                disabled={canonical.persistenceState === "loading"}
+              />
             ) : activeWorkspace === "collision" ? (
               <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading collision…</div>}>
                 <CollisionWorkspacePanel />
@@ -1523,7 +1538,7 @@ const AppLayout: React.FC = () => {
             )}
             </main>
           </StudioWorkspaceErrorBoundary>
-          {hasWorkspace && activeWorkspace !== "compose" && (
+          {hasWorkspace && activeWorkspace !== "compose" && activeWorkspace !== "animate" && (
             <TimelinePanel hidden={activeWorkspaceDefinition.capabilities.timeline !== "editable"} />
           )}
         </div>
