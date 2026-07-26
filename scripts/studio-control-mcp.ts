@@ -236,9 +236,9 @@ async function main(): Promise<void> {
     "spriteboy_import_asset",
     {
       title: "Import an image into SpriteBoy",
-      description: "Ask the local host adapter to import an image path.",
+      description: "Import an absolute PNG, JPEG, or WebP path from a bridge --file-root (10 MiB max).",
       inputSchema: z.object({ path: z.string().min(1).max(4096), ...commonInput }).strict(),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async (input, extra) => {
       try {
@@ -257,7 +257,7 @@ async function main(): Promise<void> {
     "spriteboy_import_video",
     {
       title: "Import video frames into SpriteBoy",
-      description: "Import a bounded video range with all frames or fixed-FPS sampling.",
+      description: "Queue frame extraction from an absolute path under a bridge --file-root (256 MiB max).",
       inputSchema: z.object({
         path: z.string().min(1).max(4096),
         startUs: z.number().int().nonnegative(),
@@ -271,7 +271,7 @@ async function main(): Promise<void> {
         message: "endUs must be greater than startUs",
         path: ["endUs"],
       }),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async (input, extra) => {
       try {
@@ -385,12 +385,12 @@ async function main(): Promise<void> {
     "spriteboy_export",
     {
       title: "Export from SpriteBoy",
-      description: "Run a registered SpriteBoy export format.",
+      description: "Reserved export command; the current browser capabilities omit it until artifact receipts are wired.",
       inputSchema: z.object({
         format: z.enum(["png", "zip", "gif", "mp4", "webm"]),
         ...commonInput,
       }).strict(),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async (input, extra) => {
       try {

@@ -112,6 +112,34 @@ describe("node model setup adapter (M1-02)", () => {
     expect(progress.at(-1)).toBe(1);
   });
 
+  it("restarts from byte zero when a server ignores the requested range", async () => {
+    const root = await temporaryRoot();
+    const modelRoot = join(root, tinyModel.id, "onnx");
+    await mkdir(modelRoot, { recursive: true });
+    await writeFile(join(modelRoot, "model_fp16.onnx.part"), bytes.subarray(0, 1));
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get("range")).toBe("bytes=1-");
+      return new Response(bytes, { status: 200 });
+    });
+    const port = createNodeModelSetupPort({
+      root,
+      fetch: fetchMock as typeof fetch,
+      now: fixedNow,
+      smoke: smoke(),
+      resolveModel: () => tinyModel,
+    });
+
+    await expect(
+      port.install({
+        modelId: tinyModel.id,
+        requestId: "request-range-reset",
+        signal: new AbortController().signal,
+        onProgress: () => undefined,
+      }),
+    ).resolves.toMatchObject({ smoke: { status: "passed" } });
+    expect(await readFile(join(modelRoot, "model_fp16.onnx"), "utf8")).toBe("abc");
+  });
+
   it("drops a corrupt partial and records a bounded error", async () => {
     const root = await temporaryRoot();
     const fetchMock = vi.fn(async () => new Response(new TextEncoder().encode("bad")));
@@ -200,6 +228,102 @@ describe("node model setup adapter (M1-02)", () => {
       onProgress: () => undefined,
     })).resolves.toMatchObject({ smoke: { status: "passed", backend: "wasm" } });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks a gated model before download when exact license acceptance is missing", async () => {
+    const root = await temporaryRoot();
+    const gatedModel: LocalModelDefinition = Object.freeze({
+      ...tinyModel,
+      gated: true,
+      license: {
+        id: "restricted-test-license",
+        name: "Restricted test license",
+        use: "non-commercial" as const,
+        url: "https://example.test/license",
+        acceptanceUrl: "https://example.test/accept",
+      },
+    });
+    const fetchMock = vi.fn();
+    const smokeRunner = smoke();
+    const port = createNodeModelSetupPort({
+      root,
+      fetch: fetchMock as unknown as typeof fetch,
+      now: fixedNow,
+      smoke: smokeRunner,
+      resolveModel: () => gatedModel,
+    });
+
+    await expect(
+      port.install({
+        modelId: gatedModel.id,
+        requestId: "request-license",
+        signal: new AbortController().signal,
+        onProgress: () => undefined,
+      }),
+    ).rejects.toMatchObject({ code: "license-required", retryable: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(smokeRunner.run).not.toHaveBeenCalled();
+  });
+
+  it("keeps the install unverified and records smoke failure for invalid evidence", async () => {
+    const root = await temporaryRoot();
+    const smokeRunner = {
+      run: vi.fn(async () => ({ ...smokeEvidence(), catalogFingerprint: "stale-catalog" })),
+    };
+    const port = createNodeModelSetupPort({
+      root,
+      fetch: vi.fn(async () => new Response(bytes)) as unknown as typeof fetch,
+      now: fixedNow,
+      smoke: smokeRunner,
+      resolveModel: () => tinyModel,
+    });
+
+    await expect(
+      port.install({
+        modelId: tinyModel.id,
+        requestId: "request-bad-smoke",
+        signal: new AbortController().signal,
+        onProgress: () => undefined,
+      }),
+    ).rejects.toMatchObject({ code: "smoke-failed", retryable: true });
+
+    const modelRoot = join(root, tinyModel.id);
+    expect(
+      JSON.parse(await readFile(join(modelRoot, MODEL_INSTALL_MANIFEST), "utf8")),
+    ).toMatchObject({ smoke: null });
+    expect(JSON.parse(await readFile(join(modelRoot, MODEL_ERROR_MARKER), "utf8"))).toMatchObject({
+      code: "smoke-failed",
+    });
+  });
+
+  it("maps a thrown smoke error to a bounded retryable failure", async () => {
+    const root = await temporaryRoot();
+    const smokeRunner = {
+      run: vi.fn(async () => {
+        throw new Error("private path token=secret");
+      }),
+    };
+    const port = createNodeModelSetupPort({
+      root,
+      fetch: vi.fn(async () => new Response(bytes)) as unknown as typeof fetch,
+      now: fixedNow,
+      smoke: smokeRunner,
+      resolveModel: () => tinyModel,
+    });
+
+    await expect(port.install({
+      modelId: tinyModel.id,
+      requestId: "request-smoke-throws",
+      signal: new AbortController().signal,
+      onProgress: () => undefined,
+    })).rejects.toMatchObject({
+      code: "smoke-failed",
+      message: "La prueba local del modelo falló.",
+      retryable: true,
+    });
+    expect(JSON.parse(await readFile(join(root, tinyModel.id, MODEL_ERROR_MARKER), "utf8"))).toMatchObject({
+      code: "smoke-failed",
+    });
   });
 
   it("clears the live marker on cancellation and never runs smoke", async () => {

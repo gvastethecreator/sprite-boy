@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { relative, resolve, sep } from "node:path";
 import { createJobRunner, createQueuedJob, type JobRunHandle, type JobSnapshot } from "../processing";
-import { createJobStore } from "../stores";
+import { createJobStore, type JobStoreState } from "../stores";
 import {
   LOCAL_MODEL_CATALOG,
   getLocalModelDefinition,
@@ -24,6 +24,7 @@ export interface NodeModelWeightFile {
 export interface NodeModelService {
   list(): Promise<LocalModelServiceSnapshot>;
   setup(modelId: LocalModelId): Promise<LocalModelSetupResponse>;
+  listJobs(): JobStoreState;
   getJob(jobId: string): JobSnapshot | null;
   cancelJob(jobId: string): JobSnapshot | null;
   resolveWeights(modelId: LocalModelId): Promise<NodeModelWeightFile | null>;
@@ -132,6 +133,7 @@ export function createNodeModelService(options: { readonly root: string }): Node
         job: job(jobId),
       });
     },
+    listJobs: () => store.getSnapshot(),
     getJob: job,
     cancelJob(jobId) {
       runner.cancel(jobId, "Model setup cancelled.");

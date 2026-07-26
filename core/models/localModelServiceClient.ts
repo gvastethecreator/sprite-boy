@@ -5,7 +5,9 @@ import {
   type LocalModelServiceSnapshot,
   type LocalModelSetupResponse,
 } from "./modelServiceProtocol";
-import type { JobSnapshot } from "../processing";
+import { assertJobSnapshot, type JobSnapshot } from "../processing";
+import { isEntityId } from "../project";
+import type { JobStoreState } from "../stores";
 
 export interface LocalModelServiceClientOptions {
   readonly baseUrl: string;
@@ -16,6 +18,7 @@ export interface LocalModelServiceClientOptions {
 export interface LocalModelServiceClient {
   list(signal?: AbortSignal): Promise<LocalModelServiceSnapshot>;
   setup(modelId: LocalModelId, signal?: AbortSignal): Promise<LocalModelSetupResponse>;
+  listJobs(signal?: AbortSignal): Promise<JobStoreState>;
   getJob(jobId: string, signal?: AbortSignal): Promise<JobSnapshot>;
   cancelJob(jobId: string, signal?: AbortSignal): Promise<JobSnapshot>;
   getWeights(modelId: LocalModelId, signal?: AbortSignal): Promise<ArrayBuffer>;
@@ -54,11 +57,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+const REMOTE_ERROR_CODES = new Set<LocalModelServiceErrorCode>([
+  "invalid-request",
+  "license-required",
+  "model-not-ready",
+  "not-found",
+  "setup-failed",
+]);
+
 function parseError(value: unknown): { code: LocalModelServiceErrorCode; message: string } | null {
   if (!isRecord(value) || value.version !== LOCAL_MODEL_SERVICE_VERSION || !isRecord(value.error)) return null;
   const code = value.error.code;
   const message = value.error.message;
-  return typeof code === "string" && typeof message === "string" && message.length > 0
+  return typeof code === "string" && REMOTE_ERROR_CODES.has(code as LocalModelServiceErrorCode)
+    && typeof message === "string" && message.length > 0
     ? { code: code as LocalModelServiceErrorCode, message }
     : null;
 }
@@ -90,7 +102,57 @@ function parseJob(value: unknown): JobSnapshot {
   if (!isRecord(value) || value.version !== LOCAL_MODEL_SERVICE_VERSION || !isRecord(value.job)) {
     throw new LocalModelServiceError("invalid-response", "The local model service returned invalid job data.");
   }
-  return value.job as unknown as JobSnapshot;
+  try {
+    assertJobSnapshot(value.job);
+    return value.job;
+  } catch {
+    throw new LocalModelServiceError("invalid-response", "The local model service returned invalid job data.");
+  }
+}
+
+function parseJobs(value: unknown): JobStoreState {
+  if (!isRecord(value) || value.version !== LOCAL_MODEL_SERVICE_VERSION || !isRecord(value.snapshot)) {
+    throw new LocalModelServiceError("invalid-response", "The local model service returned invalid jobs data.");
+  }
+  const snapshot = value.snapshot;
+  if (!isRecord(snapshot.jobs) || !Array.isArray(snapshot.order)
+    || !Array.isArray(snapshot.retiredRequestIds) || !Array.isArray(snapshot.retiredJobIds)
+    || !Array.isArray(snapshot.consumedRetrySourceIds)) {
+    throw new LocalModelServiceError("invalid-response", "The local model service returned invalid jobs data.");
+  }
+  const lists = [
+    snapshot.order,
+    snapshot.retiredRequestIds,
+    snapshot.retiredJobIds,
+    snapshot.consumedRetrySourceIds,
+  ];
+  if (lists.some((list) => list.some((id) => !isEntityId(id)) || new Set(list).size !== list.length)) {
+    throw new LocalModelServiceError("invalid-response", "The local model service returned invalid jobs data.");
+  }
+  const order = snapshot.order as string[];
+  const retiredRequestIds = snapshot.retiredRequestIds as string[];
+  const retiredJobIds = snapshot.retiredJobIds as string[];
+  const consumedRetrySourceIds = snapshot.consumedRetrySourceIds as string[];
+  const jobIds = Object.keys(snapshot.jobs);
+  if (jobIds.length !== order.length || jobIds.some((id) => !order.includes(id))) {
+    throw new LocalModelServiceError("invalid-response", "The local model service returned invalid jobs data.");
+  }
+  try {
+    for (const jobId of order) {
+      const job = snapshot.jobs[jobId];
+      assertJobSnapshot(job);
+      if (job.id !== jobId) throw new TypeError("Job registry key does not match its snapshot.");
+    }
+  } catch {
+    throw new LocalModelServiceError("invalid-response", "The local model service returned invalid jobs data.");
+  }
+  return Object.freeze({
+    jobs: Object.freeze({ ...snapshot.jobs }),
+    order: Object.freeze([...order]),
+    retiredRequestIds: Object.freeze([...retiredRequestIds]),
+    retiredJobIds: Object.freeze([...retiredJobIds]),
+    consumedRetrySourceIds: Object.freeze([...consumedRetrySourceIds]),
+  }) as JobStoreState;
 }
 
 export function createLocalModelServiceClient(
@@ -163,6 +225,9 @@ export function createLocalModelServiceClient(
         method: "POST",
         body: JSON.stringify({ version: LOCAL_MODEL_SERVICE_VERSION, modelId }),
       }, signal));
+    },
+    async listJobs(signal?: AbortSignal) {
+      return parseJobs(await json("/v1/models/jobs", { method: "GET" }, signal));
     },
     async getJob(jobId: string, signal?: AbortSignal) {
       if (typeof jobId !== "string" || jobId.length === 0) throw new TypeError("Job ID is invalid.");

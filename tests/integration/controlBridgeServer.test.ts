@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -35,6 +35,11 @@ describe.sequential("studio control loopback bridge", () => {
   let clientId: string;
   let stderr = "";
   let modelsRoot: string;
+  let imagePath: string;
+  let outsideRoot: string;
+  let outsidePath: string;
+  let oversizePath: string;
+  let secretPath: string;
 
   const headers = (token = TOKEN, origin?: string): Record<string, string> => ({
     Authorization: `Bearer ${token}`,
@@ -68,6 +73,16 @@ describe.sequential("studio control loopback bridge", () => {
 
   beforeAll(async () => {
     modelsRoot = await mkdtemp(join(tmpdir(), "spriteboy-bridge-models-"));
+    outsideRoot = await mkdtemp(join(tmpdir(), "spriteboy-bridge-outside-"));
+    imagePath = join(modelsRoot, "sprite.png");
+    outsidePath = join(outsideRoot, "private.png");
+    oversizePath = join(modelsRoot, "oversize.png");
+    secretPath = join(modelsRoot, ".env");
+    await writeFile(imagePath, new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    await writeFile(outsidePath, new Uint8Array([1, 2, 3]));
+    await writeFile(oversizePath, new Uint8Array([1]));
+    await truncate(oversizePath, 10 * 1024 * 1024 + 1);
+    await writeFile(secretPath, "SPRITEBOY_SECRET=must-not-leak");
     child = spawn(
       "bun",
       [
@@ -79,6 +94,8 @@ describe.sequential("studio control loopback bridge", () => {
         "--origin",
         ORIGIN,
         "--models-dir",
+        modelsRoot,
+        "--file-root",
         modelsRoot,
       ],
       {
@@ -129,6 +146,7 @@ describe.sequential("studio control loopback bridge", () => {
       });
     }
     if (modelsRoot) await rm(modelsRoot, { recursive: true, force: true });
+    if (outsideRoot) await rm(outsideRoot, { recursive: true, force: true });
   });
 
   it("binds a minimal health endpoint and hides session state without auth", async () => {
@@ -194,10 +212,55 @@ describe.sequential("studio control loopback bridge", () => {
       error: { code: "model-not-ready" },
     });
 
+    const jobs = await fetch(`${baseUrl}/v1/models/jobs`, { headers: modelHeaders });
+    expect(jobs.status).toBe(200);
+    await expect(jobs.json()).resolves.toMatchObject({
+      version: 1,
+      snapshot: { order: [], jobs: {} },
+    });
+
     const wrongOrigin = await fetch(`${baseUrl}/v1/models`, {
       headers: headers(TOKEN, "https://evil.example"),
     });
     expect(wrongOrigin.status).toBe(403);
+  });
+
+  it("serves only bounded regular files from explicit roots", async () => {
+    const fileHeaders = headers(TOKEN, ORIGIN);
+    const read = (path: string, kind = "image") => fetch(`${baseUrl}/v1/files/read`, {
+      method: "POST",
+      headers: fileHeaders,
+      body: JSON.stringify({ version: 1, path, kind }),
+    });
+
+    const image = await read(imagePath);
+    expect(image.status).toBe(200);
+    expect(image.headers.get("x-spriteboy-file-name")).toBe("sprite.png");
+    expect(image.headers.get("x-spriteboy-mime-type")).toBe("image/png");
+    expect(image.headers.get("x-spriteboy-file-size")).toBe("8");
+    expect(new Uint8Array(await image.arrayBuffer())).toEqual(
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+
+    const relative = await read("sprite.png");
+    const outside = await read(outsidePath);
+    const directory = await read(modelsRoot);
+    const oversize = await read(oversizePath);
+    const secret = await read(secretPath, "video");
+    const wrongOrigin = await fetch(`${baseUrl}/v1/files/read`, {
+      method: "POST",
+      headers: headers(TOKEN, "https://evil.example"),
+      body: JSON.stringify({ version: 1, path: imagePath, kind: "image" }),
+    });
+
+    expect(relative.status).toBe(400);
+    expect(outside.status).toBe(403);
+    expect(directory.status).toBe(400);
+    expect(oversize.status).toBe(413);
+    expect(secret.status).toBe(415);
+    expect(wrongOrigin.status).toBe(403);
+    await expect(outside.json()).resolves.toMatchObject({ error: { code: "outside-root" } });
+    expect(await secret.text()).not.toContain("must-not-leak");
   });
 
   it("connects one browser session and reports it", async () => {

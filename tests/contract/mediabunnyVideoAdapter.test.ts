@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { MediabunnyVideoAdapter, VIDEO_IMPORT_LIMITS, VideoMediaError } from "@/core/media";
+import { LazyMediabunnyVideoAdapter, VIDEO_IMPORT_LIMITS, VideoMediaError } from "@/core/media";
+import { MediabunnyVideoAdapter } from "../../core/media/mediabunnyVideoAdapter";
 import { cfrMp4Blob, vfrMp4Blob } from "./fixtures/videoFixtures";
 
 describe("MediabunnyVideoAdapter preflight", () => {
@@ -25,6 +26,16 @@ describe("MediabunnyVideoAdapter preflight", () => {
     expect(result.track.sampleCount).toBe(4);
     expect(result.sampleTimestampsUs).toEqual([0, 100_000, 300_000, 700_000]);
     expect(result.variableFrameRate).toBe(true);
+  });
+
+  it("uses a safe fallback MIME when valid media bytes have no video MIME", async () => {
+    const fixture = cfrMp4Blob();
+    const blob = new Blob([await fixture.arrayBuffer()], { type: "application/octet-stream" });
+
+    const result = await adapter.preflight(blob);
+
+    expect(result.mimeType).toBe("video/unknown");
+    expect(result.track.codec).toMatch(/^avc1/);
   });
 
   it("reports the browser codec gate before attempting pixel decode", async () => {
@@ -53,6 +64,15 @@ describe("MediabunnyVideoAdapter preflight", () => {
     });
   });
 
+  it.each([-1, 0.5, Number.NaN])(
+    "rejects invalid track index %s before media inspection",
+    async (trackIndex) => {
+      await expect(adapter.preflight(cfrMp4Blob(), { trackIndex })).rejects.toMatchObject({
+        code: "VIDEO_TRACK_NOT_FOUND",
+      });
+    },
+  );
+
   it("does not expose its internal cause in diagnostics", () => {
     const error = new VideoMediaError("VIDEO_DECODE_FAILED", "falló", {
       cause: new Error("ruta privada"),
@@ -77,5 +97,17 @@ describe("MediabunnyVideoAdapter preflight", () => {
     await expect(adapter.preflight(
       new OversizedVideoBlob([new Uint8Array([0])], { type: "video/mp4" }),
     )).rejects.toMatchObject({ code: "VIDEO_LIMIT_EXCEEDED" });
+  });
+
+  it("loads and reuses the deferred backend only when video work starts", async () => {
+    const lazy = new LazyMediabunnyVideoAdapter();
+    const preflight = await lazy.preflight(cfrMp4Blob());
+
+    expect(preflight.track.codec).toMatch(/^avc1/u);
+    await expect(lazy.extractFrames(cfrMp4Blob(), {
+      trackIndex: 0,
+      range: { startUs: 0, endUs: preflight.durationUs },
+      sampling: { mode: "all" },
+    })).rejects.toMatchObject({ code: "VIDEO_CODEC_UNSUPPORTED" });
   });
 });

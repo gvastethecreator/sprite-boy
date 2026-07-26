@@ -50,6 +50,11 @@ export interface CreateVideoImportJobTaskOptions {
   readonly selection: VideoImportSelection;
   readonly nextId?: () => string;
   readonly now?: () => string;
+  readonly reportAssetCleanupDebt?: (
+    projectId: string,
+    assetId: string,
+    pending: boolean,
+  ) => void;
 }
 
 export interface VideoImportJobResult {
@@ -64,7 +69,8 @@ export interface VideoImportJobResult {
 
 interface OwnedAssetAttempt {
   readonly requestedId: string;
-  storedId?: string;
+  readonly expected: AssetMetadata;
+  putStarted: boolean;
 }
 
 const ABORTED_GETTER = Object.getOwnPropertyDescriptor(AbortSignal.prototype, "aborted")?.get;
@@ -266,26 +272,63 @@ async function cleanupOwnedAssets(
   repository: AssetRepository,
   store: ProjectStore,
   attempts: readonly OwnedAssetAttempt[],
-): Promise<void> {
-  const graphAssets = store.getSnapshot().project.assets;
-  const ids = [...new Set(attempts.flatMap((attempt) => [attempt.requestedId, attempt.storedId]
-    .filter((id): id is string => Boolean(id))))];
+): Promise<readonly string[]> {
   const failed: string[] = [];
-  for (const id of ids) {
-    if (graphAssets[id]) continue;
+  for (const attempt of attempts) {
+    if (!attempt.putStarted) continue;
+    const id = attempt.requestedId;
+    if (store.getSnapshot().project.assets[id]) continue;
     try {
+      const record = await repository.getMetadata(id);
+      if (!matchesOwnedAsset(record, attempt.expected)) continue;
+      const latest = store.getSnapshot();
+      if (latest.project.id !== repository.projectId || latest.project.assets[id]) {
+        failed.push(id);
+        continue;
+      }
       await repository.remove(id, "release-and-remove");
+      try {
+        await repository.getMetadata(id);
+        failed.push(id);
+      } catch (error) {
+        if (!isNotFound(error)) failed.push(id);
+      }
     } catch (error) {
       if (!isNotFound(error)) failed.push(id);
     }
   }
-  if (failed.length > 0) {
-    throw new JobTaskError(
-      "runtime-failure",
-      `Video import cleanup failed for ${failed.length} asset${failed.length === 1 ? "" : "s"}.`,
-      true,
-    );
+  return Object.freeze([...new Set(failed)]);
+}
+
+function matchesOwnedAsset(record: AssetRecord, expected: AssetMetadata): boolean {
+  if (record.id !== expected.id || record.name !== expected.name
+    || record.width !== expected.width || record.height !== expected.height
+    || record.createdAt !== expected.createdAt || record.updatedAt !== expected.updatedAt
+    || (expected.declaredMimeType !== undefined && record.mimeType !== expected.declaredMimeType)
+    || record.provenance.source !== expected.provenance.source) return false;
+  if (expected.provenance.source === "import") {
+    if (record.provenance.source !== "import"
+      || record.provenance.importedAt !== expected.provenance.importedAt) return false;
+  } else if (expected.provenance.source === "derived") {
+    if (record.provenance.source !== "derived"
+      || record.provenance.recipeId !== expected.provenance.recipeId
+      || record.provenance.parentAssetId !== expected.provenance.parentAssetId) return false;
   }
+  if (!expected.media) return true;
+  if (expected.media.type === "image") return record.media.type === "image";
+  if (expected.media.type !== "video" || record.media.type !== "video") return false;
+  const actualTrack = record.media.track;
+  const expectedTrack = expected.media.track;
+  return record.media.durationUs === expected.media.durationUs
+    && actualTrack.index === expectedTrack.index
+    && actualTrack.codec === expectedTrack.codec
+    && actualTrack.codedWidth === expectedTrack.codedWidth
+    && actualTrack.codedHeight === expectedTrack.codedHeight
+    && actualTrack.displayWidth === expectedTrack.displayWidth
+    && actualTrack.displayHeight === expectedTrack.displayHeight
+    && actualTrack.rotationDegrees === expectedTrack.rotationDegrees
+    && actualTrack.frameRate === expectedTrack.frameRate
+    && actualTrack.sampleCount === expectedTrack.sampleCount;
 }
 
 function validatePreflight(preflight: VideoPreflight, selection: VideoImportSelection): void {
@@ -351,7 +394,9 @@ export function createVideoImportJobTask(
   }
   const nextId = options.nextId ?? (() => defaultId("video-import"));
   const now = options.now ?? (() => new Date().toISOString());
-  if (typeof nextId !== "function" || typeof now !== "function") {
+  const reportAssetCleanupDebt = options.reportAssetCleanupDebt;
+  if (typeof nextId !== "function" || typeof now !== "function"
+    || (reportAssetCleanupDebt !== undefined && typeof reportAssetCleanupDebt !== "function")) {
     throw new TypeError("Video import factories must be functions.");
   }
   let consumed = false;
@@ -407,8 +452,38 @@ export function createVideoImportJobTask(
     assertIdsAvailable(initialProject, allIds);
     const timestamp = now();
     assertTimestamp(timestamp);
-    const attempts: OwnedAssetAttempt[] = [sourceAssetId, ...frameAssetIds]
-      .map((requestedId) => ({ requestedId }));
+    const sourceMetadata: AssetMetadata = {
+      id: sourceAssetId,
+      name: fileName,
+      width: preflight.track.displayWidth,
+      height: preflight.track.displayHeight,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      provenance: { source: "import", importedAt: timestamp },
+      media: {
+        type: "video",
+        durationUs: preflight.durationUs,
+        track: { ...preflight.track },
+      },
+      declaredMimeType: preflight.mimeType,
+    };
+    const frameMetadata = frames.map((frame, index): AssetMetadata => ({
+      id: frameAssetIds[index]!,
+      name: `${fileName}-${String(index + 1).padStart(4, "0")}.png`,
+      width: frame.width,
+      height: frame.height,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      provenance: {
+        source: "derived",
+        recipeId,
+        parentAssetId: sourceAssetId,
+      },
+      media: { type: "image" },
+      declaredMimeType: "image/png",
+    }));
+    const attempts: OwnedAssetAttempt[] = [sourceMetadata, ...frameMetadata]
+      .map((expected) => ({ requestedId: expected.id, expected, putStarted: false }));
 
     return withAssetRepositoryMutation(repository, async () => {
       let committed = false;
@@ -419,23 +494,8 @@ export function createVideoImportJobTask(
           await assertRepositoryDestinationAbsent(repository, attempt.requestedId);
         }
 
-        const sourceMetadata: AssetMetadata = {
-          id: sourceAssetId,
-          name: fileName,
-          width: preflight.track.displayWidth,
-          height: preflight.track.displayHeight,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          provenance: { source: "import", importedAt: timestamp },
-          media: {
-            type: "video",
-            durationUs: preflight.durationUs,
-            track: { ...preflight.track },
-          },
-          declaredMimeType: preflight.mimeType,
-        };
+        attempts[0]!.putStarted = true;
         const sourceAsset = await repository.put(file, sourceMetadata);
-        attempts[0]!.storedId = sourceAsset.id;
         if (sourceAsset.id !== sourceAssetId) {
           throw new JobTaskError("runtime-failure", "Repository changed the source asset ID.", true);
         }
@@ -445,23 +505,8 @@ export function createVideoImportJobTask(
         const frameAssets: AssetRecord[] = [];
         for (const [index, frame] of frames.entries()) {
           const frameId = frameAssetIds[index]!;
-          const frameMetadata: AssetMetadata = {
-            id: frameId,
-            name: `${fileName}-${String(index + 1).padStart(4, "0")}.png`,
-            width: frame.width,
-            height: frame.height,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-            provenance: {
-              source: "derived",
-              recipeId,
-              parentAssetId: sourceAssetId,
-            },
-            media: { type: "image" },
-            declaredMimeType: "image/png",
-          };
-          const record = await repository.put(frame.blob, frameMetadata);
-          attempts[index + 1]!.storedId = record.id;
+          attempts[index + 1]!.putStarted = true;
+          const record = await repository.put(frame.blob, frameMetadata[index]!);
           if (record.id !== frameId) {
             throw new JobTaskError("runtime-failure", `Repository changed frame asset ID ${index}.`, true);
           }
@@ -586,10 +631,20 @@ export function createVideoImportJobTask(
         });
       } catch (error) {
         if (!committed) {
-          try {
-            await cleanupOwnedAssets(repository, store, attempts);
-          } catch (cleanupError) {
-            throw toVideoImportJobTaskError(cleanupError);
+          const cleanupAssetIds = await cleanupOwnedAssets(repository, store, attempts);
+          if (cleanupAssetIds.length > 0) {
+            for (const assetId of cleanupAssetIds) {
+              try {
+                reportAssetCleanupDebt?.(initialProject.id, assetId, true);
+              } catch {
+                // Persistence diagnostics must not hide the cleanup failure.
+              }
+            }
+            throw new JobTaskError(
+              "runtime-failure",
+              `Video import cleanup failed for ${cleanupAssetIds.length} asset${cleanupAssetIds.length === 1 ? "" : "s"}.`,
+              true,
+            );
           }
         }
         throw toVideoImportJobTaskError(error);

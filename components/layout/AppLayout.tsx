@@ -18,7 +18,7 @@ import {
 } from "../../contexts/StudioStoreContext";
 import { createJobCenterSummarySelector } from "../../core/stores";
 import type { ProcessingRecipe, ProjectCommand, ProjectCommandBatch, StudioProject } from "../../core/project";
-import { MediabunnyVideoAdapter } from "../../core/media";
+import { LazyMediabunnyVideoAdapter } from "../../core/media/lazyMediabunnyVideoAdapter";
 import {
   createQueuedJob,
   retryJob as createRetryJob,
@@ -270,8 +270,8 @@ const AppLayout: React.FC = () => {
   const canonicalSourceRestoreRef = useRef<string | null>(null);
   const [composeImportRequestToken, setComposeImportRequestToken] = useState(0);
   const [composeImportBusy, setComposeImportBusy] = useState(false);
-  const videoAdapterRef = useRef<MediabunnyVideoAdapter | null>(null);
-  if (videoAdapterRef.current === null) videoAdapterRef.current = new MediabunnyVideoAdapter();
+  const videoAdapterRef = useRef<LazyMediabunnyVideoAdapter | null>(null);
+  if (videoAdapterRef.current === null) videoAdapterRef.current = new LazyMediabunnyVideoAdapter();
   const videoImportRequestsRef = useRef(new Map<string, VideoImportRequest>());
   const {
     snapshot: sourceSessionSnapshot,
@@ -1171,6 +1171,7 @@ const AppLayout: React.FC = () => {
         file: request.file,
         fileName: request.file.name,
         selection: request.selection,
+        reportAssetCleanupDebt: canonical.reportAssetCleanupDebt,
       }));
       setJobCenterOpen(true);
       void handle.result.then(async (outcome) => {
@@ -1195,7 +1196,7 @@ const AppLayout: React.FC = () => {
       if (job?.attempt === 1) videoImportRequestsRef.current.delete(job.rootJobId);
       return false;
     }
-  }, [canonical.assets, canonical.store, hydrateImportedVideoResult, jobRunner, showToast]);
+  }, [canonical.assets, canonical.reportAssetCleanupDebt, canonical.store, hydrateImportedVideoResult, jobRunner, showToast]);
 
   const startVideoImport = useCallback((
     file: File,

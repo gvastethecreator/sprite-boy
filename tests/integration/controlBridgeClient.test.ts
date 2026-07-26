@@ -7,6 +7,7 @@ import {
   type StudioControlPortContext,
   type StudioControlPortResult,
   type StudioControlPorts,
+  type StudioControlService,
 } from "../../core/control/controlService";
 
 const TOKEN = "client-test-token-0123456789-abcdefghijklmnopqrstuvwxyz";
@@ -41,6 +42,15 @@ function request(requestId: string): Record<string, unknown> {
     command: "project.get",
     expectedRevision: null,
     params: {},
+  };
+}
+
+function serviceStub(): StudioControlService {
+  return {
+    disposed: false,
+    execute: vi.fn(),
+    cancel: vi.fn(() => false),
+    dispose: vi.fn(),
   };
 }
 
@@ -195,5 +205,57 @@ describe.sequential("StudioControlBridgeClient with loopback bridge", () => {
 
     await client.stop();
     expect(stderr).not.toContain(TOKEN);
+  });
+});
+
+describe("StudioControlBridgeClient guards", () => {
+  it("rejects unsafe bridge locations and malformed dependencies", () => {
+    const service = serviceStub();
+    const valid = { baseUrl: "http://127.0.0.1:5173", token: TOKEN, service };
+
+    expect(() => createStudioControlBridgeClient(null as never)).toThrow(/options are invalid/);
+    for (const baseUrl of [
+      "invalid",
+      "https://127.0.0.1:5173",
+      "http://192.168.1.3:5173",
+      "http://user@localhost:5173",
+      "http://localhost:5173/path",
+      "http://localhost:5173/?query=1",
+      "http://localhost:5173/#hash",
+    ]) {
+      expect(() => createStudioControlBridgeClient({ ...valid, baseUrl })).toThrow(/options are invalid/);
+    }
+    expect(() => createStudioControlBridgeClient({ ...valid, token: "short" })).toThrow(/options are invalid/);
+    expect(() => createStudioControlBridgeClient({ ...valid, token: "x".repeat(513) })).toThrow(/options are invalid/);
+    expect(() => createStudioControlBridgeClient({ ...valid, service: null as never })).toThrow(/options are invalid/);
+    expect(() => createStudioControlBridgeClient({
+      ...valid,
+      service: { execute: vi.fn() } as never,
+    })).toThrow(/options are invalid/);
+    expect(() => createStudioControlBridgeClient({ ...valid, fetch: 1 as never })).toThrow(/options are invalid/);
+  });
+
+  it.each([
+    ["network failure", () => Promise.reject(new Error("offline")), "could not connect"],
+    ["authentication rejection", () => Promise.resolve(new Response(null, { status: 401 })), "rejected the session token"],
+    ["session rejection", () => Promise.resolve(new Response(null, { status: 503 })), "could not connect"],
+    ["malformed response", () => Promise.resolve(new Response("invalid-json", { status: 200 })), "could not connect"],
+    ["wrong protocol version", () => Promise.resolve(Response.json({ version: 2, clientId: "client-1" })), "could not connect"],
+    ["empty client identity", () => Promise.resolve(Response.json({ version: 1, clientId: "" })), "could not connect"],
+    ["unexpected response field", () => Promise.resolve(Response.json({ version: 1, clientId: "client-1", extra: true })), "could not connect"],
+  ])("reports %s during start", async (_label, implementation, expectedMessage) => {
+    const fetchImplementation = vi.fn(implementation) as unknown as typeof globalThis.fetch;
+    const client = createStudioControlBridgeClient({
+      baseUrl: "http://localhost:5173/",
+      token: TOKEN,
+      service: serviceStub(),
+      fetch: fetchImplementation,
+    });
+
+    await expect(client.start()).rejects.toThrow(expectedMessage);
+    expect(client.getSnapshot()).toMatchObject({ status: "error", clientId: null });
+    expect(fetchImplementation).toHaveBeenCalledOnce();
+    await client.stop();
+    expect(client.getSnapshot().status).toBe("idle");
   });
 });

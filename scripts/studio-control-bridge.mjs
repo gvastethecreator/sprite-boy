@@ -11,6 +11,10 @@ import {
 import { isLocalModelId } from "../core/models/modelCatalog.ts";
 import { LOCAL_MODEL_SERVICE_VERSION } from "../core/models/modelServiceProtocol.ts";
 import { createNodeModelService, NodeModelServiceError } from "../core/models/nodeModelService.ts";
+import {
+  createHostFileBroker,
+  HostFileBrokerError,
+} from "./hostFileBroker.ts";
 
 const LOOPBACK_HOST = "127.0.0.1";
 const DEFAULT_PORT = 43_119;
@@ -26,6 +30,7 @@ const BROWSER_PATHS = new Set([
   "/v1/browser/poll",
   "/v1/browser/respond",
 ]);
+const HOST_FILE_PATH = "/v1/files/read";
 const DEFAULT_ORIGINS = Object.freeze([
   "http://127.0.0.1:5173",
   "http://localhost:5173",
@@ -44,6 +49,7 @@ function usage() {
     "  --origin <http-origin>   Allowed Studio origin; repeatable",
     "  --timeout-ms <100..120000>",
     "  --models-dir <path>      Local verified model store",
+    "  --file-root <path>       Allowed host import root; repeatable",
     "  --help",
     "",
     "SPRITEBOY_CONTROL_TOKEN may provide a 32+ character session token.",
@@ -64,6 +70,7 @@ function parseOptions(argv) {
   let timeoutMs = DEFAULT_TIMEOUT_MS;
   let modelsRoot = resolve(process.env.SPRITEBOY_MODELS_DIR ?? ".spriteboy/models");
   const origins = [];
+  const fileRoots = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--help") return { help: true };
@@ -106,6 +113,15 @@ function parseOptions(argv) {
       index += 1;
       continue;
     }
+    if (argument === "--file-root") {
+      const path = argv[index + 1];
+      if (typeof path !== "string" || path.trim().length === 0 || path.includes("\0")) {
+        throw new TypeError("File root is invalid.");
+      }
+      fileRoots.push(resolve(path));
+      index += 1;
+      continue;
+    }
     throw new TypeError(`Unknown option: ${argument}`);
   }
   return Object.freeze({
@@ -113,6 +129,7 @@ function parseOptions(argv) {
     port,
     timeoutMs,
     modelsRoot,
+    fileRoots: Object.freeze(fileRoots.length > 0 ? [...new Set(fileRoots)] : [resolve(process.cwd())]),
     origins: Object.freeze(origins.length > 0 ? [...new Set(origins)] : [...DEFAULT_ORIGINS]),
   });
 }
@@ -224,12 +241,43 @@ function parseExactObject(text, keys) {
   return value;
 }
 
-function startBridge(options, token) {
+function leasedByteStream(bytes, release) {
+  let offset = 0;
+  let closed = false;
+  const finish = () => {
+    if (closed) return;
+    closed = true;
+    release();
+  };
+  return new ReadableStream({
+    pull(controller) {
+      try {
+        if (offset >= bytes.byteLength) {
+          finish();
+          controller.close();
+          return;
+        }
+        const end = Math.min(offset + 1024 * 1024, bytes.byteLength);
+        controller.enqueue(bytes.subarray(offset, end));
+        offset = end;
+      } catch (error) {
+        finish();
+        controller.error(error);
+      }
+    },
+    cancel() {
+      finish();
+    },
+  });
+}
+
+async function startBridge(options, token) {
   const sessionId = randomBytes(12).toString("hex");
   const allowedOrigins = new Set(options.origins);
   const operations = new Map();
   const outbound = [];
   const modelService = createNodeModelService({ root: options.modelsRoot });
+  const hostFiles = await createHostFileBroker({ roots: options.fileRoots });
   let browserSession;
   let pollWaiter;
 
@@ -355,12 +403,75 @@ function startBridge(options, token) {
         }
         return emptyResponse(204, corsHeaders(origin));
       }
+      if (request.method === "OPTIONS" && url.pathname === HOST_FILE_PATH) {
+        const origin = browserOrigin(request);
+        if (!origin) {
+          audit("file-origin", "rejected");
+          return emptyResponse(403);
+        }
+        return emptyResponse(204, corsHeaders(origin));
+      }
       if (url.pathname === "/health" && request.method === "GET") {
         return jsonResponse({ ok: true });
       }
       if (!authenticated(request)) {
         audit("authentication", "rejected");
         return jsonResponse({ error: "Unauthorized." }, 401);
+      }
+
+      if (url.pathname === HOST_FILE_PATH) {
+        const origin = browserOrigin(request);
+        if (!origin) {
+          audit("file-origin", "rejected");
+          return emptyResponse(403);
+        }
+        const cors = corsHeaders(origin);
+        if (request.method !== "POST") return emptyResponse(405, cors);
+        const body = await readBoundedText(request);
+        if (!body.ok) return emptyResponse(body.status, cors);
+        const input = parseExactObject(body.text, ["version", "path", "kind"]);
+        if (
+          !input || input.version !== 1 || typeof input.path !== "string" ||
+          input.path.length < 1 || input.path.length > 4096 ||
+          (input.kind !== "image" && input.kind !== "video")
+        ) {
+          return jsonResponse({
+            version: 1,
+            error: { code: "invalid-request", message: "Host file request is invalid." },
+          }, 400, cors);
+        }
+        try {
+          const file = await hostFiles.read(input.path, input.kind, request.signal);
+          audit("file-read", "served");
+          try {
+            return new Response(leasedByteStream(file.bytes, file.release), {
+              status: 200,
+              headers: securityHeaders({
+                ...cors,
+                "Access-Control-Expose-Headers": "X-SpriteBoy-File-Name, X-SpriteBoy-File-Size, X-SpriteBoy-Mime-Type",
+                "Content-Type": "application/octet-stream",
+                "X-SpriteBoy-File-Name": encodeURIComponent(file.name),
+                "X-SpriteBoy-File-Size": String(file.byteSize),
+                "X-SpriteBoy-Mime-Type": file.mimeType,
+              }),
+            });
+          } catch (error) {
+            file.release();
+            throw error;
+          }
+        } catch (error) {
+          const known = error instanceof HostFileBrokerError;
+          const code = known ? error.code : "read-failed";
+          const status = known ? error.status : 500;
+          audit("file-read", code);
+          return jsonResponse({
+            version: 1,
+            error: {
+              code,
+              message: known ? error.message : "Host file could not be read.",
+            },
+          }, status, cors);
+        }
       }
 
       if (url.pathname.startsWith("/v1/models")) {
@@ -392,6 +503,12 @@ function startBridge(options, token) {
             const result = await modelService.setup(input.modelId);
             audit("model-setup", result.outcome);
             return jsonResponse(result, result.outcome === "started" ? 202 : 200, cors);
+          }
+          if (url.pathname === "/v1/models/jobs" && request.method === "GET") {
+            return jsonResponse({
+              version: LOCAL_MODEL_SERVICE_VERSION,
+              snapshot: modelService.listJobs(),
+            }, 200, cors);
           }
           const jobMatch = /^\/v1\/models\/jobs\/([^/]{1,200})$/u.exec(url.pathname);
           if (jobMatch && (request.method === "GET" || request.method === "DELETE")) {
@@ -620,7 +737,7 @@ try {
     process.exit(0);
   }
   const token = safeTokenFromEnvironment();
-  const bridge = startBridge(options, token);
+  const bridge = await startBridge(options, token);
   process.stdout.write(`${JSON.stringify({
     type: "spriteboy-control-ready",
     version: 1,

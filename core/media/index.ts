@@ -1,3 +1,3 @@
-export * from "./mediabunnyVideoAdapter";
+export * from "./lazyMediabunnyVideoAdapter";
 export * from "./videoContracts";
 export * from "./videoSampling";

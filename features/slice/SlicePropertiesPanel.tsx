@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { SegmentedControl } from "../../components/toolcraft";
 import type { AssetRepository } from "../../core/assets";
 import type { ProjectStore } from "../../core/stores";
-import LocalModelPanel from "./backgroundRemoval/LocalModelPanel";
 import SliceGridInspector from "./grid/SliceGridInspector";
 import type { SliceGridController } from "./grid/useSliceGridController";
+
+const LocalModelPanel = lazy(() => import("./backgroundRemoval/LocalModelPanel"));
 
 export interface SlicePropertiesPanelProps {
   readonly controller: SliceGridController;
@@ -30,7 +31,15 @@ export function SlicePropertiesPanel({ assets, controller, onCleanupDebtChange, 
       </div>
       <div className="min-h-0 flex-1">
         {tab === "models"
-          ? <LocalModelPanel assets={assets} store={store} onCleanupDebtChange={onCleanupDebtChange} />
+          ? (
+              <Suspense fallback={(
+                <div className="p-3 text-xs text-text-muted" role="status">
+                  Cargando modelos…
+                </div>
+              )}>
+                <LocalModelPanel assets={assets} store={store} onCleanupDebtChange={onCleanupDebtChange} />
+              </Suspense>
+            )
           : <SliceGridInspector controller={controller} />}
       </div>
     </div>

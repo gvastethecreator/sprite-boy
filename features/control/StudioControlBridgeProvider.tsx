@@ -8,28 +8,21 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  createStudioControlBridgeClient,
-  type StudioControlBridgeClient,
-  type StudioControlBridgeClientSnapshot,
+import type {
+  StudioControlBridgeClient,
+  StudioControlBridgeClientSnapshot,
 } from "../../core/control/controlBridgeClient";
-import {
-  createLocalModelServiceClient,
-  type LocalModelServiceClient,
+import type {
+  LocalModelServiceClient,
 } from "../../core/models";
-import {
-  createStudioControlService,
-  type StudioControlService,
+import type {
+  StudioControlService,
 } from "../../core/control/controlService";
 import { useCanonicalProject } from "../../contexts/CanonicalProjectContext";
 import {
   useJobStore,
   useStudioJobRunner,
 } from "../../contexts/StudioStoreContext";
-import {
-  BROWSER_STUDIO_CONTROL_SUPPORTED_COMMANDS,
-  createBrowserStudioControlPorts,
-} from "./studioControlPorts";
 
 const IDLE_SNAPSHOT: StudioControlBridgeClientSnapshot = Object.freeze({
   status: "idle",
@@ -62,10 +55,12 @@ export function StudioControlBridgeProvider({ children }: { readonly children: R
   const connectionRef = useRef<ActiveConnection | null>(null);
   const dependencies = useMemo(() => ({
     projectStore: canonical.store,
+    assetRepository: canonical.assets,
     jobStore: jobs,
     jobRunner,
     navigate: canonical.setActiveWorkspace,
-  }), [canonical.setActiveWorkspace, canonical.store, jobRunner, jobs]);
+    reportAssetCleanupDebt: canonical.reportAssetCleanupDebt,
+  }), [canonical.assets, canonical.reportAssetCleanupDebt, canonical.setActiveWorkspace, canonical.store, jobRunner, jobs]);
 
   const disconnect = useCallback(async (): Promise<void> => {
     const connection = connectionRef.current;
@@ -86,10 +81,25 @@ export function StudioControlBridgeProvider({ children }: { readonly children: R
     let client: StudioControlBridgeClient;
     let models: LocalModelServiceClient;
     try {
+      const [
+        { createStudioControlBridgeClient },
+        { createLocalModelServiceClient },
+        { createStudioControlService },
+        { createHostFileServiceClient },
+        { createBrowserStudioControlPorts, getBrowserStudioControlSupportedCommands },
+      ] = await Promise.all([
+        import("../../core/control/controlBridgeClient"),
+        import("../../core/models/localModelServiceClient"),
+        import("../../core/control/controlService"),
+        import("../../core/control/hostFileServiceClient"),
+        import("./studioControlPorts"),
+      ]);
       models = createLocalModelServiceClient({ baseUrl, token });
+      const hostFiles = createHostFileServiceClient({ baseUrl, token });
+      const portDependencies = { ...dependencies, models, hostFiles };
       service = createStudioControlService({
-        ports: createBrowserStudioControlPorts({ ...dependencies, models }),
-        supportedCommands: BROWSER_STUDIO_CONTROL_SUPPORTED_COMMANDS,
+        ports: createBrowserStudioControlPorts(portDependencies),
+        supportedCommands: getBrowserStudioControlSupportedCommands(portDependencies),
       });
       client = createStudioControlBridgeClient({ baseUrl, token, service });
     } catch (error) {

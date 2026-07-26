@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   AssetRepositoryError,
   type AssetMetadata,
@@ -105,6 +105,8 @@ interface RepositoryControl {
   failCode: "ASSET_STORAGE_UNAVAILABLE" | "ASSET_QUOTA_EXCEEDED";
   throwAfterWriteAt: number | null;
   delayAt: number | null;
+  failRemove: boolean;
+  readonly removedIds: string[];
   readonly putStarted: ReturnType<typeof deferred<void>>;
   readonly releasePut: ReturnType<typeof deferred<void>>;
 }
@@ -121,6 +123,8 @@ function createRepository(projectId: string): {
     failCode: "ASSET_STORAGE_UNAVAILABLE",
     throwAfterWriteAt: null,
     delayAt: null,
+    failRemove: false,
+    removedIds: [],
     putStarted: deferred<void>(),
     releasePut: deferred<void>(),
   };
@@ -187,6 +191,13 @@ function createRepository(projectId: string): {
       throw new Error("Not used by video import tests.");
     },
     async remove(assetId) {
+      control.removedIds.push(assetId);
+      if (control.failRemove) {
+        throw new AssetRepositoryError("ASSET_STORAGE_UNAVAILABLE", "Injected remove failure.", {
+          operation: "remove",
+          assetId,
+        });
+      }
       if (!control.records.delete(assetId)) throw missing("remove", assetId);
     },
     async *exportMany(assetIds): AsyncIterable<AssetPayload> {
@@ -307,6 +318,86 @@ describe("video import job task (V1-03)", () => {
     expect(runtime.store.getSnapshot().project.assets).toEqual({});
     expect(control.records.size).toBe(0);
     expect(runtime.history.getSnapshot().undoEntries).toHaveLength(0);
+  });
+
+  it("preserves an existing destination when preflight finds an ID conflict", async () => {
+    const runtime = createRuntime();
+    const { repository, control } = createRepository("project-video");
+    const foreignMetadata: AssetMetadata = {
+      id: "conflict-1",
+      name: "foreign.png",
+      width: 1,
+      height: 1,
+      createdAt: NOW,
+      updatedAt: NOW,
+      provenance: { source: "import", importedAt: NOW },
+      media: { type: "image" },
+      declaredMimeType: "image/png",
+    };
+    const foreign = await repository.put(new Blob(["foreign"], { type: "image/png" }), foreignMetadata);
+    control.putCount = 0;
+    control.requestedIds.length = 0;
+    const task = createVideoImportJobTask(createOptions(
+      createAdapter(),
+      runtime.store,
+      repository,
+      createIdFactory("conflict"),
+    ));
+
+    await expect(task(taskContext())).rejects.toMatchObject({ code: "runtime-failure" });
+    await expect(repository.getMetadata(foreign.id)).resolves.toEqual(foreign);
+    expect(control.removedIds).toEqual([]);
+    expect(runtime.store.getSnapshot().revision).toBe(0);
+  });
+
+  it("never removes a foreign asset returned for an attempted write", async () => {
+    const runtime = createRuntime();
+    const { repository, control } = createRepository("project-video");
+    const foreignMetadata: AssetMetadata = {
+      id: "foreign-asset",
+      name: "foreign.png",
+      width: 1,
+      height: 1,
+      createdAt: NOW,
+      updatedAt: NOW,
+      provenance: { source: "import", importedAt: NOW },
+      media: { type: "image" },
+      declaredMimeType: "image/png",
+    };
+    const foreign = await repository.put(new Blob(["foreign"], { type: "image/png" }), foreignMetadata);
+    control.putCount = 0;
+    control.requestedIds.length = 0;
+    const basePut = repository.put.bind(repository);
+    repository.put = async (blob, metadata) => {
+      await basePut(blob, metadata);
+      return foreign;
+    };
+    const task = createVideoImportJobTask(createOptions(createAdapter(), runtime.store, repository));
+
+    await expect(task(taskContext())).rejects.toMatchObject({ code: "runtime-failure" });
+    await expect(repository.getMetadata(foreign.id)).resolves.toEqual(foreign);
+    expect(control.removedIds).not.toContain(foreign.id);
+    expect([...control.records.keys()]).toEqual([foreign.id]);
+  });
+
+  it("reports exact durable debt when an owned late write cannot be removed", async () => {
+    const runtime = createRuntime();
+    const { repository, control } = createRepository("project-video");
+    const debt = vi.fn();
+    control.throwAfterWriteAt = 1;
+    control.failRemove = true;
+    const task = createVideoImportJobTask({
+      ...createOptions(createAdapter(), runtime.store, repository),
+      reportAssetCleanupDebt: debt,
+    });
+
+    await expect(task(taskContext())).rejects.toMatchObject({
+      code: "runtime-failure",
+      retryable: true,
+      message: "Video import cleanup failed for 1 asset.",
+    });
+    expect(debt).toHaveBeenCalledWith("project-video", "video-1", true);
+    expect(control.records.has("video-1")).toBe(true);
   });
 
   it("maps storage quota exhaustion to a retryable clean failure", async () => {
