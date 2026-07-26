@@ -19,6 +19,7 @@ bun-debug.log*
 .env
 .env.*
 *.local
+.spriteboy/models/
 
 # Editor / IDE
 .vscode/*
