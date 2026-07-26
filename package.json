@@ -21,6 +21,7 @@
     "models:status": "bun scripts/studio-model-status.mjs",
     "models:setup": "bun scripts/studio-model-setup.mjs",
     "control:bridge": "bun scripts/studio-control-bridge.mjs",
+    "control:mcp": "bun scripts/studio-control-mcp.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -37,6 +38,7 @@
     "@fontsource/archivo": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@gsap/react": "^2.1.2",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "gifshot": "^0.4.5",
     "gsap": "^3.15.0",
     "jszip": "^3.10.1",
@@ -44,7 +46,8 @@
     "mediabunny": "1.51.0",
     "onnxruntime-web": "1.27.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
