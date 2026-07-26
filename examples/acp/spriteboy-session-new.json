@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "session/new",
+  "params": {
+    "cwd": "D:\\absolute\\path\\to\\sprite-boy",
+    "mcpServers": [
+      {
+        "name": "spriteboy-studio",
+        "command": "C:\\absolute\\path\\to\\bun.exe",
+        "args": [
+          "D:\\absolute\\path\\to\\sprite-boy\\scripts\\studio-control-mcp.ts"
+        ],
+        "env": [
+          {
+            "name": "SPRITEBOY_CONTROL_BRIDGE_URL",
+            "value": "http://127.0.0.1:43119"
+          },
+          {
+            "name": "SPRITEBOY_CONTROL_TOKEN",
+            "value": "<inject-SPRITEBOY_CONTROL_TOKEN-at-runtime>"
+          }
+        ]
+      }
+    ]
+  }
+}
