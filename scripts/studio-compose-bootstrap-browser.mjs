@@ -15,8 +15,8 @@ import {
   waitForPreview,
 } from "./studio-browser-smoke.mjs";
 
-const DESKTOP_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-16/a1-02-compose-bootstrap.png";
-const COMPACT_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-16/a1-02-compose-bootstrap-compact.png";
+const DESKTOP_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-26/a2-compose-layers.png";
+const COMPACT_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-26/a2-compose-layers-compact.png";
 
 async function capture(client, outputPath) {
   const result = await client.send("Page.captureScreenshot", {
@@ -171,11 +171,66 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
     await client.waitFor(`document.body.innerText.includes("Saved locally")`, 60_000);
     await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
 
+    stage = "edit-layers";
+    const layerEdited = await client.evaluate(`(() => {
+      const duplicate = document.querySelector('button[aria-label="Duplicate layer"]');
+      if (!(duplicate instanceof HTMLButtonElement)) return false;
+      duplicate.click();
+      return true;
+    })()`);
+    if (!layerEdited) throw new Error("Compose layer controls were unavailable.");
+    await client.waitFor(`document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length === 2`);
+    const layerXEntered = await client.evaluate(`(() => {
+      const x = document.querySelector('input[aria-label="Layer X"]');
+      if (!(x instanceof HTMLInputElement)) return false;
+      const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      x.focus();
+      inputSetter?.call(x, '7');
+      x.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`);
+    if (!layerXEntered) throw new Error("Compose layer X control was unavailable.");
+    await client.waitFor(`document.querySelector('input[aria-label="Layer X"]')?.value === '7'`);
+    const layerControlsApplied = await client.evaluate(`(() => {
+      const x = document.querySelector('input[aria-label="Layer X"]');
+      const opacity = document.querySelector('input[aria-label="Layer opacity"]');
+      if (!(x instanceof HTMLInputElement) || !(opacity instanceof HTMLInputElement)) {
+        return { ok: false, reason: 'inputs', arias: [...document.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label')).filter(Boolean) };
+      }
+      const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      x.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      x.blur();
+      inputSetter?.call(opacity, '55');
+      opacity.dispatchEvent(new Event('input', { bubbles: true }));
+      opacity.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      const hide = document.querySelector('button[aria-label^="Hide "][aria-label$=" copy"]');
+      const lock = document.querySelector('button[aria-label^="Lock "][aria-label$=" copy"]');
+      if (!(hide instanceof HTMLButtonElement) || !(lock instanceof HTMLButtonElement)) {
+        return { ok: false, reason: 'buttons', arias: [...document.querySelectorAll('[data-compose-layers] button[aria-label]')].map((node) => node.getAttribute('aria-label')) };
+      }
+      hide.click();
+      lock.click();
+      return { ok: true };
+    })()`);
+    if (!layerControlsApplied?.ok) throw new Error(`Compose layer edits could not be applied: ${JSON.stringify(layerControlsApplied)}`);
+    await client.waitFor(`Boolean(document.querySelector('button[aria-label^="Show "][aria-label$=" copy"]')) && Boolean(document.querySelector('button[aria-label^="Unlock "][aria-label$=" copy"]'))`);
+    await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
+    await client.waitFor(`Boolean(document.querySelector('[data-command-id="project.save"]:not(:disabled)'))`);
+    await client.evaluate(`document.querySelector('[data-command-id="project.save"]')?.click()`);
+    await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
+    await client.waitFor(`document.body.innerText.includes("Saved locally")`, 60_000);
+    await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
+
     const composed = await client.evaluate(`(() => ({
       heading: document.querySelector('#compose-bootstrap-title')?.textContent?.trim(),
       body: document.body.innerText,
       projectName: document.querySelector('button[aria-label="Project"]')?.textContent?.trim(),
-      sourceButtons: document.querySelectorAll('main li button').length,
+      sourceButtons: document.querySelectorAll('[data-compose-sources] > li > button').length,
+      layerCount: document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length,
+      selectedLayerX: document.querySelector('input[aria-label="Layer X"]')?.value,
+      selectedLayerOpacity: document.querySelector('input[aria-label="Layer opacity"]')?.value,
+      selectedLayerLocked: Boolean(document.querySelector('button[aria-label^="Unlock "][aria-label$=" copy"]')),
+      selectedLayerHidden: Boolean(document.querySelector('button[aria-label^="Show "][aria-label$=" copy"]')),
       settingsVisible: Boolean(document.querySelector('form[aria-label="Canvas settings"]')),
       fileInputCount: document.querySelectorAll('input[aria-label="Import image into Compose"]').length,
       durableUrlText: /(?:blob:|data:image)/.test(document.body.innerText),
@@ -195,7 +250,12 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
     const reloaded = await client.evaluate(`(() => ({
       projectName: document.querySelector('button[aria-label="Project"]')?.textContent?.trim(),
       heading: document.querySelector('#compose-bootstrap-title')?.textContent?.trim(),
-      sourceButtons: document.querySelectorAll('main li button').length,
+      sourceButtons: document.querySelectorAll('[data-compose-sources] > li > button').length,
+      layerCount: document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length,
+      selectedLayerX: document.querySelector('input[aria-label="Layer X"]')?.value,
+      selectedLayerOpacity: document.querySelector('input[aria-label="Layer opacity"]')?.value,
+      selectedLayerLocked: Boolean(document.querySelector('button[aria-label^="Unlock "][aria-label$=" copy"]')),
+      selectedLayerHidden: Boolean(document.querySelector('button[aria-label^="Show "][aria-label$=" copy"]')),
       saved: document.body.innerText.includes('Saved locally'),
       openProjectDisabled: document.querySelector('[data-command-id="project.open"]')?.disabled === true,
       openProjectReason: document.querySelector('[data-command-id="project.open"]')?.getAttribute('title'),
@@ -268,6 +328,11 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
       || composed.heading !== "atlas-hero.png composition"
       || !composed.projectName?.includes("Atlas Studio")
       || composed.sourceButtons !== 1
+      || composed.layerCount !== 2
+      || composed.selectedLayerX !== "7"
+      || composed.selectedLayerOpacity !== "55"
+      || !composed.selectedLayerLocked
+      || !composed.selectedLayerHidden
       || composed.fileInputCount !== 1
       || composed.durableUrlText
       || composed.horizontalOverflow
@@ -278,6 +343,11 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
       || !reloaded.projectName?.includes("Atlas Studio")
       || reloaded.heading !== "atlas-hero.png composition"
       || reloaded.sourceButtons !== 1
+      || reloaded.layerCount !== 2
+      || reloaded.selectedLayerX !== "7"
+      || reloaded.selectedLayerOpacity !== "55"
+      || !reloaded.selectedLayerLocked
+      || !reloaded.selectedLayerHidden
       || !reloaded.saved
       || !reloaded.openProjectDisabled
       || reloaded.openProjectReason !== "Portable project opening is not available in Compose yet."
@@ -334,7 +404,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   } catch (error) {
     process.stderr.write(`${JSON.stringify({
       status: "fail",
-      check: "a1-02-compose-bootstrap-browser",
+      check: "a2-compose-layers-browser",
       message: error instanceof Error ? error.message : "unknown",
     })}\n`);
     process.exitCode = 1;

@@ -12,6 +12,7 @@ import type { EntityId } from "../../../core/project";
 import type { ProjectStore } from "../../../core/stores";
 import { useProjectStoreSelector } from "../../../hooks/useStudioStoreSelector";
 import { ComposeCanvasWorkspace } from "../canvas/ComposeCanvasWorkspace";
+import { ComposeLayersPanel } from "../layers/ComposeLayersPanel";
 import {
   importComposeAsset,
   retryComposeAssetCleanup,
@@ -280,9 +281,12 @@ export function ComposeBootstrapWorkspace({
         {composition ? (
           <div
             data-compose-canvas
-            className="flex min-h-[320px] flex-1 overflow-hidden rounded-lg border border-white/12 bg-panel/70"
+            className="grid min-h-[420px] flex-1 overflow-hidden rounded-lg border border-white/12 bg-panel/70 lg:grid-cols-[minmax(0,1fr)_18rem]"
           >
-            <ComposeCanvasWorkspace store={store} assets={assets} />
+            <div className="min-h-[320px] min-w-0">
+              <ComposeCanvasWorkspace store={store} assets={assets} />
+            </div>
+            <ComposeLayersPanel store={store} disabled={interactionDisabled} />
           </div>
         ) : null}
 
@@ -313,7 +317,7 @@ export function ComposeBootstrapWorkspace({
                 </div>
                 <span className="font-mono text-[10px] text-textMuted">{sources.length}</span>
               </div>
-              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <ul data-compose-sources className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {sources.map((item) => (
                   <li key={`${item.source.type}:${item.source.id}`}>
                     <button
