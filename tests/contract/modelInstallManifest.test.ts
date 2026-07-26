@@ -25,6 +25,7 @@ describe("model install manifest (M1-01)", () => {
         backend: "wasm",
         completedAt: "2026-07-25T22:01:00.000Z",
         outputSha256: `sha256:${"b".repeat(64)}`,
+        peakMemoryBytes: 512_000_000,
       },
     });
 
@@ -47,5 +48,17 @@ describe("model install manifest (M1-01)", () => {
     })).toThrow(/do not match/i);
     expect(() => parseModelInstallManifest({ ...base, smoke: { status: "passed" } }, model))
       .toThrow(/smoke/i);
+    expect(() => createModelInstallManifest(model, {
+      installedAt: "2026-07-25T22:00:00.000Z",
+      files,
+      smoke: {
+        status: "passed",
+        catalogFingerprint: modelCatalogFingerprint(model),
+        backend: "wasm",
+        completedAt: "2026-07-25T22:01:00.000Z",
+        outputSha256: "bad",
+        peakMemoryBytes: 512_000_000,
+      },
+    })).toThrow(/smoke/i);
   });
 });

@@ -29,6 +29,7 @@ export interface ModelSmokeEvidence {
   readonly backend: ModelBackend;
   readonly completedAt: string;
   readonly outputSha256: string;
+  readonly peakMemoryBytes: number;
 }
 
 export interface ModelInstallationEvidence {
@@ -154,6 +155,8 @@ export function deriveLocalModelStatus(
     || evidence.smoke.catalogFingerprint !== modelCatalogFingerprint(model)
     || !model.runtime.preferredBackends.includes(evidence.smoke.backend)
     || !/^sha256:[0-9a-f]{64}$/u.test(evidence.smoke.outputSha256)
+    || !Number.isSafeInteger(evidence.smoke.peakMemoryBytes)
+    || evidence.smoke.peakMemoryBytes <= 0
     || Number.isNaN(Date.parse(evidence.smoke.completedAt))
   ) {
     return freezeStatus({

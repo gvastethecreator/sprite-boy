@@ -78,6 +78,7 @@ describe("local model readiness (M1-01)", () => {
         backend: "wasm",
         completedAt: "2026-07-25T22:00:00.000Z",
         outputSha256: `sha256:${"a".repeat(64)}`,
+        peakMemoryBytes: 512_000_000,
       },
     });
     expect(ready.state).toBe("ready");
@@ -92,6 +93,7 @@ describe("local model readiness (M1-01)", () => {
         backend: "wasm",
         completedAt: "2026-07-25T22:00:00.000Z",
         outputSha256: `sha256:${"a".repeat(64)}`,
+        peakMemoryBytes: 512_000_000,
       },
     }).state).toBe("error");
   });

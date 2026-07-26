@@ -57,6 +57,8 @@ function parseSmoke(value: unknown): ModelSmokeEvidence | null {
     || (smoke.backend !== "webgpu" && smoke.backend !== "wasm")
     || typeof smoke.completedAt !== "string"
     || typeof smoke.outputSha256 !== "string"
+    || !Number.isSafeInteger(smoke.peakMemoryBytes)
+    || (smoke.peakMemoryBytes as number) <= 0
   ) throw new TypeError("Model install manifest smoke is invalid.");
   return {
     status: smoke.status,
@@ -64,6 +66,7 @@ function parseSmoke(value: unknown): ModelSmokeEvidence | null {
     backend: smoke.backend,
     completedAt: smoke.completedAt,
     outputSha256: smoke.outputSha256,
+    peakMemoryBytes: smoke.peakMemoryBytes as number,
   };
 }
 
@@ -97,6 +100,17 @@ export function createModelInstallManifest(
   });
   if (status.state !== "installed-unverified") {
     throw new TypeError("Model install files do not match the catalog.");
+  }
+  if (options.smoke) {
+    const verified = deriveLocalModelStatus(model, {
+      licenseAccepted: true,
+      activeDownload: false,
+      files: options.files,
+      smoke: options.smoke,
+    });
+    if (verified.state !== "ready") {
+      throw new TypeError("Model install smoke does not match the catalog.");
+    }
   }
   return freezeManifest({
     schemaVersion: MODEL_INSTALL_MANIFEST_SCHEMA_VERSION,
