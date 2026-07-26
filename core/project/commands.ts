@@ -203,6 +203,7 @@ export type ProjectCommand =
       type: "artifact.record";
       artifact: GeneratedArtifact;
       outputAsset?: AssetRecord;
+      recipe?: ProcessingRecipe;
       atIndex?: number;
     }
   | { type: "artifact.remove"; artifactId: EntityId; policy: DestructivePolicy }

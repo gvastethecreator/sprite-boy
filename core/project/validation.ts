@@ -1216,6 +1216,73 @@ function validateVideoExtractRecipeBody(
   }
 }
 
+function validateBackgroundRemovalRecipeBody(
+  item: UnknownRecord,
+  path: string,
+  id: string,
+  assets: Map<EntityId, UnknownRecord>,
+  diagnostics: ProjectDiagnostic[],
+): void {
+  validateAllowedKeys(
+    item,
+    ["id", "name", "kind", "version", "sourceAssetId", "model", "output", "createdAt", "updatedAt"],
+    path,
+    diagnostics,
+    id,
+  );
+  validateImageAssetReference(
+    item.sourceAssetId,
+    pathFor(path, "sourceAssetId"),
+    assets,
+    diagnostics,
+    id,
+    "Background-removal recipes may only reference image assets.",
+  );
+
+  const modelPath = pathFor(path, "model");
+  if (!isRecord(item.model)) {
+    push(diagnostics, "INVALID_DOCUMENT", modelPath, "Background-removal model settings are required.", id);
+  } else {
+    validateAllowedKeys(
+      item.model,
+      ["id", "revision", "backend", "inputWidth", "inputHeight"],
+      modelPath,
+      diagnostics,
+      id,
+    );
+    validateNonEmptyString(item.model.id, pathFor(modelPath, "id"), diagnostics, "Model ID is required.");
+    validateNonEmptyString(item.model.revision, pathFor(modelPath, "revision"), diagnostics, "Model revision is required.");
+    if (item.model.backend !== "wasm" && item.model.backend !== "webgpu") {
+      push(diagnostics, "INVALID_DOCUMENT", pathFor(modelPath, "backend"), "Model backend must be wasm or webgpu.", id);
+    }
+    for (const key of ["inputWidth", "inputHeight"] as const) {
+      const value = item.model[key];
+      if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > GRID_PROCESSING_LIMITS.maxDimension) {
+        push(
+          diagnostics,
+          "INVALID_NUMBER",
+          pathFor(modelPath, key),
+          `Model ${key} must be a positive safe integer up to ${GRID_PROCESSING_LIMITS.maxDimension}.`,
+          id,
+        );
+      }
+    }
+  }
+
+  const outputPath = pathFor(path, "output");
+  if (!isRecord(item.output)) {
+    push(diagnostics, "INVALID_DOCUMENT", outputPath, "Background-removal output settings are required.", id);
+  } else {
+    validateAllowedKeys(item.output, ["mimeType", "alpha"], outputPath, diagnostics, id);
+    if (item.output.mimeType !== "image/png") {
+      push(diagnostics, "INVALID_DOCUMENT", pathFor(outputPath, "mimeType"), 'Background-removal output mimeType must be "image/png".', id);
+    }
+    if (item.output.alpha !== "soft-mask") {
+      push(diagnostics, "INVALID_DOCUMENT", pathFor(outputPath, "alpha"), 'Background-removal alpha must be "soft-mask".', id);
+    }
+  }
+}
+
 function validateRecipe(
   item: ProcessingRecipe,
   path: string,
@@ -1243,6 +1310,10 @@ function validateRecipe(
     validateVideoExtractRecipeBody(record, path, id, assets, diagnostics);
     return;
   }
+  if (record.kind === "background-removal") {
+    validateBackgroundRemovalRecipeBody(record, path, id, assets, diagnostics);
+    return;
+  }
   validateAllowedKeys(
     record,
     ["id", "name", "kind", "version", "sourceAssetId", "createdAt", "updatedAt"],
@@ -1254,7 +1325,7 @@ function validateRecipe(
     diagnostics,
     "INVALID_DOCUMENT",
     pathFor(path, "kind"),
-    "Processing recipe kind must be grid-split or video-extract.",
+    "Processing recipe kind must be grid-split, video-extract or background-removal.",
     id,
   );
   if (record.sourceAssetId !== undefined) {
@@ -1626,6 +1697,7 @@ function validateRootOrder(
 function validateProvenanceConsistency(
   assets: Map<EntityId, UnknownRecord>,
   artifacts: Map<EntityId, UnknownRecord>,
+  recipes: Map<EntityId, UnknownRecord>,
   diagnostics: ProjectDiagnostic[],
 ): void {
   for (const [assetId, asset] of assets) {
@@ -1699,6 +1771,18 @@ function validateProvenanceConsistency(
         "Artifact provenance recipe must match artifact.recipeId.",
         artifactId,
       );
+    }
+    if (validId(artifact.recipeId) && validId(artifact.sourceAssetId)) {
+      const recipe = recipes.get(artifact.recipeId);
+      if (recipe && recipe.sourceAssetId !== artifact.sourceAssetId) {
+        push(
+          diagnostics,
+          "OWNER_MISMATCH",
+          `$.generatedArtifacts.${artifactId}.sourceAssetId`,
+          "Artifact source asset must match its processing recipe.",
+          artifactId,
+        );
+      }
     }
   }
 }
@@ -2077,7 +2161,12 @@ function validateEntityCollections(root: UnknownRecord, diagnostics: ProjectDiag
   }
 
   validateOwnership(records.compositions, records.layers, records.variantSets, records.cels, records.sequences, records.collisionSets, diagnostics);
-  validateProvenanceConsistency(records.assets, records.generatedArtifacts, diagnostics);
+  validateProvenanceConsistency(
+    records.assets,
+    records.generatedArtifacts,
+    records.processingRecipes,
+    diagnostics,
+  );
   return records;
 }
 

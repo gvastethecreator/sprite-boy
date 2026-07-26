@@ -288,6 +288,24 @@ export interface VideoExtractRecipeV1 {
   output: { mimeType: "image/png" };
 }
 
+/** Remove an image background with one pinned local segmentation model. */
+export interface BackgroundRemovalRecipeV1 {
+  kind: "background-removal";
+  version: 1;
+  sourceAssetId: EntityId;
+  model: {
+    id: string;
+    revision: string;
+    backend: "wasm" | "webgpu";
+    inputWidth: number;
+    inputHeight: number;
+  };
+  output: {
+    mimeType: "image/png";
+    alpha: "soft-mask";
+  };
+}
+
 /** Shared durable identity/timestamps for every processing recipe kind. */
 export type ProcessingRecipeCommon = {
   id: EntityId;
@@ -296,7 +314,9 @@ export type ProcessingRecipeCommon = {
   updatedAt: ISO8601Timestamp;
 };
 
-export type ProcessingRecipe = ProcessingRecipeCommon & (GridSplitRecipeV1 | VideoExtractRecipeV1);
+export type ProcessingRecipe = ProcessingRecipeCommon & (
+  GridSplitRecipeV1 | VideoExtractRecipeV1 | BackgroundRemovalRecipeV1
+);
 
 export type GeneratedArtifactType = "ai" | "export" | "processed";
 

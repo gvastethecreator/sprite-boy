@@ -76,6 +76,7 @@ const SUPPORTED_COMMAND_KEYS: Partial<Record<ProjectCommand["type"], readonly st
   "region.remove": ["type", "regionId", "policy"],
   "region.reorder": ["type", "regionId", "toIndex"],
   "processingRecipe.remove": ["type", "recipeId", "policy"],
+  "artifact.record": ["type", "artifact", "outputAsset", "recipe", "atIndex"],
   "artifact.remove": ["type", "artifactId", "policy"],
   "composition.create": ["type", "composition", "layers", "atIndex"],
   "composition.update": ["type", "compositionId", "patch"],
@@ -126,6 +127,7 @@ const SUPPORTED_COMMAND_KEYS: Partial<Record<ProjectCommand["type"], readonly st
 const SUPPORTED_COMMAND_OPTIONAL_KEYS: Partial<Record<ProjectCommand["type"], readonly string[]>> = {
   "asset.import": ["atIndex"],
   "regions.commitRecipe": ["derivedAssets", "atIndex"],
+  "artifact.record": ["outputAsset", "recipe", "atIndex"],
   "region.create": ["atIndex"],
   "composition.create": ["atIndex"],
   "layer.add": ["atIndex"],
@@ -862,6 +864,96 @@ function applyRegionsCommitRecipe(
   );
 }
 
+function applyArtifactRecord(
+  original: StudioProject,
+  command: Extract<ProjectCommand, { type: "artifact.record" }>,
+  context: ProjectCommandContext,
+): ProjectCommandResult {
+  if (!isPlainRecord(command.artifact)) {
+    return failure(original, [diagnostic("INVALID_PATCH", "artifact.record requires an artifact record.", "$.artifact")]);
+  }
+  if (command.outputAsset !== undefined && !isPlainRecord(command.outputAsset)) {
+    return failure(original, [diagnostic("INVALID_PATCH", "outputAsset must be an asset record when provided.", "$.outputAsset")]);
+  }
+  if (command.recipe !== undefined && !isPlainRecord(command.recipe)) {
+    return failure(original, [diagnostic("INVALID_PATCH", "recipe must be a processing recipe when provided.", "$.recipe")]);
+  }
+  const artifact = command.artifact;
+  const outputAsset = command.outputAsset;
+  const recipe = command.recipe;
+  if (!isEntityId(artifact.id)) {
+    return failure(original, [diagnostic("INVALID_PATCH", "Artifact ID is invalid.", "$.artifact.id")]);
+  }
+  if (hasOwn(original.generatedArtifacts, artifact.id)) {
+    return failure(original, [duplicateIdDiagnostic("generatedArtifacts", artifact.id, "$.artifact.id")]);
+  }
+  if (outputAsset) {
+    if (!isEntityId(outputAsset.id)) {
+      return failure(original, [diagnostic("INVALID_PATCH", "Output asset ID is invalid.", "$.outputAsset.id")]);
+    }
+    if (hasOwn(original.assets, outputAsset.id)) {
+      return failure(original, [duplicateIdDiagnostic("assets", outputAsset.id, "$.outputAsset.id")]);
+    }
+    if (artifact.outputAssetId !== outputAsset.id) {
+      return failure(original, [diagnostic("PRECONDITION_FAILED", "Artifact outputAssetId must match outputAsset.id.", "$.artifact.outputAssetId")]);
+    }
+  } else if (artifact.outputAssetId !== undefined && !hasOwn(original.assets, artifact.outputAssetId)) {
+    return failure(original, [missingEntityDiagnostic("assets", artifact.outputAssetId, "$.artifact.outputAssetId")]);
+  }
+  if (recipe) {
+    if (!isEntityId(recipe.id)) {
+      return failure(original, [diagnostic("INVALID_PATCH", "Processing recipe ID is invalid.", "$.recipe.id")]);
+    }
+    if (hasOwn(original.processingRecipes, recipe.id)) {
+      return failure(original, [duplicateIdDiagnostic("processingRecipes", recipe.id, "$.recipe.id")]);
+    }
+    if (artifact.recipeId !== recipe.id || artifact.provenance?.recipeId !== recipe.id) {
+      return failure(original, [diagnostic("PRECONDITION_FAILED", "Artifact recipe links must match recipe.id.", "$.artifact.recipeId")]);
+    }
+    if (artifact.sourceAssetId !== recipe.sourceAssetId) {
+      return failure(original, [diagnostic("PRECONDITION_FAILED", "Artifact sourceAssetId must match recipe.sourceAssetId.", "$.artifact.sourceAssetId")]);
+    }
+  }
+  const index = outputAsset
+    ? insertionIndex(command.atIndex, original.rootOrder.assetIds.length, "$.atIndex")
+    : command.atIndex === undefined
+      ? original.rootOrder.assetIds.length
+      : diagnostic("INVALID_PATCH", "atIndex requires an outputAsset.", "$.atIndex");
+  if (typeof index !== "number") return failure(original, [index]);
+
+  const prepared = prepareCandidate(original);
+  if (isResult(prepared)) return prepared;
+  if (recipe) setRecordValue(prepared.processingRecipes, recipe.id, clonePayload(recipe));
+  if (outputAsset) {
+    setRecordValue(prepared.assets, outputAsset.id, clonePayload(outputAsset));
+    prepared.rootOrder.assetIds = insertOrderedId(prepared.rootOrder.assetIds, outputAsset.id, index);
+  }
+  setRecordValue(prepared.generatedArtifacts, artifact.id, clonePayload(artifact));
+  prepared.updatedAt = context.now();
+
+  const inverseCommands: ProjectCommand[] = [
+    { type: "artifact.remove", artifactId: artifact.id, policy: "reject" },
+    ...(outputAsset ? [{ type: "asset.remove" as const, assetId: outputAsset.id, policy: "reject" as const }] : []),
+    ...(recipe ? [{ type: "processingRecipe.remove" as const, recipeId: recipe.id, policy: "reject" as const }] : []),
+  ];
+  const direct = [
+    reference("generatedArtifacts", artifact.id),
+    ...(outputAsset ? [reference("assets", outputAsset.id)] : []),
+    ...(recipe ? [reference("processingRecipes", recipe.id)] : []),
+  ];
+  return finalize(
+    original,
+    prepared,
+    {
+      generatedArtifacts: [artifact.id],
+      ...(outputAsset ? { assets: [outputAsset.id], rootOrder: [outputAsset.id] } : {}),
+      ...(recipe ? { processingRecipes: [recipe.id] } : {}),
+    },
+    directImpact(direct),
+    { type: "command.batch", commands: inverseCommands },
+  );
+}
+
 const REGION_CREATE_FIELDS = [
   "id",
   "assetId",
@@ -1089,6 +1181,8 @@ export function applyProjectCommand(
         return applyAssetRename(project, command, context);
       case "regions.commitRecipe":
         return applyRegionsCommitRecipe(project, command, context);
+      case "artifact.record":
+        return applyArtifactRecord(project, command, context);
       case "region.create":
         return applyRegionCreate(project, command, context);
       case "region.update":
