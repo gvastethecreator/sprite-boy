@@ -20,6 +20,7 @@
     "preview": "vite preview",
     "models:status": "bun scripts/studio-model-status.mjs",
     "models:setup": "bun scripts/studio-model-setup.mjs",
+    "control:bridge": "bun scripts/studio-control-bridge.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
