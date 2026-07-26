@@ -1,9 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 
-// Stub for canvas context in jsdom
-HTMLCanvasElement.prototype.getContext = function () {
-  return null;
-} as any;
+// Stub for canvas context when a test uses jsdom. Node-only contract tests skip it.
+if (typeof HTMLCanvasElement !== "undefined") {
+  HTMLCanvasElement.prototype.getContext = function () {
+    return null;
+  } as any;
+}
 
 // Stub for Web Worker
 class WorkerStub {
