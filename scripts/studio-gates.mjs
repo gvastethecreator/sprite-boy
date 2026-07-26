@@ -116,6 +116,12 @@ const STEPS = Object.freeze({
     ["scripts/studio-browser-smoke.mjs"],
     90_000,
   ),
+  videoBrowser: processStep(
+    "video-import-browser",
+    "Production video import browser journey",
+    ["scripts/studio-video-import-browser.mjs"],
+    120_000,
+  ),
 });
 
 function gate(id, label, steps) {
@@ -141,8 +147,9 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
       STEPS.deferredBrowser,
     ]),
     persistence: gate("persistence", "Durable persistence browser journey", [STEPS.persistenceBrowser]),
+    video: gate("video", "Video import browser journey", [STEPS.build, STEPS.videoBrowser]),
     build: gate("build", "Production build", [STEPS.build]),
-    e2e: gate("e2e", "Production browser smoke", [STEPS.build, STEPS.browser]),
+    e2e: gate("e2e", "Production browser smoke", [STEPS.build, STEPS.browser, STEPS.videoBrowser]),
     all: gate("all", "Complete local gate", [
       STEPS.reproducibility,
       STEPS.audit,
@@ -155,6 +162,7 @@ export const STUDIO_GATE_MANIFEST = Object.freeze({
       STEPS.fixtures,
       STEPS.persistenceBrowser,
       STEPS.build,
+      STEPS.videoBrowser,
       STEPS.bundle,
       STEPS.browserBudget,
       STEPS.deferredBrowser,

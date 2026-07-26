@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { MediabunnyVideoAdapter, VideoMediaError } from "@/core/media";
+import { MediabunnyVideoAdapter, VIDEO_IMPORT_LIMITS, VideoMediaError } from "@/core/media";
 import { cfrMp4Blob, vfrMp4Blob } from "./fixtures/videoFixtures";
 
 describe("MediabunnyVideoAdapter preflight", () => {
@@ -65,5 +65,17 @@ describe("MediabunnyVideoAdapter preflight", () => {
       details: { codec: "avc1" },
     });
     expect(JSON.stringify(error.toDiagnostic())).not.toContain("ruta privada");
+  });
+
+  it("rejects an oversized file before media parsing", async () => {
+    class OversizedVideoBlob extends Blob {
+      override get size(): number {
+        return VIDEO_IMPORT_LIMITS.maxFileBytes + 1;
+      }
+    }
+
+    await expect(adapter.preflight(
+      new OversizedVideoBlob([new Uint8Array([0])], { type: "video/mp4" }),
+    )).rejects.toMatchObject({ code: "VIDEO_LIMIT_EXCEEDED" });
   });
 });

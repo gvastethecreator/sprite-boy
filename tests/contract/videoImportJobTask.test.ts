@@ -102,6 +102,7 @@ interface RepositoryControl {
   readonly requestedIds: string[];
   putCount: number;
   failAt: number | null;
+  failCode: "ASSET_STORAGE_UNAVAILABLE" | "ASSET_QUOTA_EXCEEDED";
   throwAfterWriteAt: number | null;
   delayAt: number | null;
   readonly putStarted: ReturnType<typeof deferred<void>>;
@@ -117,6 +118,7 @@ function createRepository(projectId: string): {
     requestedIds: [],
     putCount: 0,
     failAt: null,
+    failCode: "ASSET_STORAGE_UNAVAILABLE",
     throwAfterWriteAt: null,
     delayAt: null,
     putStarted: deferred<void>(),
@@ -136,7 +138,7 @@ function createRepository(projectId: string): {
         await control.releasePut.promise;
       }
       if (control.failAt === control.putCount) {
-        throw new AssetRepositoryError("ASSET_STORAGE_UNAVAILABLE", "Injected put failure.", {
+        throw new AssetRepositoryError(control.failCode, "Injected put failure.", {
           operation: "put",
           assetId: metadata.id,
         });
@@ -245,6 +247,14 @@ function renameProject(store: ReturnType<typeof createRuntime>["store"], suffix:
   expect(result.result.ok).toBe(true);
 }
 
+function switchWorkspace(store: ReturnType<typeof createRuntime>["store"]): void {
+  const result = store.dispatch({
+    command: { type: "workspace.update", patch: { activeWorkspace: "compose" } },
+    metadata: { commandId: "external-workspace", origin: "user", history: "record" },
+  });
+  expect(result.result.ok).toBe(true);
+}
+
 describe("video import job task (V1-03)", () => {
   it("stores the video and frames, then commits the full graph in one history entry", async () => {
     const runtime = createRuntime();
@@ -299,6 +309,23 @@ describe("video import job task (V1-03)", () => {
     expect(runtime.history.getSnapshot().undoEntries).toHaveLength(0);
   });
 
+  it("maps storage quota exhaustion to a retryable clean failure", async () => {
+    const runtime = createRuntime();
+    const { repository, control } = createRepository("project-video");
+    control.failAt = 1;
+    control.failCode = "ASSET_QUOTA_EXCEEDED";
+    const task = createVideoImportJobTask(createOptions(createAdapter(), runtime.store, repository));
+
+    await expect(task(taskContext())).rejects.toMatchObject({
+      code: "runtime-failure",
+      retryable: true,
+      message: "Storage quota was exceeded during video import.",
+    });
+    expect(control.records.size).toBe(0);
+    expect(runtime.store.getSnapshot().revision).toBe(0);
+    expect(runtime.history.getSnapshot().undoEntries).toHaveLength(0);
+  });
+
   it("rejects a project revision change before dispatch and removes written assets", async () => {
     const runtime = createRuntime();
     const { repository, control } = createRepository("project-video");
@@ -323,6 +350,29 @@ describe("video import job task (V1-03)", () => {
     expect(snapshot.project.name).toBe("Changed during-import");
     expect(snapshot.project.assets).toEqual({});
     expect(control.records.size).toBe(0);
+  });
+
+  it("stops cleanly when the user changes workspace during decode", async () => {
+    const runtime = createRuntime();
+    const { repository, control } = createRepository("project-video");
+    const extractionStarted = deferred<void>();
+    const releaseExtraction = deferred<readonly VideoExtractedFrame[]>();
+    const adapter = createAdapter({
+      extractFrames: async () => {
+        extractionStarted.resolve();
+        return releaseExtraction.promise;
+      },
+    });
+    const task = createVideoImportJobTask(createOptions(adapter, runtime.store, repository));
+    const result = task(taskContext());
+    await extractionStarted.promise;
+    switchWorkspace(runtime.store);
+    releaseExtraction.resolve(extractedFrames());
+
+    await expect(result).rejects.toMatchObject({ code: "runtime-failure", retryable: true });
+    expect(runtime.store.getSnapshot().project.workspace.activeWorkspace).toBe("compose");
+    expect(control.records.size).toBe(0);
+    expect(control.putCount).toBe(0);
   });
 
   it("writes nothing when extraction is cancelled", async () => {

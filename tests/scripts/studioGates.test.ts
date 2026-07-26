@@ -85,6 +85,7 @@ describe("studio gate manifest", () => {
       "fixtures",
       "budgets",
       "persistence",
+      "video",
       "build",
       "e2e",
       "all",
@@ -99,6 +100,7 @@ describe("studio gate manifest", () => {
     expect(STUDIO_GATE_MANIFEST.gates.e2e.steps.map(({ id }) => id)).toEqual([
       "build",
       "browser-smoke",
+      "video-import-browser",
     ]);
     expect(STUDIO_GATE_MANIFEST.gates.reproducibility.steps.map(({ id }) => id)).toEqual([
       "reproducibility",
@@ -119,6 +121,7 @@ describe("studio gate manifest", () => {
       "fixtures",
       "persistence-browser",
       "build",
+      "video-import-browser",
       "bundle-budget",
       "browser-budget",
       "deferred-feature-browser",
@@ -135,6 +138,10 @@ describe("studio gate manifest", () => {
     ]);
     expect(STUDIO_GATE_MANIFEST.gates.persistence.steps.map(({ id }) => id)).toEqual([
       "persistence-browser",
+    ]);
+    expect(STUDIO_GATE_MANIFEST.gates.video.steps.map(({ id }) => id)).toEqual([
+      "build",
+      "video-import-browser",
     ]);
   });
 
@@ -178,6 +185,13 @@ describe("studio gate manifest", () => {
           args: ["scripts/studio-browser-smoke.mjs"],
           timeoutMs: 90_000,
         },
+        {
+          id: "video-import-browser",
+          label: "Production video import browser journey",
+          command: "bun",
+          args: ["scripts/studio-video-import-browser.mjs"],
+          timeoutMs: 120_000,
+        },
       ],
     });
   });
@@ -213,12 +227,12 @@ describe("studio gate execution", () => {
     expect(result).toEqual({
       status: "passed",
       gateId: "e2e",
-      completed: ["build", "browser-smoke"],
+      completed: ["build", "browser-smoke", "video-import-browser"],
       failedStep: null,
       reason: null,
       exitCode: 0,
     });
-    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(spawn).toHaveBeenCalledTimes(3);
     expect(calls[0]?.[0]).toBe("C:/bun.exe");
     expect(calls[0]?.[1]).toEqual(["x", "vite", "build"]);
     expect(calls[0]?.[2]).toMatchObject({
@@ -262,10 +276,10 @@ describe("studio gate execution", () => {
     const expectedSteps = {
       all: [
         "reproducibility", "audit", "typecheck", "lint", "unit", "contract", "integration",
-        "coverage", "fixtures", "persistence-browser", "build", "bundle-budget", "browser-budget",
-        "deferred-feature-browser",
+        "coverage", "fixtures", "persistence-browser", "build", "video-import-browser",
+        "bundle-budget", "browser-budget", "deferred-feature-browser",
       ],
-      e2e: ["build", "browser-smoke"],
+      e2e: ["build", "browser-smoke", "video-import-browser"],
     } as const;
     for (const [gateId, stepIds] of Object.entries(expectedSteps)) {
       stepIds.forEach((stepId, index) => {
