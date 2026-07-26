@@ -724,6 +724,12 @@ const AppLayout: React.FC = () => {
   }, [activeWorkspace, isCompactLayout]);
 
   useEffect(() => {
+    setIsSettingsOpen(false);
+    setIsHelpOpen(false);
+    setIsCommandPaletteOpen(false);
+  }, [activeWorkspace]);
+
+  useEffect(() => {
     workspaceContentRef.current?.focus({ preventScroll: true });
   }, [activeWorkspace]);
 

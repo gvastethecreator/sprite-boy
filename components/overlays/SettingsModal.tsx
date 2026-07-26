@@ -14,6 +14,7 @@ import {
 import { UserPreferences, FrameLabelPosition } from "../../types";
 import NumberControl from "../common/NumberControl";
 import { StudioDialog } from "../studio/StudioDialog";
+import { ControlBridgeSettings } from "../../features/control/ControlBridgeSettings";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -271,6 +272,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
           </section>
+
+          <ControlBridgeSettings />
         </div>
         <div className="p-4 bg-panel border-t border-border flex justify-end">
           <button

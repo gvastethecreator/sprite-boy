@@ -453,6 +453,26 @@ describe("StudioControlService hostile boundaries", () => {
 });
 
 describe("StudioControlService disposal", () => {
+  it("cancels one active idempotency key without disposing the service", async () => {
+    const pending = deferred<StudioControlPortResult>();
+    const ports = createPorts(8);
+    ports.getProject = vi.fn(() => pending.promise);
+    const service = createStudioControlService({ ports });
+    const active = service.execute(request("project.get", {}));
+
+    expect(service.cancel("missing")).toBe(false);
+    expect(service.cancel("idempotency-1")).toBe(true);
+    expect(service.disposed).toBe(false);
+    await expect(active).resolves.toMatchObject({
+      ok: false,
+      revision: 8,
+      error: { code: "cancelled" },
+    });
+    pending.resolve(success({ tooLate: true }, 9));
+    await Promise.resolve();
+    expect(ports.getProject).toHaveBeenCalledOnce();
+  });
+
   it("aborts active work, resolves cancellation, and ignores late settlement", async () => {
     const pending = deferred<StudioControlPortResult>();
     let context: StudioControlPortContext | undefined;

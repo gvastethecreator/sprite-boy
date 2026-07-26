@@ -97,6 +97,7 @@ export interface StudioControlServiceOptions {
 export interface StudioControlService {
   readonly disposed: boolean;
   execute(request: StudioControlRequest): Promise<StudioControlResponse>;
+  cancel(idempotencyKey: string): boolean;
   dispose(): void;
 }
 
@@ -477,6 +478,15 @@ export function createStudioControlService(options: StudioControlServiceOptions)
       }
       entries.clear();
       completedOrder.length = 0;
+    },
+    cancel(idempotencyKey: string): boolean {
+      if (disposed || typeof idempotencyKey !== "string" || idempotencyKey.length === 0) {
+        return false;
+      }
+      const entry = entries.get(idempotencyKey);
+      if (!entry || entry.status !== "active") return false;
+      entry.controller.abort();
+      return true;
     },
     async execute(input: StudioControlRequest): Promise<StudioControlResponse> {
       const request = parseStudioControlRequest(input);
