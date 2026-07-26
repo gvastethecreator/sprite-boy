@@ -1,4 +1,5 @@
 import { act, render, renderHook, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, expect, it } from "vitest";
 import { createJobRunner, createQueuedJob, transitionJob } from "../../core/processing";
 import {
@@ -248,5 +249,26 @@ describe("Studio store selectors", () => {
     expect(() => injectedRunner.run(queuedJob("injected-runner-job"), () => "ok"))
       .not.toThrow();
     injectedRunner.dispose();
+  });
+
+  it("keeps its default job runner alive through the StrictMode effect replay", async () => {
+    const stores = createLocalStores();
+    const wrapper = ({ children }: { readonly children: React.ReactNode }) => (
+      <StrictMode>
+        <StudioLocalStoresProvider stores={stores}>
+          {children}
+        </StudioLocalStoresProvider>
+      </StrictMode>
+    );
+    const rendered = renderHook(() => useStudioJobRunner(), { wrapper });
+
+    await Promise.resolve();
+    const handle = rendered.result.current.run(queuedJob("strict-runner-job"), () => "ok");
+    await expect(handle.result).resolves.toMatchObject({ status: "succeeded", value: "ok" });
+
+    rendered.unmount();
+    await Promise.resolve();
+    expect(() => rendered.result.current.run(queuedJob("strict-runner-late"), () => "late"))
+      .toThrow(/disposed/);
   });
 });

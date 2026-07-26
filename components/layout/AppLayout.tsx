@@ -18,6 +18,13 @@ import {
 } from "../../contexts/StudioStoreContext";
 import { createJobCenterSummarySelector } from "../../core/stores";
 import type { ProcessingRecipe, ProjectCommand, ProjectCommandBatch, StudioProject } from "../../core/project";
+import { MediabunnyVideoAdapter } from "../../core/media";
+import {
+  createQueuedJob,
+  retryJob as createRetryJob,
+  type QueuedJobSnapshot,
+  type TerminalJobSnapshot,
+} from "../../core/processing";
 import { useJobStoreSelector, useProjectStoreSelector } from "../../hooks/useStudioStoreSelector";
 import {
   createStudioCommandRegistry,
@@ -90,6 +97,12 @@ import CompositionCanvasSettingsInspector from "../../features/compose/canvasSet
 import { handoffRegionToCompose } from "../../features/slice/handoff/sliceToComposeHandoff";
 import StudioWorkspaceErrorBoundary from "../studio/StudioWorkspaceErrorBoundary";
 import { DUAL_ENGINE_FREEZE_ACTIVE } from "../../core/studio/dualEngineFreeze";
+import {
+  createVideoImportJobTask,
+  SliceVideoImportPanel,
+  type VideoImportJobResult,
+  type VideoImportSelection,
+} from "../../features/slice/video";
 
 const CollisionWorkspacePanel = React.lazy(
   () => import("../../features/collision/CollisionWorkspacePanel"),
@@ -104,7 +117,17 @@ const LEGACY_MODE_BY_WORKSPACE = {
 } as const satisfies Record<StudioWorkspaceId, AppMode>;
 
 const COMPACT_STUDIO_QUERY = "(max-width: 1279px)";
+const VIDEO_IMPORT_TIMEOUT_MS = 30 * 60 * 1_000;
 const ExportModal = React.lazy(() => import("../overlays/ExportModal"));
+
+function isVideoImportFile(file: File): boolean {
+  return file.type.startsWith("video/") || /\.(m4v|mkv|mov|mp4|webm)$/iu.test(file.name);
+}
+
+interface VideoImportRequest {
+  readonly file: File;
+  readonly selection: VideoImportSelection;
+}
 
 function newIrregularEntityId(prefix: string): string {
   try {
@@ -209,6 +232,7 @@ const AppLayout: React.FC = () => {
   const resetSourceTriggerRef = useRef<HTMLButtonElement>(null);
   const dropzoneBrowseButtonRef = useRef<HTMLButtonElement>(null);
   const sourcePickerReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const videoImportRestoreFocusRef = useRef<HTMLButtonElement | null>(null);
   const focusDropzoneAfterResetRef = useRef(false);
   const { activeWorkspace, navigate } = useStudioNavigation();
   const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
@@ -220,6 +244,7 @@ const AppLayout: React.FC = () => {
     useState<SourceReadyMetadata | null>(null);
   const [sliceGridSourceGeneration, setSliceGridSourceGeneration] = useState(0);
   const [sourceActionError, setSourceActionError] = useState<SourceSessionError | null>(null);
+  const [videoImportFile, setVideoImportFile] = useState<File | null>(null);
   const [irregularToolMode, setIrregularToolMode] = useState<IrregularToolMode>("wand");
   const [wandMode, setWandMode] = useState<WandSelectionMode>("replace");
   const [wandAlphaThreshold, setWandAlphaThreshold] = useState(IRREGULAR_REGION_DONOR_DEFAULTS.alphaThreshold);
@@ -243,6 +268,9 @@ const AppLayout: React.FC = () => {
   const canonicalSourceRestoreRef = useRef<string | null>(null);
   const [composeImportRequestToken, setComposeImportRequestToken] = useState(0);
   const [composeImportBusy, setComposeImportBusy] = useState(false);
+  const videoAdapterRef = useRef<MediabunnyVideoAdapter | null>(null);
+  if (videoAdapterRef.current === null) videoAdapterRef.current = new MediabunnyVideoAdapter();
+  const videoImportRequestsRef = useRef(new Map<string, VideoImportRequest>());
   const {
     snapshot: sourceSessionSnapshot,
     select: selectSourceSession,
@@ -648,7 +676,7 @@ const AppLayout: React.FC = () => {
   const isCompactLayout = useCompactStudioLayout();
   const jobStore = useJobStore();
   const jobRunner = useStudioJobRunner();
-  const retryJob = useStudioJobRetryAction();
+  const injectedRetryJob = useStudioJobRetryAction();
   const selectJobSummary = useMemo(createJobCenterSummarySelector, []);
   const jobSummary = useJobStoreSelector(jobStore, selectJobSummary);
   const hasWorkspace = !!slicerImage || !!builderCanvas;
@@ -1064,6 +1092,127 @@ const AppLayout: React.FC = () => {
     }
   }, [cancelSourceCommit, commitReadySource, retrySourceSession, slicerImage]);
 
+  const selectSliceInput = useCallback(async (input: File | FileList): Promise<void> => {
+    const file = input instanceof File ? input : input.item(0);
+    if (!file) return;
+    if (isVideoImportFile(file)) {
+      setStudioError(null);
+      setSourceActionError(null);
+      setVideoImportFile(file);
+      return;
+    }
+    await selectSliceSource(input);
+  }, [selectSliceSource]);
+
+  const hydrateImportedVideoResult = useCallback(async (
+    result: VideoImportJobResult,
+  ): Promise<void> => {
+    const firstFrame = result.frames[0];
+    if (!firstFrame) return;
+    canonicalSourceRestoreRef.current = firstFrame.id;
+    try {
+      const blob = await canonical.assets.getBlob(firstFrame.id);
+      clearSourceWorkflow();
+      const generation = ++sourceImportGenerationRef.current;
+      const file = new File([blob], firstFrame.name, { type: firstFrame.mimeType });
+      const snapshot = await selectSourceSession(file);
+      if (snapshot.status !== "ready") throw new Error("The first extracted frame could not be decoded.");
+      await handleUpload(file);
+      if (sourceImportGenerationRef.current !== generation) return;
+      setCommittedSourceMetadata(snapshot.metadata);
+      setCanonicalSliceSourceId(firstFrame.id);
+      setSliceGridSourceGeneration((current) => current + 1);
+      navigate("slice");
+      workspaceContentRef.current?.focus({ preventScroll: true });
+    } finally {
+      if (canonicalSourceRestoreRef.current === firstFrame.id) {
+        canonicalSourceRestoreRef.current = null;
+      }
+    }
+  }, [canonical.assets, clearSourceWorkflow, handleUpload, navigate, selectSourceSession]);
+
+  const launchVideoImport = useCallback((
+    request: VideoImportRequest,
+    queuedJob?: QueuedJobSnapshot,
+  ): boolean => {
+    let job: QueuedJobSnapshot | null = null;
+    try {
+      const timestamp = new Date().toISOString();
+      job = queuedJob ?? createQueuedJob({
+        id: newIrregularEntityId("video-job"),
+        requestId: newIrregularEntityId("video-request"),
+        kind: "video.import",
+        label: `Extract ${request.file.name}`,
+        createdAt: timestamp,
+        timeoutMs: VIDEO_IMPORT_TIMEOUT_MS,
+      });
+      const activeJob = job;
+      videoImportRequestsRef.current.set(activeJob.rootJobId, request);
+      const handle = jobRunner.run(activeJob, createVideoImportJobTask({
+        adapter: videoAdapterRef.current!,
+        store: canonical.store,
+        repository: canonical.assets,
+        file: request.file,
+        fileName: request.file.name,
+        selection: request.selection,
+      }));
+      setJobCenterOpen(true);
+      void handle.result.then(async (outcome) => {
+        if (outcome.status === "succeeded") {
+          videoImportRequestsRef.current.delete(activeJob.rootJobId);
+          try {
+            await hydrateImportedVideoResult(outcome.value);
+            setJobCenterOpen(false);
+            showToast(`${outcome.value.frames.length} video frames imported.`, "success");
+          } catch {
+            showToast("Frames were imported, but the first frame could not be opened in Slice.", "error");
+          }
+          return;
+        }
+        if (!outcome.job.error.retryable) videoImportRequestsRef.current.delete(activeJob.rootJobId);
+      }).catch(() => {
+        videoImportRequestsRef.current.delete(activeJob.rootJobId);
+        showToast("Video import could not start.", "error", false);
+      });
+      return true;
+    } catch {
+      if (job?.attempt === 1) videoImportRequestsRef.current.delete(job.rootJobId);
+      return false;
+    }
+  }, [canonical.assets, canonical.store, hydrateImportedVideoResult, jobRunner, showToast]);
+
+  const startVideoImport = useCallback((
+    file: File,
+    selection: VideoImportSelection,
+  ): boolean => {
+    const accepted = launchVideoImport({
+      file,
+      selection: {
+        trackIndex: selection.trackIndex,
+        range: { ...selection.range },
+        sampling: selection.sampling.mode === "all"
+          ? { mode: "all" }
+          : { mode: "fps", fps: selection.sampling.fps },
+      },
+    });
+    if (accepted) setVideoImportFile(null);
+    return accepted;
+  }, [launchVideoImport]);
+
+  const retryStudioJob = useCallback((job: TerminalJobSnapshot): boolean | Promise<boolean> => {
+    if (job.kind !== "video.import") return injectedRetryJob?.(job) ?? false;
+    const request = videoImportRequestsRef.current.get(job.rootJobId);
+    if (!request) return false;
+    const retry = createRetryJob(job, {
+      id: newIrregularEntityId("video-job"),
+      requestId: newIrregularEntityId("video-request"),
+      createdAt: new Date().toISOString(),
+    });
+    return retry.outcome === "created" && retry.retry !== null
+      ? launchVideoImport(request, retry.retry)
+      : false;
+  }, [injectedRetryJob, launchVideoImport]);
+
   const loadProjectFile = useCallback(async (file: File): Promise<void> => {
     const loaded = await handleLoadProject(file);
     if (!loaded) return;
@@ -1154,6 +1303,7 @@ const AppLayout: React.FC = () => {
       setCompactPanel(null);
       setJobCenterOpen(false);
       setResetSourceDialogOpen(false);
+      setVideoImportFile(null);
       controller.closeAllModals();
     },
     isModalOpen:
@@ -1163,7 +1313,8 @@ const AppLayout: React.FC = () => {
       isCommandPaletteOpen ||
       isResetSourceDialogOpen ||
       compactPanel !== null ||
-      isJobCenterOpen,
+      isJobCenterOpen ||
+      videoImportFile !== null,
     activeAnimationId,
   });
 
@@ -1175,7 +1326,7 @@ const AppLayout: React.FC = () => {
       <input
         ref={assetInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,.m4v,.mkv,.mov"
         className="hidden"
         aria-hidden="true"
         tabIndex={-1}
@@ -1186,8 +1337,9 @@ const AppLayout: React.FC = () => {
             restoreSourcePickerFocus();
             return;
           }
+          videoImportRestoreFocusRef.current = sourcePickerReturnFocusRef.current;
           sourcePickerReturnFocusRef.current = null;
-          void selectSliceSource(file);
+          void selectSliceInput(file);
         }}
       />
       <input
@@ -1300,7 +1452,7 @@ const AppLayout: React.FC = () => {
                 committing={isSourceCommitting}
                 browseButtonRef={dropzoneBrowseButtonRef}
                 onBrowse={() => openSourcePicker(dropzoneBrowseButtonRef.current)}
-                onSelect={(input) => selectSliceSource(input as File | FileList)}
+                onSelect={(input) => selectSliceInput(input as File | FileList)}
                 onRetry={retrySliceSource}
               />
             ) : workspaceState.kind === "ready" ? (
@@ -1429,6 +1581,28 @@ const AppLayout: React.FC = () => {
         ) : null}
       </StudioDialog>
 
+      <StudioDialog
+        isOpen={videoImportFile !== null}
+        onClose={() => setVideoImportFile(null)}
+        ariaLabel="Extract video frames"
+        restoreFocusRef={videoImportRestoreFocusRef}
+        panelClassName="max-w-xl"
+      >
+        {videoImportFile ? (
+          <SliceVideoImportPanel
+            adapter={videoAdapterRef.current!}
+            file={videoImportFile}
+            disabled={canonical.persistenceState === "loading"}
+            onClose={() => setVideoImportFile(null)}
+            onChooseAnother={() => {
+              setVideoImportFile(null);
+              queueMicrotask(() => openSourcePicker(videoImportRestoreFocusRef.current));
+            }}
+            onStart={startVideoImport}
+          />
+        ) : null}
+      </StudioDialog>
+
       <SliceSourceResetDialog
         isOpen={isResetSourceDialogOpen}
         sourceName={committedSourceMetadata?.name ?? slicerImage?.name}
@@ -1450,7 +1624,7 @@ const AppLayout: React.FC = () => {
           onClose={() => setJobCenterOpen(false)}
           className="h-full border-0"
         >
-          <JobCenter store={jobStore} runner={jobRunner} retryJob={retryJob} />
+          <JobCenter store={jobStore} runner={jobRunner} retryJob={retryStudioJob} />
         </StudioPanel>
       </StudioDialog>
 

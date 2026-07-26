@@ -24,9 +24,9 @@ function statusCopy(snapshot: SourceSessionSnapshot, committing: boolean): strin
     case "decoding": return "Decoding pixels…";
     case "ready": return "Source validated. Preparing workspace…";
     case "error": return `${snapshot.error.message} ${snapshot.error.retryable
-      ? "Try again, or choose another image."
-      : "Choose another image to continue."}`;
-    case "idle": return "PNG, JPEG or WebP · maximum 10 MiB";
+      ? "Try again, or choose another file."
+      : "Choose another file to continue."}`;
+    case "idle": return "PNG, JPEG, WebP, MP4, WebM, MOV or MKV";
   }
 }
 
@@ -166,7 +166,7 @@ export function SliceSourceDropzone({
         </div>
 
         <h1 id={titleId} className="text-lg font-semibold tracking-tight text-textMain sm:text-xl">
-          {dragActive ? "Drop the spritesheet here" : "Bring in a spritesheet"}
+          {dragActive ? "Drop the image or video here" : "Bring in an image or video"}
         </h1>
 
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
@@ -181,7 +181,7 @@ export function SliceSourceDropzone({
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white shadow-glow hover:bg-accentHover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
             <FileImage size={14} aria-hidden="true" />
-            Choose source image
+            Choose image or video
           </button>
           {snapshot.status === "error" && snapshot.error.retryable && onRetry ? (
             <button

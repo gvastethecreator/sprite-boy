@@ -29,9 +29,9 @@ describe("SliceSourceDropzone", () => {
       <SliceSourceDropzone snapshot={idle} onBrowse={onBrowse} onSelect={vi.fn()} />,
     );
 
-    expect(screen.getByRole("heading", { name: "Bring in a spritesheet" })).toBeInTheDocument();
-    expect(screen.getByText(/PNG, JPEG or WebP · maximum 10 MiB/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Choose source image" }));
+    expect(screen.getByRole("heading", { name: "Bring in an image or video" })).toBeInTheDocument();
+    expect(screen.getByText(/PNG, JPEG, WebP, MP4, WebM, MOV or MKV/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Choose image or video" }));
     expect(onBrowse).toHaveBeenCalledOnce();
   });
 
@@ -45,7 +45,7 @@ describe("SliceSourceDropzone", () => {
 
     fireEvent.dragEnter(dropzone, { dataTransfer: { files, dropEffect: "none" } });
     expect(dropzone).toHaveAttribute("data-drop-active", "true");
-    expect(screen.getByRole("heading", { name: "Drop the spritesheet here" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Drop the image or video here" })).toBeInTheDocument();
     fireEvent.drop(dropzone, { dataTransfer: { files, dropEffect: "copy" } });
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith(files);
@@ -71,7 +71,7 @@ describe("SliceSourceDropzone", () => {
 
     expect(dropzone).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("status")).toHaveTextContent(/Checking file type/i);
-    expect(screen.getByRole("button", { name: "Choose source image" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Choose image or video" })).toBeDisabled();
     fireEvent.drop(dropzone, { dataTransfer: { files, dropEffect: "none" } });
     expect(onBrowse).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe("SliceSourceDropzone", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent(/Opening the validated source/i);
-    expect(screen.getByRole("button", { name: "Choose source image" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Choose image or video" })).toBeDisabled();
   });
 
   it("announces a retryable error and invokes retry without reopening the picker", () => {
@@ -135,8 +135,8 @@ describe("SliceSourceDropzone", () => {
     });
     render(<SliceSourceDropzone snapshot={failed} onBrowse={vi.fn()} onSelect={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "Choose source image" })).toHaveFocus();
-    expect(screen.getByRole("alert")).toHaveTextContent(/Choose another image to continue/i);
+    expect(screen.getByRole("button", { name: "Choose image or video" })).toHaveFocus();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Choose another file to continue/i);
   });
 
   it("contains hostile drop boundaries and reports a recoverable selection error", () => {
@@ -171,7 +171,7 @@ describe("SliceSourceDropzone", () => {
       await Promise.resolve();
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/Choose the file again/i);
-    expect(screen.getByRole("button", { name: "Choose source image" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Choose image or video" })).toHaveFocus();
   });
 
   it("contains async browse and retry rejections without rendering hostile rejection values", async () => {
@@ -196,7 +196,7 @@ describe("SliceSourceDropzone", () => {
     );
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Choose source image" }));
+      fireEvent.click(screen.getByRole("button", { name: "Choose image or video" }));
       await Promise.resolve();
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/could not be read/i);
@@ -216,6 +216,6 @@ describe("SliceSourceDropzone", () => {
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/could not be read/i);
     expect(screen.queryByText("hostile retry failure")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Choose source image" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Choose image or video" })).toHaveFocus();
   });
 });

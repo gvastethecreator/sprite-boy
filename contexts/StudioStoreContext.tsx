@@ -57,9 +57,19 @@ export function StudioLocalStoresProvider({
     () => jobRunner ?? createJobRunner({ store: activeStores.jobs }),
     [activeStores.jobs, jobRunner],
   );
+  const activeRunnerRef = useRef(activeRunner);
+  activeRunnerRef.current = activeRunner;
+  const runnerLifecycleGenerationRef = useRef(0);
   useEffect(() => {
     if (jobRunner) return;
-    return () => activeRunner.dispose();
+    const generation = ++runnerLifecycleGenerationRef.current;
+    return () => {
+      queueMicrotask(() => {
+        const replayedSameRunner = runnerLifecycleGenerationRef.current !== generation
+          && activeRunnerRef.current === activeRunner;
+        if (!replayedSameRunner) activeRunner.dispose();
+      });
+    };
   }, [activeRunner, jobRunner]);
   const value = useMemo<StudioStoreContextValue>(() => Object.freeze({
     stores: activeStores,
