@@ -1,12 +1,16 @@
 #!/usr/bin/env bun
 
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { resolve } from "node:path";
 import {
   createStudioControlFailure,
   parseStudioControlRequestJson,
   serializeStudioControlResponse,
   STUDIO_CONTROL_MAX_REQUEST_BYTES,
 } from "../core/control/controlProtocol.ts";
+import { isLocalModelId } from "../core/models/modelCatalog.ts";
+import { LOCAL_MODEL_SERVICE_VERSION } from "../core/models/modelServiceProtocol.ts";
+import { createNodeModelService, NodeModelServiceError } from "../core/models/nodeModelService.ts";
 
 const LOOPBACK_HOST = "127.0.0.1";
 const DEFAULT_PORT = 43_119;
@@ -39,6 +43,7 @@ function usage() {
     "  --port <0..65535>        Loopback port; 0 selects a free port",
     "  --origin <http-origin>   Allowed Studio origin; repeatable",
     "  --timeout-ms <100..120000>",
+    "  --models-dir <path>      Local verified model store",
     "  --help",
     "",
     "SPRITEBOY_CONTROL_TOKEN may provide a 32+ character session token.",
@@ -57,6 +62,7 @@ function parseInteger(value, min, max, label) {
 function parseOptions(argv) {
   let port = DEFAULT_PORT;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
+  let modelsRoot = resolve(process.env.SPRITEBOY_MODELS_DIR ?? ".spriteboy/models");
   const origins = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -91,12 +97,22 @@ function parseOptions(argv) {
       index += 1;
       continue;
     }
+    if (argument === "--models-dir") {
+      const path = argv[index + 1];
+      if (typeof path !== "string" || path.trim().length === 0 || path.includes("\0")) {
+        throw new TypeError("Models directory is invalid.");
+      }
+      modelsRoot = resolve(path);
+      index += 1;
+      continue;
+    }
     throw new TypeError(`Unknown option: ${argument}`);
   }
   return Object.freeze({
     help: false,
     port,
     timeoutMs,
+    modelsRoot,
     origins: Object.freeze(origins.length > 0 ? [...new Set(origins)] : [...DEFAULT_ORIGINS]),
   });
 }
@@ -213,6 +229,7 @@ function startBridge(options, token) {
   const allowedOrigins = new Set(options.origins);
   const operations = new Map();
   const outbound = [];
+  const modelService = createNodeModelService({ root: options.modelsRoot });
   let browserSession;
   let pollWaiter;
 
@@ -227,7 +244,7 @@ function startBridge(options, token) {
 
   const corsHeaders = (origin) => ({
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Max-Age": "600",
     Vary: "Origin",
@@ -330,12 +347,102 @@ function startBridge(options, token) {
         }
         return emptyResponse(204, corsHeaders(origin));
       }
+      if (request.method === "OPTIONS" && url.pathname.startsWith("/v1/models")) {
+        const origin = browserOrigin(request);
+        if (!origin) {
+          audit("model-origin", "rejected");
+          return emptyResponse(403);
+        }
+        return emptyResponse(204, corsHeaders(origin));
+      }
       if (url.pathname === "/health" && request.method === "GET") {
         return jsonResponse({ ok: true });
       }
       if (!authenticated(request)) {
         audit("authentication", "rejected");
         return jsonResponse({ error: "Unauthorized." }, 401);
+      }
+
+      if (url.pathname.startsWith("/v1/models")) {
+        const origin = browserOrigin(request);
+        if (!origin) {
+          audit("model-origin", "rejected");
+          return emptyResponse(403);
+        }
+        const cors = corsHeaders(origin);
+        try {
+          if (url.pathname === "/v1/models" && request.method === "GET") {
+            return jsonResponse(await modelService.list(), 200, cors);
+          }
+          if (url.pathname === "/v1/models/setup" && request.method === "POST") {
+            const body = await readBoundedText(request);
+            if (!body.ok) return emptyResponse(body.status, cors);
+            const input = parseExactObject(body.text, ["version", "modelId"]);
+            if (
+              !input ||
+              input.version !== LOCAL_MODEL_SERVICE_VERSION ||
+              typeof input.modelId !== "string" ||
+              !isLocalModelId(input.modelId)
+            ) {
+              return jsonResponse({
+                version: LOCAL_MODEL_SERVICE_VERSION,
+                error: { code: "invalid-request", message: "Unknown local model." },
+              }, 400, cors);
+            }
+            const result = await modelService.setup(input.modelId);
+            audit("model-setup", result.outcome);
+            return jsonResponse(result, result.outcome === "started" ? 202 : 200, cors);
+          }
+          const jobMatch = /^\/v1\/models\/jobs\/([^/]{1,200})$/u.exec(url.pathname);
+          if (jobMatch && (request.method === "GET" || request.method === "DELETE")) {
+            let jobId;
+            try {
+              jobId = decodeURIComponent(jobMatch[1]);
+            } catch {
+              return emptyResponse(400, cors);
+            }
+            const job = request.method === "DELETE"
+              ? modelService.cancelJob(jobId)
+              : modelService.getJob(jobId);
+            if (!job) {
+              return jsonResponse({
+                version: LOCAL_MODEL_SERVICE_VERSION,
+                error: { code: "not-found", message: "Model job not found." },
+              }, 404, cors);
+            }
+            return jsonResponse({ version: LOCAL_MODEL_SERVICE_VERSION, job }, 200, cors);
+          }
+          const weightMatch = /^\/v1\/models\/weights\/([^/]{1,80})$/u.exec(url.pathname);
+          if (weightMatch && request.method === "GET") {
+            const modelId = decodeURIComponent(weightMatch[1]);
+            if (!isLocalModelId(modelId)) {
+              return jsonResponse({
+                version: LOCAL_MODEL_SERVICE_VERSION,
+                error: { code: "not-found", message: "Local model not found." },
+              }, 404, cors);
+            }
+            const weights = await modelService.resolveWeights(modelId);
+            if (!weights) return emptyResponse(404, cors);
+            return new Response(Bun.file(weights.path), {
+              status: 200,
+              headers: securityHeaders({
+                ...cors,
+                "Content-Type": weights.contentType,
+                "Content-Length": String(weights.byteSize),
+              }),
+            });
+          }
+          return emptyResponse(404, cors);
+        } catch (error) {
+          const known = error instanceof NodeModelServiceError;
+          const code = known ? error.code : "setup-failed";
+          const message = known ? error.message : "The local model service failed.";
+          audit("model-service", code);
+          return jsonResponse({
+            version: LOCAL_MODEL_SERVICE_VERSION,
+            error: { code, message },
+          }, code === "license-required" || code === "model-not-ready" ? 409 : 500, cors);
+        }
       }
 
       if (url.pathname.startsWith("/v1/browser/")) {
@@ -494,6 +601,7 @@ function startBridge(options, token) {
 
   const stop = (signal) => {
     invalidateBrowser("bridge-stopped");
+    modelService.dispose();
     server.stop(true);
     audit("bridge", signal);
     process.exit(0);

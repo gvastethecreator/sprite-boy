@@ -74,6 +74,7 @@ import IrregularSliceTools, {
 } from "../../features/slice/irregular/IrregularSliceTools";
 import { browserRegionCrop, convertRegionToAsset } from "../../features/slice/assets";
 import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
+import SlicePropertiesPanel from "../../features/slice/SlicePropertiesPanel";
 import {
   commitStagedGridResults,
   SliceResultsTray,
@@ -1555,10 +1556,9 @@ const AppLayout: React.FC = () => {
                 compositionId={canonicalCompositionId}
               />
             ) : (
-              <RightSidebar
-                isSliceWorkspace={activeWorkspace === "slice"}
-                sliceGridController={sliceGridController}
-              />
+              activeWorkspace === "slice"
+                ? <SlicePropertiesPanel controller={sliceGridController} />
+                : <RightSidebar />
             )}
           </StudioPanel>
         )}
@@ -1593,10 +1593,9 @@ const AppLayout: React.FC = () => {
                 compositionId={canonicalCompositionId}
               />
             ) : (
-              <RightSidebar
-                isSliceWorkspace={activeWorkspace === "slice"}
-                sliceGridController={sliceGridController}
-              />
+              activeWorkspace === "slice"
+                ? <SlicePropertiesPanel controller={sliceGridController} />
+                : <RightSidebar />
             )}
           </StudioPanel>
         ) : null}

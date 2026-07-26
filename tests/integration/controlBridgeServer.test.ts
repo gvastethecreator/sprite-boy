@@ -1,5 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const TOKEN = "bridge-test-token-0123456789-abcdefghijklmnopqrstuvwxyz";
@@ -31,6 +34,7 @@ describe.sequential("studio control loopback bridge", () => {
   let baseUrl: string;
   let clientId: string;
   let stderr = "";
+  let modelsRoot: string;
 
   const headers = (token = TOKEN, origin?: string): Record<string, string> => ({
     Authorization: `Bearer ${token}`,
@@ -63,6 +67,7 @@ describe.sequential("studio control loopback bridge", () => {
   });
 
   beforeAll(async () => {
+    modelsRoot = await mkdtemp(join(tmpdir(), "spriteboy-bridge-models-"));
     child = spawn(
       "bun",
       [
@@ -73,6 +78,8 @@ describe.sequential("studio control loopback bridge", () => {
         "180",
         "--origin",
         ORIGIN,
+        "--models-dir",
+        modelsRoot,
       ],
       {
         cwd: process.cwd(),
@@ -111,15 +118,17 @@ describe.sequential("studio control loopback bridge", () => {
   }, 15_000);
 
   afterAll(async () => {
-    if (!child || child.exitCode !== null) return;
-    child.kill();
-    await new Promise<void>((resolve) => {
-      const timeout = setTimeout(resolve, 3_000);
-      child.once("exit", () => {
-        clearTimeout(timeout);
-        resolve();
+    if (child && child.exitCode === null) {
+      child.kill();
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, 3_000);
+        child.once("exit", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
       });
-    });
+    }
+    if (modelsRoot) await rm(modelsRoot, { recursive: true, force: true });
   });
 
   it("binds a minimal health endpoint and hides session state without auth", async () => {
@@ -153,6 +162,42 @@ describe.sequential("studio control loopback bridge", () => {
     expect(wrongPath.status).toBe(404);
     expect(oversized.status).toBe(413);
     expect(await wrongToken.text()).not.toContain(TOKEN);
+  });
+
+  it("reports local model readiness and enforces license and ready gates", async () => {
+    const modelHeaders = headers(TOKEN, ORIGIN);
+    const listed = await fetch(`${baseUrl}/v1/models`, { headers: modelHeaders });
+    expect(listed.status).toBe(200);
+    await expect(listed.json()).resolves.toMatchObject({
+      version: 1,
+      models: [
+        { id: "birefnet-lite-512", status: { state: "absent" } },
+        { id: "rmbg-2.0", status: { state: "license-required" } },
+      ],
+    });
+
+    const licenseBlocked = await fetch(`${baseUrl}/v1/models/setup`, {
+      method: "POST",
+      headers: modelHeaders,
+      body: JSON.stringify({ version: 1, modelId: "rmbg-2.0" }),
+    });
+    expect(licenseBlocked.status).toBe(409);
+    await expect(licenseBlocked.json()).resolves.toMatchObject({
+      error: { code: "license-required" },
+    });
+
+    const weightsBlocked = await fetch(`${baseUrl}/v1/models/weights/birefnet-lite-512`, {
+      headers: modelHeaders,
+    });
+    expect(weightsBlocked.status).toBe(409);
+    await expect(weightsBlocked.json()).resolves.toMatchObject({
+      error: { code: "model-not-ready" },
+    });
+
+    const wrongOrigin = await fetch(`${baseUrl}/v1/models`, {
+      headers: headers(TOKEN, "https://evil.example"),
+    });
+    expect(wrongOrigin.status).toBe(403);
   });
 
   it("connects one browser session and reports it", async () => {

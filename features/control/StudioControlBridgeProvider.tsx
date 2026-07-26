@@ -14,6 +14,10 @@ import {
   type StudioControlBridgeClientSnapshot,
 } from "../../core/control/controlBridgeClient";
 import {
+  createLocalModelServiceClient,
+  type LocalModelServiceClient,
+} from "../../core/models";
+import {
   createStudioControlService,
   type StudioControlService,
 } from "../../core/control/controlService";
@@ -33,12 +37,14 @@ const IDLE_SNAPSHOT: StudioControlBridgeClientSnapshot = Object.freeze({
 
 interface ActiveConnection {
   readonly client: StudioControlBridgeClient;
+  readonly models: LocalModelServiceClient;
   readonly service: StudioControlService;
   readonly unsubscribe: () => void;
 }
 
 interface StudioControlBridgeContextValue {
   readonly snapshot: StudioControlBridgeClientSnapshot;
+  readonly models: LocalModelServiceClient | null;
   connect(baseUrl: string, token: string): Promise<void>;
   disconnect(): Promise<void>;
 }
@@ -77,14 +83,16 @@ export function StudioControlBridgeProvider({ children }: { readonly children: R
       ports: createBrowserStudioControlPorts(dependencies),
     });
     let client: StudioControlBridgeClient;
+    let models: LocalModelServiceClient;
     try {
       client = createStudioControlBridgeClient({ baseUrl, token, service });
+      models = createLocalModelServiceClient({ baseUrl, token });
     } catch (error) {
       service.dispose();
       throw error;
     }
     const unsubscribe = client.subscribe(() => setSnapshot(client.getSnapshot()));
-    const connection = Object.freeze({ client, service, unsubscribe });
+    const connection = Object.freeze({ client, models, service, unsubscribe });
     connectionRef.current = connection;
     setSnapshot(client.getSnapshot());
     try {
@@ -117,6 +125,7 @@ export function StudioControlBridgeProvider({ children }: { readonly children: R
 
   const value = useMemo<StudioControlBridgeContextValue>(() => Object.freeze({
     snapshot,
+    models: snapshot.status === "connected" ? connectionRef.current?.models ?? null : null,
     connect,
     disconnect,
   }), [connect, disconnect, snapshot]);
