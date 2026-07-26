@@ -54,6 +54,49 @@ export interface AssetProvenance extends EntityProvenance {
   parentAssetId?: EntityId;
 }
 
+/** Durable media discriminant for image assets (no runtime payload). */
+export type ImageAssetMedia = {
+  type: "image";
+};
+
+/** Durable non-visual payload such as text or an opaque export artifact. */
+export type BinaryAssetMedia = {
+  type: "binary";
+};
+
+/**
+ * Selected video track metadata persisted with a video asset.
+ * Dimensions and timing are JSON numbers only — no decoder handles.
+ */
+export type VideoTrackMetadata = {
+  /** Non-negative safe integer track index. */
+  index: number;
+  /** Non-empty codec identifier string. */
+  codec: string;
+  /** Positive safe integer coded frame width. */
+  codedWidth: number;
+  /** Positive safe integer coded frame height. */
+  codedHeight: number;
+  /** Positive safe integer display width (must match asset width). */
+  displayWidth: number;
+  /** Positive safe integer display height (must match asset height). */
+  displayHeight: number;
+  rotationDegrees: 0 | 90 | 180 | 270;
+  /** Optional positive finite frames-per-second. */
+  frameRate?: number;
+  /** Optional non-negative safe integer sample count. */
+  sampleCount?: number;
+};
+
+export type VideoAssetMedia = {
+  type: "video";
+  /** Positive safe integer duration in microseconds. */
+  durationUs: number;
+  track: VideoTrackMetadata;
+};
+
+export type AssetMedia = BinaryAssetMedia | ImageAssetMedia | VideoAssetMedia;
+
 export interface AssetRecord {
   id: EntityId;
   name: string;
@@ -66,6 +109,8 @@ export interface AssetRecord {
   createdAt: ISO8601Timestamp;
   updatedAt: ISO8601Timestamp;
   provenance: AssetProvenance;
+  /** Required durable media kind. Visual MIME types must match the discriminant. */
+  media: AssetMedia;
 }
 
 /** A rectangular region inside an immutable source asset. */
@@ -226,12 +271,32 @@ export interface GridSplitRecipeV1 {
   };
 }
 
-export interface ProcessingRecipe extends GridSplitRecipeV1 {
+/** Extract still frames from a durable video asset into PNG image assets. */
+export interface VideoExtractRecipeV1 {
+  kind: "video-extract";
+  version: 1;
+  sourceAssetId: EntityId;
+  /** Non-negative safe integer; must equal source media.track.index. */
+  trackIndex: number;
+  range: {
+    /** Non-negative safe integer start (microseconds). */
+    startUs: number;
+    /** Positive safe integer end (microseconds); must be > startUs and <= source durationUs. */
+    endUs: number;
+  };
+  sampling: { mode: "all" } | { mode: "fps"; fps: number };
+  output: { mimeType: "image/png" };
+}
+
+/** Shared durable identity/timestamps for every processing recipe kind. */
+export type ProcessingRecipeCommon = {
   id: EntityId;
   name?: string;
   createdAt: ISO8601Timestamp;
   updatedAt: ISO8601Timestamp;
-}
+};
+
+export type ProcessingRecipe = ProcessingRecipeCommon & (GridSplitRecipeV1 | VideoExtractRecipeV1);
 
 export type GeneratedArtifactType = "ai" | "export" | "processed";
 
@@ -288,8 +353,8 @@ export interface ProjectWorkspaceState {
   selectedCelIds?: EntityId[];
 }
 
-export interface StudioProjectV1 {
-  schemaVersion: 1;
+export interface StudioProjectV2 {
+  schemaVersion: 2;
   id: EntityId;
   name: string;
   createdAt: ISO8601Timestamp;
@@ -307,6 +372,9 @@ export interface StudioProjectV1 {
   generatedArtifacts: Record<EntityId, GeneratedArtifact>;
   workspace: ProjectWorkspaceState;
 }
+
+/** Current canonical project document used by stores, commands and features. */
+export type StudioProject = StudioProjectV2;
 
 export type ProjectRecordCollection =
   | "assets"

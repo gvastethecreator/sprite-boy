@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AssetIntegrity, AssetIntegrityStatus } from "../../core/assets";
-import type { AssetRecord, StudioProjectV1 } from "../../core/project";
+import type { AssetRecord, StudioProject } from "../../core/project";
 import {
   assessProjectRecovery,
   ProjectRecoveryError,
@@ -12,7 +12,7 @@ import type {
 } from "../../core/persistence";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
-function cloneFixture(): StudioProjectV1 {
+function cloneFixture(): StudioProject {
   return structuredClone(studioProjectV1Fixture);
 }
 
@@ -70,7 +70,7 @@ describe("project recovery report (F3-06)", () => {
       source: "autosave-checkpoint",
       disposition: "ready",
       canActivate: true,
-      schemaVersion: 1,
+      schemaVersion: 2,
       projectId: studioProjectV1Fixture.id,
       issues: [],
       actions: [],

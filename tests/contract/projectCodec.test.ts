@@ -9,10 +9,10 @@ import {
   createEmptyStudioProject,
   validateStudioProject,
 } from "../../core/project";
-import type { AssetRecord, StudioProjectV1 } from "../../core/project";
+import type { AssetRecord, StudioProject } from "../../core/project";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
-function cloneFixture(): StudioProjectV1 {
+function cloneFixture(): StudioProject {
   return structuredClone(studioProjectV1Fixture);
 }
 
@@ -26,8 +26,8 @@ async function captureError(work: () => unknown): Promise<ProjectCodecError> {
   throw new Error("Expected ProjectCodecError.");
 }
 
-describe("ProjectCodec V1 (F3-01)", () => {
-  it("round-trips representative V1 exactly with stable re-encoding", () => {
+describe("ProjectCodec V2 (F3-01/V1-01)", () => {
+  it("round-trips representative V2 exactly with stable re-encoding", () => {
     const encoded = projectCodec.encode(cloneFixture());
     const decoded = projectCodec.decode(encoded);
 
@@ -37,23 +37,39 @@ describe("ProjectCodec V1 (F3-01)", () => {
     expect(encoded).not.toContain("blob:");
   });
 
-  it("round-trips an empty project and advertises only the explicit V1 decoder", () => {
+  it("round-trips an empty project and advertises V1 migration plus V2", () => {
     const codec = new ProjectCodec();
     const project = createEmptyStudioProject({
       id: "project-codec-empty",
       name: "Codec empty",
       now: "2026-07-14T00:00:00.000Z",
     });
-    expect(codec.supportedVersions).toEqual([1]);
+    expect(codec.supportedVersions).toEqual([1, 2]);
     expect(Object.isFrozen(codec.supportedVersions)).toBe(true);
     expect(codec.decode(codec.encode(project))).toEqual(project);
+  });
+
+  it("migrates V1 image assets into explicit V2 media records", () => {
+    const legacy = cloneFixture() as unknown as Record<string, unknown>;
+    legacy.schemaVersion = 1;
+    const assets = legacy.assets as Record<string, Record<string, unknown>>;
+    for (const asset of Object.values(assets)) delete asset.media;
+
+    const decoded = projectCodec.decode(JSON.stringify(legacy));
+
+    expect(decoded.schemaVersion).toBe(2);
+    expect(Object.values(decoded.assets).map(({ media }) => media)).toEqual([
+      { type: "image" },
+      { type: "image" },
+    ]);
+    expect(projectCodec.decode(projectCodec.encode(decoded))).toEqual(decoded);
   });
 
   it("emits deterministic JSON independent of object insertion order", () => {
     const canonical = cloneFixture();
     const reordered = Object.fromEntries(
       Object.entries(cloneFixture()).reverse(),
-    ) as unknown as StudioProjectV1;
+    ) as unknown as StudioProject;
     reordered.assets = Object.fromEntries(Object.entries(reordered.assets).reverse());
     reordered.layers = Object.fromEntries(Object.entries(reordered.layers).reverse());
     reordered.cels = Object.fromEntries(Object.entries(reordered.cels).reverse());
@@ -61,7 +77,7 @@ describe("ProjectCodec V1 (F3-01)", () => {
     expect(projectCodec.encode(reordered)).toBe(projectCodec.encode(canonical));
   });
 
-  it("dispatches future versions before V1 validation", async () => {
+  it("dispatches future versions before current validation", async () => {
     const future = { ...cloneFixture(), schemaVersion: 99 };
     const error = await captureError(() => projectCodec.decode(JSON.stringify(future)));
 
@@ -156,7 +172,7 @@ describe("ProjectCodec V1 (F3-01)", () => {
   });
 
   it("contains cyclic documents as typed validation errors", async () => {
-    const project = cloneFixture() as StudioProjectV1 & { cycle?: unknown };
+    const project = cloneFixture() as StudioProject & { cycle?: unknown };
     project.cycle = project;
     const error = await captureError(() => projectCodec.encode(project));
 
@@ -171,7 +187,7 @@ describe("ProjectCodec V1 (F3-01)", () => {
     const revoked = Proxy.revocable({}, {});
     revoked.revoke();
     const error = await captureError(() => projectCodec.encode(
-      revoked.proxy as StudioProjectV1,
+      revoked.proxy as StudioProject,
     ));
 
     expect(error).toMatchObject({
@@ -185,7 +201,7 @@ describe("ProjectCodec V1 (F3-01)", () => {
       projectDiagnostics: [{
         code: "INVALID_DOCUMENT",
         path: "$",
-        message: "The input could not be inspected as a StudioProjectV1 document.",
+        message: "The input could not be inspected as a StudioProject document.",
       }],
     });
     expect(JSON.stringify(error.toDiagnostic())).not.toContain("cause");
@@ -203,6 +219,7 @@ describe("ProjectCodec V1 (F3-01)", () => {
       blobKey: `sha256:${"a".repeat(64)}`,
       contentHash: "a".repeat(64),
       mimeType: "image/png",
+      media: { type: "image" },
       width: 1,
       height: 1,
       byteSize: 1,

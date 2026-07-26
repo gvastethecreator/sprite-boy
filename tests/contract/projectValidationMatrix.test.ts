@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { GRID_PROCESSING_LIMITS } from "../../core/processing/gridProcessingLimits";
 import { validateStudioProject } from "../../core/project";
-import type { StudioProjectV1 } from "../../core/project/schema";
+import type { StudioProject } from "../../core/project/schema";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
 type ExpectedDiagnostic = readonly [code: string, path: string];
 
-function cloneFixture(): StudioProjectV1 {
-  return JSON.parse(JSON.stringify(studioProjectV1Fixture)) as StudioProjectV1;
+function cloneFixture(): StudioProject {
+  return JSON.parse(JSON.stringify(studioProjectV1Fixture)) as StudioProject;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -24,7 +24,7 @@ function expectDiagnostics(input: unknown, expected: readonly ExpectedDiagnostic
   }
 }
 
-describe("StudioProjectV1 hostile validation matrix", () => {
+describe("StudioProject hostile validation matrix", () => {
   it("contains every non-canonical JSON shape without evaluating accessors", () => {
     const negativeZero = cloneFixture();
     record(negativeZero.workspace).runtimeOffset = -0;

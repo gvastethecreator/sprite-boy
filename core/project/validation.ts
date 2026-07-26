@@ -9,7 +9,7 @@ import type {
   Layer,
   ProcessingRecipe,
   Sequence,
-  StudioProjectV1,
+  StudioProject,
   VariantKey,
   VariantSet,
   WorkspaceId,
@@ -42,7 +42,7 @@ export interface ProjectDiagnostic {
 export interface ProjectValidationResult {
   valid: boolean;
   diagnostics: ProjectDiagnostic[];
-  project?: StudioProjectV1;
+  project?: StudioProject;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -99,7 +99,7 @@ function validateAllowedKeys(
         diagnostics,
         "INVALID_DOCUMENT",
         pathFor(path, key),
-        "Field is not part of the StudioProjectV1 schema.",
+        "Field is not part of the current StudioProject schema.",
         entityId,
       );
     }
@@ -273,6 +273,92 @@ function validateFiniteNumber(value: unknown, path: string, diagnostics: Project
   }
   return true;
 }
+
+function validatePositiveSafeInteger(
+  value: unknown,
+  path: string,
+  diagnostics: ProjectDiagnostic[],
+  message: string,
+  entityId?: EntityId,
+): value is number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+    push(diagnostics, "INVALID_NUMBER", path, message, entityId);
+    return false;
+  }
+  return true;
+}
+
+function validateNonNegativeSafeInteger(
+  value: unknown,
+  path: string,
+  diagnostics: ProjectDiagnostic[],
+  message: string,
+  entityId?: EntityId,
+): value is number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    push(diagnostics, "INVALID_NUMBER", path, message, entityId);
+    return false;
+  }
+  return true;
+}
+
+function validatePositiveFiniteNumber(
+  value: unknown,
+  path: string,
+  diagnostics: ProjectDiagnostic[],
+  message: string,
+  entityId?: EntityId,
+): value is number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    push(diagnostics, "INVALID_NUMBER", path, message, entityId);
+    return false;
+  }
+  return true;
+}
+
+function assetMediaType(
+  asset: UnknownRecord | undefined,
+): "binary" | "image" | "video" | undefined {
+  if (!asset || !isRecord(asset.media) || typeof asset.media.type !== "string") return undefined;
+  if (
+    asset.media.type === "binary"
+    || asset.media.type === "image"
+    || asset.media.type === "video"
+  ) {
+    return asset.media.type;
+  }
+  return undefined;
+}
+
+function validateImageAssetReference(
+  value: unknown,
+  path: string,
+  assets: Map<EntityId, UnknownRecord>,
+  diagnostics: ProjectDiagnostic[],
+  entityId: EntityId | undefined,
+  message: string,
+): void {
+  if (!validateReference(value, path, assets, diagnostics, entityId)) return;
+  if (assetMediaType(assets.get(value)) !== "image") {
+    push(diagnostics, "INVALID_DOCUMENT", path, message, entityId);
+  }
+}
+
+function validateVideoAssetReference(
+  value: unknown,
+  path: string,
+  assets: Map<EntityId, UnknownRecord>,
+  diagnostics: ProjectDiagnostic[],
+  entityId: EntityId | undefined,
+  message: string,
+): void {
+  if (!validateReference(value, path, assets, diagnostics, entityId)) return;
+  if (assetMediaType(assets.get(value)) !== "video") {
+    push(diagnostics, "INVALID_DOCUMENT", path, message, entityId);
+  }
+}
+
+const VIDEO_ROTATION_DEGREES = new Set([0, 90, 180, 270]);
 
 function validateUnitInterval(
   value: unknown,
@@ -475,7 +561,14 @@ function validateLayer(
     push(diagnostics, "INVALID_DOCUMENT", sourcePath, "Layer source must be discriminated.", id);
   } else if (source.type === "asset") {
     validateAllowedKeys(source, ["type", "id"], sourcePath, diagnostics, id);
-    validateReference(source.id, pathFor(sourcePath, "id"), assets, diagnostics, id);
+    validateImageAssetReference(
+      source.id,
+      pathFor(sourcePath, "id"),
+      assets,
+      diagnostics,
+      id,
+      "Layer asset sources may only reference image assets.",
+    );
   } else if (source.type === "region") {
     validateAllowedKeys(source, ["type", "id"], sourcePath, diagnostics, id);
     validateReference(source.id, pathFor(sourcePath, "id"), regions, diagnostics, id);
@@ -484,7 +577,7 @@ function validateLayer(
       diagnostics,
       "NESTED_COMPOSITION_FORBIDDEN",
       sourcePath,
-      "Composition sources are not allowed for layers in StudioProjectV1.",
+      "Composition sources are not allowed for layers in StudioProject.",
       id,
     );
   } else {
@@ -778,28 +871,28 @@ function validateCollisionSet(
   });
 }
 
-function validateRecipe(
-  item: ProcessingRecipe,
+function validateGridSplitRecipeBody(
+  item: UnknownRecord,
   path: string,
   id: string,
   assets: Map<EntityId, UnknownRecord>,
   diagnostics: ProjectDiagnostic[],
 ): void {
   validateAllowedKeys(
-    item as unknown as UnknownRecord,
+    item,
     ["id", "name", "kind", "version", "sourceAssetId", "layout", "crop", "chroma", "pixel", "createdAt", "updatedAt"],
     path,
     diagnostics,
     id,
   );
-  if (item.name !== undefined) validateString(item.name, pathFor(path, "name"), diagnostics);
-  if (item.kind !== "grid-split") {
-    push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "kind"), "Processing recipe kind must be grid-split in V1.", id);
-  }
-  if (item.version !== 1) {
-    push(diagnostics, "UNSUPPORTED_SCHEMA_VERSION", pathFor(path, "version"), "Processing recipe version must be 1.", id);
-  }
-  validateReference(item.sourceAssetId, pathFor(path, "sourceAssetId"), assets, diagnostics, id);
+  validateImageAssetReference(
+    item.sourceAssetId,
+    pathFor(path, "sourceAssetId"),
+    assets,
+    diagnostics,
+    id,
+    "Grid-split recipes may only reference image assets.",
+  );
   if (!isRecord(item.layout)) {
     push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "layout"), "Recipe layout is required.", id);
   } else if (item.layout.mode === "manual") {
@@ -977,6 +1070,195 @@ function validateRecipe(
         pixel.palette.forEach((color, index) => validateString(color, `${path}.pixel.palette[${index}]`, diagnostics));
       }
     }
+  }
+}
+
+function validateVideoExtractRecipeBody(
+  item: UnknownRecord,
+  path: string,
+  id: string,
+  assets: Map<EntityId, UnknownRecord>,
+  diagnostics: ProjectDiagnostic[],
+): void {
+  validateAllowedKeys(
+    item,
+    [
+      "id",
+      "name",
+      "kind",
+      "version",
+      "sourceAssetId",
+      "trackIndex",
+      "range",
+      "sampling",
+      "output",
+      "createdAt",
+      "updatedAt",
+    ],
+    path,
+    diagnostics,
+    id,
+  );
+  const sourcePath = pathFor(path, "sourceAssetId");
+  validateVideoAssetReference(
+    item.sourceAssetId,
+    sourcePath,
+    assets,
+    diagnostics,
+    id,
+    "Video-extract recipes may only reference video assets.",
+  );
+
+  const trackIndexPath = pathFor(path, "trackIndex");
+  const trackIndexValid = validateNonNegativeSafeInteger(
+    item.trackIndex,
+    trackIndexPath,
+    diagnostics,
+    "Track index must be a non-negative safe integer.",
+    id,
+  );
+  if (trackIndexValid && validId(item.sourceAssetId)) {
+    const source = assets.get(item.sourceAssetId);
+    if (assetMediaType(source) === "video" && isRecord(source?.media) && isRecord(source.media.track)) {
+      const sourceIndex = source.media.track.index;
+      if (typeof sourceIndex === "number" && sourceIndex !== item.trackIndex) {
+        push(
+          diagnostics,
+          "INVALID_NUMBER",
+          trackIndexPath,
+          "Track index must equal the source video media.track.index.",
+          id,
+        );
+      }
+    }
+  }
+
+  const rangePath = pathFor(path, "range");
+  if (!isRecord(item.range)) {
+    push(diagnostics, "INVALID_DOCUMENT", rangePath, "Video-extract range is required.", id);
+  } else {
+    validateAllowedKeys(item.range, ["startUs", "endUs"], rangePath, diagnostics, id);
+    const startValid = validateNonNegativeSafeInteger(
+      item.range.startUs,
+      pathFor(rangePath, "startUs"),
+      diagnostics,
+      "Range startUs must be a non-negative safe integer.",
+      id,
+    );
+    const endValid = validatePositiveSafeInteger(
+      item.range.endUs,
+      pathFor(rangePath, "endUs"),
+      diagnostics,
+      "Range endUs must be a positive safe integer.",
+      id,
+    );
+    if (endValid) {
+      const endUs = item.range.endUs as number;
+      if (startValid && endUs <= (item.range.startUs as number)) {
+        push(
+          diagnostics,
+          "INVALID_NUMBER",
+          pathFor(rangePath, "endUs"),
+          "Range endUs must be greater than startUs.",
+          id,
+        );
+      }
+      if (validId(item.sourceAssetId)) {
+        const source = assets.get(item.sourceAssetId);
+        if (assetMediaType(source) === "video" && isRecord(source?.media)) {
+          const durationUs = source.media.durationUs;
+          if (typeof durationUs === "number" && Number.isSafeInteger(durationUs) && endUs > durationUs) {
+            push(
+              diagnostics,
+              "INVALID_NUMBER",
+              pathFor(rangePath, "endUs"),
+              "Range endUs must not exceed the source video durationUs.",
+              id,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  const samplingPath = pathFor(path, "sampling");
+  if (!isRecord(item.sampling)) {
+    push(diagnostics, "INVALID_DOCUMENT", samplingPath, "Video-extract sampling is required.", id);
+  } else if (item.sampling.mode === "all") {
+    validateAllowedKeys(item.sampling, ["mode"], samplingPath, diagnostics, id);
+  } else if (item.sampling.mode === "fps") {
+    validateAllowedKeys(item.sampling, ["mode", "fps"], samplingPath, diagnostics, id);
+    validatePositiveFiniteNumber(
+      item.sampling.fps,
+      pathFor(samplingPath, "fps"),
+      diagnostics,
+      "FPS sampling requires a positive finite fps.",
+      id,
+    );
+  } else {
+    push(diagnostics, "INVALID_DOCUMENT", samplingPath, "Video-extract sampling mode is unsupported.", id);
+  }
+
+  const outputPath = pathFor(path, "output");
+  if (!isRecord(item.output)) {
+    push(diagnostics, "INVALID_DOCUMENT", outputPath, "Video-extract output is required.", id);
+  } else {
+    validateAllowedKeys(item.output, ["mimeType"], outputPath, diagnostics, id);
+    if (item.output.mimeType !== "image/png") {
+      push(
+        diagnostics,
+        "INVALID_DOCUMENT",
+        pathFor(outputPath, "mimeType"),
+        'Video-extract output mimeType must be "image/png".',
+        id,
+      );
+    }
+  }
+}
+
+function validateRecipe(
+  item: ProcessingRecipe,
+  path: string,
+  id: string,
+  assets: Map<EntityId, UnknownRecord>,
+  diagnostics: ProjectDiagnostic[],
+): void {
+  const record = item as unknown as UnknownRecord;
+  if (record.name !== undefined) validateString(record.name, pathFor(path, "name"), diagnostics);
+  if (record.version !== 1) {
+    push(
+      diagnostics,
+      "UNSUPPORTED_SCHEMA_VERSION",
+      pathFor(path, "version"),
+      "Processing recipe version must be 1.",
+      id,
+    );
+  }
+
+  if (record.kind === "grid-split") {
+    validateGridSplitRecipeBody(record, path, id, assets, diagnostics);
+    return;
+  }
+  if (record.kind === "video-extract") {
+    validateVideoExtractRecipeBody(record, path, id, assets, diagnostics);
+    return;
+  }
+  validateAllowedKeys(
+    record,
+    ["id", "name", "kind", "version", "sourceAssetId", "createdAt", "updatedAt"],
+    path,
+    diagnostics,
+    id,
+  );
+  push(
+    diagnostics,
+    "INVALID_DOCUMENT",
+    pathFor(path, "kind"),
+    "Processing recipe kind must be grid-split or video-extract.",
+    id,
+  );
+  if (record.sourceAssetId !== undefined) {
+    validateReference(record.sourceAssetId, pathFor(path, "sourceAssetId"), assets, diagnostics, id);
   }
 }
 
@@ -1463,6 +1745,7 @@ function validateEntityCollections(root: UnknownRecord, diagnostics: ProjectDiag
         "createdAt",
         "updatedAt",
         "provenance",
+        "media",
       ],
       path,
       diagnostics,
@@ -1471,7 +1754,7 @@ function validateEntityCollections(root: UnknownRecord, diagnostics: ProjectDiag
     validateString(item.name, `${path}.name`, diagnostics, "Asset name is required.");
     validateString(item.blobKey, `${path}.blobKey`, diagnostics, "Asset blobKey is required.");
     validateString(item.contentHash, `${path}.contentHash`, diagnostics, "Asset contentHash is required.");
-    validateString(item.mimeType, `${path}.mimeType`, diagnostics, "Asset mimeType is required.");
+    const mimeOk = validateString(item.mimeType, `${path}.mimeType`, diagnostics, "Asset mimeType is required.");
     validateDimensions(item, path, diagnostics);
     if (typeof item.byteSize !== "number" || !Number.isInteger(item.byteSize) || item.byteSize < 0) {
       push(diagnostics, "INVALID_NUMBER", `${path}.byteSize`, "Asset byteSize must be a non-negative integer.", id);
@@ -1509,6 +1792,188 @@ function validateEntityCollections(root: UnknownRecord, diagnostics: ProjectDiag
         }
       }
     }
+
+    const mediaPath = `${path}.media`;
+    if (!hasOwn(item, "media")) {
+      push(diagnostics, "INVALID_DOCUMENT", mediaPath, "Asset media is required.", id);
+    } else if (!isRecord(item.media)) {
+      push(diagnostics, "INVALID_DOCUMENT", mediaPath, "Asset media must be a plain object.", id);
+    } else if (item.media.type === "binary") {
+      validateAllowedKeys(item.media, ["type"], mediaPath, diagnostics, id);
+      if (
+        mimeOk
+        && typeof item.mimeType === "string"
+        && /^(?:image|video)\//iu.test(item.mimeType)
+      ) {
+        push(
+          diagnostics,
+          "INVALID_DOCUMENT",
+          `${path}.mimeType`,
+          "Binary media cannot use an image/* or video/* MIME type.",
+          id,
+        );
+      }
+    } else if (item.media.type === "image") {
+      validateAllowedKeys(item.media, ["type"], mediaPath, diagnostics, id);
+      if (mimeOk && typeof item.mimeType === "string" && !/^image\//iu.test(item.mimeType)) {
+        push(
+          diagnostics,
+          "INVALID_DOCUMENT",
+          `${path}.mimeType`,
+          "Image media requires an image/* MIME type.",
+          id,
+        );
+      }
+    } else if (item.media.type === "video") {
+      validateAllowedKeys(item.media, ["type", "durationUs", "track"], mediaPath, diagnostics, id);
+      if (mimeOk && typeof item.mimeType === "string" && !/^video\//iu.test(item.mimeType)) {
+        push(
+          diagnostics,
+          "INVALID_DOCUMENT",
+          `${path}.mimeType`,
+          "Video media requires a video/* MIME type.",
+          id,
+        );
+      }
+      validatePositiveSafeInteger(
+        item.media.durationUs,
+        `${mediaPath}.durationUs`,
+        diagnostics,
+        "Video durationUs must be a positive safe integer.",
+        id,
+      );
+      const trackPath = `${mediaPath}.track`;
+      if (!isRecord(item.media.track)) {
+        push(diagnostics, "INVALID_DOCUMENT", trackPath, "Video media track is required.", id);
+      } else {
+        validateAllowedKeys(
+          item.media.track,
+          [
+            "index",
+            "codec",
+            "codedWidth",
+            "codedHeight",
+            "displayWidth",
+            "displayHeight",
+            "rotationDegrees",
+            "frameRate",
+            "sampleCount",
+          ],
+          trackPath,
+          diagnostics,
+          id,
+        );
+        validateNonNegativeSafeInteger(
+          item.media.track.index,
+          `${trackPath}.index`,
+          diagnostics,
+          "Video track index must be a non-negative safe integer.",
+          id,
+        );
+        validateNonEmptyString(
+          item.media.track.codec,
+          `${trackPath}.codec`,
+          diagnostics,
+          "Video track codec must be a non-empty string.",
+        );
+        validatePositiveSafeInteger(
+          item.media.track.codedWidth,
+          `${trackPath}.codedWidth`,
+          diagnostics,
+          "Video track codedWidth must be a positive safe integer.",
+          id,
+        );
+        validatePositiveSafeInteger(
+          item.media.track.codedHeight,
+          `${trackPath}.codedHeight`,
+          diagnostics,
+          "Video track codedHeight must be a positive safe integer.",
+          id,
+        );
+        const displayWidthValid = validatePositiveSafeInteger(
+          item.media.track.displayWidth,
+          `${trackPath}.displayWidth`,
+          diagnostics,
+          "Video track displayWidth must be a positive safe integer.",
+          id,
+        );
+        const displayHeightValid = validatePositiveSafeInteger(
+          item.media.track.displayHeight,
+          `${trackPath}.displayHeight`,
+          diagnostics,
+          "Video track displayHeight must be a positive safe integer.",
+          id,
+        );
+        if (
+          typeof item.media.track.rotationDegrees !== "number" ||
+          !VIDEO_ROTATION_DEGREES.has(item.media.track.rotationDegrees)
+        ) {
+          push(
+            diagnostics,
+            "INVALID_NUMBER",
+            `${trackPath}.rotationDegrees`,
+            "Video track rotationDegrees must be 0, 90, 180 or 270.",
+            id,
+          );
+        }
+        if (item.media.track.frameRate !== undefined) {
+          validatePositiveFiniteNumber(
+            item.media.track.frameRate,
+            `${trackPath}.frameRate`,
+            diagnostics,
+            "Video track frameRate must be a positive finite number.",
+            id,
+          );
+        }
+        if (item.media.track.sampleCount !== undefined) {
+          validateNonNegativeSafeInteger(
+            item.media.track.sampleCount,
+            `${trackPath}.sampleCount`,
+            diagnostics,
+            "Video track sampleCount must be a non-negative safe integer.",
+            id,
+          );
+        }
+        if (
+          displayWidthValid &&
+          typeof item.width === "number" &&
+          Number.isInteger(item.width) &&
+          item.width > 0 &&
+          item.media.track.displayWidth !== item.width
+        ) {
+          push(
+            diagnostics,
+            "INVALID_DIMENSIONS",
+            `${trackPath}.displayWidth`,
+            "Video track displayWidth must equal asset width.",
+            id,
+          );
+        }
+        if (
+          displayHeightValid &&
+          typeof item.height === "number" &&
+          Number.isInteger(item.height) &&
+          item.height > 0 &&
+          item.media.track.displayHeight !== item.height
+        ) {
+          push(
+            diagnostics,
+            "INVALID_DIMENSIONS",
+            `${trackPath}.displayHeight`,
+            "Video track displayHeight must equal asset height.",
+            id,
+          );
+        }
+      }
+    } else {
+      push(
+        diagnostics,
+        "INVALID_DOCUMENT",
+        mediaPath,
+        "Asset media type must be binary, image or video.",
+        id,
+      );
+    }
   }
 
   for (const [id, item] of records.regions) {
@@ -1521,7 +1986,14 @@ function validateEntityCollections(root: UnknownRecord, diagnostics: ProjectDiag
       id,
     );
     if (item.name !== undefined) validateString(item.name, `${path}.name`, diagnostics);
-    validateReference(item.assetId, `${path}.assetId`, records.assets, diagnostics, id);
+    validateImageAssetReference(
+      item.assetId,
+      `${path}.assetId`,
+      records.assets,
+      diagnostics,
+      id,
+      "Regions may only reference image assets.",
+    );
     validateRect(item.bounds, `${path}.bounds`, diagnostics);
     if (item.pivot !== undefined) validatePoint(item.pivot, `${path}.pivot`, diagnostics);
     if (item.hidden !== undefined) validateBoolean(item.hidden, `${path}.hidden`, diagnostics);
@@ -1618,7 +2090,7 @@ function validateStudioProjectInternal(input: unknown): ProjectValidationResult 
   }
 
   if (!isRecord(input)) {
-    push(diagnostics, "INVALID_DOCUMENT", "$", "A StudioProjectV1 document must be a plain object.");
+    push(diagnostics, "INVALID_DOCUMENT", "$", "A StudioProject document must be a plain object.");
     return { valid: false, diagnostics: sortDiagnostics(diagnostics) };
   }
 
@@ -1649,12 +2121,12 @@ function validateStudioProjectInternal(input: unknown): ProjectValidationResult 
   );
   if (!hasOwn(root, "schemaVersion") || typeof root.schemaVersion !== "number") {
     push(diagnostics, "INVALID_DOCUMENT", "$.schemaVersion", "schemaVersion must be numeric and present.");
-  } else if (root.schemaVersion !== 1) {
+  } else if (root.schemaVersion !== 2) {
     push(
       diagnostics,
       "UNSUPPORTED_SCHEMA_VERSION",
       "$.schemaVersion",
-      "Only StudioProjectV1 (schemaVersion 1) is supported.",
+      "Only StudioProjectV2 (schemaVersion 2) is supported.",
     );
   }
   validateId(root.id, "$.id", diagnostics);
@@ -1664,7 +2136,7 @@ function validateStudioProjectInternal(input: unknown): ProjectValidationResult 
 
   const rootOrder = root.rootOrder;
   const workspace = root.workspace;
-  if (root.schemaVersion === 1) {
+  if (root.schemaVersion === 2) {
     const records = validateEntityCollections(root, diagnostics);
     validateRootOrder(rootOrder, records.assets, records.regions, records.compositions, records.sequences, diagnostics);
     validateWorkspace(workspace, records.assets, records.regions, records.compositions, records.layers, records.variantSets, records.sequences, records.cels, diagnostics);
@@ -1675,7 +2147,7 @@ function validateStudioProjectInternal(input: unknown): ProjectValidationResult 
 
   const ordered = sortDiagnostics(diagnostics);
   if (ordered.length > 0) return { valid: false, diagnostics: ordered };
-  return { valid: true, diagnostics: [], project: input as unknown as StudioProjectV1 };
+  return { valid: true, diagnostics: [], project: input as unknown as StudioProject };
 }
 
 /** Validate any runtime value without mutating it or propagating inspection failures. */
@@ -1689,7 +2161,7 @@ export function validateStudioProject(input: unknown): ProjectValidationResult {
         {
           code: "INVALID_DOCUMENT",
           path: "$",
-          message: "The input could not be inspected as a StudioProjectV1 document.",
+          message: "The input could not be inspected as a StudioProject document.",
         },
       ],
     };

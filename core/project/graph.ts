@@ -1,19 +1,19 @@
 import type {
   EntityId,
   ProjectRecordCollection,
-  StudioProjectV1,
+  StudioProject,
 } from "./schema";
 import { isEntityId } from "./primitives";
 
 export type ProjectRevision = number;
 
 export interface ProjectSnapshot {
-  readonly project: StudioProjectV1;
+  readonly project: StudioProject;
   readonly revision: ProjectRevision;
 }
 
 export function createProjectSnapshot(
-  project: StudioProjectV1,
+  project: StudioProject,
   revision: ProjectRevision = 0,
 ): ProjectSnapshot {
   if (!Number.isSafeInteger(revision) || revision < 0) {
@@ -24,29 +24,29 @@ export function createProjectSnapshot(
 
 export function advanceProjectSnapshot(
   snapshot: ProjectSnapshot,
-  project: StudioProjectV1,
+  project: StudioProject,
 ): ProjectSnapshot {
   return createProjectSnapshot(project, snapshot.revision + 1);
 }
 
 export function getProjectEntity(
-  project: StudioProjectV1,
+  project: StudioProject,
   collection: ProjectRecordCollection,
   id: EntityId,
-): StudioProjectV1[ProjectRecordCollection][EntityId] | undefined {
+): StudioProject[ProjectRecordCollection][EntityId] | undefined {
   return project[collection][id];
 }
 
 export function hasProjectEntity(
-  project: StudioProjectV1,
+  project: StudioProject,
   collection: ProjectRecordCollection,
   id: EntityId,
 ): boolean {
   return Object.prototype.hasOwnProperty.call(project[collection], id);
 }
 
-export function cloneStudioProject(project: StudioProjectV1): StudioProjectV1 {
-  return JSON.parse(JSON.stringify(project)) as StudioProjectV1;
+export function cloneStudioProject(project: StudioProject): StudioProject {
+  return JSON.parse(JSON.stringify(project)) as StudioProject;
 }
 
 export function insertOrderedId(

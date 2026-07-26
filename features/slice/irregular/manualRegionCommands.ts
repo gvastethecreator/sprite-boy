@@ -1,7 +1,7 @@
 import type { ProjectCommand } from "../../../core/project/commands";
 import { cloneDataOnly } from "../../../core/project/dataBoundary";
 import { isEntityId, isISO8601Timestamp } from "../../../core/project/primitives";
-import type { Rect, StudioProjectV1 } from "../../../core/project/schema";
+import type { Rect, StudioProject } from "../../../core/project/schema";
 import { validateStudioProject } from "../../../core/project/validation";
 
 export const MAX_MANUAL_REGIONS = 4096;
@@ -84,12 +84,12 @@ function readBounds(value: unknown): Readonly<Rect> {
   return Object.freeze({ x: x as number, y: y as number, width: width as number, height: height as number });
 }
 
-function readProject(value: unknown): StudioProjectV1 {
+function readProject(value: unknown): StudioProject {
   const cloned = cloneDataOnly(value);
-  if (!cloned.ok) throw invalid("requires a canonical data-only StudioProjectV1");
+  if (!cloned.ok) throw invalid("requires a canonical data-only StudioProject");
   const validation = validateStudioProject(cloned.value);
-  if (!validation.valid) throw invalid("requires a valid canonical StudioProjectV1");
-  return cloned.value as StudioProjectV1;
+  if (!validation.valid) throw invalid("requires a valid canonical StudioProject");
+  return cloned.value as StudioProject;
 }
 
 function readIntent(value: unknown): ManualRegionIntent {

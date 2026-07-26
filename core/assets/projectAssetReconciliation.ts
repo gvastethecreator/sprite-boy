@@ -1,4 +1,4 @@
-import type { EntityId, StudioProjectV1 } from "../project";
+import type { EntityId, StudioProject } from "../project";
 import type { AssetRepository } from "./contracts";
 
 export interface ProjectAssetReconciliationResult {
@@ -10,7 +10,7 @@ export interface ProjectAssetReconciliationResult {
 
 export interface ProjectAssetReconciliationOptions {
   /** Re-read the active graph immediately before each removal. */
-  readonly getProject?: () => StudioProjectV1;
+  readonly getProject?: () => StudioProject;
 }
 
 const repositoryMutationLocks = new WeakMap<AssetRepository, Promise<void>>();
@@ -32,10 +32,10 @@ export function withAssetRepositoryMutation<T>(
  */
 async function reconcileProjectAssetRepositoryUnlocked(
   repository: AssetRepository,
-  project: StudioProjectV1,
+  project: StudioProject,
   options: ProjectAssetReconciliationOptions = {},
 ): Promise<ProjectAssetReconciliationResult> {
-  let activeProject: StudioProjectV1;
+  let activeProject: StudioProject;
   try {
     // The caller's project argument can predate a queued import. Resolve the
     // canonical graph only after this operation owns the repository lock.
@@ -95,7 +95,7 @@ async function reconcileProjectAssetRepositoryUnlocked(
 
 export function reconcileProjectAssetRepository(
   repository: AssetRepository,
-  project: StudioProjectV1,
+  project: StudioProject,
   options: ProjectAssetReconciliationOptions = {},
 ): Promise<ProjectAssetReconciliationResult> {
   return withAssetRepositoryMutation(repository, () => reconcileProjectAssetRepositoryUnlocked(repository, project, options));

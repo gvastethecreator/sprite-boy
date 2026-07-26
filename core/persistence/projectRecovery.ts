@@ -1,5 +1,5 @@
 import type { AssetIntegrity, AssetIntegrityStatus, AssetOperationOptions } from "../assets";
-import type { AssetRecord, EntityId, StudioProjectV1 } from "../project";
+import type { AssetRecord, EntityId, StudioProject } from "../project";
 import {
   isProjectCodecError,
   projectCodec,
@@ -71,7 +71,7 @@ export interface ProjectRecoveryReport {
  */
 export interface ProjectRecoveryAssessment {
   report: ProjectRecoveryReport;
-  quarantinedProject?: StudioProjectV1;
+  quarantinedProject?: StudioProject;
 }
 
 export interface ProjectRecoveryAssetVerifier {
@@ -672,7 +672,7 @@ export async function assessProjectRecovery(
   const normalized = normalizeOptions(options);
   try {
     throwIfAborted(normalized.signal);
-    let project: StudioProjectV1;
+    let project: StudioProject;
     try {
       project = projectCodec.decode(serialized);
     } catch (error) {

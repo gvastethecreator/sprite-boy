@@ -9,7 +9,7 @@ import { validateStudioProject } from "../../core/project";
 import type {
   LegacyProjectV0MigrationContext,
 } from "../../core/persistence";
-import type { StudioProjectV1 } from "../../core/project";
+import type { StudioProject } from "../../core/project";
 import {
   legacyProjectV0Ambiguity,
   legacyProjectV0Fixture,
@@ -60,7 +60,7 @@ async function captureError(work: () => unknown): Promise<ProjectMigrationError>
   throw new Error("Expected ProjectMigrationError.");
 }
 
-describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
+describe("legacy SpriteBoy V0 → canonical V2 migration (F3-03/V1-01)", () => {
   it("previews every unresolved binary and ambiguous cel without applying the step", async () => {
     const input = cloneLegacy();
     const result = await migrateLegacyProjectV0(input, {
@@ -75,7 +75,7 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
     expect(result.report).toMatchObject({
       status: "needs-input",
       sourceVersion: 0,
-      targetVersion: 1,
+      targetVersion: 2,
       reachedVersion: 0,
       appliedSteps: [],
       pendingStep: {
@@ -116,28 +116,32 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
     });
   });
 
-  it("migrates the real fixture to a valid connected V1 graph with explicit loss notes", async () => {
+  it("migrates the real fixture to a valid connected V2 graph with explicit loss notes", async () => {
     const result = await migrateLegacyProjectV0(cloneLegacy(), baseContext());
-    const project = result.document as StudioProjectV1;
+    const project = result.document as StudioProject;
 
     expect(result.report).toMatchObject({
       status: "migrated",
       sourceVersion: 0,
-      targetVersion: 1,
-      reachedVersion: 1,
-      appliedSteps: [{ id: "legacy-project-v0-to-v1", fromVersion: 0, toVersion: 1 }],
+      targetVersion: 2,
+      reachedVersion: 2,
+      appliedSteps: [
+        { id: "legacy-project-v0-to-v1", fromVersion: 0, toVersion: 1 },
+        { id: "studio-project-v1-to-v2", fromVersion: 1, toVersion: 2 },
+      ],
     });
     expect(result.report.issues.map(({ code }) => code)).toEqual([
       "LEGACY_PROJECT_NORMALIZED",
       "LEGACY_BUILDER_SLOT_CONSTRAINTS_FLATTENED",
       "LEGACY_ASPECT_RATIO_NOT_STORED",
       "LEGACY_VIEW_PREFERENCES_NOT_PROJECT_DATA",
+      "STUDIO_PROJECT_MEDIA_SCHEMA_UPGRADED",
     ]);
     expect(result.report.issues.some(({ blocking }) => blocking)).toBe(false);
     expect(validateStudioProject(project)).toMatchObject({ valid: true, diagnostics: [] });
 
     expect(project).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: "migrated-project",
       name: "Migrated legacy project",
       createdAt: TIMESTAMP,
@@ -234,7 +238,7 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
       [legacyProjectV0Ambiguity.keyframeUid]: { type: "builder-slot", gridIndex: 0 },
     };
     const result = await migrateLegacyProjectV0(legacy, context);
-    const project = result.document as StudioProjectV1;
+    const project = result.document as StudioProject;
     const cel = project.cels["legacy:cel:legacy-cel-ambiguous"];
 
     expect(cel.source).toEqual({
@@ -264,8 +268,8 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
     const first = await migrateLegacyProjectV0(cloneLegacy(), context);
     const second = await migrateLegacyProjectV0(cloneLegacy(), reversed);
 
-    expect(projectCodec.encode(first.document as StudioProjectV1))
-      .toBe(projectCodec.encode(second.document as StudioProjectV1));
+    expect(projectCodec.encode(first.document as StudioProject))
+      .toBe(projectCodec.encode(second.document as StudioProject));
     expect(first.report).toEqual(second.report);
   });
 
@@ -281,7 +285,7 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
     legacy.project.builderSlots["0"].assetId = "source-sheet";
     legacy.project.builderFreeObjects[0].assetId = "source-sheet";
     const result = await migrateLegacyProjectV0(legacy, baseContext());
-    const project = result.document as StudioProjectV1;
+    const project = result.document as StudioProject;
 
     expect(project.regions["legacy:region:0"].assetId).toBe("asset-source-sheet");
     expect(project.layers["legacy:layer:builder-slot:0"].source).toEqual({
@@ -309,7 +313,7 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
       },
     };
     const result = await migrateLegacyProjectV0(legacy, context);
-    const project = result.document as StudioProjectV1;
+    const project = result.document as StudioProject;
 
     expect(project.rootOrder.assetIds).toEqual(["asset-source-sheet"]);
     expect(Object.keys(project.assets)).toEqual(["asset-source-sheet"]);
@@ -343,7 +347,7 @@ describe("legacy SpriteBoy V0 → canonical V1 migration (F3-03)", () => {
     };
 
     const result = await migrateLegacyProjectV0(legacy, context);
-    const project = result.document as StudioProjectV1;
+    const project = result.document as StudioProject;
 
     expect(result.report.status).toBe("migrated");
     expect(project.assets["asset-source-sheet"].provenance.sourceId).toBe("source-sheet");

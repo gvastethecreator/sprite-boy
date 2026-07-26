@@ -1,4 +1,4 @@
-import type { EntityId, ISO8601Timestamp, StudioProjectV1 } from "./schema";
+import type { EntityId, ISO8601Timestamp, StudioProject } from "./schema";
 import { isEntityId, isISO8601Timestamp } from "./primitives";
 
 export type ProjectIdFactory = (() => EntityId) | { next: () => EntityId };
@@ -41,7 +41,7 @@ function readTimestamp(options: CreateEmptyStudioProjectOptions): ISO8601Timesta
  */
 export function createEmptyStudioProject(
   options: CreateEmptyStudioProjectOptions = {},
-): StudioProjectV1 {
+): StudioProject {
   const id = options.id ?? options.projectId ?? nextProjectId(options.idFactory);
   const timestamp = readTimestamp(options);
   const name = options.name ?? DEFAULT_PROJECT_NAME;
@@ -57,7 +57,7 @@ export function createEmptyStudioProject(
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     name,
     createdAt,

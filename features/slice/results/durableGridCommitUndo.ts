@@ -1,4 +1,4 @@
-import type { StudioProjectV1 } from "../../../core/project";
+import type { StudioProject } from "../../../core/project";
 import type { CommitStagedGridResultsResult } from "./commitStagedGridResults";
 
 export const GRID_COMMIT_UNDO_KEY = "sprite-boy-studio:grid-commit-undo:v1";
@@ -94,7 +94,7 @@ export function clearDurableGridCommitUndo(projectId?: string): void {
 }
 
 export function durableGridCommitMatchesProject(
-  project: StudioProjectV1,
+  project: StudioProject,
   marker: DurableGridCommitUndo | null,
 ): marker is DurableGridCommitUndo {
   if (!marker || marker.projectId !== project.id ||

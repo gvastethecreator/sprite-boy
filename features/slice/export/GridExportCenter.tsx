@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Download, ExternalLink, FileArchive, LoaderCircle, X } from "lucide-react";
 import type { AssetRepository } from "../../../core/assets";
 import type { DeepReadonly } from "../../../core/stores";
-import type { EntityId, StudioProjectV1 } from "../../../core/project";
+import type { EntityId, StudioProject } from "../../../core/project";
 import {
   createBrowserDownloadWriter,
   createGridExportPort,
@@ -13,7 +13,7 @@ import {
 } from "./gridExport";
 
 export interface GridExportCenterProps {
-  readonly project: DeepReadonly<StudioProjectV1>;
+  readonly project: DeepReadonly<StudioProject>;
   readonly revision: number;
   readonly repository: AssetRepository;
   readonly onOpenCompose: (regionId: EntityId) => void;

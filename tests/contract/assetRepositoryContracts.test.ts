@@ -35,6 +35,7 @@ const contractRecord: AssetRecord = {
   contentHash: "contract",
   mimeType: "image/png",
   byteSize: 4,
+  media: { type: "image" },
 };
 
 const fakeRepository: AssetRepository = {

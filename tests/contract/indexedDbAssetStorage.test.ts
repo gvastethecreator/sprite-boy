@@ -11,6 +11,7 @@ const record: AssetRecord = {
   blobKey: "sha256:storage",
   contentHash: "storage",
   mimeType: "image/png",
+  media: { type: "image" },
   width: 8,
   height: 8,
   byteSize: 4,

@@ -18,7 +18,7 @@ import {
 import {
   createEmptyStudioProject,
   type EntityId,
-  type StudioProjectV1,
+  type StudioProject,
   type WorkspaceId,
 } from "../core/project";
 import {
@@ -66,7 +66,7 @@ export interface CanonicalProjectContextValue extends CanonicalProjectBundle {
 export interface CanonicalProjectProviderProps {
   readonly children: ReactNode;
   /** Deterministic test/host injection. Injected documents skip startup recovery. */
-  readonly initialProject?: StudioProjectV1;
+  readonly initialProject?: StudioProject;
   readonly assetRepositoryFactory?: (projectId: EntityId) => AssetRepository;
   readonly autosave?: ProjectAutosaveJournal | null;
 }
@@ -119,7 +119,7 @@ function createUntitledProject(projectId = nextIdentity("project"), name = "Unti
 }
 
 function createBundle(
-  project: StudioProjectV1,
+  project: StudioProject,
   assetRepositoryFactory: (projectId: EntityId) => AssetRepository,
 ): CanonicalProjectBundle {
   const runtime = createProjectStoreWithHistory(project, {
@@ -187,7 +187,7 @@ export function CanonicalProjectProvider({
   const lifecycleGenerationRef = useRef(0);
   bundleRef.current = bundle;
 
-  const replaceBundle = useCallback((project: StudioProjectV1): void => {
+  const replaceBundle = useCallback((project: StudioProject): void => {
     const previous = bundleRef.current;
     const replacement = createBundle(project, assetRepositoryFactory);
     generationRef.current += 1;
@@ -201,7 +201,7 @@ export function CanonicalProjectProvider({
     if (initialProject || injectedAutosave === null) return;
     const autosave = autosaveRef.current;
     if (!autosave) return;
-    const startup = bundleRef.current.store.getSnapshot().project as StudioProjectV1;
+    const startup = bundleRef.current.store.getSnapshot().project as StudioProject;
     let active = true;
     void (async () => {
       try {
@@ -224,8 +224,8 @@ export function CanonicalProjectProvider({
         const activeBundle = bundleRef.current;
         const reconciliation = await reconcileProjectAssetRepository(
           activeBundle.assets,
-          activeBundle.store.getSnapshot().project as StudioProjectV1,
-          { getProject: () => bundleRef.current.store.getSnapshot().project as StudioProjectV1 },
+          activeBundle.store.getSnapshot().project as StudioProject,
+          { getProject: () => bundleRef.current.store.getSnapshot().project as StudioProject },
         );
         if (!active) return;
         if (!reconciliation.complete) {
@@ -252,7 +252,7 @@ export function CanonicalProjectProvider({
     };
   }, [initialProject, injectedAutosave, replaceBundle]);
 
-  const queueCheckpoint = useCallback((project: StudioProjectV1): Promise<void> => {
+  const queueCheckpoint = useCallback((project: StudioProject): Promise<void> => {
     const autosave = autosaveRef.current;
     if (!autosave) return Promise.resolve();
     const generation = generationRef.current;
@@ -269,8 +269,8 @@ export function CanonicalProjectProvider({
           if (history.undoEntries.length === 0 && history.redoEntries.length === 0) {
             const reconciliation = await reconcileProjectAssetRepository(
               current.assets,
-              current.store.getSnapshot().project as StudioProjectV1,
-              { getProject: () => current.store.getSnapshot().project as StudioProjectV1 },
+              current.store.getSnapshot().project as StudioProject,
+              { getProject: () => current.store.getSnapshot().project as StudioProject },
             );
             if (generation !== generationRef.current) return;
             if (!reconciliation.listFailed) {
@@ -282,7 +282,7 @@ export function CanonicalProjectProvider({
         const resolvedCleanupIds = await withAssetRepositoryMutation(current.assets, async () => {
           const resolved: EntityId[] = [];
           for (const assetId of assetCleanupIdsRef.current) {
-            const currentProject = current.store.getSnapshot().project as StudioProjectV1;
+            const currentProject = current.store.getSnapshot().project as StudioProject;
             // A late rollback must never remove a binary that the active graph now owns.
             // The graph is authoritative over cleanup debt.
             if (currentProject.assets[assetId]) {
@@ -331,7 +331,7 @@ export function CanonicalProjectProvider({
   useEffect(() => {
     if (persistenceState === "loading") return;
     return bundle.store.subscribe(() => {
-      const project = bundle.store.getSnapshot().project as StudioProjectV1;
+      const project = bundle.store.getSnapshot().project as StudioProject;
       void queueCheckpoint(project);
     });
   }, [bundle.store, persistenceState, queueCheckpoint]);
@@ -365,8 +365,8 @@ export function CanonicalProjectProvider({
         const current = bundleRef.current;
         const reconciliation = await reconcileProjectAssetRepository(
           current.assets,
-          current.store.getSnapshot().project as StudioProjectV1,
-          { getProject: () => current.store.getSnapshot().project as StudioProjectV1 },
+          current.store.getSnapshot().project as StudioProject,
+          { getProject: () => current.store.getSnapshot().project as StudioProject },
         );
         if (!reconciliation.complete) {
           cleanupBlocked = true;
@@ -425,7 +425,7 @@ export function CanonicalProjectProvider({
 
   const saveProject = useCallback(async (): Promise<void> => {
     await queueCheckpoint(
-      bundleRef.current.store.getSnapshot().project as StudioProjectV1,
+      bundleRef.current.store.getSnapshot().project as StudioProject,
     );
   }, [queueCheckpoint]);
 
@@ -446,7 +446,7 @@ export function CanonicalProjectProvider({
       setPersistenceMessage("Temporary asset cleanup is pending. Retry after storage access recovers.");
       return;
     }
-    const project = bundleRef.current.store.getSnapshot().project as StudioProjectV1;
+    const project = bundleRef.current.store.getSnapshot().project as StudioProject;
     if (autosaveRef.current) void queueCheckpoint(project);
     else {
       setPersistenceState("saved");

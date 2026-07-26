@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StudioProjectV1 } from "../../core/project";
+import type { StudioProject } from "../../core/project";
 import {
   AUTOSAVE_CHECKPOINT_STORE,
   AUTOSAVE_JOURNAL_STORE,
@@ -119,7 +119,7 @@ class MemoryAutosaveStorage implements AutosaveJournalStorage {
   }
 }
 
-function updatedProject(name: string, updatedAt: string): StudioProjectV1 {
+function updatedProject(name: string, updatedAt: string): StudioProject {
   return { ...studioProjectV1Fixture, name, updatedAt };
 }
 

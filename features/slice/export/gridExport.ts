@@ -9,7 +9,7 @@ import {
 } from "../../../core/export";
 import type { AssetRepository } from "../../../core/assets";
 import type { DeepReadonly } from "../../../core/stores";
-import type { EntityId, Region, StudioProjectV1 } from "../../../core/project";
+import type { EntityId, Region, StudioProject } from "../../../core/project";
 import { ExportPortError } from "../../../core/export";
 
 export const GRID_EXPORT_FORMATS = Object.freeze({
@@ -44,7 +44,7 @@ export type GridExportPayload =
  * compatibility fallback for older manual Regions without provenance.
  */
 export function isSourceBackedGridRegion(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   region: Region,
 ): boolean {
   const provenance = region.provenance;
@@ -58,7 +58,7 @@ export function isSourceBackedGridRegion(
 }
 
 function sourceAssetIdForRegion(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   region: Region,
 ): EntityId | undefined {
   const provenance = region.provenance;
@@ -197,7 +197,7 @@ export function createBrowserDownloadWriter(
 }
 
 export function createGridExportRequest<TSource>(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   revision: number,
   formatId: string,
   baseName: string,
@@ -258,7 +258,7 @@ async function cropRegionBlob(
 }
 
 export async function resolveGridRegionBlob(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   repository: AssetRepository,
   regionId: EntityId,
   signal?: AbortSignal,
@@ -284,7 +284,7 @@ export async function resolveGridRegionBlob(
 }
 
 export async function resolveGridExportBundle(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   repository: AssetRepository,
   revision: number,
   signal?: AbortSignal,

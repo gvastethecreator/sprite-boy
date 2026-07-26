@@ -4,7 +4,7 @@ import {
   type AssetMetadata,
   type AssetRepository,
 } from "../../../core/assets";
-import type { AssetRecord, EntityId, ISO8601Timestamp, StudioProjectV1 } from "../../../core/project";
+import type { AssetRecord, EntityId, ISO8601Timestamp, StudioProject } from "../../../core/project";
 import type { ProjectStore, ProjectStoreDispatchResult } from "../../../core/stores";
 
 export const SLICE_SOURCE_IMPORT_ERROR_CODES = Object.freeze([
@@ -169,7 +169,7 @@ function dispatchFailureMessage(result: ProjectStoreDispatchResult): string {
 
 async function importSliceSourceUnlocked(options: ImportSliceSourceOptions): Promise<ImportSliceSourceResult> {
   const initialState = options.store.getSnapshot();
-  const project = initialState.project as StudioProjectV1;
+  const project = initialState.project as StudioProject;
   if (options.repository.projectId !== project.id) fail("repository-mismatch", "The AssetRepository belongs to a different active project.");
   if (typeof Blob === "undefined" || !(options.blob instanceof Blob) || options.blob.size < 1) {
     fail("invalid-input", "A non-empty source Blob is required.");
@@ -255,7 +255,7 @@ export async function restoreCanonicalSliceSource(
 ): Promise<RestoreCanonicalSliceSourceResult> {
   abortIfNeeded(options.signal);
   const snapshot = options.store.getSnapshot();
-  const project = snapshot.project as StudioProjectV1;
+  const project = snapshot.project as StudioProject;
   if (options.repository.projectId !== project.id) fail("repository-mismatch", "The AssetRepository belongs to a different active project.");
   const asset = project.assets[options.assetId];
   if (!asset) fail("invalid-input", "The selected canonical source Asset is missing.");

@@ -9,7 +9,7 @@ import type {
   EntityId,
   ISO8601Timestamp,
   ProjectCommandEnvelope,
-  StudioProjectV1,
+  StudioProject,
 } from "../../core/project";
 import type { DeepReadonly, ProjectStore } from "../../core/stores";
 
@@ -37,7 +37,7 @@ function metadata(commandId: EntityId, issuedAt: ISO8601Timestamp) {
 }
 
 export function listCollisionSets(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
 ): readonly CollisionSet[] {
   return Object.freeze(
     Object.values(project.collisionSets).map((set) => Object.freeze({ ...set, shapes: [...set.shapes] })),

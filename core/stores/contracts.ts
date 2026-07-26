@@ -3,7 +3,7 @@ import type {
   ProjectCommandResult,
 } from "../project/commands";
 import type { ProjectRevision } from "../project/graph";
-import type { EntityId, StudioProjectV1, WorkspaceId } from "../project/schema";
+import type { EntityId, StudioProject, WorkspaceId } from "../project/schema";
 import type { JobSnapshot } from "../processing";
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
@@ -90,7 +90,7 @@ export type StoreListener = () => void;
 export type StoreUnsubscribe = () => void;
 
 export interface ProjectStoreState {
-  readonly project: DeepReadonly<StudioProjectV1>;
+  readonly project: DeepReadonly<StudioProject>;
   readonly revision: ProjectRevision;
 }
 

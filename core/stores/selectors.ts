@@ -3,7 +3,7 @@ import {
   isEntityId,
   type EntityId,
   type ProjectRecordCollection,
-  type StudioProjectV1,
+  type StudioProject,
   type WorkspaceId,
 } from "../project";
 import { JOB_STATUSES, isTerminalJob, type JobStatus } from "../processing";
@@ -32,7 +32,7 @@ function hasOwn(record: object, key: PropertyKey): boolean {
 
 export const selectProjectDocument = (
   state: DeepReadonly<ProjectStoreState>,
-): DeepReadonly<StudioProjectV1> => state.project;
+): DeepReadonly<StudioProject> => state.project;
 
 export const selectProjectRevision = (state: DeepReadonly<ProjectStoreState>): number =>
   state.revision;
@@ -45,7 +45,7 @@ export const selectActiveWorkspace = (
 ): WorkspaceId | undefined => state.project.workspace.activeWorkspace;
 
 type ProjectEntityFor<TCollection extends ProjectRecordCollection> =
-  StudioProjectV1[TCollection] extends Record<EntityId, infer TEntity> ? TEntity : never;
+  StudioProject[TCollection] extends Record<EntityId, infer TEntity> ? TEntity : never;
 
 export function createProjectEntitySelector<TCollection extends ProjectRecordCollection>(
   collection: TCollection,

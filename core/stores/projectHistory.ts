@@ -3,7 +3,7 @@ import type {
   ProjectCommandDiagnostic,
   ProjectCommandInverse,
   ProjectWorkspaceState,
-  StudioProjectV1,
+  StudioProject,
 } from "../project";
 import { validateStudioProject } from "../project";
 import type {
@@ -94,10 +94,10 @@ function hasOwn(record: object, key: PropertyKey): boolean {
 
 /** Preserve ignored workspace intent only where it remains valid in a historical snapshot. */
 function rebaseIgnoredWorkspace(
-  target: StudioProjectV1,
+  target: StudioProject,
   currentWorkspace: DeepReadonly<ProjectWorkspaceState>,
-  updatedAt: StudioProjectV1["updatedAt"],
-): StudioProjectV1 | undefined {
+  updatedAt: StudioProject["updatedAt"],
+): StudioProject | undefined {
   const workspace: ProjectWorkspaceState = {};
   if (currentWorkspace.activeWorkspace !== undefined) {
     workspace.activeWorkspace = currentWorkspace.activeWorkspace;
@@ -118,7 +118,7 @@ function rebaseIgnoredWorkspace(
     );
   }
 
-  const rebased: StudioProjectV1 = {
+  const rebased: StudioProject = {
     ...target,
     updatedAt,
     workspace,
@@ -209,7 +209,7 @@ function operationFailure(
 
 /** Create a canonical ProjectStore and its non-serializing history controller. */
 export function createProjectStoreWithHistory(
-  initialProject: StudioProjectV1,
+  initialProject: StudioProject,
   options: CreateProjectStoreWithHistoryOptions,
 ): ProjectStoreWithHistory {
   const onHistorySubscriberError = normalizeHistoryObserver(options);

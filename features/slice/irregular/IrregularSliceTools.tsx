@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Copy, Eye, EyeOff, Hand, MousePointer2, Plus, Trash2, Wand2 } from "lucide-react";
 import type { DeepReadonly } from "../../../core/stores";
-import type { EntityId, StudioProjectV1 } from "../../../core/project";
+import type { EntityId, StudioProject } from "../../../core/project";
 import { WandSelectionProbe } from "./WandSelectionProbe";
 import type { WandSelectionMode, WandSelectionSnapshot } from "./wandSelection";
 
@@ -15,7 +15,7 @@ export interface ManualRegionDraft {
 }
 
 export interface IrregularSliceToolsProps {
-  readonly project: DeepReadonly<StudioProjectV1>;
+  readonly project: DeepReadonly<StudioProject>;
   readonly sourceAssetId: EntityId | null;
   readonly selection: WandSelectionSnapshot;
   readonly toolMode: IrregularToolMode;

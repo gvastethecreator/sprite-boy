@@ -3,7 +3,7 @@ import {
   createEmptyStudioProject,
   type ProjectCommandContext,
   type ProjectCommandEnvelope,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../core/project";
 import { createProjectStore } from "../../core/stores";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
@@ -245,10 +245,10 @@ describe("ProjectStore", () => {
   it("rejects invalid initial documents and revision overflow without committing", () => {
     const invalid = {
       ...createEmptyStudioProject({ id: "project-invalid" }),
-      schemaVersion: 2,
-    } as unknown as StudioProjectV1;
+      schemaVersion: 3,
+    } as unknown as StudioProject;
     expect(() => createProjectStore(invalid, { context })).toThrow(
-      /requires a valid StudioProjectV1/,
+      /requires a valid StudioProject/,
     );
 
     const now = vi.fn(() => "2026-07-14T12:00:00.000Z" as const);

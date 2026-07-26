@@ -27,6 +27,7 @@ function record(): AssetRecord {
     blobKey: `sha256:${HASH}`,
     contentHash: HASH,
     mimeType: "text/plain",
+    media: { type: "binary" },
     width: 1,
     height: 1,
     byteSize: 3,

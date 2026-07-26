@@ -5,7 +5,7 @@ import {
   createEmptyStudioProject,
   type AssetRecord,
   type GridSplitRecipeV1,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../core/project";
 import { createProjectStoreWithHistory, type ProjectStore, type ProjectStoreDispatchResult } from "../../core/stores";
 import {
@@ -30,6 +30,7 @@ function sourceAsset(): AssetRecord {
     blobKey: `sha256:${HASH}`,
     contentHash: HASH,
     mimeType: "image/png",
+    media: { type: "image" },
     width: 4,
     height: 2,
     byteSize: 32,
@@ -94,7 +95,7 @@ function staged(options: { readonly derived?: boolean } = {}): StagedGridResults
   });
 }
 
-function projectWithSource(extra: Partial<StudioProjectV1> = {}): StudioProjectV1 {
+function projectWithSource(extra: Partial<StudioProject> = {}): StudioProject {
   const empty = createEmptyStudioProject({ id: "project-grid-commit", now: NOW });
   return {
     ...empty,
@@ -114,6 +115,7 @@ function repository(projectId: string, options: { readonly rejectAfterPut?: bool
       blobKey: `sha256:${contentHash}`,
       contentHash,
       mimeType: blob.type || "image/png",
+      media: { type: "image" },
       width: metadata.width,
       height: metadata.height,
       byteSize: blob.size,

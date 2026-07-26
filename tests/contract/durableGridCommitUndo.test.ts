@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyStudioProject, type AssetRecord, type Region, type StudioProjectV1 } from "../../core/project";
+import { createEmptyStudioProject, type AssetRecord, type Region, type StudioProject } from "../../core/project";
 import {
   durableGridCommitMatchesProject,
   GRID_COMMIT_UNDO_KEY,
@@ -8,7 +8,7 @@ import {
 
 const NOW = "2026-07-16T12:00:00.000Z";
 
-function fixture(): StudioProjectV1 {
+function fixture(): StudioProject {
   const project = createEmptyStudioProject({ id: "project-marker", now: NOW });
   const source: AssetRecord = {
     id: "asset-source",
@@ -16,6 +16,7 @@ function fixture(): StudioProjectV1 {
     blobKey: "sha256:" + "a".repeat(64),
     contentHash: "a".repeat(64),
     mimeType: "image/png",
+    media: { type: "image" },
     width: 4,
     height: 2,
     byteSize: 8,

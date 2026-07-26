@@ -6,7 +6,7 @@ import type {
   ProjectCommandResult,
 } from "../../core/project/commands";
 import { cloneStudioProject } from "../../core/project/graph";
-import type { Composition, Layer, StudioProjectV1 } from "../../core/project/schema";
+import type { Composition, Layer, StudioProject } from "../../core/project/schema";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
 const NOW = "2026-01-01T00:20:00.000Z";
@@ -18,7 +18,7 @@ function asCommand(value: unknown): ProjectCommand {
 
 function failure(
   command: unknown,
-  project: StudioProjectV1 = studioProjectV1Fixture,
+  project: StudioProject = studioProjectV1Fixture,
   commandContext = context,
 ): Extract<ProjectCommandResult, { ok: false }> {
   const result = applyCompositionFamilyCommand(project, asCommand(command), commandContext);

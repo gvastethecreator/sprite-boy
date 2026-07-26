@@ -1,4 +1,4 @@
-import type { StudioProjectV1 } from "../project/schema";
+import type { StudioProject } from "../project/schema";
 import {
   validateStudioProject,
 } from "../project/validation";
@@ -6,9 +6,10 @@ import type {
   ProjectDiagnostic,
   ProjectValidationResult,
 } from "../project/validation";
+import { migrateStudioProjectV1Document } from "./studioProjectV1Migration";
 
-export const STUDIO_PROJECT_SCHEMA_VERSION = 1 as const;
-export const SUPPORTED_STUDIO_PROJECT_SCHEMA_VERSIONS = Object.freeze([1] as const);
+export const STUDIO_PROJECT_SCHEMA_VERSION = 2 as const;
+export const SUPPORTED_STUDIO_PROJECT_SCHEMA_VERSIONS = Object.freeze([1, 2] as const);
 
 export type ProjectCodecOperation = "encode" | "decode";
 
@@ -165,7 +166,7 @@ function invalidDocument(
 ): ProjectCodecError {
   const unsupported = Number.isSafeInteger(schemaVersion)
     && (schemaVersion as number) >= 1
-    && !SUPPORTED_STUDIO_PROJECT_SCHEMA_VERSIONS.includes(schemaVersion as 1)
+    && !SUPPORTED_STUDIO_PROJECT_SCHEMA_VERSIONS.includes(schemaVersion as 1 | 2)
     && validation.diagnostics.some((diagnostic) => (
       diagnostic.code === "UNSUPPORTED_SCHEMA_VERSION"
     ));
@@ -182,7 +183,7 @@ function invalidDocument(
   );
 }
 
-function validateV1(value: unknown, operation: ProjectCodecOperation): StudioProjectV1 {
+function validateCurrent(value: unknown, operation: ProjectCodecOperation): StudioProject {
   const validation = validateStudioProject(value);
   if (!validation.valid || !validation.project) {
     throw invalidDocument(operation, validation, readSchemaVersion(value));
@@ -190,17 +191,18 @@ function validateV1(value: unknown, operation: ProjectCodecOperation): StudioPro
   return validation.project;
 }
 
-type VersionDecoder = (value: unknown) => StudioProjectV1;
+type VersionDecoder = (value: unknown) => StudioProject;
 
 const VERSION_DECODERS: ReadonlyMap<number, VersionDecoder> = new Map([
-  [STUDIO_PROJECT_SCHEMA_VERSION, (value) => validateV1(value, "decode")],
+  [1, (value) => validateCurrent(migrateStudioProjectV1Document(value), "decode")],
+  [STUDIO_PROJECT_SCHEMA_VERSION, (value) => validateCurrent(value, "decode")],
 ]);
 
-/** Canonical StudioProject JSON codec. Migrations are deliberately a later boundary. */
+/** Canonical V2 codec with a deterministic V1 media-layout migration. */
 export class ProjectCodec {
   readonly supportedVersions = SUPPORTED_STUDIO_PROJECT_SCHEMA_VERSIONS;
 
-  encode(project: StudioProjectV1): string {
+  encode(project: StudioProject): string {
     const version = readSchemaVersion(project);
     const initialValidation = validateStudioProject(project);
     if (!initialValidation.valid || !initialValidation.project) {
@@ -231,7 +233,7 @@ export class ProjectCodec {
     }
   }
 
-  decode(serialized: string): StudioProjectV1 {
+  decode(serialized: string): StudioProject {
     if (typeof serialized !== "string") {
       throw new ProjectCodecError(
         "PROJECT_CODEC_INVALID_INPUT",
@@ -273,7 +275,7 @@ export class ProjectCodec {
         { operation: "decode", schemaVersion: version, cause },
       );
     }
-    return validateV1(snapshot, "decode");
+    return validateCurrent(snapshot, "decode");
   }
 }
 

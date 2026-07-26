@@ -1,5 +1,6 @@
 import type { AssetRecord, EntityId } from "../project/schema";
 import { isEntityId } from "../project/primitives";
+import { hydrateAssetRecordMedia, sanitizeAssetMedia } from "./assetMedia";
 import {
   AssetRepositoryError,
   awaitAbortableAssetOperation,
@@ -217,6 +218,11 @@ function validatePutInput(projectId: EntityId, record: AssetRecord, blob: Blob):
     throw invalidInput("put", "Asset blobKey must be a non-empty string.", record.id);
   }
   if (!(blob instanceof Blob)) throw invalidInput("put", "Asset payload must be a Blob.", record.id);
+  try {
+    sanitizeAssetMedia(record.media, record.mimeType, record.width, record.height);
+  } catch {
+    throw invalidInput("put", "Asset media metadata is invalid.", record.id);
+  }
 }
 
 function metadataKey(projectId: EntityId, assetId: EntityId): [EntityId, EntityId] {
@@ -633,7 +639,15 @@ export class IndexedDbAssetStorage {
         ));
         return;
       }
-      monitor.setResult(entry.record);
+      try {
+        monitor.setResult(hydrateAssetRecordMedia(entry.record));
+      } catch (error) {
+        monitor.fail(new AssetRepositoryError(
+          "ASSET_INTEGRITY_MISMATCH",
+          `Stored asset media metadata for ${assetId} is invalid.`,
+          { operation: "get-metadata", assetId, cause: error },
+        ));
+      }
     };
     const result = await monitor.promise;
     if (!result) throw new AssetRepositoryError(
@@ -740,10 +754,18 @@ export class IndexedDbAssetStorage {
     }
     request.onsuccess = () => {
       const entries = request.result as StoredAssetMetadataEntry[];
-      monitor.setResult(entries
-        .filter((entry) => !options?.contentHash || entry.contentHash === options.contentHash)
-        .map((entry) => entry.record)
-        .sort((left, right) => left.id.localeCompare(right.id)));
+      try {
+        monitor.setResult(entries
+          .filter((entry) => !options?.contentHash || entry.contentHash === options.contentHash)
+          .map((entry) => hydrateAssetRecordMedia(entry.record))
+          .sort((left, right) => left.id.localeCompare(right.id)));
+      } catch (error) {
+        monitor.fail(new AssetRepositoryError(
+          "ASSET_INTEGRITY_MISMATCH",
+          "Stored asset media metadata is invalid.",
+          { operation: "list", cause: error },
+        ));
+      }
     };
     return monitor.promise;
   }

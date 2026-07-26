@@ -109,7 +109,7 @@ export interface ProjectState {
   animations: SpriteAnimation[];
   builderAssets: BuilderAsset[];
   aspectRatio?: string;
-  /** Legacy host bridge until StudioProjectV1 owns the mounted Slice workspace. */
+  /** Legacy host bridge until StudioProject owns the mounted Slice workspace. */
   sliceGrid?: SliceGridRecipeStateV1;
 }
 

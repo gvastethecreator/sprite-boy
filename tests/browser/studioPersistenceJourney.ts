@@ -3,7 +3,7 @@ import {
   IndexedDbAssetRepository,
 } from "../../core/assets";
 import type { AssetIntegrityScan, AssetMetadata } from "../../core/assets";
-import type { AssetRecord, StudioProjectV1 } from "../../core/project";
+import type { AssetRecord, StudioProject } from "../../core/project";
 import {
   exportSpriteBoyPackage,
   importSpriteBoyPackage,
@@ -234,7 +234,7 @@ async function cleanDatabases(assetDatabaseName: string, autosaveDatabaseName: s
 
 async function assertRepositoryExact(
   repository: IndexedDbAssetRepository,
-  project: StudioProjectV1,
+  project: StudioProject,
   integrity: AssetIntegrityScan,
 ): Promise<Record<string, string>> {
   const expectedIds = Object.keys(project.assets).sort(compareCodeUnit);
@@ -320,7 +320,7 @@ function assetMetadata(record: AssetRecord): AssetMetadata {
 async function createJourneyProject(
   repository: IndexedDbAssetRepository,
 ): Promise<{
-  project: StudioProjectV1;
+  project: StudioProject;
   migration: {
     legacyExpiredBlobUrlCount: number;
     legacyPreviewBlockingIssueCount: number;
@@ -404,7 +404,7 @@ async function createJourneyProject(
   ) {
     fail("F3-07 resolved legacy migration did not reach V1.");
   }
-  const project = structuredClone(migrated.document as StudioProjectV1);
+  const project = structuredClone(migrated.document as StudioProject);
   const canonicalAsset = Object.values(project.assets)[0];
   if (!canonicalAsset || Object.keys(project.assets).length !== 1) {
     fail("F3-07 legacy content deduplication did not produce one canonical asset.");

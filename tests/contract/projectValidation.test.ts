@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyStudioProject } from "../../core/project/factory";
 import { validateStudioProject } from "../../core/project";
-import type { StudioProjectV1 } from "../../core/project/schema";
+import type { StudioProject } from "../../core/project/schema";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
-function cloneFixture(): StudioProjectV1 {
-  return JSON.parse(JSON.stringify(studioProjectV1Fixture)) as StudioProjectV1;
+function cloneFixture(): StudioProject {
+  return JSON.parse(JSON.stringify(studioProjectV1Fixture)) as StudioProject;
 }
 
 function diagnosticCodes(result: ReturnType<typeof validateStudioProject>): string[] {
@@ -24,7 +24,7 @@ function expectDiagnostic(
   }
 }
 
-describe("StudioProjectV1 validation contract", () => {
+describe("StudioProject validation contract", () => {
   it("accepts the deterministic empty project produced by the factory", () => {
     const project = createEmptyStudioProject({
       id: "empty-contract-project",
@@ -55,7 +55,7 @@ describe("StudioProjectV1 validation contract", () => {
   });
 
   it("rejects a future schema version", () => {
-    const project = { ...cloneFixture(), schemaVersion: 2 };
+    const project = { ...cloneFixture(), schemaVersion: 3 };
 
     const result = validateStudioProject(project);
 
@@ -302,7 +302,7 @@ describe("StudioProjectV1 validation contract", () => {
       type: "processed",
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
-    } as unknown as StudioProjectV1["generatedArtifacts"][string];
+    } as unknown as StudioProject["generatedArtifacts"][string];
     const result = validateStudioProject(project);
 
     expectDiagnostic(

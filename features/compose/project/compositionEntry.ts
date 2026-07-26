@@ -5,7 +5,7 @@ import type {
   Layer,
   ProjectCommandDiagnostic,
   ProjectCommandEnvelope,
-  StudioProjectV1,
+  StudioProject,
 } from "../../../core/project";
 import { isEntityId, isISO8601Timestamp } from "../../../core/project";
 import type { DeepReadonly, ProjectStore } from "../../../core/stores";
@@ -264,7 +264,7 @@ function readNamedDimensions(
 }
 
 function resolveSource(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   source: CompositionEntrySource,
 ): ResolvedSource | CompositionEntryFailure {
   try {
@@ -338,7 +338,7 @@ function resolveSource(
 }
 
 function readExistingComposition(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   resolved: ResolvedSource,
   identity: CompositionEntryIdentity,
 ):
@@ -437,7 +437,7 @@ function workspacePatch(
 }
 
 function workspaceAlreadyOpen(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   resolved: ResolvedSource,
   compositionId: EntityId,
   layerId: EntityId | undefined,
@@ -506,7 +506,7 @@ function createInitialComposition(
 
 /** Build a deterministic, data-only open/create intent without mutating the Project graph. */
 export function createCompositionEntryIntent(
-  project: DeepReadonly<StudioProjectV1>,
+  project: DeepReadonly<StudioProject>,
   input: CompositionEntryRequest,
 ): CompositionEntryIntent {
   const requestResult = readRequest(input);

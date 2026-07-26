@@ -25,6 +25,7 @@ function assetRecord(
     blobKey: identity.blobKey,
     contentHash: identity.contentHash,
     mimeType,
+    media: mimeType.startsWith("image/") ? { type: "image" } : { type: "binary" },
     width: 8,
     height: 8,
     byteSize: identity.byteSize,

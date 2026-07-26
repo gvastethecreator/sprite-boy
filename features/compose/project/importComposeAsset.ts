@@ -9,7 +9,7 @@ import {
   type ISO8601Timestamp,
   type ProjectCommand,
   type ProjectCommandDiagnostic,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../../core/project";
 import type { ProjectStore } from "../../../core/stores";
 import {
@@ -199,7 +199,7 @@ async function importComposeAssetUnlocked(
 
     const importCommand: ProjectCommand = { type: "asset.import", asset: record };
     const preview = applyProjectCommand(
-      latest.project as StudioProjectV1,
+      latest.project as StudioProject,
       importCommand,
       { nextId: () => "compose-import-preview", now: () => timestamp },
     );

@@ -9,7 +9,7 @@ import type {
   ProjectCommandResult,
 } from "../../core/project/commands";
 import { cloneStudioProject } from "../../core/project/graph";
-import type { Composition, Layer, StudioProjectV1 } from "../../core/project/schema";
+import type { Composition, Layer, StudioProject } from "../../core/project/schema";
 import { validateStudioProject } from "../../core/project/validation";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
@@ -51,7 +51,7 @@ function replacement(id = "composition-replacement"): { composition: Composition
 
 function failure(
   command: ProjectCommand,
-  project: StudioProjectV1 = studioProjectV1Fixture,
+  project: StudioProject = studioProjectV1Fixture,
 ): Extract<ProjectCommandResult, { ok: false }> {
   const result = applyDestructiveFamilyCommand(project, command, context);
   expect(result?.ok).toBe(false);

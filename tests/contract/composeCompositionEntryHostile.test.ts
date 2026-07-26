@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   validateStudioProject,
   type AssetRecord,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../core/project";
 import { createProjectStore } from "../../core/stores";
 import {
@@ -15,7 +15,7 @@ import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
 const NOW = "2026-07-16T12:00:00.000Z";
 
-function cloneFixture(): StudioProjectV1 {
+function cloneFixture(): StudioProject {
   return structuredClone(studioProjectV1Fixture);
 }
 
@@ -134,7 +134,7 @@ describe("A1-01 Composition entry hostile boundaries", () => {
     const created = openCompositionFromSource(store, request(source.type, source.id));
     expect(created).toMatchObject({ ok: true, outcome: "created" });
     const identity = deriveCompositionEntryIdentity(source);
-    const canonical = structuredClone(store.getSnapshot().project as StudioProjectV1);
+    const canonical = structuredClone(store.getSnapshot().project as StudioProject);
 
     const wrongKind = structuredClone(canonical);
     wrongKind.layers[identity.layerId].source = { type: "region", id: "region-hero" };
@@ -177,7 +177,7 @@ describe("A1-01 Composition entry hostile boundaries", () => {
       outcome: "created",
     });
     const identity = deriveCompositionEntryIdentity(source);
-    const project = structuredClone(store.getSnapshot().project as StudioProjectV1);
+    const project = structuredClone(store.getSnapshot().project as StudioProject);
     project.compositions[identity.compositionId].width = 128;
     expect(validateStudioProject(project).valid).toBe(true);
 
@@ -195,7 +195,7 @@ describe("A1-01 Composition entry hostile boundaries", () => {
       outcome: "created",
     });
     const identity = deriveCompositionEntryIdentity(source);
-    const project = structuredClone(store.getSnapshot().project as StudioProjectV1);
+    const project = structuredClone(store.getSnapshot().project as StudioProject);
     project.layers["compose-entry-extra-layer"] = {
       ...structuredClone(project.layers[identity.layerId]),
       id: "compose-entry-extra-layer",
@@ -236,7 +236,8 @@ describe("A1-01 Composition entry hostile boundaries", () => {
       name: "prototype-safe.png",
       blobKey: "asset/prototype-safe",
       contentHash: "sha256:prototype-safe",
-      mimeType: "image/png",
+          mimeType: "image/png",
+          media: { type: "image" },
       width: 7,
       height: 9,
       byteSize: 63,

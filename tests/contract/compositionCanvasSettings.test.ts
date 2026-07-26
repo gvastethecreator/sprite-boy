@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectCodec } from "../../core/persistence";
-import type { StudioProjectV1 } from "../../core/project";
+import type { StudioProject } from "../../core/project";
 import { createSceneProjection, renderSceneExport, type SceneCompositorFrame, type SceneCompositorTarget } from "../../core/render";
 import { createProjectStoreWithHistory, type WorkspaceState } from "../../core/stores";
 import type { ProjectStore } from "../../core/stores";
@@ -193,7 +193,7 @@ describe("A1-03 composition canvas settings", () => {
       issuedAt: NOW,
     };
     const beforeProject = structuredClone(studioProjectV1Fixture);
-    const resultProject = structuredClone(studioProjectV1Fixture) as StudioProjectV1 & Record<string, unknown>;
+    const resultProject = structuredClone(studioProjectV1Fixture) as StudioProject & Record<string, unknown>;
     resultProject.compositions["composition-project"].width = 320;
     resultProject.compositions["composition-project"].height = 180;
     const hugeUnrelated: Record<string, number> = {};
@@ -257,7 +257,7 @@ describe("A1-03 composition canvas settings", () => {
     expect(applyCompositionCanvasSettings(fakeStore(incomplete), input)).toMatchObject({ ok: false, code: "BOUNDARY_FAILED" });
     expect(applyCompositionCanvasSettings(fakeStore(success, 0), input)).toMatchObject({ ok: false, code: "BOUNDARY_FAILED" });
 
-    const mismatchProject = structuredClone(studioProjectV1Fixture) as StudioProjectV1;
+    const mismatchProject = structuredClone(studioProjectV1Fixture) as StudioProject;
     mismatchProject.compositions["composition-project"].height = 180;
     mismatchProject.compositions["composition-project"].width = 319;
     expect(applyCompositionCanvasSettings(fakeStore(ordinarySuccess(mismatchProject)), input)).toMatchObject({
@@ -276,7 +276,7 @@ describe("A1-03 composition canvas settings", () => {
         return 320;
       },
     });
-    const accessorProject = structuredClone(studioProjectV1Fixture) as StudioProjectV1;
+    const accessorProject = structuredClone(studioProjectV1Fixture) as StudioProject;
     accessorProject.compositions["composition-project"] = accessorTarget as never;
     expect(applyCompositionCanvasSettings(fakeStore(ordinarySuccess(accessorProject)), input)).toMatchObject({
       ok: false,
@@ -360,7 +360,7 @@ describe("A1-03 composition canvas settings", () => {
     }).ok).toBe(true);
 
     const reloaded = projectCodec.decode(projectCodec.encode(
-      structuredClone(store.getSnapshot().project) as StudioProjectV1,
+      structuredClone(store.getSnapshot().project) as StudioProject,
     ));
     const projection = createSceneProjection({ project: reloaded, revision: 1 }, WORKSPACE);
     expect(projection.canvas).toEqual({ width: 320, height: 180, background: "#2468ac" });

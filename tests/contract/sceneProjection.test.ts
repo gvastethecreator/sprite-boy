@@ -1,10 +1,10 @@
-import { createEmptyStudioProject, type StudioProjectV1 } from "../../core/project";
+import { createEmptyStudioProject, type StudioProject } from "../../core/project";
 import { createSceneProjection, type SceneProjection } from "../../core/render";
 import type { WorkspaceState } from "../../core/stores";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
 interface MutableProjectState {
-  project: StudioProjectV1;
+  project: StudioProject;
   revision: number;
 }
 

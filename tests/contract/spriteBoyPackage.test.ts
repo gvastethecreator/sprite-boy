@@ -13,7 +13,7 @@ import type {
   SpriteBoyPackageExportOptions,
 } from "../../core/persistence";
 import { createEmptyStudioProject } from "../../core/project";
-import type { AssetRecord, StudioProjectV1 } from "../../core/project";
+import type { AssetRecord, StudioProject } from "../../core/project";
 
 const TIMESTAMP = "2026-07-14T00:00:00.000Z";
 const ALPHA_HASH = "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8";
@@ -37,6 +37,7 @@ function asset(
     blobKey: `sha256:${contentHash}`,
     contentHash,
     mimeType: "image/png",
+    media: { type: "image" },
     width: 1,
     height: 1,
     byteSize,
@@ -46,7 +47,7 @@ function asset(
   };
 }
 
-function packageProject(includeDuplicate = false): StudioProjectV1 {
+function packageProject(includeDuplicate = false): StudioProject {
   const project = createEmptyStudioProject({
     id: "package-project",
     name: "Portable package",
@@ -206,7 +207,7 @@ describe("portable .spriteboy package (F3-04)", () => {
     expect(manifest).toMatchObject({
       format: SPRITEBOY_PACKAGE_FORMAT,
       formatVersion: 1,
-      project: { path: "project.json", schemaVersion: 1 },
+      project: { path: "project.json", schemaVersion: 2 },
       blobs: [
         {
           path: `assets/${ALPHA_HASH}.png`,
@@ -238,6 +239,31 @@ describe("portable .spriteboy package (F3-04)", () => {
     expect(await imported.blobs[1].blob.text()).toBe("beta");
     expect(Object.isFrozen(imported.manifest)).toBe(true);
     expect(Object.isFrozen(imported.blobs)).toBe(true);
+  });
+
+  it("imports a V1 package and migrates its image assets to V2", async () => {
+    const portable = await exportSpriteBoyPackage(packageProject(), packageSource());
+    const legacyPackage = await repackManifest(portable, async (manifest, zip) => {
+      const legacy = JSON.parse(await zip.file("project.json")!.async("string")) as Record<string, unknown>;
+      legacy.schemaVersion = 1;
+      const assets = legacy.assets as Record<string, Record<string, unknown>>;
+      for (const record of Object.values(assets)) delete record.media;
+      const encoded = JSON.stringify(legacy);
+      zip.file("project.json", encoded);
+      const projectManifest = manifest.project as Record<string, unknown>;
+      projectManifest.schemaVersion = 1;
+      projectManifest.sha256 = await sha256(encoded);
+      projectManifest.byteSize = new TextEncoder().encode(encoded).byteLength;
+    });
+
+    const imported = await importSpriteBoyPackage(legacyPackage);
+
+    expect(imported.manifest.project.schemaVersion).toBe(1);
+    expect(imported.project.schemaVersion).toBe(2);
+    expect(Object.values(imported.project.assets).map(({ media }) => media)).toEqual([
+      { type: "image" },
+      { type: "image" },
+    ]);
   });
 
   it("deduplicates shared content into one ZIP entry and one provider read", async () => {
@@ -509,7 +535,7 @@ describe("portable .spriteboy package (F3-04)", () => {
     }
 
     await expect(captureError(() => exportSpriteBoyPackage(
-      {} as StudioProjectV1,
+      {} as StudioProject,
       packageSource(),
     ))).resolves.toMatchObject({ code: "SPRITEBOY_PACKAGE_PROJECT_INVALID" });
 

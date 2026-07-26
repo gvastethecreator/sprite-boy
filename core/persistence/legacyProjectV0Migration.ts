@@ -12,12 +12,16 @@ import type {
   ProcessingRecipe,
   Region,
   Sequence,
-  StudioProjectV1,
+  StudioProject,
   WorkspaceId,
 } from "../project";
 import {
   ProjectMigrator,
 } from "./projectMigration";
+import {
+  migrateStudioProjectV1Document,
+  projectV2AsLegacyV1Document,
+} from "./studioProjectV1Migration";
 import type {
   ProjectMigrationIssue,
   ProjectMigrationResult,
@@ -858,7 +862,7 @@ function buildCanonicalProject(
   context: LegacyProjectV0MigrationContext,
   sources: readonly LegacySourceAsset[],
   celSources: ReadonlyMap<string, ResolvedCelSource>,
-): StudioProjectV1 {
+): StudioProject {
   const project = createEmptyStudioProject({
     id: context.projectId,
     name: context.projectName,
@@ -910,6 +914,7 @@ function buildCanonicalProject(
         sourceId: /^(?:blob:|data:)/iu.test(source.sourceRef) ? sourceKey : source.sourceRef,
         importedAt: context.timestamp,
       },
+      media: { type: "image" },
     };
     setRecord(project.assets, asset.id, asset);
     project.rootOrder.assetIds.push(asset.id);
@@ -1138,7 +1143,7 @@ function buildCanonicalProject(
   const validation = validateStudioProject(project);
   if (!validation.valid) {
     const summary = validation.diagnostics.slice(0, 5).map(({ code, path }) => `${code}@${path}`).join(", ");
-    throw new TypeError(`Legacy migration produced an invalid V1 project: ${summary}.`);
+    throw new TypeError(`Legacy migration produced an invalid V2 project: ${summary}.`);
   }
   return project;
 }
@@ -1155,7 +1160,7 @@ function completedIssues(
       severity: "info",
       blocking: false,
       path: "$.project",
-      message: "Legacy indexed project state was normalized into stable V1 entities.",
+      message: "Legacy indexed project state was normalized into stable project entities.",
     },
   ];
   if (Object.keys(document.project.builderSlots).length > 0) {
@@ -1240,13 +1245,49 @@ export const legacyProjectV0ToV1Step = Object.freeze({
     if (blockingIssues.length > 0) return { status: "needs-input", issues: blockingIssues };
     return {
       status: "completed",
-      document: buildCanonicalProject(document, normalizedContext, sources, celResolution.resolved),
+      document: projectV2AsLegacyV1Document(
+        buildCanonicalProject(document, normalizedContext, sources, celResolution.resolved),
+      ),
       issues: completedIssues(document, sources, normalizedContext),
     };
   },
 } satisfies ProjectMigrationStep<LegacyProjectV0MigrationContext>);
 
-export const legacyProjectV0Migrator = new ProjectMigrator([legacyProjectV0ToV1Step]);
+export const studioProjectV1ToV2Step = Object.freeze({
+  id: "studio-project-v1-to-v2",
+  fromVersion: 1,
+  toVersion: 2,
+  migrate(document: unknown): ProjectMigrationStepResult {
+    const migrated = migrateStudioProjectV1Document(document);
+    const validation = validateStudioProject(migrated);
+    if (!validation.valid || !validation.project) {
+      const summary = validation.diagnostics
+        .slice(0, 5)
+        .map(({ code, path }) => `${code}@${path}`)
+        .join(", ");
+      throw new TypeError(`StudioProjectV1 migration produced an invalid V2 project: ${summary}.`);
+    }
+    return {
+      status: "completed",
+      document: validation.project,
+      issues: [
+        {
+          code: "STUDIO_PROJECT_MEDIA_SCHEMA_UPGRADED",
+          category: "change",
+          severity: "info",
+          blocking: false,
+          path: "$.assets",
+          message: "Asset media types were added for StudioProjectV2.",
+        },
+      ],
+    };
+  },
+} satisfies ProjectMigrationStep<LegacyProjectV0MigrationContext>);
+
+export const legacyProjectV0Migrator = new ProjectMigrator([
+  legacyProjectV0ToV1Step,
+  studioProjectV1ToV2Step,
+]);
 
 export function migrateLegacyProjectV0(
   document: unknown,
@@ -1255,7 +1296,7 @@ export function migrateLegacyProjectV0(
 ): Promise<ProjectMigrationResult> {
   return legacyProjectV0Migrator.migrate(document, {
     sourceVersion: 0,
-    targetVersion: 1,
+    targetVersion: 2,
     context,
     ...(signal ? { signal } : {}),
   });

@@ -6,7 +6,7 @@ import type {
   ProjectCommandResult,
 } from "../../core/project/commands";
 import { cloneStudioProject } from "../../core/project/graph";
-import type { Cel, CollisionSet, Sequence, StudioProjectV1 } from "../../core/project/schema";
+import type { Cel, CollisionSet, Sequence, StudioProject } from "../../core/project/schema";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
 const NOW = "2026-01-01T00:20:00.000Z";
@@ -21,7 +21,7 @@ function asCommand(value: unknown): ProjectCommand {
 
 function failure(
   command: unknown,
-  project: StudioProjectV1 = studioProjectV1Fixture,
+  project: StudioProject = studioProjectV1Fixture,
   commandContext: ProjectCommandContext = context,
 ): Extract<ProjectCommandResult, { ok: false }> {
   const result = applyAnimationFamilyCommand(project, asCommand(command), commandContext);

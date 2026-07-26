@@ -2,7 +2,7 @@ import type {
   CelSource,
   EntityId,
   ProjectRecordCollection,
-  StudioProjectV1,
+  StudioProject,
 } from "./schema";
 import type {
   ChangedEntityIds,
@@ -64,12 +64,12 @@ function keyOf(reference: EntityReference): string {
   return JSON.stringify([reference.collection, reference.id]);
 }
 
-function failureWithImpact(project: StudioProjectV1, impact: CommandImpact): ProjectCommandResult {
+function failureWithImpact(project: StudioProject, impact: CommandImpact): ProjectCommandResult {
   return { ok: false, project, diagnostics: impact.blockers, impact };
 }
 
 function diagnosticFailure(
-  project: StudioProjectV1,
+  project: StudioProject,
   diagnostic: ProjectCommandDiagnostic,
   impact?: CommandImpact,
 ): ProjectCommandResult {
@@ -81,7 +81,7 @@ function diagnosticFailure(
   };
 }
 
-function snapshotInverse(project: StudioProjectV1): ProjectSnapshotInverse {
+function snapshotInverse(project: StudioProject): ProjectSnapshotInverse {
   return { type: "project.restoreSnapshot", project: cloneStudioProject(project) };
 }
 
@@ -130,7 +130,7 @@ function denseDataArray(value: unknown): unknown[] | undefined {
 }
 
 function removeReferences(
-  candidate: StudioProjectV1,
+  candidate: StudioProject,
   references: readonly EntityReference[],
   now: string,
 ): ChangedEntityIds {
@@ -200,7 +200,7 @@ function removeReferences(
   appendChanged(changed, "variantSets", [...changedVariantSets]);
 
   const workspaceBefore = JSON.stringify(candidate.workspace);
-  const selectedFields: Array<[keyof StudioProjectV1["workspace"], ProjectRecordCollection]> = [
+  const selectedFields: Array<[keyof StudioProject["workspace"], ProjectRecordCollection]> = [
     ["selectedAssetId", "assets"],
     ["selectedRegionId", "regions"],
     ["selectedCompositionId", "compositions"],
@@ -222,12 +222,12 @@ function removeReferences(
   return changed;
 }
 
-function analyze(project: StudioProjectV1, command: DestructiveCommand): CommandImpact {
+function analyze(project: StudioProject, command: DestructiveCommand): CommandImpact {
   return analyzeProjectCommandImpact(project, command);
 }
 
 function applyPureRemove(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Exclude<DestructiveCommand, { type: "variant.remove" | "variant.replace" | "cel.replaceSource" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -240,7 +240,7 @@ function applyPureRemove(
 }
 
 function applyVariantRemove(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<DestructiveCommand, { type: "variant.remove" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -264,7 +264,7 @@ function payloadId(value: unknown): EntityId | undefined {
 }
 
 function ensureAvailableIds(
-  original: StudioProjectV1,
+  original: StudioProject,
   collection: ProjectRecordCollection,
   payloads: readonly unknown[],
   removable: ReadonlySet<string>,
@@ -284,7 +284,7 @@ function ensureAvailableIds(
 }
 
 function installRecords(
-  candidate: StudioProjectV1,
+  candidate: StudioProject,
   collection: ProjectRecordCollection,
   payloads: readonly unknown[],
 ): void {
@@ -295,7 +295,7 @@ function installRecords(
 }
 
 function applyVariantReplace(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<DestructiveCommand, { type: "variant.replace" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -352,8 +352,8 @@ function sourceTarget(source: unknown): EntityReference | undefined {
 }
 
 function installOwnedCelGraph(
-  original: StudioProjectV1,
-  candidate: StudioProjectV1,
+  original: StudioProject,
+  candidate: StudioProject,
   command: Extract<DestructiveCommand, { type: "cel.replaceSource" }>,
   removable: ReadonlySet<string>,
 ): ProjectCommandDiagnostic | undefined {
@@ -395,7 +395,7 @@ function installOwnedCelGraph(
 }
 
 function applyCelReplaceSource(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<DestructiveCommand, { type: "cel.replaceSource" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -461,7 +461,7 @@ function directRemoveTarget(command: ProjectCommand): EntityReference | undefine
 
 /** Apply all explicit removes to one candidate so mutual reference cycles are atomic. */
 export function applyCombinedRemoveCommands(
-  project: StudioProjectV1,
+  project: StudioProject,
   commands: ProjectCommand[],
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -493,7 +493,7 @@ export function applyCombinedRemoveCommands(
 }
 
 export function applyDestructiveFamilyCommand(
-  project: StudioProjectV1,
+  project: StudioProject,
   command: ProjectCommand,
   context: ProjectCommandContext,
 ): ProjectCommandResult | undefined {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cloneStudioProject } from "../../core/project/graph";
 import { analyzeProjectCommandImpact } from "../../core/project/impact";
-import type { StudioProjectV1 } from "../../core/project/schema";
+import type { StudioProject } from "../../core/project/schema";
 import { validateStudioProject } from "../../core/project/validation";
 import { studioProjectV1Fixture } from "./fixtures/studioProjectV1";
 
@@ -10,7 +10,7 @@ function expectBlocker(command: unknown, code: string, project = studioProjectV1
   expect(impact.blockers.some((blocker) => blocker.code === code)).toBe(true);
 }
 
-function valid(project: StudioProjectV1): StudioProjectV1 {
+function valid(project: StudioProject): StudioProject {
   expect(validateStudioProject(project).valid).toBe(true);
   return project;
 }

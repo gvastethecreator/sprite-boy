@@ -12,7 +12,7 @@ import type {
   CelSource,
   EntityId,
   ProjectRecordCollection,
-  StudioProjectV1,
+  StudioProject,
   VariantKey,
 } from "./schema";
 import { isEntityId } from "./primitives";
@@ -116,7 +116,7 @@ function addEdge(
  * Owner order arrays are deliberately represented by their child backreference
  * only, so removing a layer/cel repairs membership instead of deleting its owner.
  */
-function collectReferenceEdges(project: StudioProjectV1): ReferenceEdge[] {
+function collectReferenceEdges(project: StudioProject): ReferenceEdge[] {
   const edges: ReferenceEdge[] = [];
 
   for (const id of Object.keys(project.assets).sort()) {
@@ -264,7 +264,7 @@ function collectReferenceEdges(project: StudioProjectV1): ReferenceEdge[] {
     left.path.localeCompare(right.path));
 }
 
-function entityExists(project: StudioProjectV1, target: EntityReference): boolean {
+function entityExists(project: StudioProject, target: EntityReference): boolean {
   return hasOwn(project[target.collection], target.id);
 }
 
@@ -277,7 +277,7 @@ function missingTargetBlocker(target: EntityReference): ProjectCommandDiagnostic
   );
 }
 
-function analyzeCascade(project: StudioProjectV1, request: CascadeRequest): CommandImpact {
+function analyzeCascade(project: StudioProject, request: CascadeRequest): CommandImpact {
   const direct = uniqueSortedReferences(request.direct);
   const deleteSeeds = uniqueSortedReferences(request.deleteSeeds);
   const missing = uniqueSortedReferences([...direct, ...deleteSeeds])
@@ -342,7 +342,7 @@ function invalidImpact(message: string, path = "$"): CommandImpact {
   };
 }
 
-function invalidProjectImpact(project: StudioProjectV1): CommandImpact | undefined {
+function invalidProjectImpact(project: StudioProject): CommandImpact | undefined {
   const validation = validateStudioProject(project);
   if (validation.valid) return undefined;
   return {
@@ -423,7 +423,7 @@ function sourceReference(source: unknown): EntityReference | undefined {
 }
 
 function ownedSourceBlocker(
-  project: StudioProjectV1,
+  project: StudioProject,
   command: Record<string, unknown>,
   celId: EntityId,
   nextSource: EntityReference,
@@ -535,7 +535,7 @@ function layerSourceReference(source: unknown): EntityReference | undefined {
 }
 
 function collectBatchReferenceOverrides(
-  project: StudioProjectV1,
+  project: StudioProject,
   commands: readonly unknown[],
 ): ReferenceOverride[] {
   const overrides = new Map<string, ReferenceOverride>();
@@ -577,7 +577,7 @@ function collectBatchReferenceOverrides(
   return [...overrides.values()].sort((left, right) => compareReferences(left.from, right.from));
 }
 
-function analyzeBatch(project: StudioProjectV1, record: Record<string, unknown>): CommandImpact {
+function analyzeBatch(project: StudioProject, record: Record<string, unknown>): CommandImpact {
   const commands = readBatchCommands(record.commands);
   if (!commands) return invalidImpact("command.batch commands must be a dense data-only array.", "$.commands");
   const referenceOverrides = collectBatchReferenceOverrides(project, commands);
@@ -684,7 +684,7 @@ function removeTarget(
 }
 
 function analyzeVariantChange(
-  project: StudioProjectV1,
+  project: StudioProject,
   type: "variant.replace" | "variant.remove",
   command: Record<string, unknown>,
 ): CommandImpact {
@@ -749,7 +749,7 @@ function analyzeVariantChange(
   return analyzeCascade(project, { direct: [direct], deleteSeeds, policy, survivors: [direct] });
 }
 
-function analyzeCelRelink(project: StudioProjectV1, command: Record<string, unknown>): CommandImpact {
+function analyzeCelRelink(project: StudioProject, command: Record<string, unknown>): CommandImpact {
   if (!isEntityId(command.celId)) return invalidImpact("celId must be a non-empty string.", "$.celId");
   const policy = policyOf(command);
   if (!policy) return invalidImpact("policy must be reject or cascade.", "$.policy");
@@ -779,10 +779,10 @@ function analyzeCelRelink(project: StudioProjectV1, command: Record<string, unkn
 /**
  * Analyze graph consequences without mutating the project. “Orphans” are
  * prospective only: reject reports blockers; cascade lists every entity that
- * an atomic reducer must remove so StudioProjectV1 never contains dangling refs.
+ * an atomic reducer must remove so StudioProject never contains dangling refs.
  */
 export function analyzeProjectCommandImpact(
-  project: StudioProjectV1,
+  project: StudioProject,
   command: unknown,
 ): CommandImpact {
   try {

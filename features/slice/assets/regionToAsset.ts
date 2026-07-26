@@ -11,7 +11,7 @@ import {
   isISO8601Timestamp,
   type AssetRecord,
   type Rect,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../../core/project";
 import { cloneDataOnly } from "../../../core/project/dataBoundary";
 import { validateStudioProject } from "../../../core/project/validation";
@@ -156,7 +156,7 @@ interface Ports {
 }
 
 interface Snapshot {
-  readonly project: StudioProjectV1;
+  readonly project: StudioProject;
   readonly revision: number;
 }
 
@@ -286,7 +286,7 @@ function trySnapshot(ports: Pick<Ports, "getSnapshot">): Snapshot | null {
     if (!cloned.ok) return null;
     const validation = validateStudioProject(cloned.value);
     if (!validation.valid) return null;
-    return Object.freeze({ project: cloned.value as StudioProjectV1, revision: revision.value as number });
+    return Object.freeze({ project: cloned.value as StudioProject, revision: revision.value as number });
   } catch {
     return null;
   }
@@ -366,14 +366,22 @@ function sameAsset(actual: Readonly<AssetRecord>, expected: Readonly<AssetRecord
     && actual.mimeType === expected.mimeType && actual.width === expected.width
     && actual.height === expected.height && actual.byteSize === expected.byteSize
     && actual.createdAt === expected.createdAt && actual.updatedAt === expected.updatedAt
+    && actual.media.type === "image" && expected.media.type === "image"
     && sameProvenance(actual.provenance, expected.provenance);
+}
+
+function isExactImageMedia(value: unknown): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && exactKeys(value as Record<string, unknown>, ["type"])
+    && (value as { type?: unknown }).type === "image";
 }
 
 function readExactAsset(value: unknown, expected: Readonly<AssetRecord>): AssetRecord | null {
   const cloned = cloneDataOnly(value);
   if (!cloned.ok || cloned.value === null || typeof cloned.value !== "object" || Array.isArray(cloned.value)) return null;
   const record = cloned.value as Record<string, unknown>;
-  if (!exactKeys(record, ["id", "name", "blobKey", "contentHash", "mimeType", "width", "height", "byteSize", "createdAt", "updatedAt", "provenance"])) return null;
+  if (!exactKeys(record, ["id", "name", "blobKey", "contentHash", "mimeType", "media", "width", "height", "byteSize", "createdAt", "updatedAt", "provenance"])
+    || !isExactImageMedia(record.media)) return null;
   if (record.provenance === null || typeof record.provenance !== "object" || Array.isArray(record.provenance)) return null;
   const provenance = record.provenance as Record<string, unknown>;
   if (!exactKeys(provenance, ["source", "sourceId", "importedAt", "parentAssetId", "note"])) return null;
@@ -385,9 +393,10 @@ function readAssetRecord(value: unknown): AssetRecord | null {
   const cloned = cloneDataOnly(value);
   if (!cloned.ok || cloned.value === null || typeof cloned.value !== "object" || Array.isArray(cloned.value)) return null;
   const record = cloned.value as Record<string, unknown>;
-  if (!exactKeys(record, ["id", "name", "blobKey", "contentHash", "mimeType", "width", "height", "byteSize", "createdAt", "updatedAt", "provenance"])
+  if (!exactKeys(record, ["id", "name", "blobKey", "contentHash", "mimeType", "media", "width", "height", "byteSize", "createdAt", "updatedAt", "provenance"])
     || !isEntityId(record.id) || typeof record.name !== "string" || typeof record.blobKey !== "string"
     || !HASH.test(String(record.contentHash)) || typeof record.mimeType !== "string"
+    || !isExactImageMedia(record.media)
     || !Number.isSafeInteger(record.width) || (record.width as number) < 1
     || !Number.isSafeInteger(record.height) || (record.height as number) < 1
     || !Number.isSafeInteger(record.byteSize) || (record.byteSize as number) < 1
@@ -481,12 +490,13 @@ function ownership(ports: Ports, expected: Readonly<AssetRecord>): Ownership {
 
 async function assetRecordFingerprint(record: Readonly<AssetRecord>): Promise<string> {
   const payload = JSON.stringify({
-    version: 1,
+    version: 2,
     id: record.id,
     name: record.name,
     blobKey: record.blobKey,
     contentHash: record.contentHash,
     mimeType: record.mimeType,
+    media: record.media,
     width: record.width,
     height: record.height,
     byteSize: record.byteSize,
@@ -662,6 +672,7 @@ function restoreMetadata(record: Readonly<AssetRecord>): AssetMetadata {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     provenance: Object.freeze({ ...record.provenance }),
+    media: record.media,
     declaredMimeType: record.mimeType,
     expectedContentHash: record.contentHash,
   });
@@ -828,6 +839,7 @@ async function convertRegionToAssetUnlocked(
     createdAt: request.timestamp,
     updatedAt: request.timestamp,
     provenance,
+    media: Object.freeze({ type: "image" as const }),
   });
   const expectedRecordFingerprint = await assetRecordFingerprint(expected);
 

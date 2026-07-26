@@ -1,6 +1,6 @@
 import { isEntityId, isISO8601Timestamp } from "../../../core/project/primitives";
 import type { ProjectCommand, ProjectCommandBatch } from "../../../core/project/commands";
-import type { StudioProjectV1 } from "../../../core/project/schema";
+import type { StudioProject } from "../../../core/project/schema";
 import type {
   WandRegionIntentBatch,
   WandRegionMutation,
@@ -16,7 +16,7 @@ export interface WandRegionCommandAdapter {
 
 /** Exact own-data view over the canonical project Regions collection. */
 export interface WandCanonicalProjectRegionView {
-  readonly regions: StudioProjectV1["regions"];
+  readonly regions: StudioProject["regions"];
 }
 
 function invalid(message: string): TypeError {

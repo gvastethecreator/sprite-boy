@@ -1,4 +1,5 @@
 import type {
+  AssetMedia,
   AssetProvenance,
   AssetRecord,
   EntityId,
@@ -178,6 +179,8 @@ export interface AssetMetadata {
   createdAt: ISO8601Timestamp;
   updatedAt: ISO8601Timestamp;
   provenance: AssetProvenance;
+  /** Optional for legacy image/binary callers; required for video assets. */
+  media?: AssetMedia;
   declaredMimeType?: string;
   expectedContentHash?: string;
 }

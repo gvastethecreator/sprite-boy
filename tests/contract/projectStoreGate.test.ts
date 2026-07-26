@@ -3,7 +3,7 @@ import {
   cloneStudioProject,
   type ProjectCommandBatch,
   type ProjectCommandEnvelope,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../core/project";
 import {
   createInteractionStore,
@@ -239,7 +239,7 @@ describe("F4-06 ProjectStore gate", () => {
     expect(Object.isFrozen(initialSnapshot.project.rootOrder.assetIds)).toBe(true);
 
     expect(() => {
-      (initialSnapshot.project as unknown as StudioProjectV1).name = "Snapshot mutation";
+      (initialSnapshot.project as unknown as StudioProject).name = "Snapshot mutation";
     }).toThrow(TypeError);
     expect(() => {
       (initialSnapshot.project.rootOrder.assetIds as unknown as string[]).push("asset-mutation");
@@ -253,7 +253,7 @@ describe("F4-06 ProjectStore gate", () => {
     expect(Object.isFrozen(committed.result.inverse)).toBe(true);
     expect(Object.isFrozen(committed.result.changedIds)).toBe(true);
     expect(() => {
-      (committed.result.project as unknown as StudioProjectV1).name = "Result mutation";
+      (committed.result.project as unknown as StudioProject).name = "Result mutation";
     }).toThrow(TypeError);
     expect(store.getSnapshot().project.name).toBe("Committed frozen");
     expect(history.undo()).toEqual({ ok: true, revision: 2 });

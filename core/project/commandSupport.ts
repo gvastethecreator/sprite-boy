@@ -1,4 +1,4 @@
-import type { EntityId, StudioProjectV1 } from "./schema";
+import type { EntityId, StudioProject } from "./schema";
 import { cloneStudioProject } from "./graph";
 import type {
   ChangedEntityIds,
@@ -35,7 +35,7 @@ export function commandDiagnostic(
 }
 
 export function commandFailure(
-  project: StudioProjectV1,
+  project: StudioProject,
   diagnostics: ProjectCommandDiagnostic[],
 ): ProjectCommandResult {
   return { ok: false, project, diagnostics };
@@ -53,7 +53,7 @@ export function directCommandImpact(direct: EntityReference[]): CommandImpact {
 }
 
 export function noChangeCommandResult(
-  project: StudioProjectV1,
+  project: StudioProject,
   impact: CommandImpact,
   inverse: ProjectCommandInverse,
 ): ProjectCommandResult {
@@ -108,7 +108,7 @@ export function jsonValuesEqual(
 }
 
 function invariantFailure(
-  project: StudioProjectV1,
+  project: StudioProject,
   validation: ReturnType<typeof validateStudioProject>,
 ): ProjectCommandResult {
   return commandFailure(
@@ -120,8 +120,8 @@ function invariantFailure(
 }
 
 export function finalizeCommandMutation(
-  original: StudioProjectV1,
-  candidate: StudioProjectV1,
+  original: StudioProject,
+  candidate: StudioProject,
   changedIds: ChangedEntityIds,
   impact: CommandImpact,
   inverse: ProjectCommandInverse,
@@ -176,8 +176,8 @@ export function cloneCommandPayload<T>(value: T, seen = new WeakMap<object, unkn
 }
 
 export function prepareCommandCandidate(
-  project: StudioProjectV1,
-): StudioProjectV1 | ProjectCommandResult {
+  project: StudioProject,
+): StudioProject | ProjectCommandResult {
   const baseline = validateStudioProject(project);
   if (!baseline.valid) return invariantFailure(project, baseline);
   try {
@@ -186,7 +186,7 @@ export function prepareCommandCandidate(
     return commandFailure(project, [
       commandDiagnostic(
         "INVARIANT_VIOLATION",
-        "The project could not be cloned as a JSON-safe StudioProjectV1 document.",
+        "The project could not be cloned as a JSON-safe StudioProject document.",
         "$",
       ),
     ]);
@@ -194,7 +194,7 @@ export function prepareCommandCandidate(
 }
 
 export function isCommandResult(
-  value: StudioProjectV1 | ProjectCommandResult,
+  value: StudioProject | ProjectCommandResult,
 ): value is ProjectCommandResult {
   return typeof value === "object" && "ok" in value;
 }
@@ -262,7 +262,7 @@ export function missingEntityDiagnostic(
   );
 }
 
-export function malformedCommandFailure(project: StudioProjectV1): ProjectCommandResult {
+export function malformedCommandFailure(project: StudioProject): ProjectCommandResult {
   return commandFailure(project, [
     commandDiagnostic(
       "INVALID_PATCH",

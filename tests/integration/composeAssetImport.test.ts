@@ -8,7 +8,7 @@ import {
 import {
   createEmptyStudioProject,
   type AssetRecord,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../core/project";
 import { createProjectStoreWithHistory } from "../../core/stores";
 import {
@@ -52,6 +52,7 @@ function fakeRepository(
       blobKey: `sha256:${hash}`,
       contentHash: hash,
       mimeType: blob.type,
+      media: { type: "image" },
       width: metadata.width,
       height: metadata.height,
       byteSize: blob.size,
@@ -186,7 +187,7 @@ describe("canonical Compose asset import", () => {
   it("compensates repository and graph state when a reserved Composition identity conflicts", async () => {
     const identity = deriveCompositionEntryIdentity({ type: "asset", id: "asset-imported" });
     const project = createEmptyStudioProject({ id: "project-compose-conflict", now: NOW });
-    const conflicted: StudioProjectV1 = {
+    const conflicted: StudioProject = {
       ...project,
       rootOrder: { ...project.rootOrder, compositionIds: [identity.compositionId] },
       compositions: {
@@ -232,7 +233,7 @@ describe("canonical Compose asset import", () => {
   it("reports durable cleanup debt and exposes an exact retry path", async () => {
     const identity = deriveCompositionEntryIdentity({ type: "asset", id: "asset-imported" });
     const project = createEmptyStudioProject({ id: "project-cleanup-debt", now: NOW });
-    const conflicted: StudioProjectV1 = {
+    const conflicted: StudioProject = {
       ...project,
       rootOrder: { ...project.rootOrder, compositionIds: [identity.compositionId] },
       compositions: {
@@ -267,7 +268,7 @@ describe("canonical Compose asset import", () => {
 
     await expect(reconcileProjectAssetRepository(
       repo.repository,
-      store.getSnapshot().project as StudioProjectV1,
+      store.getSnapshot().project as StudioProject,
     )).resolves.toEqual({
       complete: true,
       removedAssetIds: ["asset-imported"],

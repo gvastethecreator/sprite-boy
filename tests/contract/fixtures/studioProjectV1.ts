@@ -1,17 +1,17 @@
-import type { StudioProjectV1 } from "../../../core/project/schema";
+import type { StudioProject } from "../../../core/project/schema";
 
 const CREATED_AT = "2026-01-01T00:00:00.000Z";
 const UPDATED_AT = "2026-01-01T00:01:00.000Z";
 
 /**
- * A small but connected StudioProjectV1 graph used by the contract tests.
+ * A small but connected StudioProject graph used by the contract tests.
  *
  * The fixture intentionally keeps binary data outside the document: assets
  * carry stable blob keys and hashes, while the processed artifact is a
  * durable, completed record with provenance only (no job/progress state).
  */
-export const studioProjectV1Fixture: StudioProjectV1 = {
-  schemaVersion: 1,
+export const studioProjectV1Fixture: StudioProject = {
+  schemaVersion: 2,
   id: "fixture-project-v1",
   name: "Contract project",
   createdAt: CREATED_AT,
@@ -38,6 +38,7 @@ export const studioProjectV1Fixture: StudioProjectV1 = {
         source: "fixture",
         note: "Canonical contract fixture source asset",
       },
+      media: { type: "image" },
     },
     "asset-processed": {
       id: "asset-processed",
@@ -56,6 +57,7 @@ export const studioProjectV1Fixture: StudioProjectV1 = {
         artifactId: "artifact-processed",
         parentAssetId: "asset-sheet",
       },
+      media: { type: "image" },
     },
   },
   regions: {
@@ -314,4 +316,4 @@ export const studioProjectV1Fixture: StudioProjectV1 = {
 };
 
 /** Alias kept descriptive for callers that prefer the fixture's role. */
-export const representativeStudioProjectV1 = studioProjectV1Fixture;
+export const representativeStudioProject = studioProjectV1Fixture;

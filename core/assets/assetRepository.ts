@@ -1,8 +1,10 @@
 import type {
+  AssetMedia,
   AssetProvenance,
   AssetRecord,
   EntityId,
 } from "../project/schema";
+import { resolveAssetMedia } from "./assetMedia";
 import { isEntityId, isISO8601Timestamp } from "../project/primitives";
 import {
   AssetRepositoryError,
@@ -81,6 +83,7 @@ interface SanitizedMetadata {
   createdAt: string;
   updatedAt: string;
   provenance: AssetProvenance;
+  media?: AssetMedia;
   declaredMimeType?: string;
   expectedContentHash?: string;
 }
@@ -277,6 +280,7 @@ function sanitizeMetadata(value: unknown): SanitizedMetadata {
   const updatedAt = ownDataValue(value, "updatedAt");
   const declaredMimeType = ownDataValue(value, "declaredMimeType", true);
   const expectedContentHash = ownDataValue(value, "expectedContentHash", true);
+  const media = ownDataValue(value, "media", true);
   if (!isEntityId(id)) throw new TypeError("Asset id must be a non-empty string.");
   if (typeof name !== "string" || name.trim().length === 0) {
     throw new TypeError("Asset name must be a non-empty string.");
@@ -311,6 +315,7 @@ function sanitizeMetadata(value: unknown): SanitizedMetadata {
     createdAt,
     updatedAt,
     provenance: sanitizeProvenance(ownDataValue(value, "provenance")),
+    ...(media === undefined ? {} : { media: media as AssetMedia }),
     ...(declaredMimeType ? { declaredMimeType: declaredMimeType.trim().toLowerCase() } : {}),
     ...(expectedContentHash ? { expectedContentHash } : {}),
   };
@@ -505,6 +510,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
         createdAt: safe.createdAt,
         updatedAt: safe.updatedAt,
         provenance: safe.provenance,
+        media: resolveAssetMedia(safe.media, payload.type, safe.width, safe.height),
       });
       let committed: AssetStoragePutResult;
       try {

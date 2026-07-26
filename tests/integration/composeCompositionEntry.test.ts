@@ -3,7 +3,7 @@ import { projectCodec } from "../../core/persistence";
 import {
   validateStudioProject,
   type ProjectCommandContext,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../core/project";
 import { createProjectStore } from "../../core/stores";
 import {
@@ -19,7 +19,7 @@ import { studioProjectV1Fixture } from "../contract/fixtures/studioProjectV1";
 const ISSUED_AT = "2026-07-16T12:00:00.000Z";
 const COMMITTED_AT = "2026-07-16T12:00:01.000Z";
 
-function cloneFixture(): StudioProjectV1 {
+function cloneFixture(): StudioProject {
   return structuredClone(studioProjectV1Fixture);
 }
 
@@ -234,7 +234,7 @@ describe("A1-01 Composition entry integration", () => {
     const created = openCompositionFromSource(store, request(source, "before-reload"));
     expect(created.ok).toBe(true);
 
-    const encoded = projectCodec.encode(store.getSnapshot().project as StudioProjectV1);
+    const encoded = projectCodec.encode(store.getSnapshot().project as StudioProject);
     const reloadedProject = projectCodec.decode(encoded);
     expect(validateStudioProject(reloadedProject)).toMatchObject({ valid: true, diagnostics: [] });
     expect(encoded).not.toMatch(/(?:blob:|data:)/i);
@@ -251,6 +251,6 @@ describe("A1-01 Composition entry integration", () => {
       revision: 0,
       dispatched: false,
     });
-    expect(projectCodec.encode(reloadedStore.getSnapshot().project as StudioProjectV1)).toBe(encoded);
+    expect(projectCodec.encode(reloadedStore.getSnapshot().project as StudioProject)).toBe(encoded);
   });
 });

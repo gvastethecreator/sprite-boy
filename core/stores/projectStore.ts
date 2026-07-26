@@ -15,7 +15,7 @@ import {
 } from "../project";
 import { cloneDataOnly } from "../project/dataBoundary";
 import { createProjectSnapshot, type ProjectRevision } from "../project/graph";
-import type { StudioProjectV1 } from "../project/schema";
+import type { StudioProject } from "../project/schema";
 import { validateStudioProject } from "../project/validation";
 import type {
   ProjectStore,
@@ -119,7 +119,7 @@ function immutableDispatchResult(
 }
 
 function applyDispatchCommand(
-  project: StudioProjectV1,
+  project: StudioProject,
   command: ProjectDispatchCommand,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -316,7 +316,7 @@ function readEnvelope(envelope: unknown): EnvelopeReadResult {
 }
 
 function envelopeFailure(
-  project: StudioProjectV1,
+  project: StudioProject,
   path: string,
   message: string,
 ): ProjectCommandResult {
@@ -327,7 +327,7 @@ function envelopeFailure(
   };
 }
 
-function reentrantDispatchResult(project: StudioProjectV1): ProjectCommandResult {
+function reentrantDispatchResult(project: StudioProject): ProjectCommandResult {
   return {
     ok: false,
     project,
@@ -341,7 +341,7 @@ function reentrantDispatchResult(project: StudioProjectV1): ProjectCommandResult
   };
 }
 
-function exhaustedRevisionResult(project: StudioProjectV1): ProjectCommandResult {
+function exhaustedRevisionResult(project: StudioProject): ProjectCommandResult {
   return {
     ok: false,
     project,
@@ -360,7 +360,7 @@ function exhaustedRevisionResult(project: StudioProjectV1): ProjectCommandResult
  * boundary by F4-04; no alternate setter is exposed.
  */
 export function createProjectStoreRuntime(
-  initialProject: StudioProjectV1,
+  initialProject: StudioProject,
   options: CreateProjectStoreOptions,
   onCommandCommit?: ProjectStoreInternalCommitHook,
 ): ProjectStoreRuntime {
@@ -368,7 +368,7 @@ export function createProjectStoreRuntime(
   if (!normalizedOptions) {
     throw new TypeError("ProjectStore options require a data-only ProjectCommandContext.");
   }
-  let project: StudioProjectV1;
+  let project: StudioProject;
   try {
     if (!isDataOnlyGraph(initialProject)) throw new TypeError();
     const isolated = structuredClone(initialProject);
@@ -376,13 +376,13 @@ export function createProjectStoreRuntime(
     if (!validation.valid) {
       const first = validation.diagnostics[0];
       throw new TypeError(
-        `ProjectStore requires a valid StudioProjectV1${first ? `: ${first.code} at ${first.path}` : "."}`,
+        `ProjectStore requires a valid StudioProject${first ? `: ${first.code} at ${first.path}` : "."}`,
       );
     }
     project = deepFreezeData(isolated);
   } catch (error) {
     if (error instanceof TypeError && error.message.startsWith("ProjectStore requires")) throw error;
-    throw new TypeError("ProjectStore could not isolate the initial StudioProjectV1.");
+    throw new TypeError("ProjectStore could not isolate the initial StudioProject.");
   }
   let state: ProjectStoreState = createProjectSnapshot(
     project,
@@ -515,7 +515,7 @@ export function createProjectStoreRuntime(
 
 /** Create a ProjectStore without attaching a history controller. */
 export function createProjectStore(
-  initialProject: StudioProjectV1,
+  initialProject: StudioProject,
   options: CreateProjectStoreOptions,
 ): ProjectStore {
   return createProjectStoreRuntime(initialProject, options).store;

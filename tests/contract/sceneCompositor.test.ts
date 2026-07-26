@@ -9,7 +9,7 @@ import {
   type SceneDrawOperation,
   type SceneProjection,
 } from "../../core/render";
-import { createEmptyStudioProject, validateStudioProject, type StudioProjectV1 } from "../../core/project";
+import { createEmptyStudioProject, validateStudioProject, type StudioProject } from "../../core/project";
 import type { WorkspaceState } from "../../core/stores";
 import {
   sceneCompositorPixelGoldens,
@@ -149,7 +149,7 @@ class SoftwareRasterTarget implements SceneCompositorTarget<RasterFixture> {
 type GoldenRoot = keyof typeof sceneCompositorPixelGoldens;
 
 function projectionFor(root: GoldenRoot): SceneProjection {
-  const project: StudioProjectV1 = structuredClone(sceneCompositorProjectFixture);
+  const project: StudioProject = structuredClone(sceneCompositorProjectFixture);
   switch (root) {
     case "asset":
       project.workspace.activeWorkspace = "assets";

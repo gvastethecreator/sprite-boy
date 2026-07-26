@@ -1,4 +1,4 @@
-import type { StudioProjectV1 } from "../../../core/project";
+import type { StudioProject } from "../../../core/project";
 
 const TIMESTAMP = "2026-01-01T00:00:00.000Z";
 
@@ -13,8 +13,8 @@ const centerTransform = (flipX = false) => ({
   flipY: false,
 });
 
-export const sceneCompositorProjectFixture: StudioProjectV1 = {
-  schemaVersion: 1,
+export const sceneCompositorProjectFixture: StudioProject = {
+  schemaVersion: 2,
   id: "scene-compositor-project",
   name: "Scene compositor pixels",
   createdAt: TIMESTAMP,
@@ -38,6 +38,7 @@ export const sceneCompositorProjectFixture: StudioProjectV1 = {
       createdAt: TIMESTAMP,
       updatedAt: TIMESTAMP,
       provenance: { source: "fixture" },
+      media: { type: "image" },
     },
   },
   regions: {

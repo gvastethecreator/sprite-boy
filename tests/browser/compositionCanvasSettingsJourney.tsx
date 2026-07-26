@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import "../../index.css";
 import { projectCodec } from "../../core/persistence";
-import type { StudioProjectV1 } from "../../core/project";
+import type { StudioProject } from "../../core/project";
 import { createSceneProjection, renderBrowserSceneExport } from "../../core/render";
 import { createProjectStoreWithHistory, type WorkspaceState } from "../../core/stores";
 import { CompositionCanvasSettingsInspector } from "../../features/compose/canvasSettings";
@@ -123,7 +123,7 @@ async function run(): Promise<A103BrowserResult> {
   invariant(exported.background === "#3157a4" && exported.byteSize > 0, "Export background diverged.");
 
   const reloaded = projectCodec.decode(projectCodec.encode(
-    structuredClone(snapshot.project) as StudioProjectV1,
+    structuredClone(snapshot.project) as StudioProject,
   ));
   const reloadProjection = createSceneProjection({ project: reloaded, revision: snapshot.revision }, workspace);
   const reloadMatches = JSON.stringify(reloadProjection.canvas) === JSON.stringify(projection.canvas);

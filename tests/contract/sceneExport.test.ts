@@ -13,7 +13,7 @@ import {
   type SceneProjection,
   type SceneRasterEncodeOptions,
 } from "../../core/render";
-import { createEmptyStudioProject, type StudioProjectV1 } from "../../core/project";
+import { createEmptyStudioProject, type StudioProject } from "../../core/project";
 import type { WorkspaceState } from "../../core/stores";
 import {
   sceneCompositorPixelGoldens,
@@ -49,7 +49,7 @@ type MutableSceneProjection = {
 };
 
 function projectionFor(root: GoldenRoot): SceneProjection {
-  const project: StudioProjectV1 = structuredClone(sceneCompositorProjectFixture);
+  const project: StudioProject = structuredClone(sceneCompositorProjectFixture);
   switch (root) {
     case "asset":
       project.workspace.activeWorkspace = "assets";

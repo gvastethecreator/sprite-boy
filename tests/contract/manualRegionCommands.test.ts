@@ -7,7 +7,7 @@ import {
   type ProjectCommandContext,
   type ProjectCommandEnvelope,
   type Region,
-  type StudioProjectV1,
+  type StudioProject,
 } from "../../core/project";
 import { projectCodec } from "../../core/persistence/projectCodec";
 import { createProjectStoreWithHistory } from "../../core/stores";
@@ -41,7 +41,7 @@ function envelope(command: ProjectCommand, commandId: string): ProjectCommandEnv
   };
 }
 
-function projectWithManualRegion(): StudioProjectV1 {
+function projectWithManualRegion(): StudioProject {
   const command = requiredCommand(adaptManualRegionIntentToProjectCommand(studioProjectV1Fixture, createIntent));
   const result = applyProjectCommand(studioProjectV1Fixture, command, context);
   if (!result.ok) throw new Error(result.diagnostics.map(({ message }) => message).join("; "));
@@ -62,7 +62,7 @@ function defineOwn<T>(record: Record<string, T>, id: string, value: T): void {
 
 const prototypeLikeIds = ["toString", "constructor", "__proto__"] as const;
 
-function projectWithOwnPrototypeLikeRecords(): StudioProjectV1 {
+function projectWithOwnPrototypeLikeRecords(): StudioProject {
   const project = structuredClone(studioProjectV1Fixture);
   for (const id of prototypeLikeIds) {
     const asset: AssetRecord = {
@@ -133,7 +133,7 @@ describe("S1-03 manual Region commands", () => {
     const initial = projectWithManualRegion();
     const { store, history } = createProjectStoreWithHistory(initial, { context });
 
-    const move = requiredCommand(adaptManualRegionIntentToProjectCommand(store.getSnapshot().project as StudioProjectV1, {
+    const move = requiredCommand(adaptManualRegionIntentToProjectCommand(store.getSnapshot().project as StudioProject, {
       type: "move", regionId: "region-manual", x: 40, y: 30,
     }));
     expect(store.dispatch(envelope(move, "manual-move"))).toMatchObject({ revision: 1, result: { ok: true } });
@@ -143,18 +143,18 @@ describe("S1-03 manual Region commands", () => {
       bounds: { x: 40, y: 30, width: 20, height: 18 },
     });
 
-    const noOp = adaptManualRegionIntentToProjectCommand(store.getSnapshot().project as StudioProjectV1, {
+    const noOp = adaptManualRegionIntentToProjectCommand(store.getSnapshot().project as StudioProject, {
       type: "move", regionId: "region-manual", x: 40, y: 30,
     });
     expect(noOp).toBeNull();
     expect(store.getSnapshot().revision).toBe(1);
     expect(history.getSnapshot().undoEntries).toHaveLength(1);
 
-    const resize = requiredCommand(adaptManualRegionIntentToProjectCommand(store.getSnapshot().project as StudioProjectV1, {
+    const resize = requiredCommand(adaptManualRegionIntentToProjectCommand(store.getSnapshot().project as StudioProject, {
       type: "resize", regionId: "region-manual", bounds: { x: 40, y: 30, width: 30, height: 28 },
     }));
     expect(store.dispatch(envelope(resize, "manual-resize"))).toMatchObject({ revision: 2, result: { ok: true } });
-    const reloaded = projectCodec.decode(projectCodec.encode(store.getSnapshot().project as StudioProjectV1));
+    const reloaded = projectCodec.decode(projectCodec.encode(store.getSnapshot().project as StudioProject));
     expect(reloaded.regions["region-manual"]).toMatchObject({
       id: "region-manual",
       assetId: "asset-sheet",
@@ -213,7 +213,7 @@ describe("S1-03 manual Region commands", () => {
       },
     });
     expect(() => adaptManualRegionIntentToProjectCommand(hostileProject, createIntent)).toThrow(
-      "Manual Region command adapter requires a canonical data-only StudioProjectV1.",
+      "Manual Region command adapter requires a canonical data-only StudioProject.",
     );
     expect(projectReads).toBe(0);
 
@@ -252,7 +252,7 @@ describe("S1-03 manual Region commands", () => {
     expect(() => adaptManualRegionIntentToProjectCommand(
       revokedProject.proxy,
       createIntent,
-    )).toThrow("Manual Region command adapter requires a canonical data-only StudioProjectV1.");
+    )).toThrow("Manual Region command adapter requires a canonical data-only StudioProject.");
   });
 
   it("rejects inherited prototype-like IDs but accepts exact own canonical records with those IDs", () => {

@@ -6,7 +6,7 @@ import type {
   CompositionOwner,
   Layer,
   Sequence,
-  StudioProjectV1,
+  StudioProject,
   VariantKey,
   VariantSet,
 } from "./schema";
@@ -112,7 +112,7 @@ function setRecordValue<T extends Record<string, unknown>>(record: T, key: strin
 }
 
 function validateCelSource(
-  project: StudioProjectV1,
+  project: StudioProject,
   source: unknown,
   path: string,
 ): ProjectCommandDiagnostic | undefined {
@@ -137,7 +137,7 @@ function validateCelSource(
 }
 
 function validateCollisionOwner(
-  project: StudioProjectV1,
+  project: StudioProject,
   owner: unknown,
   path: string,
 ): ProjectCommandDiagnostic | undefined {
@@ -162,7 +162,7 @@ function validateCollisionOwner(
 }
 
 function applySequenceCreate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "sequence.create" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -244,7 +244,7 @@ function ownPatchKeys(record: Record<string, unknown>): string[] {
 }
 
 function applySequenceUpdate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "sequence.update" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -310,7 +310,7 @@ function ownedCelPayloadDiagnostic(
 }
 
 function applyCelAdd(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "cel.add" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -368,7 +368,7 @@ function applyCelAdd(
 }
 
 function applyCelUpdate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "cel.update" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -414,7 +414,7 @@ function applyCelUpdate(
 }
 
 function applyCelReorder(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "cel.reorder" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -475,7 +475,7 @@ function sortedUniqueIds(ids: readonly string[]): string[] {
 }
 
 function applyCelDuplicate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "cel.duplicate" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -732,7 +732,7 @@ function shapeIndex(
 }
 
 function applyCollisionSetCreate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "collisionSet.create" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -764,7 +764,7 @@ function applyCollisionSetCreate(
 }
 
 function existingCollisionSet(
-  original: StudioProjectV1,
+  original: StudioProject,
   id: unknown,
 ): CollisionSet | ProjectCommandResult {
   const idDiagnostic = requireEntityId(id, "$.collisionSetId");
@@ -776,7 +776,7 @@ function existingCollisionSet(
 }
 
 function applyCollisionAdd(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "collision.add" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -821,7 +821,7 @@ function applyCollisionAdd(
 }
 
 function applyCollisionUpdate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "collision.update" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -873,7 +873,7 @@ function applyCollisionUpdate(
 }
 
 function applyCollisionRemove(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "collision.remove" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -900,7 +900,7 @@ function applyCollisionRemove(
 
 /** Apply the minimal sequence/cel/collision family; other command types are unhandled. */
 export function applyAnimationFamilyCommand(
-  project: StudioProjectV1,
+  project: StudioProject,
   command: ProjectCommand,
   context: ProjectCommandContext,
 ): ProjectCommandResult | undefined {

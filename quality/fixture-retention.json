@@ -66,16 +66,16 @@
       "kind": "scene-pixel-golden-fixture",
       "owner": "F5",
       "mode": "text-lf",
-      "bytes": 5081,
-      "sha256": "fde7b5ce11bb88d98405656252ee9294ae5f2aecdea36697ce3850264ccd4cdf"
+      "bytes": 5109,
+      "sha256": "39c323320231ccfa27b9668331589c0cfb2f76bab3e071289a32c12ffc71bb64"
     },
     {
       "path": "tests/contract/fixtures/studioProjectV1.ts",
       "kind": "representative-canonical-project",
       "owner": "F0/F3",
       "mode": "text-lf",
-      "bytes": 8413,
-      "sha256": "e2445d3b8b80159d0ccfb52580fcc36b58f884285a83db14287508b2410bf604"
+      "bytes": 8469,
+      "sha256": "476c55ee886dca928e9f79fa6b0c69d50a29776b4ead2f0c260c68f767247dfd"
     }
   ]
 }

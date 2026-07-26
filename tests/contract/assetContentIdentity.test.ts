@@ -18,6 +18,7 @@ const record = (identity: AssetContentIdentity): AssetRecord => ({
   blobKey: identity.blobKey,
   contentHash: identity.contentHash,
   mimeType: "text/plain",
+  media: { type: "binary" },
   width: 1,
   height: 1,
   byteSize: identity.byteSize,

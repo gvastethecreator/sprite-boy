@@ -5,7 +5,7 @@ import {
   type AssetMetadata,
   type AssetRepository,
 } from "../../core/assets";
-import type { AssetRecord, StudioProjectV1 } from "../../core/project";
+import type { AssetRecord, StudioProject } from "../../core/project";
 import { projectCodec } from "../../core/persistence";
 import { createProjectStoreWithHistory, type ProjectStore } from "../../core/stores";
 import {
@@ -76,6 +76,7 @@ function createRepository(control: FakeRepositoryControl): AssetRepository {
         createdAt: metadata.createdAt,
         updatedAt: metadata.updatedAt,
         provenance: Object.freeze({ ...metadata.provenance }),
+        media: Object.freeze({ type: "image" as const }),
       });
       control.records.set(record.id, record);
       control.blobs.set(record.id, blob);
@@ -200,7 +201,7 @@ describe("Region-to-Asset compensated transaction (S1-05)", () => {
       sourceBounds: { x: 0, y: 0, width: 128, height: 128 },
       grid: { marginX: 7, marginY: 5, gapX: 3, gapY: 2 },
     });
-    const reloaded = projectCodec.decode(projectCodec.encode(store.getSnapshot().project as StudioProjectV1));
+    const reloaded = projectCodec.decode(projectCodec.encode(store.getSnapshot().project as StudioProject));
     expect(parseRegionAssetProvenanceNote(reloaded.assets[first.asset.id]?.provenance.note)).toEqual(note);
     expect(history.undo()).toMatchObject({ ok: true });
     expect(control.blobs.has(first.asset.id)).toBe(true);
@@ -381,7 +382,7 @@ describe("Region-to-Asset compensated transaction (S1-05)", () => {
     expect(value.control.removeCount).toBe(removesBefore);
     expect(value.control.blobs.has(first.asset.id)).toBe(true);
     expect(value.history.redo()).toMatchObject({ ok: true });
-    const reloaded = projectCodec.decode(projectCodec.encode(value.store.getSnapshot().project as StudioProjectV1));
+    const reloaded = projectCodec.decode(projectCodec.encode(value.store.getSnapshot().project as StudioProject));
     expect(reloaded.assets[first.asset.id]).toEqual(first.asset);
     expect(value.control.blobs.has(first.asset.id)).toBe(true);
   });

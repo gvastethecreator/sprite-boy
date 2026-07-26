@@ -9,7 +9,7 @@ import type {
   GridSplitRecipeV1,
   ProcessingRecipe,
   Region,
-  StudioProjectV1,
+  StudioProject,
 } from "../../../core/project";
 import type { ProjectStore } from "../../../core/stores";
 import type { StagedGridResultOutput, StagedGridResultsSnapshot } from "./stagedGridResults";
@@ -244,7 +244,7 @@ function generatedId(value: string, label: string): string {
   return value;
 }
 
-function assertGeneratedIdsAvailable(project: StudioProjectV1, ids: readonly string[]): void {
+function assertGeneratedIdsAvailable(project: StudioProject, ids: readonly string[]): void {
   if (new Set(ids).size !== ids.length) fail("id-conflict", "Generated recipe, asset and region IDs are not unique.");
   for (const id of ids) {
     if (project.processingRecipes[id] || project.assets[id] || project.regions[id]) {
@@ -347,7 +347,7 @@ async function commitStagedGridResultsUnlocked(options: CommitStagedGridResultsO
     fail("invalid-input", "The staged recipe is not bound to the current canonical source asset.");
   }
   const projectState = options.store.getSnapshot();
-  const project = projectState.project as StudioProjectV1;
+  const project = projectState.project as StudioProject;
   if (options.repository.projectId !== project.id) {
     fail("repository-mismatch", "The AssetRepository belongs to a different active project.");
   }

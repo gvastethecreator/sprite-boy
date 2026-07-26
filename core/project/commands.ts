@@ -14,7 +14,7 @@ import type {
   ProjectWorkspaceState,
   Region,
   Sequence,
-  StudioProjectV1,
+  StudioProject,
   VariantKey,
   VariantSet,
 } from "./schema";
@@ -142,7 +142,7 @@ export type ProjectDispatchCommand = ProjectCommand | ProjectCommandBatch;
 
 export interface ProjectSnapshotInverse {
   type: "project.restoreSnapshot";
-  project: StudioProjectV1;
+  project: StudioProject;
   semantic?: ProjectCommand | ProjectCommandBatch;
 }
 
@@ -151,7 +151,7 @@ export type ProjectCommandInverse = ProjectCommand | ProjectCommandBatch | Proje
 export type ProjectCommandResult =
   | {
       ok: true;
-      project: StudioProjectV1;
+      project: StudioProject;
       changedIds: ChangedEntityIds;
       warnings: ProjectCommandWarning[];
       impact: CommandImpact;
@@ -159,7 +159,7 @@ export type ProjectCommandResult =
     }
   | {
       ok: false;
-      project: StudioProjectV1;
+      project: StudioProject;
       diagnostics: ProjectCommandDiagnostic[];
       impact?: CommandImpact;
     };

@@ -1,5 +1,5 @@
 import { computeAssetContentIdentity } from "../assets";
-import type { EntityId, StudioProjectV1 } from "../project";
+import type { EntityId, StudioProject } from "../project";
 import { isEntityId, isISO8601Timestamp } from "../project/primitives";
 import { projectCodec } from "./projectCodec";
 
@@ -218,12 +218,12 @@ export interface ProjectAutosaveJournalOptions {
 
 export interface AutosaveCheckpoint {
   record: StoredProjectCheckpoint;
-  project: StudioProjectV1;
+  project: StudioProject;
 }
 
 export interface AutosaveRecoveryCandidate {
   record: StoredAutosaveJournal;
-  project: StudioProjectV1;
+  project: StudioProject;
 }
 
 export interface AutosaveInspection {
@@ -857,7 +857,7 @@ export class ProjectAutosaveJournal {
     record: StoredProjectCheckpoint | StoredAutosaveJournal,
     operation: AutosaveJournalOperation,
     signal: AbortSignal | undefined,
-  ): Promise<StudioProjectV1> {
+  ): Promise<StudioProject> {
     const identity = await this.identity(record.projectJson, operation, signal, record.projectId);
     if (identity.sha256 !== record.sha256 || identity.byteSize !== record.byteSize) {
       throw autosaveError(
@@ -928,7 +928,7 @@ export class ProjectAutosaveJournal {
   }
 
   async stage(
-    project: StudioProjectV1,
+    project: StudioProject,
     options?: AutosaveOperationOptions,
   ): Promise<StoredAutosaveJournal> {
     const lease = normalizeOperationOptions(options, "stage");
@@ -936,7 +936,7 @@ export class ProjectAutosaveJournal {
     try {
       throwIfAborted(lease.signal, "stage");
       let projectJson: string;
-      let canonicalProject: StudioProjectV1;
+      let canonicalProject: StudioProject;
       try {
         projectJson = projectCodec.encode(project);
         canonicalProject = projectCodec.decode(projectJson);
@@ -1050,7 +1050,7 @@ export class ProjectAutosaveJournal {
   }
 
   async checkpoint(
-    project: StudioProjectV1,
+    project: StudioProject,
     options?: AutosaveOperationOptions,
   ): Promise<AutosaveCheckpoint> {
     const lease = normalizeOperationOptions(options, "stage");

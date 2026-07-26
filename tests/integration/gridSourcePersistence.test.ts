@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { AssetRepositoryError, reconcileProjectAssetRepository, type AssetMetadata, type AssetRepository } from "../../core/assets";
-import { createEmptyStudioProject, type AssetRecord, type GridSplitRecipeV1, type StudioProjectV1 } from "../../core/project";
+import { createEmptyStudioProject, type AssetRecord, type GridSplitRecipeV1, type StudioProject } from "../../core/project";
 import { createProjectStoreWithHistory } from "../../core/stores";
 import {
   AUTOSAVE_JOURNAL_FORMAT,
@@ -77,6 +77,7 @@ function repository(projectId: string) {
       blobKey: `sha256:${hash}`,
       contentHash: hash,
       mimeType: blob.type || "image/png",
+      media: { type: "image" },
       width: metadata.width,
       height: metadata.height,
       byteSize: blob.size,
@@ -181,7 +182,7 @@ describe("Grid source persistence and reconstruction (G6-04)", () => {
     });
     const autosaveStorage = new MemoryAutosaveStorage();
     const autosave = new ProjectAutosaveJournal(autosaveStorage, { now: () => NOW });
-    await autosave.checkpoint(first.store.getSnapshot().project as StudioProjectV1);
+    await autosave.checkpoint(first.store.getSnapshot().project as StudioProject);
     const inspection = await autosave.inspect(project.id);
     const encoded = inspection.confirmed?.record.projectJson;
     expect(encoded).toBeDefined();
@@ -212,6 +213,7 @@ describe("Grid source persistence and reconstruction (G6-04)", () => {
       blobKey: "sha256:" + "e".repeat(64),
       contentHash: "e".repeat(64),
       mimeType: "image/png",
+      media: { type: "image" },
       width: 4,
       height: 2,
       byteSize: 4,
@@ -243,6 +245,7 @@ describe("Grid source persistence and reconstruction (G6-04)", () => {
       blobKey: "sha256:" + "d".repeat(64),
       contentHash: "d".repeat(64),
       mimeType: "image/png",
+      media: { type: "image" },
       width: 2,
       height: 2,
       byteSize: 4,
@@ -313,7 +316,7 @@ describe("Grid source persistence and reconstruction (G6-04)", () => {
     });
     await putEntered;
     const reconciliation = reconcileProjectAssetRepository(repo.value, project, {
-      getProject: () => bundle.store.getSnapshot().project as StudioProjectV1,
+      getProject: () => bundle.store.getSnapshot().project as StudioProject,
     });
     releasePut();
     await imported;

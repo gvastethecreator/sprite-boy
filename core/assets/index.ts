@@ -1,4 +1,5 @@
 export * from "./contracts";
+export * from "./assetMedia";
 export * from "./contentIdentity";
 export * from "./assetRepository";
 export * from "./projectAssetReconciliation";

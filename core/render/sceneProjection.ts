@@ -8,7 +8,7 @@ import type {
   LayerTransform,
   ProjectRevision,
   Region,
-  StudioProjectV1,
+  StudioProject,
   VariantKey,
   VariantSet,
   WorkspaceId,
@@ -133,7 +133,7 @@ export interface SceneProjection {
   readonly root: SceneRootNode | null;
 }
 
-type ProjectSnapshot = DeepReadonly<StudioProjectV1>;
+type ProjectSnapshot = DeepReadonly<StudioProject>;
 
 type RootReference =
   | { readonly kind: "asset"; readonly id: EntityId }

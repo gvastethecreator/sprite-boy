@@ -2,7 +2,7 @@ import { WORKSPACE_IDS } from "./schema";
 import type {
   EntityId,
   Region,
-  StudioProjectV1,
+  StudioProject,
   WorkspaceId,
 } from "./schema";
 import {
@@ -243,14 +243,14 @@ function validateSupportedCommandShape(command: unknown): CommandEnvelopeValidat
 }
 
 function failure(
-  project: StudioProjectV1,
+  project: StudioProject,
   diagnostics: ProjectCommandDiagnostic[],
 ): ProjectCommandResult {
   return { ok: false, project, diagnostics };
 }
 
 function invariantFailure(
-  project: StudioProjectV1,
+  project: StudioProject,
   validation: ReturnType<typeof validateStudioProject>,
 ): ProjectCommandResult {
   return failure(
@@ -261,13 +261,13 @@ function invariantFailure(
   );
 }
 
-function unsupported(project: StudioProjectV1, type: string): ProjectCommandResult {
+function unsupported(project: StudioProject, type: string): ProjectCommandResult {
   return failure(project, [
     diagnostic("COMMAND_UNSUPPORTED", `Command type "${type}" is not supported by this reducer.`),
   ]);
 }
 
-function malformedCommand(project: StudioProjectV1): ProjectCommandResult {
+function malformedCommand(project: StudioProject): ProjectCommandResult {
   return failure(project, [
     diagnostic(
       "INVALID_PATCH",
@@ -291,7 +291,7 @@ function reference(collection: EntityReference["collection"], id: EntityId): Ent
 }
 
 function success(
-  project: StudioProjectV1,
+  project: StudioProject,
   changedIds: ChangedEntityIds,
   impact: CommandImpact,
   inverse: ProjectCommandInverse,
@@ -301,8 +301,8 @@ function success(
 }
 
 function finalize(
-  original: StudioProjectV1,
-  candidate: StudioProjectV1,
+  original: StudioProject,
+  candidate: StudioProject,
   changedIds: ChangedEntityIds,
   impact: CommandImpact,
   inverse: ProjectCommandInverse,
@@ -417,7 +417,7 @@ function normalizeProjectCommandBatch(batch: unknown): ProjectCommandBatch | und
   }
 }
 
-function prepareCandidate(project: StudioProjectV1): StudioProjectV1 | ProjectCommandResult {
+function prepareCandidate(project: StudioProject): StudioProject | ProjectCommandResult {
   const baseline = validateStudioProject(project);
   if (!baseline.valid) return invariantFailure(project, baseline);
   try {
@@ -426,14 +426,14 @@ function prepareCandidate(project: StudioProjectV1): StudioProjectV1 | ProjectCo
     return failure(project, [
       diagnostic(
         "INVARIANT_VIOLATION",
-        "The project could not be cloned as a JSON-safe StudioProjectV1 document.",
+        "The project could not be cloned as a JSON-safe StudioProject document.",
         "$",
       ),
     ]);
   }
 }
 
-function isResult(value: StudioProjectV1 | ProjectCommandResult): value is ProjectCommandResult {
+function isResult(value: StudioProject | ProjectCommandResult): value is ProjectCommandResult {
   return typeof value === "object" && "ok" in value;
 }
 
@@ -511,7 +511,7 @@ function duplicatePayloadIds<T extends { id: EntityId }>(
 }
 
 function applyProjectRename(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "project.rename" }>,
   _context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -586,7 +586,7 @@ function validateWorkspaceCelIds(
 }
 
 function applyWorkspaceUpdate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "workspace.update" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -669,7 +669,7 @@ function applyWorkspaceUpdate(
 }
 
 function applyAssetImport(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "asset.import" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -704,7 +704,7 @@ function applyAssetImport(
 }
 
 function applyAssetReplace(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "asset.replace" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -749,7 +749,7 @@ function applyAssetReplace(
 }
 
 function applyAssetRename(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "asset.rename" }>,
   _context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -783,7 +783,7 @@ function applyAssetRename(
 }
 
 function applyRegionsCommitRecipe(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "regions.commitRecipe" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -875,7 +875,7 @@ const REGION_CREATE_FIELDS = [
 ] as const;
 
 function applyRegionCreate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "region.create" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -946,7 +946,7 @@ function applyRegionCreate(
 }
 
 function applyRegionUpdate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "region.update" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -1022,7 +1022,7 @@ function applyRegionUpdate(
 }
 
 function applyRegionReorder(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<ProjectCommand, { type: "region.reorder" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -1065,7 +1065,7 @@ function applyRegionReorder(
 
 /** Apply one supported command; unsupported command families fail atomically. */
 export function applyProjectCommand(
-  project: StudioProjectV1,
+  project: StudioProject,
   command: ProjectCommand,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -1117,7 +1117,7 @@ function mergeChangedIds(target: ChangedEntityIds, source: ChangedEntityIds): vo
 
 /** Apply a batch atomically; failures return the exact original project. */
 export function applyProjectCommandBatch(
-  project: StudioProjectV1,
+  project: StudioProject,
   batch: ProjectCommandBatch,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -1158,7 +1158,7 @@ export function applyProjectCommandBatch(
   };
 }
 
-function changedIdsBetween(current: StudioProjectV1, target: StudioProjectV1): ChangedEntityIds {
+function changedIdsBetween(current: StudioProject, target: StudioProject): ChangedEntityIds {
   const changed: ChangedEntityIds = {};
   for (const collection of PROJECT_RECORD_COLLECTIONS) {
     const ids = [...new Set([...Object.keys(current[collection]), ...Object.keys(target[collection])])]
@@ -1172,7 +1172,7 @@ function changedIdsBetween(current: StudioProjectV1, target: StudioProjectV1): C
 
 /** Execute a typed command, batch or structured snapshot inverse. */
 export function applyProjectCommandInverse(
-  project: StudioProjectV1,
+  project: StudioProject,
   inverse: ProjectCommandInverse,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -1199,7 +1199,7 @@ export function applyProjectCommandInverse(
           diagnostic("INVARIANT_VIOLATION", item.message, item.path)),
       };
     }
-    const restored = cloneStudioProject(snapshot as StudioProjectV1);
+    const restored = cloneStudioProject(snapshot as StudioProject);
     return {
       ok: true,
       project: restored,

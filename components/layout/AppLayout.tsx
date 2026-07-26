@@ -17,7 +17,7 @@ import {
   useStudioJobRunner,
 } from "../../contexts/StudioStoreContext";
 import { createJobCenterSummarySelector } from "../../core/stores";
-import type { ProcessingRecipe, ProjectCommand, ProjectCommandBatch, StudioProjectV1 } from "../../core/project";
+import type { ProcessingRecipe, ProjectCommand, ProjectCommandBatch, StudioProject } from "../../core/project";
 import { useJobStoreSelector, useProjectStoreSelector } from "../../hooks/useStudioStoreSelector";
 import {
   createStudioCommandRegistry,
@@ -337,7 +337,7 @@ const AppLayout: React.FC = () => {
   }, [canonical.store, showToast]);
   const createWandRecipe = useCallback((sourceAssetId: string, componentId: string, timestamp: string): ProcessingRecipe => {
     const suffix = componentId.replace(/[^a-zA-Z0-9_-]/gu, "").slice(-48) || newIrregularEntityId("wand");
-    const project = canonical.store.getSnapshot().project as StudioProjectV1;
+    const project = canonical.store.getSnapshot().project as StudioProject;
     let id = `recipe-wand-${suffix}`;
     if (project.processingRecipes[id]) id = newIrregularEntityId("recipe-wand");
     return {
@@ -716,7 +716,7 @@ const AppLayout: React.FC = () => {
   const canonicalCanUndo = canonicalHistory.undoEntries.length > 0;
   const canonicalCanRedo = canonicalHistory.redoEntries.length > 0;
   const durableGridCommitAvailable = canonicalSliceHistoryOwned &&
-    durableGridCommitMatchesProject(canonicalProject as unknown as StudioProjectV1, durableGridCommitUndo);
+    durableGridCommitMatchesProject(canonicalProject as unknown as StudioProject, durableGridCommitUndo);
 
   const undoCanonical = useCallback(async (): Promise<void> => {
     if (canonicalCanUndo) {

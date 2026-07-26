@@ -5,8 +5,8 @@ import {
   inspectNativeAssetBlob,
 } from "../assets";
 import type { AssetOperationOptions } from "../assets";
-import type { AssetRecord, StudioProjectV1 } from "../project";
-import { projectCodec } from "./projectCodec";
+import type { AssetRecord, StudioProject } from "../project";
+import { projectCodec, STUDIO_PROJECT_SCHEMA_VERSION } from "./projectCodec";
 
 export const SPRITEBOY_PACKAGE_FORMAT = "spriteboy-package" as const;
 export const SPRITEBOY_PACKAGE_VERSION = 1 as const;
@@ -25,7 +25,7 @@ const ZIP_MAX_COMMENT_BYTES = 0xffff;
 
 export interface SpriteBoyPackageProjectManifest {
   path: typeof PROJECT_PATH;
-  schemaVersion: 1;
+  schemaVersion: 1 | typeof STUDIO_PROJECT_SCHEMA_VERSION;
   sha256: string;
   byteSize: number;
 }
@@ -65,7 +65,7 @@ export interface ImportedSpriteBoyBlob extends SpriteBoyPackageBlobManifest {
 }
 
 export interface ImportedSpriteBoyPackage {
-  project: StudioProjectV1;
+  project: StudioProject;
   manifest: SpriteBoyPackageManifestV1;
   blobs: readonly ImportedSpriteBoyBlob[];
 }
@@ -445,7 +445,7 @@ interface BlobGroup {
 }
 
 function groupProjectAssets(
-  project: StudioProjectV1,
+  project: StudioProject,
   operation: SpriteBoyPackageOperation = "export",
 ): BlobGroup[] {
   const byBlobKey = new Map<string, BlobGroup>();
@@ -500,7 +500,7 @@ function freezeManifest(value: SpriteBoyPackageManifestV1): SpriteBoyPackageMani
 
 /** Create a deterministic portable package without mutating repository state. */
 export async function exportSpriteBoyPackage(
-  project: StudioProjectV1,
+  project: StudioProject,
   source: SpriteBoyPackageAssetSource,
   options: SpriteBoyPackageExportOptions = {},
 ): Promise<Blob> {
@@ -517,7 +517,7 @@ export async function exportSpriteBoyPackage(
 }
 
 async function exportSpriteBoyPackageNormalized(
-  project: StudioProjectV1,
+  project: StudioProject,
   source: NormalizedAssetSource,
   options: NormalizedExportOptions,
 ): Promise<Blob> {
@@ -603,7 +603,7 @@ async function exportSpriteBoyPackageNormalized(
     formatVersion: SPRITEBOY_PACKAGE_VERSION,
     project: {
       path: PROJECT_PATH,
-      schemaVersion: 1,
+      schemaVersion: STUDIO_PROJECT_SCHEMA_VERSION,
       sha256: projectIdentity.contentHash,
       byteSize: projectBytes.byteLength,
     },
@@ -756,7 +756,11 @@ function parseManifest(value: unknown): SpriteBoyPackageManifestV1 {
   const project = requireRecord(record.project, "$.project");
   requireExactKeys(project, ["path", "schemaVersion", "sha256", "byteSize"], "$.project");
   const sha256 = requireString(project.sha256, "$.project.sha256");
-  if (project.path !== PROJECT_PATH || project.schemaVersion !== 1 || !/^[0-9a-f]{64}$/.test(sha256)) {
+  if (
+    project.path !== PROJECT_PATH
+    || (project.schemaVersion !== 1 && project.schemaVersion !== STUDIO_PROJECT_SCHEMA_VERSION)
+    || !/^[0-9a-f]{64}$/.test(sha256)
+  ) {
     throw packageError(
       "SPRITEBOY_PACKAGE_MANIFEST_INVALID",
       "import",
@@ -793,7 +797,7 @@ function parseManifest(value: unknown): SpriteBoyPackageManifestV1 {
     formatVersion: 1,
     project: {
       path: PROJECT_PATH,
-      schemaVersion: 1,
+      schemaVersion: project.schemaVersion,
       sha256,
       byteSize: requireSafeSize(project.byteSize, "$.project.byteSize"),
     },
@@ -989,14 +993,14 @@ function decodeUtf8(bytes: Uint8Array, path: string): string {
   }
 }
 
-function expectedBlobGroups(project: StudioProjectV1): Map<string, BlobGroup> {
+function expectedBlobGroups(project: StudioProject): Map<string, BlobGroup> {
   const groups = groupProjectAssets(project, "import");
   return new Map(groups.map((group) => [group.record.blobKey, group]));
 }
 
 function assertManifestMatchesProject(
   manifest: SpriteBoyPackageManifestV1,
-  project: StudioProjectV1,
+  project: StudioProject,
 ): void {
   const expected = expectedBlobGroups(project);
   if (expected.size !== manifest.blobs.length) {
@@ -1181,7 +1185,7 @@ async function importSpriteBoyPackageNormalized(
       { path: PROJECT_PATH },
     );
   }
-  let project: StudioProjectV1;
+  let project: StudioProject;
   try {
     project = projectCodec.decode(decodeUtf8(projectBytes, PROJECT_PATH));
   } catch (cause) {

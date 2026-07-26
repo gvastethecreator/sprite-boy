@@ -1,7 +1,7 @@
 import type {
   Composition,
   Layer,
-  StudioProjectV1,
+  StudioProject,
   VariantKey,
 } from "./schema";
 import {
@@ -137,7 +137,7 @@ function setRecordValue<T extends Record<string, unknown>>(record: T, key: strin
 }
 
 function validateLayerSourceReference(
-  original: StudioProjectV1,
+  original: StudioProject,
   source: unknown,
   path: string,
 ): ProjectCommandDiagnostic | undefined {
@@ -164,7 +164,7 @@ function validateLayerSourceReference(
 }
 
 function validateCompositionCreatePayload(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "composition.create" }>,
 ): ProjectCommandDiagnostic | undefined {
   const compositionRecordDiagnostic = requirePlainRecord(
@@ -259,7 +259,7 @@ function validateCompositionCreatePayload(
 }
 
 function applyCompositionCreate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "composition.create" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -315,7 +315,7 @@ function applyCompositionCreate(
 }
 
 function validateLayerAddPayload(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "layer.add" }>,
 ): ProjectCommandDiagnostic | undefined {
   const compositionIdDiagnostic = requireEntityId(command.compositionId, "$.compositionId");
@@ -346,7 +346,7 @@ function validateLayerAddPayload(
 }
 
 function applyLayerAdd(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "layer.add" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -381,7 +381,7 @@ function applyLayerAdd(
 }
 
 function validateLayerPatch(
-  original: StudioProjectV1,
+  original: StudioProject,
   patch: unknown,
 ): ProjectCommandDiagnostic | undefined {
   const patchDiagnostic = requirePlainRecord(patch, "$.patch", "layer.update patch");
@@ -420,7 +420,7 @@ function hasUnsafeNameControls(value: string): boolean {
 }
 
 function validateCompositionPatch(
-  original: StudioProjectV1,
+  original: StudioProject,
   compositionId: string,
   patch: unknown,
 ): ProjectCommandDiagnostic | undefined {
@@ -515,7 +515,7 @@ function validateCompositionPatch(
 }
 
 function applyCompositionUpdate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "composition.update" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -576,7 +576,7 @@ function applyCompositionUpdate(
 }
 
 function applyLayerUpdate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "layer.update" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -635,7 +635,7 @@ function applyLayerUpdate(
 }
 
 function applyLayerReorder(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "layer.reorder" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -692,7 +692,7 @@ function applyLayerReorder(
 }
 
 function applyLayerDuplicate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "layer.duplicate" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -759,7 +759,7 @@ function applyLayerDuplicate(
 }
 
 function applyVariantActivate(
-  original: StudioProjectV1,
+  original: StudioProject,
   command: Extract<FamilyCommand, { type: "variant.activate" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
@@ -835,7 +835,7 @@ function applyVariantActivate(
  * malformed payloads for these five types are always contained as INVALID_PATCH.
  */
 export function applyCompositionFamilyCommand(
-  project: StudioProjectV1,
+  project: StudioProject,
   command: ProjectCommand,
   context: ProjectCommandContext,
 ): ProjectCommandResult | undefined {
