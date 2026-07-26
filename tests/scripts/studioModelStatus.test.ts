@@ -51,6 +51,7 @@ describe("studio model status CLI (M1-01)", () => {
 
     expect(result.models.map(({ modelId, status }) => [modelId, status.state])).toEqual([
       ["birefnet-lite-512", "absent"],
+      ["ben2-base", "absent"],
       ["rmbg-2.0", "license-required"],
     ]);
     expect(result.models[0]?.capacity.requiredStorageBytes).toBeGreaterThan(98_485_002);

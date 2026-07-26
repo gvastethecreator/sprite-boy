@@ -1,9 +1,13 @@
 import {
   isBackgroundRemovalWorkerResponse,
+  getBackgroundRemovalBrowserBackend,
+  isRunnableBackgroundRemovalModelId,
   type BackgroundRemovalWorkerProgress,
   type BackgroundRemovalWorkerRequest,
   type BackgroundRemovalWorkerSuccess,
+  type RunnableBackgroundRemovalModelId,
 } from "./backgroundRemovalProtocol";
+import { getLocalModelDefinition } from "../../../core/models";
 
 interface BackgroundRemovalWorkerPort {
   postMessage(message: unknown, transfer: Transferable[]): void;
@@ -16,6 +20,7 @@ interface BackgroundRemovalWorkerPort {
 
 export interface RunBackgroundRemovalOptions {
   readonly requestId?: string;
+  readonly modelId?: RunnableBackgroundRemovalModelId;
   readonly source: Blob;
   readonly weights: ArrayBuffer;
   readonly signal?: AbortSignal;
@@ -26,6 +31,7 @@ export interface RunBackgroundRemovalOptions {
 
 export interface BackgroundRemovalResult {
   readonly requestId: string;
+  readonly backend: "wasm" | "webgpu-wasm";
   readonly width: number;
   readonly height: number;
   readonly mask: Blob;
@@ -69,6 +75,12 @@ export function runBackgroundRemoval(options: RunBackgroundRemovalOptions): Prom
   if (!(options.weights instanceof ArrayBuffer) || options.weights.byteLength < 1) {
     return Promise.reject(new BackgroundRemovalRuntimeError("invalid-input", "Verified model weights are required."));
   }
+  const modelId = options.modelId ?? "birefnet-lite-512";
+  if (!isRunnableBackgroundRemovalModelId(modelId)) {
+    return Promise.reject(new BackgroundRemovalRuntimeError("invalid-input", "The local model cannot run background removal."));
+  }
+  const model = getLocalModelDefinition(modelId);
+  const backend = getBackgroundRemovalBrowserBackend(modelId);
   if (options.signal?.aborted) {
     return Promise.reject(new BackgroundRemovalRuntimeError("cancelled", "Background removal was cancelled."));
   }
@@ -109,6 +121,7 @@ export function runBackgroundRemoval(options: RunBackgroundRemovalOptions): Prom
       cleanup();
       resolve(Object.freeze({
         requestId,
+        backend: response.backend,
         width: response.width,
         height: response.height,
         mask: response.mask,
@@ -131,6 +144,10 @@ export function runBackgroundRemoval(options: RunBackgroundRemovalOptions): Prom
         fail(new BackgroundRemovalRuntimeError(event.data.code, event.data.message));
         return;
       }
+      if (event.data.backend !== backend) {
+        fail(new BackgroundRemovalRuntimeError("invalid-response", "The background removal worker returned the wrong backend."));
+        return;
+      }
       succeed(event.data);
     };
     const timer = setTimeout(
@@ -144,9 +161,10 @@ export function runBackgroundRemoval(options: RunBackgroundRemovalOptions): Prom
     const request: BackgroundRemovalWorkerRequest = {
       type: "run",
       requestId,
-      modelId: "birefnet-lite-512",
-      inputWidth: 512,
-      inputHeight: 512,
+      modelId,
+      backend,
+      inputWidth: model.runtime.inputWidth,
+      inputHeight: model.runtime.inputHeight,
       weights: options.weights,
       source: options.source,
     };

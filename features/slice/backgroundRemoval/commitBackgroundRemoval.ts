@@ -10,14 +10,14 @@ import type {
   GeneratedArtifact,
   ProcessingRecipe,
 } from "../../../core/project";
-import type { LocalModelId, ModelBackend } from "../../../core/models";
+import type { LocalModelId } from "../../../core/models";
 import type { ProjectStore } from "../../../core/stores";
 
 export interface BackgroundRemovalModelProvenance {
   readonly id: LocalModelId;
   readonly repositoryId: string;
   readonly revision: string;
-  readonly backend: ModelBackend;
+  readonly backend: BackgroundRemovalRecipeV1["model"]["backend"];
   readonly inputWidth: number;
   readonly inputHeight: number;
 }

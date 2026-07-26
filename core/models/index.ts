@@ -1,4 +1,5 @@
 export * from "./modelCatalog";
+export * from "./modelMask";
 export * from "./modelInstallManifest";
 export * from "./modelReadiness";
 export * from "./modelSetupJobTask";

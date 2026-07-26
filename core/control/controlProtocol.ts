@@ -3,6 +3,8 @@
  * No I/O, no React, no side effects. Hostile input is rejected with generic errors.
  */
 
+import { LOCAL_MODEL_IDS, type LocalModelId } from "../models/modelCatalog";
+
 export const STUDIO_CONTROL_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_CONTROL_MAX_REQUEST_BYTES = 1_048_576 as const;
 
@@ -95,7 +97,7 @@ export type StudioControlRequest =
       idempotencyKey: string;
       command: "model.status";
       expectedRevision: number | null;
-      params: { modelId: "birefnet-lite-512" | "rmbg-2.0" };
+      params: { modelId: LocalModelId };
     }
   | {
       version: 1;
@@ -104,7 +106,7 @@ export type StudioControlRequest =
       command: "model.setup";
       expectedRevision: number | null;
       params: {
-        modelId: "birefnet-lite-512" | "rmbg-2.0";
+        modelId: LocalModelId;
         acceptLicense: boolean;
       };
     }
@@ -200,8 +202,6 @@ const WORKSPACE_IDS = Object.freeze([
   "collision",
   "export",
 ] as const);
-
-const MODEL_IDS = Object.freeze(["birefnet-lite-512", "rmbg-2.0"] as const);
 
 const EXPORT_FORMATS = Object.freeze([
   "png",
@@ -427,24 +427,24 @@ function parseVideoImportParams(params: unknown): {
 }
 
 function parseModelStatusParams(params: unknown): {
-  modelId: "birefnet-lite-512" | "rmbg-2.0";
+  modelId: LocalModelId;
 } {
   assertSafePlainObject(params, INVALID_REQUEST);
   exactKeys(params, ["modelId"], INVALID_REQUEST);
   const modelId = readDataProp(params, "modelId", INVALID_REQUEST);
   if (
     typeof modelId !== "string" ||
-    !(MODEL_IDS as readonly string[]).includes(modelId)
+    !(LOCAL_MODEL_IDS as readonly string[]).includes(modelId)
   ) {
     throw new TypeError(INVALID_REQUEST);
   }
   return Object.freeze({
-    modelId: modelId as "birefnet-lite-512" | "rmbg-2.0",
+    modelId: modelId as LocalModelId,
   });
 }
 
 function parseModelSetupParams(params: unknown): {
-  modelId: "birefnet-lite-512" | "rmbg-2.0";
+  modelId: LocalModelId;
   acceptLicense: boolean;
 } {
   assertSafePlainObject(params, INVALID_REQUEST);
@@ -453,7 +453,7 @@ function parseModelSetupParams(params: unknown): {
   const acceptLicense = readDataProp(params, "acceptLicense", INVALID_REQUEST);
   if (
     typeof modelId !== "string" ||
-    !(MODEL_IDS as readonly string[]).includes(modelId)
+    !(LOCAL_MODEL_IDS as readonly string[]).includes(modelId)
   ) {
     throw new TypeError(INVALID_REQUEST);
   }
@@ -461,7 +461,7 @@ function parseModelSetupParams(params: unknown): {
     throw new TypeError(INVALID_REQUEST);
   }
   return Object.freeze({
-    modelId: modelId as "birefnet-lite-512" | "rmbg-2.0",
+    modelId: modelId as LocalModelId,
     acceptLicense,
   });
 }

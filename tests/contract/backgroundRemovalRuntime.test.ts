@@ -48,16 +48,27 @@ describe("background removal worker boundary", () => {
       type: "run",
       requestId: "request-1",
       modelId: "birefnet-lite-512",
+      backend: "wasm",
       inputWidth: 512,
       inputHeight: 512,
       weights: new ArrayBuffer(8),
       source: new Blob(["image"], { type: "image/png" }),
     };
     expect(isBackgroundRemovalWorkerRequest(request)).toBe(true);
+    expect(isBackgroundRemovalWorkerRequest({
+      ...request,
+      modelId: "ben2-base",
+      backend: "webgpu-wasm",
+      inputWidth: 1024,
+      inputHeight: 1024,
+    })).toBe(true);
+    expect(isBackgroundRemovalWorkerRequest({ ...request, modelId: "ben2-base" })).toBe(false);
+    expect(isBackgroundRemovalWorkerRequest({ ...request, backend: "webgpu" })).toBe(false);
     expect(isBackgroundRemovalWorkerRequest({ ...request, extra: true })).toBe(false);
     expect(isBackgroundRemovalWorkerResponse({
       type: "success",
       requestId: "request-1",
+      backend: "wasm",
       width: 2,
       height: 2,
       mask: new Blob(["mask"], { type: "image/png" }),
@@ -125,16 +136,51 @@ describe("background removal worker boundary", () => {
     worker.emit({
       type: "success",
       requestId: "request-2",
+      backend: "wasm",
       width: 4,
       height: 3,
       mask: new Blob(["mask"], { type: "image/png" }),
       output: new Blob(["output"], { type: "image/png" }),
     });
 
-    await expect(pending).resolves.toMatchObject({ requestId: "request-2", width: 4, height: 3 });
+    await expect(pending).resolves.toMatchObject({ requestId: "request-2", backend: "wasm", width: 4, height: 3 });
     expect(progress).toHaveBeenCalledTimes(1);
     expect(worker.terminated).toBe(1);
     expect(worker.messages.size).toBe(0);
+  });
+
+  it("sends the BEN2 runtime dimensions without changing the default model", async () => {
+    const defaultWorker = new FakeWorker();
+    const ben2Worker = new FakeWorker();
+    const defaultPending = runBackgroundRemoval({
+      requestId: "request-default",
+      source: new Blob(["image"], { type: "image/png" }),
+      weights: new ArrayBuffer(16),
+      workerFactory: () => defaultWorker,
+    });
+    const ben2Pending = runBackgroundRemoval({
+      requestId: "request-ben2",
+      modelId: "ben2-base",
+      source: new Blob(["image"], { type: "image/png" }),
+      weights: new ArrayBuffer(16),
+      workerFactory: () => ben2Worker,
+    });
+
+    expect(defaultWorker.posted).toMatchObject({
+      modelId: "birefnet-lite-512",
+      backend: "wasm",
+      inputWidth: 512,
+      inputHeight: 512,
+    });
+    expect(ben2Worker.posted).toMatchObject({
+      modelId: "ben2-base",
+      backend: "webgpu-wasm",
+      inputWidth: 1024,
+      inputHeight: 1024,
+    });
+    defaultWorker.emit({ type: "error", requestId: "request-default", code: "runtime-failed", message: "Stopped" });
+    ben2Worker.emit({ type: "error", requestId: "request-ben2", code: "runtime-failed", message: "Stopped" });
+    await Promise.allSettled([defaultPending, ben2Pending]);
   });
 
   it("terminates real work when the caller cancels", async () => {
@@ -181,5 +227,26 @@ describe("background removal worker boundary", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     await timedExpectation;
     expect(timeoutWorker.terminated).toBe(1);
+  });
+
+  it("rejects a success response from the wrong backend", async () => {
+    const worker = new FakeWorker();
+    const pending = runBackgroundRemoval({
+      requestId: "request-backend",
+      source: new Blob(["image"], { type: "image/png" }),
+      weights: new ArrayBuffer(16),
+      workerFactory: () => worker,
+    });
+    worker.emit({
+      type: "success",
+      requestId: "request-backend",
+      backend: "webgpu",
+      width: 4,
+      height: 3,
+      mask: new Blob(["mask"], { type: "image/png" }),
+      output: new Blob(["output"], { type: "image/png" }),
+    });
+    await expect(pending).rejects.toMatchObject({ code: "invalid-response" });
+    expect(worker.terminated).toBe(1);
   });
 });

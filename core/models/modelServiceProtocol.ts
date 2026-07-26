@@ -26,9 +26,14 @@ export interface LocalModelServiceSummary {
   readonly runtime: {
     readonly inputWidth: number;
     readonly inputHeight: number;
-    readonly dtype: "fp16" | "q4f16";
+    readonly dtype: "fp16" | "fp32" | "q4f16";
     readonly preferredBackends: readonly ModelBackend[];
     readonly minimumMemoryBytes: number;
+    readonly inputNormalization: "imagenet" | "zero-one";
+    readonly outputNormalization: "min-max" | "sigmoid";
+    readonly outputType: "float16" | "float32";
+    readonly inputName: string | null;
+    readonly outputName: string | null;
   };
   readonly status: {
     readonly state: LocalModelState;

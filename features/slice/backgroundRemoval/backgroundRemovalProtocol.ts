@@ -1,4 +1,29 @@
-import type { LocalModelId } from "../../../core/models";
+import { getLocalModelDefinition, type LocalModelId } from "../../../core/models";
+
+export const RUNNABLE_BACKGROUND_REMOVAL_MODEL_IDS = Object.freeze([
+  "birefnet-lite-512",
+  "ben2-base",
+] as const satisfies readonly LocalModelId[]);
+
+export type RunnableBackgroundRemovalModelId = typeof RUNNABLE_BACKGROUND_REMOVAL_MODEL_IDS[number];
+
+export type BackgroundRemovalBrowserBackend = "wasm" | "webgpu-wasm";
+
+const BROWSER_BACKENDS: Readonly<Record<RunnableBackgroundRemovalModelId, BackgroundRemovalBrowserBackend>> = Object.freeze({
+  "birefnet-lite-512": "wasm",
+  "ben2-base": "webgpu-wasm",
+});
+
+export function isRunnableBackgroundRemovalModelId(value: unknown): value is RunnableBackgroundRemovalModelId {
+  return typeof value === "string"
+    && (RUNNABLE_BACKGROUND_REMOVAL_MODEL_IDS as readonly string[]).includes(value);
+}
+
+export function getBackgroundRemovalBrowserBackend(
+  modelId: RunnableBackgroundRemovalModelId,
+): BackgroundRemovalBrowserBackend {
+  return BROWSER_BACKENDS[modelId];
+}
 
 export type BackgroundRemovalProgressPhase =
   | "decode"
@@ -10,9 +35,10 @@ export type BackgroundRemovalProgressPhase =
 export interface BackgroundRemovalWorkerRequest {
   readonly type: "run";
   readonly requestId: string;
-  readonly modelId: Extract<LocalModelId, "birefnet-lite-512">;
-  readonly inputWidth: 512;
-  readonly inputHeight: 512;
+  readonly modelId: RunnableBackgroundRemovalModelId;
+  readonly backend: BackgroundRemovalBrowserBackend;
+  readonly inputWidth: number;
+  readonly inputHeight: number;
   readonly weights: ArrayBuffer;
   readonly source: Blob;
 }
@@ -28,6 +54,7 @@ export interface BackgroundRemovalWorkerProgress {
 export interface BackgroundRemovalWorkerSuccess {
   readonly type: "success";
   readonly requestId: string;
+  readonly backend: BackgroundRemovalBrowserBackend;
   readonly width: number;
   readonly height: number;
   readonly mask: Blob;
@@ -92,12 +119,16 @@ export function readBackgroundRemovalRequestId(value: unknown): string | null {
 }
 
 export function isBackgroundRemovalWorkerRequest(value: unknown): value is BackgroundRemovalWorkerRequest {
-  const record = exactRecord(value, ["type", "requestId", "modelId", "inputWidth", "inputHeight", "weights", "source"]);
+  const record = exactRecord(value, ["type", "requestId", "modelId", "backend", "inputWidth", "inputHeight", "weights", "source"]);
+  const definition = isRunnableBackgroundRemovalModelId(record?.modelId)
+    ? getLocalModelDefinition(record.modelId)
+    : null;
   return record?.type === "run"
     && validRequestId(record.requestId)
-    && record.modelId === "birefnet-lite-512"
-    && record.inputWidth === 512
-    && record.inputHeight === 512
+    && definition !== null
+    && record.backend === getBackgroundRemovalBrowserBackend(record.modelId as RunnableBackgroundRemovalModelId)
+    && record.inputWidth === definition.runtime.inputWidth
+    && record.inputHeight === definition.runtime.inputHeight
     && isArrayBuffer(record.weights)
     && record.weights.byteLength > 0
     && isBlob(record.source)
@@ -131,8 +162,9 @@ export function isBackgroundRemovalWorkerResponse(value: unknown): value is Back
       && typeof record.message === "string";
   }
   if (type === "success") {
-    const record = exactRecord(value, ["type", "requestId", "width", "height", "mask", "output"]);
+    const record = exactRecord(value, ["type", "requestId", "backend", "width", "height", "mask", "output"]);
     return Boolean(record)
+      && (record?.backend === "wasm" || record?.backend === "webgpu-wasm")
       && Number.isSafeInteger(record?.width) && (record?.width as number) > 0
       && Number.isSafeInteger(record?.height) && (record?.height as number) > 0
       && isBlob(record?.mask) && record.mask.size > 0 && record.mask.type === "image/png"

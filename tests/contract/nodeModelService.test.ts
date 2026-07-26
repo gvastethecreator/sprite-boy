@@ -71,7 +71,7 @@ afterEach(async () => {
 });
 
 describe("node model service", () => {
-  it("lists both catalog models with isolated inspection and latest-job state", async () => {
+  it("lists all catalog models with isolated inspection and latest-job state", async () => {
     const root = await temporaryRoot();
     mocks.inspectLocalModel.mockImplementation(async (modelId: LocalModelId) => inspection(modelId, "absent"));
     mocks.install.mockImplementation(({ signal }: { signal: AbortSignal }) => new Promise((_, reject) => {
@@ -83,17 +83,19 @@ describe("node model service", () => {
     const snapshot = await service.list();
 
     expect(snapshot.version).toBe(1);
-    expect(snapshot.models.map(({ id }) => id)).toEqual(["birefnet-lite-512", "rmbg-2.0"]);
+    expect(snapshot.models.map(({ id }) => id)).toEqual(["birefnet-lite-512", "ben2-base", "rmbg-2.0"]);
     expect(snapshot.models[0]).toMatchObject({
       id: "birefnet-lite-512",
       repositoryId: "studioludens/birefnet-lite-512",
       status: { state: "absent" },
       job: { id: started.job?.id, kind: "model.setup" },
     });
-    expect(snapshot.models[1]).toMatchObject({ id: "rmbg-2.0", status: { state: "absent" }, job: null });
+    expect(snapshot.models[1]).toMatchObject({ id: "ben2-base", status: { state: "absent" }, job: null });
+    expect(snapshot.models[2]).toMatchObject({ id: "rmbg-2.0", status: { state: "absent" }, job: null });
     expect(mocks.inspectLocalModel.mock.calls.map(([modelId]) => modelId)).toEqual([
       "birefnet-lite-512",
       "birefnet-lite-512",
+      "ben2-base",
       "rmbg-2.0",
     ]);
     service.cancelJob(started.job!.id);

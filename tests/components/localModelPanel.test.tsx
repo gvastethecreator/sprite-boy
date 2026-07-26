@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AssetRepository } from "../../core/assets";
 import { createEmptyStudioProject } from "../../core/project";
 import type { JobSnapshot } from "../../core/processing";
-import type { LocalModelServiceSummary } from "../../core/models";
+import type { LocalModelId, LocalModelServiceSummary } from "../../core/models";
 import { createProjectStore } from "../../core/stores";
 import { LocalModelPanel } from "../../features/slice/backgroundRemoval/LocalModelPanel";
 
@@ -74,33 +74,40 @@ function renderPanel(options: { source?: boolean; strict?: boolean } = {}) {
 }
 
 function summary(
-  id: "birefnet-lite-512" | "rmbg-2.0",
+  id: LocalModelId,
   state: LocalModelServiceSummary["status"]["state"],
 ): LocalModelServiceSummary {
+  const ben2 = id === "ben2-base";
+  const rmbg = id === "rmbg-2.0";
   return {
     id,
-    label: id === "birefnet-lite-512" ? "BiRefNet Lite 512" : "RMBG 2.0",
-    repositoryId: id === "birefnet-lite-512" ? "studioludens/birefnet-lite-512" : "briaai/RMBG-2.0",
+    label: ben2 ? "BEN2 Base" : rmbg ? "RMBG 2.0" : "BiRefNet Lite 512",
+    repositoryId: ben2 ? "PramaLLC/BEN2" : rmbg ? "briaai/RMBG-2.0" : "studioludens/birefnet-lite-512",
     revision: "a".repeat(40),
-    gated: id === "rmbg-2.0",
+    gated: rmbg,
     license: {
-      id: id === "rmbg-2.0" ? "bria-rmbg-2.0" : "MIT",
-      name: id === "rmbg-2.0" ? "CC BY-NC 4.0 for non-commercial use" : "MIT License",
-      use: id === "rmbg-2.0" ? "non-commercial" : "permissive",
+      id: rmbg ? "bria-rmbg-2.0" : "MIT",
+      name: rmbg ? "CC BY-NC 4.0 for non-commercial use" : "MIT License",
+      use: rmbg ? "non-commercial" : "permissive",
       url: "https://huggingface.co/model",
-      acceptanceUrl: id === "rmbg-2.0" ? "https://huggingface.co/model" : null,
+      acceptanceUrl: rmbg ? "https://huggingface.co/model" : null,
     },
     runtime: {
-      inputWidth: id === "rmbg-2.0" ? 1024 : 512,
-      inputHeight: id === "rmbg-2.0" ? 1024 : 512,
-      dtype: id === "rmbg-2.0" ? "q4f16" : "fp16",
-      preferredBackends: id === "rmbg-2.0" ? ["webgpu"] : ["webgpu", "wasm"],
-      minimumMemoryBytes: 1_073_741_824,
+      inputWidth: ben2 || rmbg ? 1024 : 512,
+      inputHeight: ben2 || rmbg ? 1024 : 512,
+      dtype: ben2 ? "fp32" : rmbg ? "q4f16" : "fp16",
+      preferredBackends: ben2 ? ["webgpu", "wasm"] : rmbg ? ["webgpu"] : ["webgpu", "wasm"],
+      minimumMemoryBytes: ben2 ? 4_831_838_208 : 1_073_741_824,
+      inputNormalization: ben2 ? "zero-one" : "imagenet",
+      outputNormalization: ben2 ? "min-max" : "sigmoid",
+      outputType: ben2 ? "float16" : "float32",
+      inputName: ben2 ? "input.1" : rmbg ? null : "input_image",
+      outputName: ben2 ? "17728" : rmbg ? null : "output_image",
     },
     status: {
       state,
       verifiedBytes: state === "ready" ? 98_484_532 : 0,
-      totalBytes: id === "rmbg-2.0" ? 233_816_089 : 98_485_002,
+      totalBytes: ben2 ? 222_932_053 : rmbg ? 233_816_089 : 98_485_002,
       problems: state === "license-required" ? ["license-required"] : [],
     },
     capacity: {
@@ -240,6 +247,78 @@ describe("LocalModelPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove background" }));
     await waitFor(() => expect(screen.getByText("Decoding source image")).toBeInTheDocument());
     expect(screen.getByRole("progressbar", { name: "Background removal progress" })).toHaveAttribute("aria-valuenow", "19");
+  });
+
+  it("offers BEN2 as an optional runner while keeping BiRefNet selected by default", async () => {
+    vi.stubGlobal("navigator", { gpu: {} });
+    if (typeof globalThis.OffscreenCanvas !== "function") {
+      vi.stubGlobal("OffscreenCanvas", class OffscreenCanvas {});
+    }
+    if (typeof globalThis.createImageBitmap !== "function") {
+      vi.stubGlobal("createImageBitmap", vi.fn());
+    }
+    const getWeights = vi.fn(async () => new ArrayBuffer(16));
+    bridgeState.current = {
+      snapshot: { status: "connected", message: "Connected", clientId: "client", activeOperations: 0 },
+      models: {
+        list: vi.fn(async () => ({
+          version: 1 as const,
+          models: [summary("birefnet-lite-512", "ready"), summary("ben2-base", "ready")],
+        })),
+        getWeights,
+      },
+    };
+    runBackgroundRemovalMock.mockImplementation(() => new Promise(() => undefined));
+    jobRunnerState.current = {
+      run: vi.fn((job, task) => {
+        const controller = new AbortController();
+        return {
+          jobId: job.id,
+          requestId: job.requestId,
+          result: Promise.resolve(task({
+            requestId: job.requestId,
+            signal: controller.signal,
+            reportProgress: () => true,
+          })),
+          cancel: () => {
+            controller.abort();
+            return true;
+          },
+        };
+      }),
+    };
+
+    renderPanel({ source: true });
+    await waitFor(() => expect(screen.getByLabelText("Local model")).toHaveValue("birefnet-lite-512"));
+    fireEvent.change(screen.getByLabelText("Local model"), { target: { value: "ben2-base" } });
+    await waitFor(() => expect(screen.getByText(/1024 WebGPU model.*BiRefNet Lite remains the default/)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Remove background" }));
+    await waitFor(() => expect(getWeights).toHaveBeenCalledWith("ben2-base", expect.any(AbortSignal)));
+    expect(runBackgroundRemovalMock).toHaveBeenCalledWith(expect.objectContaining({ modelId: "ben2-base" }));
+  });
+
+  it("keeps BEN2 inference disabled when WebGPU is unavailable", async () => {
+    if (typeof globalThis.OffscreenCanvas !== "function") {
+      vi.stubGlobal("OffscreenCanvas", class OffscreenCanvas {});
+    }
+    if (typeof globalThis.createImageBitmap !== "function") {
+      vi.stubGlobal("createImageBitmap", vi.fn());
+    }
+    bridgeState.current = {
+      snapshot: { status: "connected", message: "Connected", clientId: "client", activeOperations: 0 },
+      models: {
+        list: vi.fn(async () => ({
+          version: 1 as const,
+          models: [summary("birefnet-lite-512", "ready"), summary("ben2-base", "ready")],
+        })),
+      },
+    };
+
+    renderPanel({ source: true });
+    await waitFor(() => expect(screen.getByLabelText("Local model")).toHaveValue("birefnet-lite-512"));
+    fireEvent.change(screen.getByLabelText("Local model"), { target: { value: "ben2-base" } });
+    await waitFor(() => expect(screen.getByText(/cannot run the verified local model/)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Remove background" })).toBeDisabled();
   });
 
   it("keeps inference disabled when local capacity blocks the runtime", async () => {

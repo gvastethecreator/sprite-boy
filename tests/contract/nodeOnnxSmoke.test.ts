@@ -7,11 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const ortMocks = vi.hoisted(() => {
   class Tensor {
     readonly type: string;
-    readonly data: Float32Array | Uint8Array;
+    readonly data: Float32Array | Uint16Array | Uint8Array;
     readonly dims: readonly number[];
     readonly size: number;
 
-    constructor(type: string, data: Float32Array | Uint8Array, dims: readonly number[]) {
+    constructor(type: string, data: Float32Array | Uint16Array | Uint8Array, dims: readonly number[]) {
       this.type = type;
       this.data = data;
       this.dims = dims;
@@ -40,6 +40,7 @@ import { createNodeOnnxSmokeRunner } from "../../core/models/nodeOnnxSmoke";
 
 const temporaryDirectories: string[] = [];
 const model = getLocalModelDefinition("birefnet-lite-512");
+const ben2 = getLocalModelDefinition("ben2-base");
 const pixelCount = model.runtime.inputWidth * model.runtime.inputHeight;
 
 interface FakeSession {
@@ -50,7 +51,7 @@ interface FakeSession {
 }
 
 function tensor(
-  data: Float32Array | Uint8Array = new Float32Array(pixelCount),
+  data: Float32Array | Uint16Array | Uint8Array = new Float32Array(pixelCount),
   type = "float32",
   dims: readonly number[] = [1, 1, model.runtime.inputHeight, model.runtime.inputWidth],
 ) {
@@ -70,12 +71,12 @@ function session(options: {
   };
 }
 
-async function modelRoot(): Promise<string> {
+async function modelRoot(definition: LocalModelDefinition = model): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sprite-boy-onnx-smoke-"));
   temporaryDirectories.push(root);
-  const onnx = model.files.find((file) => file.path.endsWith(".onnx"));
+  const onnx = definition.files.find((file) => file.path.endsWith(".onnx"));
   expect(onnx).toBeDefined();
-  const path = join(root, model.id, onnx!.path);
+  const path = join(root, definition.id, onnx!.path);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, new Uint8Array([0x08, 0x01, 0x12, 0x02]));
   return root;
@@ -124,6 +125,42 @@ describe("node ONNX smoke runner", () => {
     });
     expect(evidence.completedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u);
     expect(evidence.peakMemoryBytes).toBeGreaterThan(0);
+    expect(fake.release).toHaveBeenCalledOnce();
+  });
+
+  it("runs BEN2 with zero-one input, pinned tensor names and min-max output", async () => {
+    const root = await modelRoot(ben2);
+    const ben2Pixels = ben2.runtime.inputWidth * ben2.runtime.inputHeight;
+    const output = new Uint16Array(ben2Pixels);
+    for (let index = 0; index < output.length; index += 1) output[index] = index % 2 === 0 ? 0 : 0x3c00;
+    const fake = session({
+      inputNames: ["input.1"],
+      outputNames: ["17728"],
+      run: vi.fn(async () => ({
+        "17728": new ortMocks.Tensor(
+          "float16",
+          output,
+          [1, 1, ben2.runtime.inputHeight, ben2.runtime.inputWidth],
+        ),
+      })),
+    });
+    ortMocks.create.mockResolvedValue(fake);
+
+    const evidence = await run(root, new AbortController().signal, ben2);
+
+    const feeds = fake.run.mock.calls[0]![0] as { "input.1": InstanceType<typeof ortMocks.Tensor> };
+    expect(feeds["input.1"]).toMatchObject({
+      dims: [1, 3, 1024, 1024],
+      size: 3_145_728,
+    });
+    expect(feeds["input.1"].data[0]).toBeGreaterThanOrEqual(0);
+    expect(feeds["input.1"].data[0]).toBeLessThanOrEqual(1);
+    expect(evidence).toMatchObject({
+      status: "passed",
+      backend: "wasm",
+      catalogFingerprint: modelCatalogFingerprint(ben2),
+    });
+    expect(evidence.outputSha256).toMatch(/^sha256:[0-9a-f]{64}$/u);
     expect(fake.release).toHaveBeenCalledOnce();
   });
 
@@ -180,8 +217,8 @@ describe("node ONNX smoke runner", () => {
 
   it.each([
     ["missing output", undefined, "Model inference returned no output image."],
-    ["wrong tensor type", tensor(new Float32Array(pixelCount), "float64"), "Model output tensor is invalid."],
-    ["wrong tensor size", tensor(new Float32Array(4), "float32", [1, 1, 2, 2]), "Model output tensor is invalid."],
+    ["wrong tensor type", tensor(new Float32Array(pixelCount), "float64"), "Model output tensor type is invalid."],
+    ["wrong tensor size", tensor(new Float32Array(4), "float32", [1, 1, 2, 2]), "Model output tensor size is invalid."],
     ["non-finite mask", tensor(new Float32Array(pixelCount).fill(Number.NaN)), "Model mask contains invalid values."],
   ])("rejects %s and still releases the session", async (_label, output, message) => {
     const root = await modelRoot();

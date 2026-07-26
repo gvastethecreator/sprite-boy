@@ -138,7 +138,7 @@ describe("parseStudioControlRequest — valid commands", () => {
   });
 
   it("parses model.status and model.setup", () => {
-    for (const modelId of ["birefnet-lite-512", "rmbg-2.0"] as const) {
+    for (const modelId of ["birefnet-lite-512", "ben2-base", "rmbg-2.0"] as const) {
       const status = parseStudioControlRequest(
         req("model.status", { modelId }),
       );

@@ -4,7 +4,8 @@ import { join } from "node:path";
 
 import * as ort from "onnxruntime-web";
 
-import { modelCatalogFingerprint } from "./modelCatalog";
+import { modelCatalogFingerprint, type LocalModelDefinition } from "./modelCatalog";
+import { normalizeModelMaskTensor } from "./modelMask";
 import type { NodeModelSmokeRunner } from "./nodeModelSetup";
 import type { ModelSmokeEvidence } from "./modelReadiness";
 
@@ -22,7 +23,8 @@ async function serialized<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
-function fixtureTensor(width: number, height: number): ort.Tensor {
+function fixtureTensor(model: LocalModelDefinition): ort.Tensor {
+  const { inputHeight: height, inputWidth: width, inputNormalization } = model.runtime;
   const pixels = width * height;
   const data = new Float32Array(pixels * 3);
   const mean = [0.485, 0.456, 0.406] as const;
@@ -33,30 +35,34 @@ function fixtureTensor(width: number, height: number): ort.Tensor {
       const colors = foreground ? [245, 74, 38] : [16, 24, 32];
       const pixel = y * width + x;
       for (let channel = 0; channel < 3; channel += 1) {
-        data[channel * pixels + pixel] = (colors[channel]! / 255 - mean[channel]!) / standardDeviation[channel]!;
+        const value = colors[channel]! / 255;
+        data[channel * pixels + pixel] = inputNormalization === "imagenet"
+          ? (value - mean[channel]!) / standardDeviation[channel]!
+          : value;
       }
     }
   }
   return new ort.Tensor("float32", data, [1, 3, height, width]);
 }
 
-function hashMask(tensor: ort.Tensor, expectedSize: number): string {
-  if (tensor.type !== "float32" || tensor.size !== expectedSize || !(tensor.data instanceof Float32Array)) {
-    throw new TypeError("Model output tensor is invalid.");
-  }
-  const bytes = new Uint8Array(expectedSize);
-  for (let index = 0; index < tensor.data.length; index += 1) {
-    const value = 1 / (1 + Math.exp(-tensor.data[index]!));
-    if (!Number.isFinite(value) || value < 0 || value > 1) throw new TypeError("Model mask contains invalid values.");
-    bytes[index] = Math.round(value * 255);
-  }
+function hashMask(
+  tensor: ort.Tensor,
+  expectedSize: number,
+  model: LocalModelDefinition,
+): string {
+  const bytes = normalizeModelMaskTensor(
+    tensor,
+    expectedSize,
+    model.runtime.outputType,
+    model.runtime.outputNormalization,
+  );
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 export function createNodeOnnxSmokeRunner(): NodeModelSmokeRunner {
   return Object.freeze({
     run: ({ model, modelsRoot, signal }: Parameters<NodeModelSmokeRunner["run"]>[0]): Promise<ModelSmokeEvidence> => serialized(async () => {
-      if (model.id !== "birefnet-lite-512" || !model.runtime.preferredBackends.includes("wasm")) {
+      if (!model.runtime.preferredBackends.includes("wasm")) {
         throw new TypeError(`No WASM smoke is defined for ${model.id}.`);
       }
       if (signal.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
@@ -76,18 +82,26 @@ export function createNodeOnnxSmokeRunner(): NodeModelSmokeRunner {
           graphOptimizationLevel: "all",
           logSeverityLevel: 3,
         });
+        const inputName = session.inputNames[0];
+        const outputName = session.outputNames[0];
         if (
-          session.inputNames.length !== 1 || session.inputNames[0] !== "input_image"
-          || session.outputNames.length !== 1 || session.outputNames[0] !== "output_image"
+          session.inputNames.length !== 1 || !inputName
+          || session.outputNames.length !== 1 || !outputName
+          || (model.runtime.inputName !== null && inputName !== model.runtime.inputName)
+          || (model.runtime.outputName !== null && outputName !== model.runtime.outputName)
         ) throw new TypeError("Model input or output names are invalid.");
         if (signal.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
-        const input = fixtureTensor(model.runtime.inputWidth, model.runtime.inputHeight);
-        const outputs = await session.run({ input_image: input });
+        const input = fixtureTensor(model);
+        const outputs = await session.run({ [inputName]: input });
         sampleMemory();
         if (signal.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
-        const output = outputs.output_image;
+        const output = outputs[outputName];
         if (!output) throw new TypeError("Model inference returned no output image.");
-        const outputSha256 = hashMask(output, model.runtime.inputWidth * model.runtime.inputHeight);
+        const outputSha256 = hashMask(
+          output,
+          model.runtime.inputWidth * model.runtime.inputHeight,
+          model,
+        );
         return Object.freeze({
           status: "passed" as const,
           catalogFingerprint: modelCatalogFingerprint(model),

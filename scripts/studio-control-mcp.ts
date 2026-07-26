@@ -11,6 +11,7 @@ import {
   type StudioControlRequest,
   type StudioControlResponse,
 } from "../core/control/controlProtocol";
+import { LOCAL_MODEL_IDS } from "../core/models/modelCatalog";
 
 const MCP_SERVER_NAME = "spriteboy-studio";
 const MCP_SERVER_VERSION = "1.0.0";
@@ -295,9 +296,9 @@ async function main(): Promise<void> {
     "spriteboy_model_status",
     {
       title: "Check a SpriteBoy local model",
-      description: "Read verified local setup state for BiRefNet Lite or RMBG 2.0.",
+      description: "Read verified local setup state for BiRefNet Lite, BEN2 Base or RMBG 2.0.",
       inputSchema: z.object({
-        modelId: z.enum(["birefnet-lite-512", "rmbg-2.0"]),
+        modelId: z.enum(LOCAL_MODEL_IDS),
         ...commonInput,
       }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
@@ -319,9 +320,9 @@ async function main(): Promise<void> {
     "spriteboy_model_setup",
     {
       title: "Set up a SpriteBoy local model",
-      description: "Start verified local model setup. RMBG 2.0 still requires explicit license acceptance.",
+      description: "Start verified local model setup. BEN2 Base is optional; RMBG 2.0 still requires explicit license acceptance.",
       inputSchema: z.object({
-        modelId: z.enum(["birefnet-lite-512", "rmbg-2.0"]),
+        modelId: z.enum(LOCAL_MODEL_IDS),
         acceptLicense: z.boolean(),
         ...commonInput,
       }).strict(),

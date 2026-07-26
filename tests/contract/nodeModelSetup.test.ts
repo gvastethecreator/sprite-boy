@@ -34,6 +34,11 @@ const tinyModel: LocalModelDefinition = Object.freeze({
     inputHeight: 1,
     preferredBackends: ["wasm" as const],
     minimumMemoryBytes: 1,
+    inputNormalization: "imagenet" as const,
+    outputNormalization: "sigmoid" as const,
+    outputType: "float32" as const,
+    inputName: "input_image" as const,
+    outputName: "output_image" as const,
   },
   files: [{
     path: "onnx/model_fp16.onnx",

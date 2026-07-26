@@ -1,6 +1,12 @@
 export const MODEL_CATALOG_SCHEMA_VERSION = 1 as const;
 
-export type LocalModelId = "birefnet-lite-512" | "rmbg-2.0";
+export const LOCAL_MODEL_IDS = Object.freeze([
+  "birefnet-lite-512",
+  "ben2-base",
+  "rmbg-2.0",
+] as const);
+
+export type LocalModelId = typeof LOCAL_MODEL_IDS[number];
 export type ModelDigestAlgorithm = "sha256" | "git-sha1";
 export type ModelBackend = "webgpu" | "wasm";
 
@@ -32,11 +38,16 @@ export interface LocalModelDefinition {
   };
   readonly runtime: {
     readonly task: "image-segmentation";
-    readonly dtype: "fp16" | "q4f16";
+    readonly dtype: "fp16" | "fp32" | "q4f16";
     readonly inputWidth: number;
     readonly inputHeight: number;
     readonly preferredBackends: readonly ModelBackend[];
     readonly minimumMemoryBytes: number;
+    readonly inputNormalization: "imagenet" | "zero-one";
+    readonly outputNormalization: "min-max" | "sigmoid";
+    readonly outputType: "float16" | "float32";
+    readonly inputName: string | null;
+    readonly outputName: string | null;
   };
   readonly files: readonly ModelFileSpec[];
 }
@@ -52,6 +63,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 const BIREFNET_REVISION = "4a3c40c36c94093cc1e724d9ea428b8fa4b57dc7";
+const BEN2_REVISION = "e48a20765fb421d19dcdb0bf3cc61e802ca5ec8f";
 const RMBG_REVISION = "5df4c9c76d8170882c34f6986e848ee07fd0ba43";
 
 export const LOCAL_MODEL_CATALOG: Readonly<Record<LocalModelId, LocalModelDefinition>> = deepFreeze({
@@ -76,6 +88,11 @@ export const LOCAL_MODEL_CATALOG: Readonly<Record<LocalModelId, LocalModelDefini
       inputHeight: 512,
       preferredBackends: ["webgpu", "wasm"],
       minimumMemoryBytes: 1_073_741_824,
+      inputNormalization: "imagenet",
+      outputNormalization: "sigmoid",
+      outputType: "float32",
+      inputName: "input_image",
+      outputName: "output_image",
     },
     files: [
       {
@@ -115,6 +132,45 @@ export const LOCAL_MODEL_CATALOG: Readonly<Record<LocalModelId, LocalModelDefini
       },
     ],
   },
+  "ben2-base": {
+    schemaVersion: MODEL_CATALOG_SCHEMA_VERSION,
+    id: "ben2-base",
+    label: "BEN2 Base",
+    repositoryId: "PramaLLC/BEN2",
+    revision: BEN2_REVISION,
+    gated: false,
+    license: {
+      id: "MIT",
+      name: "MIT License",
+      use: "permissive",
+      url: "https://huggingface.co/PramaLLC/BEN2",
+      acceptanceUrl: null,
+    },
+    runtime: {
+      task: "image-segmentation",
+      dtype: "fp32",
+      inputWidth: 1024,
+      inputHeight: 1024,
+      preferredBackends: ["webgpu", "wasm"],
+      minimumMemoryBytes: 4_831_838_208,
+      inputNormalization: "zero-one",
+      outputNormalization: "min-max",
+      outputType: "float16",
+      inputName: "input.1",
+      outputName: "17728",
+    },
+    files: [
+      {
+        path: "ben2-base.onnx",
+        byteSize: 222_932_053,
+        digest: {
+          algorithm: "sha256",
+          value: "22cea62108ff53b7ccc20f7a008bf30494228d84b1687f29ecbe76936a998101",
+        },
+        downloadUrl: pinnedUrl("PramaLLC/BEN2", BEN2_REVISION, "BEN2_Base.onnx"),
+      },
+    ],
+  },
   "rmbg-2.0": {
     schemaVersion: MODEL_CATALOG_SCHEMA_VERSION,
     id: "rmbg-2.0",
@@ -136,6 +192,11 @@ export const LOCAL_MODEL_CATALOG: Readonly<Record<LocalModelId, LocalModelDefini
       inputHeight: 1024,
       preferredBackends: ["webgpu"],
       minimumMemoryBytes: 2_147_483_648,
+      inputNormalization: "imagenet",
+      outputNormalization: "sigmoid",
+      outputType: "float32",
+      inputName: null,
+      outputName: null,
     },
     files: [
       {
@@ -182,8 +243,20 @@ export function modelInstallByteSize(model: LocalModelDefinition): number {
 }
 
 export function modelCatalogFingerprint(model: LocalModelDefinition): string {
+  const runtime = [
+    model.runtime.task,
+    model.runtime.dtype,
+    `${model.runtime.inputWidth}x${model.runtime.inputHeight}`,
+    model.runtime.preferredBackends.join(","),
+    model.runtime.minimumMemoryBytes,
+    model.runtime.inputNormalization,
+    model.runtime.outputNormalization,
+    model.runtime.outputType,
+    model.runtime.inputName ?? "auto",
+    model.runtime.outputName ?? "auto",
+  ].join(":");
   const files = model.files
     .map((file) => `${file.path}:${file.byteSize}:${file.digest.algorithm}:${file.digest.value}`)
     .join("|");
-  return `${MODEL_CATALOG_SCHEMA_VERSION}:${model.id}:${model.revision}:${files}`;
+  return `${MODEL_CATALOG_SCHEMA_VERSION}:${model.id}:${model.revision}:${runtime}:${files}`;
 }

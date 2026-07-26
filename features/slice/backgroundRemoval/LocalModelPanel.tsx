@@ -17,6 +17,11 @@ import {
   BackgroundRemovalRuntimeError,
   runBackgroundRemoval,
 } from "./runBackgroundRemoval";
+import {
+  getBackgroundRemovalBrowserBackend,
+  isRunnableBackgroundRemovalModelId,
+  type BackgroundRemovalBrowserBackend,
+} from "./backgroundRemovalProtocol";
 
 export interface LocalModelPanelProps {
   readonly store: ProjectStore;
@@ -32,6 +37,7 @@ interface BackgroundRemovalPreview {
   readonly height: number;
   readonly output: Blob;
   readonly model: LocalModelServiceSummary;
+  readonly backend: BackgroundRemovalBrowserBackend;
   readonly urls: {
     readonly source: string;
     readonly mask: string;
@@ -101,6 +107,7 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
     readonly mask: Blob;
     readonly width: number;
     readonly height: number;
+    readonly backend: BackgroundRemovalBrowserBackend;
   }> | null>(null);
   const previewRef = useRef<BackgroundRemovalPreview | null>(null);
   const inferenceRevisionRef = useRef<number | null>(null);
@@ -214,21 +221,28 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
     label: model.label,
   })) ?? [
     { value: "birefnet-lite-512", label: "BiRefNet Lite 512" },
+    { value: "ben2-base", label: "BEN2 Base" },
     { value: "rmbg-2.0", label: "RMBG 2.0" },
   ], [snapshot]);
   const connected = bridge.snapshot.status === "connected" && bridge.models !== null;
   const setupRunning = Boolean(job && !terminal(job));
   const inferenceRunning = inferenceProgress !== null;
   const sourceReady = selectedAsset?.media.type === "image";
+  const selectedBackend = selected && isRunnableBackgroundRemovalModelId(selected.id)
+    ? getBackgroundRemovalBrowserBackend(selected.id)
+    : null;
+  const webGpuReady = selectedBackend !== "webgpu-wasm"
+    || (typeof navigator === "object" && "gpu" in navigator && navigator.gpu !== undefined);
   const browserRuntimeReady = typeof Worker === "function"
     && typeof OffscreenCanvas === "function"
     && typeof createImageBitmap === "function"
-    && typeof WebAssembly === "object";
+    && typeof WebAssembly === "object"
+    && webGpuReady;
   const capacityBlocksInference = selected?.capacity.problems.some((problem) => (
     problem === "backend-unavailable" || problem === "memory-insufficient"
   )) ?? false;
   const inferenceReady = selected?.status.state === "ready"
-    && selected.id === "birefnet-lite-512"
+    && isRunnableBackgroundRemovalModelId(selected.id)
     && sourceReady
     && browserRuntimeReady
     && !capacityBlocksInference;
@@ -263,7 +277,11 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
 
   const startInference = async () => {
     if (
-      !bridge.models || !selected || !inferenceReady || !selectedAsset || !selectedAssetId
+      !bridge.models || !selected || !selectedAsset || !selectedAssetId
+    ) return;
+    const modelId = selected.id;
+    if (
+      !inferenceReady || !isRunnableBackgroundRemovalModelId(modelId)
       || inferenceRunning || inferenceRef.current || accepting
     ) return;
     const models = bridge.models;
@@ -282,6 +300,7 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
       readonly mask: Blob;
       readonly width: number;
       readonly height: number;
+      readonly backend: BackgroundRemovalBrowserBackend;
     }>;
     try {
       handle = jobRunner.run(createQueuedJob({
@@ -298,11 +317,12 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
           const source = await assets.getBlob(selectedAssetId, { signal });
           reportProgress({ ratio: 0.08, phase: "weights", message: "Reading verified model weights" });
           if (mountedRef.current) setInferenceProgress({ ratio: 0.08, message: "Reading verified model weights" });
-          const weights = await models.getWeights("birefnet-lite-512", signal);
+          const weights = await models.getWeights(modelId, signal);
           reportProgress({ ratio: 0.15, phase: "runtime", message: "Starting local model" });
           if (mountedRef.current) setInferenceProgress({ ratio: 0.15, message: "Starting local model" });
           const result = await runBackgroundRemoval({
             requestId,
+            modelId,
             source,
             weights,
             signal,
@@ -318,6 +338,7 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
             mask: result.mask,
             width: result.width,
             height: result.height,
+            backend: result.backend,
           };
         } catch (reason) {
           throw new JobTaskError("runtime-failure", safeMessage(reason), false);
@@ -349,6 +370,7 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
         height: result.value.height,
         output: result.value.output,
         model,
+        backend: result.value.backend,
         urls,
       };
       previewRef.current = nextPreview;
@@ -387,7 +409,7 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
           id: preview.model.id,
           repositoryId: preview.model.repositoryId,
           revision: preview.model.revision,
-          backend: "wasm",
+          backend: preview.backend,
           inputWidth: preview.model.runtime.inputWidth,
           inputHeight: preview.model.runtime.inputHeight,
         },
@@ -490,7 +512,10 @@ export function LocalModelPanel({ assets, onCleanupDebtChange, store }: LocalMod
                 {selectedId === "rmbg-2.0" ? (
                   <p className="mt-2 text-amber-200">RMBG execution stays locked until its exact license and WebGPU smoke are complete.</p>
                 ) : null}
-                {selectedId === "birefnet-lite-512" && (!browserRuntimeReady || capacityBlocksInference) ? (
+                {selectedId === "ben2-base" ? (
+                  <p className="mt-2 text-textMuted">Experimental 1024 WebGPU model. BiRefNet Lite remains the default.</p>
+                ) : null}
+                {isRunnableBackgroundRemovalModelId(selectedId) && (!browserRuntimeReady || capacityBlocksInference) ? (
                   <p role="alert" className="mt-2 text-amber-200">This browser cannot run the verified local model with its current runtime or memory.</p>
                 ) : null}
               </div>

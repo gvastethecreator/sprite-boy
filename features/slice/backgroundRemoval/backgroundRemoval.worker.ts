@@ -1,6 +1,11 @@
 /// <reference lib="webworker" />
 
-import type * as Ort from "onnxruntime-web/wasm";
+import type * as Ort from "onnxruntime-web";
+import {
+  getLocalModelDefinition,
+  normalizeModelMaskTensor,
+  type LocalModelDefinition,
+} from "../../../core/models";
 import { GRID_PROCESSING_LIMITS } from "../../../core/processing/gridProcessingLimits";
 import {
   isBackgroundRemovalWorkerRequest,
@@ -27,7 +32,13 @@ function failure(requestId: string, code: BackgroundRemovalWorkerFailure["code"]
   return { type: "error", requestId, code, message };
 }
 
-function preprocess(ort: typeof Ort, bitmap: ImageBitmap, width: number, height: number): Ort.Tensor {
+function preprocess(
+  ort: typeof Ort,
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  normalization: LocalModelDefinition["runtime"]["inputNormalization"],
+): Ort.Tensor {
   const canvas = new OffscreenCanvas(width, height);
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new TypeError("Image preprocessing is unavailable.");
@@ -41,18 +52,13 @@ function preprocess(ort: typeof Ort, bitmap: ImageBitmap, width: number, height:
   for (let pixel = 0; pixel < planeSize; pixel += 1) {
     const rgba = pixel * 4;
     for (let channel = 0; channel < 3; channel += 1) {
-      tensor[channel * planeSize + pixel] = (
-        pixels[rgba + channel]! / 255 - MEAN[channel]!
-      ) / STANDARD_DEVIATION[channel]!;
+      const value = pixels[rgba + channel]! / 255;
+      tensor[channel * planeSize + pixel] = normalization === "imagenet"
+        ? (value - MEAN[channel]!) / STANDARD_DEVIATION[channel]!
+        : value;
     }
   }
   return new ort.Tensor("float32", tensor, [1, 3, height, width]);
-}
-
-function sigmoid(value: number): number {
-  if (value >= 0) return 1 / (1 + Math.exp(-value));
-  const exp = Math.exp(value);
-  return exp / (1 + exp);
 }
 
 async function renderResults(
@@ -60,18 +66,21 @@ async function renderResults(
   tensor: Ort.Tensor,
   modelWidth: number,
   modelHeight: number,
+  outputType: LocalModelDefinition["runtime"]["outputType"],
+  normalization: LocalModelDefinition["runtime"]["outputNormalization"],
 ): Promise<{ mask: Blob; output: Blob }> {
-  if (tensor.type !== "float32" || !(tensor.data instanceof Float32Array) || tensor.size !== modelWidth * modelHeight) {
-    throw new TypeError("Model output tensor is invalid.");
-  }
+  const maskBytes = normalizeModelMaskTensor(
+    tensor,
+    modelWidth * modelHeight,
+    outputType,
+    normalization,
+  );
   const lowCanvas = new OffscreenCanvas(modelWidth, modelHeight);
   const lowContext = lowCanvas.getContext("2d");
   if (!lowContext) throw new TypeError("Mask rendering is unavailable.");
   const lowMask = lowContext.createImageData(modelWidth, modelHeight);
-  for (let index = 0; index < tensor.data.length; index += 1) {
-    const value = sigmoid(tensor.data[index]!);
-    if (!Number.isFinite(value)) throw new TypeError("Model mask contains invalid values.");
-    const byte = Math.round(value * 255);
+  for (let index = 0; index < maskBytes.length; index += 1) {
+    const byte = maskBytes[index]!;
     const offset = index * 4;
     lowMask.data[offset] = byte;
     lowMask.data[offset + 1] = byte;
@@ -132,25 +141,38 @@ async function run(request: BackgroundRemovalWorkerRequest): Promise<void> {
     }
 
     progress(request.requestId, "preprocess", 0.15, "Preparing model runtime");
-    const ort = await import("onnxruntime-web/wasm");
+    const definition = getLocalModelDefinition(request.modelId);
+    const ort: typeof Ort = request.backend === "webgpu-wasm"
+      ? await import("onnxruntime-web/all")
+      : await import("onnxruntime-web/wasm");
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.proxy = false;
-    const input = preprocess(ort, bitmap, request.inputWidth, request.inputHeight);
+    const input = preprocess(
+      ort,
+      bitmap,
+      request.inputWidth,
+      request.inputHeight,
+      definition.runtime.inputNormalization,
+    );
     progress(request.requestId, "load-model", 0.3, "Loading verified local model");
     let output: Ort.Tensor | null = null;
     try {
       session = await ort.InferenceSession.create(request.weights, {
-        executionProviders: ["wasm"],
-        graphOptimizationLevel: "all",
+        executionProviders: request.backend === "webgpu-wasm" ? ["webgpu", "wasm"] : ["wasm"],
+        graphOptimizationLevel: request.backend === "webgpu-wasm" ? "disabled" : "all",
         logSeverityLevel: 3,
       });
+      const inputName = session.inputNames[0];
+      const outputName = session.outputNames[0];
       if (
-        session.inputNames.length !== 1 || session.inputNames[0] !== "input_image"
-        || session.outputNames.length !== 1 || session.outputNames[0] !== "output_image"
+        session.inputNames.length !== 1 || !inputName
+        || session.outputNames.length !== 1 || !outputName
+        || (definition.runtime.inputName !== null && inputName !== definition.runtime.inputName)
+        || (definition.runtime.outputName !== null && outputName !== definition.runtime.outputName)
       ) throw new TypeError("Model input or output names are invalid.");
       progress(request.requestId, "inference", 0.6, "Removing background");
-      const outputs = await session.run({ input_image: input });
-      output = outputs.output_image ?? null;
+      const outputs = await session.run({ [inputName]: input });
+      output = outputs[outputName] ?? null;
       if (!output) throw new TypeError("Model inference returned no output image.");
     } catch {
       workerScope.postMessage(failure(request.requestId, "model-failed", "The local model could not complete background removal."));
@@ -158,10 +180,18 @@ async function run(request: BackgroundRemovalWorkerRequest): Promise<void> {
     }
     progress(request.requestId, "render", 0.9, "Rendering mask and alpha");
     try {
-      const rendered = await renderResults(bitmap, output, request.inputWidth, request.inputHeight);
+      const rendered = await renderResults(
+        bitmap,
+        output,
+        request.inputWidth,
+        request.inputHeight,
+        definition.runtime.outputType,
+        definition.runtime.outputNormalization,
+      );
       workerScope.postMessage({
         type: "success",
         requestId: request.requestId,
+        backend: request.backend,
         width: bitmap.width,
         height: bitmap.height,
         mask: rendered.mask,

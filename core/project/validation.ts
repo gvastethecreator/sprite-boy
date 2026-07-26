@@ -1252,8 +1252,8 @@ function validateBackgroundRemovalRecipeBody(
     );
     validateNonEmptyString(item.model.id, pathFor(modelPath, "id"), diagnostics, "Model ID is required.");
     validateNonEmptyString(item.model.revision, pathFor(modelPath, "revision"), diagnostics, "Model revision is required.");
-    if (item.model.backend !== "wasm" && item.model.backend !== "webgpu") {
-      push(diagnostics, "INVALID_DOCUMENT", pathFor(modelPath, "backend"), "Model backend must be wasm or webgpu.", id);
+    if (item.model.backend !== "wasm" && item.model.backend !== "webgpu" && item.model.backend !== "webgpu-wasm") {
+      push(diagnostics, "INVALID_DOCUMENT", pathFor(modelPath, "backend"), "Model backend must be wasm, webgpu or webgpu-wasm.", id);
     }
     for (const key of ["inputWidth", "inputHeight"] as const) {
       const value = item.model[key];

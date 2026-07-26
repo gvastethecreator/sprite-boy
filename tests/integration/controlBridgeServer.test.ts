@@ -190,6 +190,7 @@ describe.sequential("studio control loopback bridge", () => {
       version: 1,
       models: [
         { id: "birefnet-lite-512", status: { state: "absent" } },
+        { id: "ben2-base", status: { state: "absent" } },
         { id: "rmbg-2.0", status: { state: "license-required" } },
       ],
     });

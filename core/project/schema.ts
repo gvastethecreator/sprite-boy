@@ -296,7 +296,7 @@ export interface BackgroundRemovalRecipeV1 {
   model: {
     id: string;
     revision: string;
-    backend: "wasm" | "webgpu";
+    backend: "wasm" | "webgpu" | "webgpu-wasm";
     inputWidth: number;
     inputHeight: number;
   };
