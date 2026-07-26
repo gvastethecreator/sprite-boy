@@ -19,6 +19,12 @@ const ToastItem: React.FC<{ toast: ToastData; onRemove: (id: string) => void }> 
   useGSAP(
     () => {
       const el = itemRef.current;
+      const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      if (reducedMotion) {
+        if (el) gsap.set(el, { opacity: 1, y: 0 });
+        if (barRef.current) gsap.set(barRef.current, { scaleX: 0 });
+        return;
+      }
       if (el) {
         gsap.fromTo(
           el,
@@ -41,11 +47,13 @@ const ToastItem: React.FC<{ toast: ToastData; onRemove: (id: string) => void }> 
   return (
     <div
       ref={itemRef}
+      role="status"
+      aria-atomic="true"
       onClick={() => onRemove(toast.id)}
       className={`
                 relative overflow-hidden group pointer-events-auto cursor-pointer w-full
                 rounded-lg shadow-lg flex items-center border bg-panel/95 backdrop-blur-md
-                transition-all duration-300
+                transition-opacity duration-300 motion-reduce:transition-none
                 ${
                   toast.type === "error"
                     ? "border-red-500/50"
@@ -77,11 +85,11 @@ const ToastItem: React.FC<{ toast: ToastData; onRemove: (id: string) => void }> 
           }`}
         >
           {toast.type === "error" ? (
-            <XCircle size={16} />
+            <XCircle size={16} aria-hidden="true" />
           ) : toast.type === "info" ? (
-            <Info size={16} />
+            <Info size={16} aria-hidden="true" />
           ) : (
-            <CheckCircle2 size={16} />
+            <CheckCircle2 size={16} aria-hidden="true" />
           )}
         </div>
 
@@ -94,7 +102,11 @@ const ToastItem: React.FC<{ toast: ToastData; onRemove: (id: string) => void }> 
         <button
           type="button"
           aria-label={`Dismiss notification: ${toast.msg}`}
-          className="shrink-0 opacity-50 hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all self-center text-textMuted hover:text-white"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove(toast.id);
+          }}
+          className="self-center shrink-0 rounded-full p-1 text-textMuted opacity-50 transition-[color,background-color,opacity] hover:bg-white/10 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none"
         >
           <X size={14} aria-hidden="true" />
         </button>
@@ -105,7 +117,9 @@ const ToastItem: React.FC<{ toast: ToastData; onRemove: (id: string) => void }> 
 
 const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onRemove }) => {
   return (
-    <div className="absolute top-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-[100] pointer-events-none w-full max-w-sm px-4">
+    <div
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4rem)] z-[100] mx-auto flex w-full max-w-sm flex-col items-center gap-3 px-4 sm:absolute sm:bottom-auto sm:left-1/2 sm:top-20 sm:-translate-x-1/2"
+    >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
       ))}

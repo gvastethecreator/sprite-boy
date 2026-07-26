@@ -63,6 +63,8 @@ describe("JobCenter", () => {
     expect(screen.getByRole("status", { name: "Job Center summary" }))
       .toHaveTextContent("Job Center is empty");
     expect(screen.getByRole("heading", { name: "No jobs yet" })).toBeInTheDocument();
+    expect(screen.getByText("Video extraction and local model setup jobs will appear here."))
+      .toBeInTheDocument();
     expect(screen.getByText("Active").nextElementSibling).toHaveTextContent("0");
     expect(screen.queryByRole("button", { name: /Retry / })).not.toBeInTheDocument();
     runner.dispose();

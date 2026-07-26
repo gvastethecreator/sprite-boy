@@ -38,7 +38,7 @@ export function ControlBridgeSettings() {
   return (
     <section className="pt-6 border-t border-border/20">
       <h3 className="text-xs text-textMuted font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-        <Network size={14} /> Local control
+        <Network size={14} aria-hidden="true" /> Local control
       </h3>
       <form
         className="space-y-3 rounded-lg border border-border/50 bg-surface/30 p-4"
@@ -56,7 +56,7 @@ export function ControlBridgeSettings() {
             onChange={(event) => setBaseUrl(event.target.value)}
             disabled={connected || submitting}
             spellCheck={false}
-            className="w-full rounded border border-border bg-input px-2.5 py-2 font-mono text-xs text-textMain outline-none focus:border-accent disabled:opacity-60"
+            className="w-full rounded border border-border bg-input px-2.5 py-2 font-mono text-xs text-textMain outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-60"
           />
         </label>
         {!connected && (
@@ -68,7 +68,7 @@ export function ControlBridgeSettings() {
               onChange={(event) => setToken(event.target.value)}
               autoComplete="off"
               spellCheck={false}
-              className="w-full rounded border border-border bg-input px-2.5 py-2 font-mono text-xs text-textMain outline-none focus:border-accent"
+              className="w-full rounded border border-border bg-input px-2.5 py-2 font-mono text-xs text-textMain outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
             />
           </label>
         )}
@@ -93,7 +93,7 @@ export function ControlBridgeSettings() {
             type="button"
             onClick={() => void handleDisconnect()}
             disabled={submitting}
-            className="inline-flex min-h-9 items-center justify-center gap-2 rounded border border-border bg-panel px-3 text-xs font-semibold text-textMain hover:border-red-400/60 disabled:opacity-50"
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded border border-border bg-panel px-3 text-xs font-semibold text-textMain hover:border-red-400/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
           >
             {submitting && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
             Disconnect
@@ -102,7 +102,7 @@ export function ControlBridgeSettings() {
           <button
             type="submit"
             disabled={submitting || token.length < 32 || baseUrl.trim().length === 0}
-            className="inline-flex min-h-9 items-center justify-center gap-2 rounded bg-accent px-3 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50"
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded bg-accent px-3 text-xs font-semibold text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel disabled:opacity-50"
           >
             {submitting && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
             Connect bridge

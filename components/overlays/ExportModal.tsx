@@ -9,9 +9,10 @@ import {
   Film,
   Loader2,
 } from "lucide-react";
-import { CodeFormat } from "../../types";
+import type { CodeFormat } from "../../types";
 import { useProject } from "../../contexts/ProjectContext";
 import { StudioDialog } from "../studio/StudioDialog";
+import { SelectControl } from "../toolcraft";
 
 interface ExportModalProps {
   onGenerateCode: (animId: string, scale: number, format: CodeFormat) => string;
@@ -37,24 +38,27 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const [codeFormat, setCodeFormat] = useState<CodeFormat>("json_generic");
   const [generatedSnippet, setGeneratedSnippet] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const resolvedAnimationId = animations.some(({ id }) => id === selectedAnimId)
     ? selectedAnimId
     : animations[0]?.id || "";
 
   useEffect(() => {
-    if (type === "code" && resolvedAnimationId) {
-      setGeneratedSnippet(onGenerateCode(resolvedAnimationId, codeScale, codeFormat));
-    }
+    if (type !== "code") return;
+    setGeneratedSnippet(
+      resolvedAnimationId ? onGenerateCode(resolvedAnimationId, codeScale, codeFormat) : "",
+    );
   }, [type, resolvedAnimationId, codeScale, codeFormat, onGenerateCode]);
 
   const handleExportGifAction = async () => {
     if (!resolvedAnimationId) return;
+    setExportError(null);
     setIsProcessing(true);
     try {
       await onExportGif(resolvedAnimationId);
       onClose();
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setExportError("GIF export failed. Check the sequence and try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -87,29 +91,29 @@ const ExportModal: React.FC<ExportModalProps> = ({
       panelClassName="max-h-[90vh] max-w-2xl border-border shadow-modal"
     >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
-          <h2 id="studio-export-title" className="text-sm font-bold text-white flex items-center gap-3">
-            <div className="p-1.5 bg-accent/20 rounded-lg text-accent">
-              <Icon size={18} />
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-panelHeader px-4 py-3 sm:px-6 sm:py-4">
+          <h2 id="studio-export-title" className="flex min-w-0 items-center gap-3 text-sm font-bold text-white">
+            <div className="shrink-0 rounded-lg bg-accent/20 p-1.5 text-accent">
+              <Icon size={18} aria-hidden="true" />
             </div>
-            {titles[type]}
+            <span className="truncate">{titles[type]}</span>
           </h2>
           <button
             type="button"
             aria-label="Close export"
             onClick={onClose}
-            className="text-textMuted hover:text-white transition-colors p-1 hover:bg-white/5 rounded-full"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-textMuted transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-8 overflow-y-auto bg-app">
+        <div className="custom-scrollbar overflow-y-auto bg-app p-4 sm:p-8">
           {/* PNG Mode */}
           {type === "png" && (
             <div className="space-y-6">
-              <div className="bg-surface/30 p-6 rounded-xl border border-border/50">
+              <div className="rounded-xl border border-border/50 bg-surface/30 p-4 sm:p-6">
                 <label className="flex items-center gap-4 cursor-pointer">
                   <input
                     type="checkbox"
@@ -128,21 +132,23 @@ const ExportModal: React.FC<ExportModalProps> = ({
                 </label>
               </div>
 
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
                 <button
+                  type="button"
                   onClick={onClose}
-                  className="px-5 py-2.5 text-xs font-bold text-textMuted hover:text-textMain transition-colors"
+                  className="min-h-10 rounded-md px-5 py-2.5 text-xs font-bold text-textMuted transition-colors hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     onExportPng(pngGrid);
                     onClose();
                   }}
-                  className="px-6 py-2.5 btn-primary rounded-xl text-xs font-bold flex items-center gap-2 shadow-glow-sm active:scale-95"
+                  className="btn-primary flex min-h-10 items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-glow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-app active:scale-95"
                 >
-                  <Download size={16} /> Download Spritesheet
+                  <Download size={16} aria-hidden="true" /> Download Spritesheet
                 </button>
               </div>
             </div>
@@ -152,23 +158,24 @@ const ExportModal: React.FC<ExportModalProps> = ({
           {type === "zip" && (
             <div className="space-y-6 text-center">
               <div className="w-20 h-20 bg-accent/10 rounded-3xl flex items-center justify-center border border-accent/20 mx-auto mb-4">
-                <Layers size={40} className="text-accent" />
+                <Layers size={40} className="text-accent" aria-hidden="true" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-textMain">PNG sequence (ZIP)</h3>
               </div>
-              <div className="flex justify-center gap-3 pt-4">
-                <button onClick={onClose} className="px-5 py-2.5 text-xs font-bold text-textMuted">
+              <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-center sm:gap-3">
+                <button type="button" onClick={onClose} className="min-h-10 rounded-md px-5 py-2.5 text-xs font-bold text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     onExportZip();
                     onClose();
                   }}
-                  className="px-8 py-3 btn-primary rounded-xl text-xs font-bold flex items-center gap-2 shadow-glow-sm active:scale-95"
+                  className="btn-primary flex min-h-10 items-center justify-center gap-2 rounded-lg px-8 py-3 text-xs font-bold shadow-glow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent active:scale-95"
                 >
-                  <Layers size={16} /> Generate & Download ZIP
+                  <Layers size={16} aria-hidden="true" /> Generate & Download ZIP
                 </button>
               </div>
             </div>
@@ -178,43 +185,43 @@ const ExportModal: React.FC<ExportModalProps> = ({
           {type === "gif" && (
             <div className="space-y-6">
               <div className="space-y-4">
-                <label className="text-xs font-bold text-textMuted uppercase tracking-wider block">
-                  Sequence to Encode
-                </label>
-                <select
+                <SelectControl
+                  name="Sequence to encode"
                   value={resolvedAnimationId}
-                  onChange={(e) => setSelectedAnimId(e.target.value)}
-                  className="w-full bg-input border border-border rounded-lg text-sm p-3 text-textMain outline-none focus:border-accent"
-                >
-                  {animations.length === 0 ? (
-                    <option value="" disabled>
-                      No animations available
-                    </option>
-                  ) : (
-                    animations.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.keyframes.length} frames)
-                      </option>
-                    ))
-                  )}
-                </select>
+                  disabled={animations.length === 0}
+                  options={animations.map((animation) => ({
+                    label: `${animation.name} (${animation.keyframes.length} frames)`,
+                    value: animation.id,
+                  }))}
+                  onValueChange={setSelectedAnimId}
+                />
+                {animations.length === 0 ? (
+                  <p className="text-xs text-textMuted">Create a sequence before exporting a GIF.</p>
+                ) : null}
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
-                <button onClick={onClose} className="px-5 py-2.5 text-xs font-bold text-textMuted">
+              {exportError ? (
+                <p role="alert" className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+                  {exportError}
+                </p>
+              ) : null}
+
+              <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:gap-3">
+                <button type="button" onClick={onClose} className="min-h-10 rounded-md px-5 py-2.5 text-xs font-bold text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleExportGifAction}
                   disabled={isProcessing || !resolvedAnimationId}
-                  className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-glow-sm active:scale-95 disabled:opacity-50"
+                  className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-purple-600 px-8 py-3 text-xs font-bold text-white shadow-glow-sm hover:bg-purple-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95"
                 >
                   {isProcessing ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   ) : (
-                    <Film size={16} />
+                    <Film size={16} aria-hidden="true" />
                   )}
-                  {isProcessing ? "Encoding..." : "Export GIF"}
+                  {isProcessing ? "Encoding…" : "Export GIF"}
                 </button>
               </div>
             </div>
@@ -223,66 +230,62 @@ const ExportModal: React.FC<ExportModalProps> = ({
           {/* Code Mode */}
           {type === "code" && (
             <div className="space-y-5">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">
-                    Animation
-                  </label>
-                  <select
-                    value={resolvedAnimationId}
-                    onChange={(e) => setSelectedAnimId(e.target.value)}
-                    className="w-full bg-input border border-border rounded-lg text-xs p-2 text-textMain outline-none focus:border-accent"
-                  >
-                    {animations.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">
-                    Scale
-                  </label>
-                  <select
-                    value={codeScale}
-                    onChange={(e) => setCodeScale(Number(e.target.value))}
-                    className="w-full bg-input border border-border rounded-lg text-xs p-2 text-textMain outline-none focus:border-accent"
-                  >
-                    <option value={1}>1x (Standard)</option>
-                    <option value={2}>2x (Retina)</option>
-                    <option value={4}>4x (HD)</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider">
-                    Format
-                  </label>
-                  <select
-                    value={codeFormat}
-                    onChange={(e) => setCodeFormat(e.target.value as CodeFormat)}
-                    className="w-full bg-input border border-border rounded-lg text-xs p-2 text-textMain outline-none focus:border-accent"
-                  >
-                    <option value="json_generic">Generic JSON</option>
-                    <option value="phaser">Phaser 3</option>
-                    <option value="godot">Godot Engine</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <SelectControl
+                  name="Animation"
+                  value={resolvedAnimationId}
+                  disabled={animations.length === 0}
+                  options={animations.map((animation) => ({
+                    label: animation.name,
+                    value: animation.id,
+                  }))}
+                  onValueChange={setSelectedAnimId}
+                />
+                <SelectControl
+                  name="Scale"
+                  value={String(codeScale)}
+                  options={[
+                    { value: "1", label: "1x (Standard)" },
+                    { value: "2", label: "2x (Retina)" },
+                    { value: "4", label: "4x (HD)" },
+                  ]}
+                  onValueChange={(scale) => setCodeScale(Number(scale))}
+                />
+                <SelectControl
+                  name="Format"
+                  value={codeFormat}
+                  options={[
+                    { value: "json_generic", label: "Generic JSON" },
+                    { value: "phaser", label: "Phaser 3" },
+                    { value: "godot", label: "Godot Engine" },
+                  ]}
+                  onValueChange={(format) => setCodeFormat(format as CodeFormat)}
+                />
               </div>
+
+              {animations.length === 0 ? (
+                <p className="text-xs text-textMuted">
+                  Create a sequence before exporting animation data.
+                </p>
+              ) : null}
 
               <div className="relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-accent/20 to-purple-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <textarea
+                  aria-label="Generated animation data"
                   readOnly
                   value={generatedSnippet}
                   className="relative w-full h-64 bg-input border border-border rounded-lg p-4 text-[11px] font-mono text-textMain/80 resize-none outline-none focus:border-accent custom-scrollbar"
                 />
                 <div className="absolute top-3 right-3 flex gap-2">
                   <button
+                    type="button"
+                    aria-label="Copy generated animation data"
+                    disabled={!generatedSnippet}
                     onClick={() => onCopyCode(generatedSnippet)}
-                    className="p-2 bg-panel border border-border rounded-lg hover:bg-white/5 text-textMuted hover:text-white transition-all"
+                    className="rounded-lg border border-border bg-panel p-2 text-textMuted transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    <Copy size={14} />
+                    <Copy size={14} aria-hidden="true" />
                   </button>
                 </div>
               </div>

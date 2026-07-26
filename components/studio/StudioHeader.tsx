@@ -50,7 +50,12 @@ const WORKSPACE_ICONS = {
   animate: Clapperboard,
   collision: Target,
   export: Download,
-} as const satisfies Record<StudioWorkspaceId, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>>;
+} as const satisfies Record<StudioWorkspaceId, React.ComponentType<{
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+  "aria-hidden"?: boolean | "true";
+}>>;
 
 function commandState(
   registry: StudioCommandRegistry,
@@ -65,7 +70,12 @@ interface CommandButtonProps {
   readonly registry: StudioCommandRegistry;
   readonly commandContext: StudioCommandContext;
   readonly onExecute: (commandId: StudioCommandId) => void;
-  readonly icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  readonly icon: React.ComponentType<{
+    size?: number;
+    strokeWidth?: number;
+    className?: string;
+    "aria-hidden"?: boolean | "true";
+  }>;
   readonly className?: string;
   readonly menuItem?: boolean;
 }
@@ -118,11 +128,11 @@ function CommandButton({
         menuItem
           ? "flex w-full items-center gap-3 px-3 py-2 text-left text-xs text-textMain hover:bg-accent/10 hover:text-accent"
           : "inline-flex items-center justify-center rounded-md text-textMuted hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35",
-        "transition-colors",
+        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
         className,
       ].join(" ")}
     >
-      <Icon size={menuItem ? 14 : 15} strokeWidth={1.8} />
+      <Icon size={menuItem ? 14 : 15} strokeWidth={1.8} aria-hidden="true" />
       <span className={menuItem ? undefined : "sr-only"}>{command.label}</span>
     </button>
   );
@@ -275,7 +285,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
       <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
         <div className="flex shrink-0 select-none items-center gap-2" aria-label="SpriteBoy Studio">
           <div className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-surface text-textMain">
-            <LayoutGrid size={15} strokeWidth={1.8} />
+            <LayoutGrid size={15} strokeWidth={1.8} aria-hidden="true" />
           </div>
           <div className="hidden items-baseline gap-1.5 sm:flex">
             <span className="text-sm font-semibold leading-none tracking-tight text-textMain">SpriteBoy</span>
@@ -295,10 +305,10 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
             aria-expanded={openMenu === "project"}
             aria-controls="studio-project-menu"
             onClick={() => setOpenMenu((current) => current === "project" ? null : "project")}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-textMuted transition-colors hover:bg-white/5 hover:text-white sm:px-3"
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-textMuted transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-3"
           >
             <span className="max-w-32 truncate">{projectName}</span>
-            <ChevronDown size={12} className={openMenu === "project" ? "rotate-180 opacity-70" : "opacity-60"} />
+            <ChevronDown size={12} aria-hidden="true" className={openMenu === "project" ? "rotate-180 opacity-70" : "opacity-60"} />
           </button>
           {openMenu === "project" && (
             <>
@@ -460,10 +470,10 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           aria-expanded={openMenu === "workspace"}
           aria-controls="studio-workspace-menu"
           onClick={() => setOpenMenu((current) => current === "workspace" ? null : "workspace")}
-          className="inline-flex max-w-[34vw] items-center gap-1.5 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain hover:bg-white/10"
+          className="inline-flex max-w-[34vw] items-center gap-1.5 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <span className="truncate">{getStudioWorkspace(activeWorkspace).label}</span>
-          <ChevronDown size={12} className={openMenu === "workspace" ? "rotate-180 opacity-70" : "opacity-60"} />
+          <ChevronDown size={12} aria-hidden="true" className={openMenu === "workspace" ? "rotate-180 opacity-70" : "opacity-60"} />
         </button>
         {openMenu === "workspace" && (
           <>
@@ -508,7 +518,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
                       disabled ? "pointer-events-none opacity-35" : "",
                     ].join(" ")}
                   >
-                    <Icon size={14} strokeWidth={1.8} />
+                    <Icon size={14} strokeWidth={1.8} aria-hidden="true" />
                     <span>{workspace.label}</span>
                   </a>
                 );
@@ -541,7 +551,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
                 disabled ? "pointer-events-none opacity-35" : "",
               ].join(" ")}
             >
-              <Icon size={13} strokeWidth={1.8} />
+              <Icon size={13} strokeWidth={1.8} aria-hidden="true" />
               {workspace.label}
             </a>
           );
@@ -580,11 +590,11 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           title={exportDisabled ? exportState.reason : registry.getCommand(exportCommandId).description}
           onClick={(event) => executeWorkspace(event, exportCommandId)}
           className={[
-            "inline-flex items-center gap-2 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain transition-colors hover:bg-white/10 sm:px-3",
+            "inline-flex items-center gap-2 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-3",
             exportDisabled ? "pointer-events-none opacity-35" : "",
           ].join(" ")}
         >
-          <Download size={14} strokeWidth={1.8} />
+          <Download size={14} strokeWidth={1.8} aria-hidden="true" />
           <span className="hidden sm:inline">Export</span>
         </a>
         <div className="hidden items-center gap-1 border-l border-white/10 pl-2 sm:flex">

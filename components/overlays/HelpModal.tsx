@@ -10,9 +10,9 @@ interface HelpModalProps {
 }
 
 const ShortcutRow = ({ keys, desc }: { keys: readonly string[]; desc: string }) => (
-  <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-    <span className="text-sm text-textMain">{desc}</span>
-    <div className="flex gap-1">
+  <div className="flex items-center justify-between gap-3 border-b border-border/50 py-2 last:border-0">
+    <span className="min-w-0 text-sm leading-5 text-textMain">{desc}</span>
+    <div className="flex max-w-[64%] shrink-0 flex-nowrap justify-end gap-1">
       {keys.map((k, i) => (
         <kbd
           key={i}
@@ -42,23 +42,24 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
       backdropClassName="items-center pt-4"
       panelClassName="max-w-md border-border"
     >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panelHeader">
-          <h2 id="studio-help-title" className="text-lg font-semibold text-textMain flex items-center gap-2">
-            <Keyboard size={20} className="text-accent" /> Keyboard Shortcuts
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-panelHeader px-4 py-3 sm:px-6 sm:py-4">
+          <h2 id="studio-help-title" className="flex min-w-0 items-center gap-2 text-base font-semibold text-textMain sm:text-lg">
+            <Keyboard size={20} className="shrink-0 text-accent" aria-hidden="true" />
+            <span className="truncate">Keyboard Shortcuts</span>
           </h2>
           <button
             type="button"
             aria-label="Close keyboard shortcuts"
             onClick={onClose}
-            className="text-textMuted hover:text-textMain transition-colors p-1 hover:bg-white/10 rounded-full"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-textMuted transition-colors hover:bg-white/10 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[70vh] custom-scrollbar bg-app">
+        <div className="custom-scrollbar max-h-[70vh] overflow-y-auto bg-app p-4 sm:p-6">
           <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Command size={12} /> Studio commands
+            <Command size={12} aria-hidden="true" /> Studio commands
           </h3>
           <div className="mb-6 space-y-1">
             {STUDIO_SHORTCUT_ROWS.map((row) => (
@@ -67,7 +68,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Command size={12} /> Canvas & Navigation
+            <Command size={12} aria-hidden="true" /> Canvas & Navigation
           </h3>
           <div className="mb-6 space-y-1">
             <ShortcutRow keys={["Space + Drag"]} desc="Pan View" />
@@ -76,7 +77,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Command size={12} /> Editing
+            <Command size={12} aria-hidden="true" /> Editing
           </h3>
           <div className="mb-6 space-y-1">
             <ShortcutRow keys={["Delete"]} desc="Delete Selection" />
@@ -85,7 +86,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Command size={12} /> Animation
+            <Command size={12} aria-hidden="true" /> Animation
           </h3>
           <div className="mb-6 space-y-1">
             <ShortcutRow keys={["Space"]} desc="Play / Pause" />
@@ -94,8 +95,8 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
 
         </div>
 
-        <div className="p-4 bg-panel border-t border-border flex justify-center text-[10px] text-textMuted">
-          Press <kbd className="mx-1 px-1 bg-white/10 rounded">ESC</kbd> to close any modal
+        <div className="flex justify-center border-t border-border bg-panel px-4 py-3 text-[11px] text-textMuted">
+          Press <kbd className="mx-1 rounded bg-white/10 px-1.5 py-0.5">Esc</kbd> to close
         </div>
     </StudioDialog>
   );

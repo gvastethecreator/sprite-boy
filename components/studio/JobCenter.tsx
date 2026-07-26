@@ -165,6 +165,9 @@ export function JobCenter({ store, runner, retryJob = null }: JobCenterProps) {
           </div>
           <div>
             <h3 className="text-xs font-semibold text-textMain">No jobs yet</h3>
+            <p className="mt-1 max-w-56 text-[11px] leading-4 text-textMuted">
+              Video extraction and local model setup jobs will appear here.
+            </p>
           </div>
         </div>
       ) : (

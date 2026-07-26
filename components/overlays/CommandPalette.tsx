@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Command, Search } from "lucide-react";
+import { Command, Search } from "lucide-react";
 import type {
   StudioCommand,
   StudioCommandContext,
@@ -147,7 +147,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                         {state.enabled ? command.description : state.reason}
                       </span>
                     </span>
-                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${selected ? "bg-white/15" : "bg-tool text-textMuted"}`}>
+                    <span className={`hidden rounded-full px-1.5 py-0.5 text-[9px] uppercase tracking-wide sm:inline ${selected ? "bg-white/15" : "bg-tool text-textMuted"}`}>
                       {command.category}
                     </span>
                   </span>
@@ -166,10 +166,12 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
           )}
         </div>
 
-        <footer className="flex items-center justify-between border-t border-border bg-panelHeader px-3 py-1.5 text-[10px] text-textMuted">
-          <span>Commands reflect the active workspace.</span>
-          <span className="flex items-center gap-1.5">
-            Arrows to navigate <ArrowRight size={10} aria-hidden="true" /> Enter to run
+        <footer className="flex min-h-8 items-center justify-center border-t border-border bg-panelHeader px-3 py-1.5 text-[10px] text-textMuted sm:justify-between">
+          <span className="hidden sm:inline">Commands reflect the active workspace.</span>
+          <span className="flex items-center gap-2 whitespace-nowrap">
+            <kbd className="font-mono">↑ ↓</kbd> Navigate
+            <span aria-hidden="true">·</span>
+            <kbd className="font-mono">Enter</kbd> Run
           </span>
         </footer>
     </StudioDialog>
