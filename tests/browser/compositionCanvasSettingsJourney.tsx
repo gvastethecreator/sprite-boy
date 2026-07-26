@@ -95,7 +95,7 @@ async function run(): Promise<A103BrowserResult> {
   invariant(colorMode, "Color mode missing.");
   colorMode.click();
   await nextPaint();
-  const color = document.querySelector<HTMLInputElement>('input[aria-label="Canvas background color"]');
+  const color = document.querySelector<HTMLInputElement>('input[aria-label="Canvas background color hex"]');
   invariant(color, "Color input missing.");
   setNativeValue(color, "#3157a4");
   await nextPaint();

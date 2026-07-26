@@ -66,11 +66,10 @@ describe("Slice source reset project boundary (G0-04)", () => {
     expect(replacement.builderAssets).toBe(previous.builderAssets);
   });
 
-  it("revokes only the two owned runtime URL roles, deduplicated exactly once", () => {
+  it("revokes the owned source runtime URL exactly once", () => {
     const revokeObjectURL = vi.fn();
     const released = revokeSliceOwnedRuntimeUrls({
       source: "blob:shared-source-preview",
-      backgroundPreview: "blob:shared-source-preview",
     }, { revokeObjectURL });
 
     expect(released).toBe(1);
@@ -78,7 +77,6 @@ describe("Slice source reset project boundary (G0-04)", () => {
     expect(revokeObjectURL).not.toHaveBeenCalledWith("blob:asset-kept");
     expect(revokeSliceOwnedRuntimeUrls({
       source: "data:image/png;base64,kept",
-      backgroundPreview: null,
     }, { revokeObjectURL })).toBe(0);
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);
   });
@@ -87,19 +85,14 @@ describe("Slice source reset project boundary (G0-04)", () => {
     const revokeObjectURL = vi.fn(() => { throw new Error("revoked host object"); });
     expect(() => revokeSliceOwnedRuntimeUrls({
       source: "blob:old-source",
-      backgroundPreview: "blob:old-background-preview",
     }, { revokeObjectURL })).not.toThrow();
-    expect(revokeObjectURL.mock.calls).toEqual([
-      ["blob:old-source"],
-      ["blob:old-background-preview"],
-    ]);
+    expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith("blob:old-source");
   });
 
-  it("protects preserved asset aliases for both source and BG preview roles", () => {
+  it("protects a preserved asset alias used as the source", () => {
     const revokeObjectURL = vi.fn();
     const released = revokeSliceOwnedRuntimeUrls({
       source: "blob:asset-source-alias",
-      backgroundPreview: "blob:asset-bg-alias",
       protectedAssetUrls: ["blob:asset-source-alias", "blob:asset-bg-alias"],
     }, { revokeObjectURL });
 

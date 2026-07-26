@@ -36,8 +36,6 @@ import { SectionHeader } from "../common/PanelComponents";
 import { ASPECT_RATIOS } from "../canvas/CanvasToolbar";
 import { RATIO_PRESETS, DEFAULT_SLOT_DATA } from "../../hooks/domains/useBuilderLogic";
 import { useProject } from "../../contexts/ProjectContext";
-import SliceGridInspector from "../../features/slice/grid/SliceGridInspector";
-import type { SliceGridController } from "../../features/slice/grid/useSliceGridController";
 
 const ALIGNMENTS: { id: SlotAlignment; icon: any }[] = [
   { id: "top-left", icon: AlignStartVertical },
@@ -51,15 +49,7 @@ const ALIGNMENTS: { id: SlotAlignment; icon: any }[] = [
   { id: "bottom-right", icon: AlignEndVertical },
 ];
 
-interface RightSidebarProps {
-  readonly isSliceWorkspace?: boolean;
-  readonly sliceGridController?: SliceGridController;
-}
-
-const RightSidebar: React.FC<RightSidebarProps> = ({
-  isSliceWorkspace = false,
-  sliceGridController,
-}) => {
+const RightSidebar: React.FC = () => {
   const {
     currentMode,
     slicerImage: imageMeta,
@@ -162,10 +152,6 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   };
 
   const hasWorkspace = !!builderCanvas || !!imageMeta;
-
-  if (isSliceWorkspace && sliceGridController) {
-    return <SliceGridInspector controller={sliceGridController} />;
-  }
 
   if (currentMode === AppMode.BUILDER && !hasWorkspace) {
     return (

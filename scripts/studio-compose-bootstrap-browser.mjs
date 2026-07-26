@@ -200,9 +200,11 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
       const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
       x.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
       x.blur();
+      const opacityRoot = opacity.closest('[data-toolcraft-slider]');
+      opacityRoot?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
       inputSetter?.call(opacity, '55');
       opacity.dispatchEvent(new Event('input', { bubbles: true }));
-      opacity.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      opacityRoot?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
       const hide = document.querySelector('button[aria-label^="Hide "][aria-label$=" copy"]');
       const lock = document.querySelector('button[aria-label^="Lock "][aria-label$=" copy"]');
       if (!(hide instanceof HTMLButtonElement) || !(lock instanceof HTMLButtonElement)) {

@@ -36,7 +36,7 @@ async function capture(client, outputPath) {
 
 async function selectSource(client) {
   return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     const canvas = document.createElement("canvas");
     canvas.width = 400;
@@ -82,28 +82,52 @@ async function dispatchCanvasPointer(client, type, point, extra = {}) {
   })()`);
 }
 
+async function dragSlider(client, name, value) {
+  const points = await client.evaluate(`(() => {
+    const input = document.querySelector(${JSON.stringify(`input[aria-label="${name}"]`)});
+    const track = input?.closest('[data-toolcraft-slider]')?.querySelector('[data-slot="slider-track"]');
+    if (!(input instanceof HTMLInputElement) || !(track instanceof HTMLElement)) return null;
+    const rect = track.getBoundingClientRect();
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const current = Number(input.value);
+    const x = (raw) => rect.left + ((raw - min) / (max - min)) * rect.width;
+    return {
+      start: { x: x(current), y: rect.top + rect.height / 2 },
+      end: { x: x(${JSON.stringify(value)}), y: rect.top + rect.height / 2 },
+    };
+  })()`);
+  if (!points) return false;
+  await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.start.x, y: points.start.y, button: "none" });
+  await client.send("Input.dispatchMouseEvent", { type: "mousePressed", x: points.start.x, y: points.start.y, button: "left", buttons: 1, clickCount: 1 });
+  await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.end.x, y: points.end.y, button: "left", buttons: 1 });
+  await client.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: points.end.x, y: points.end.y, button: "left", buttons: 0, clickCount: 1 });
+  await client.waitFor(`document.querySelector(${JSON.stringify(`input[aria-label="${name}"]`)})?.value === ${JSON.stringify(String(value))}`);
+  return true;
+}
+
 async function configureChroma(client) {
-  return client.evaluate(`(() => {
+  const baseReady = await client.evaluate(`(() => {
     const root = document.querySelector("[data-slice-chroma-controls]");
     const checkbox = root?.querySelector('input[type="checkbox"]');
-    const color = root?.querySelector('input[aria-label="Chroma key hex color"]');
-    const swatch = root?.querySelector('input[type="color"]');
-    const ranges = root?.querySelectorAll('input[type="range"]');
+    const color = root?.querySelector('input[aria-label="Chroma key color hex"]');
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    if (!(checkbox instanceof HTMLInputElement) || !(color instanceof HTMLInputElement) ||
-      !(swatch instanceof HTMLInputElement) || ranges?.length !== 3 || !setter) return false;
+    if (!(checkbox instanceof HTMLInputElement) || !(color instanceof HTMLInputElement) || !setter) return false;
     checkbox.click();
-    setter.call(swatch, "#ff00aa");
-    swatch.dispatchEvent(new Event("input", { bubbles: true }));
-    swatch.dispatchEvent(new Event("change", { bubbles: true }));
-    [35, 20, 15].forEach((value, index) => {
-      const input = ranges[index];
-      setter.call(input, String(value));
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
-    });
+    color.focus();
+    setter.call(color, "#ff00aa");
+    color.dispatchEvent(new Event("input", { bubbles: true }));
     return true;
   })()`);
+  if (!baseReady) return false;
+  await client.waitFor(`document.querySelector('input[aria-label="Chroma key color hex"]')?.value === "#FF00AA"`);
+  await client.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+  await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+  await client.waitFor(`document.querySelector("[data-slice-chroma-controls]")?.dataset.chromaColor === "#ff00aa"`);
+  for (const [name, value] of [["Tolerance", 35], ["Smoothness", 20], ["Spill suppression", 15]]) {
+    if (!await dragSlider(client, name, value)) return false;
+  }
+  return true;
 }
 
 export async function runGridEyedropperBrowserGate(options = {}) {
@@ -160,12 +184,13 @@ export async function runGridEyedropperBrowserGate(options = {}) {
     if (await selectSource(client) !== true) throw new Error("Source fixture could not be selected.");
     stage = "source-ready";
     await client.waitFor(`document.querySelector("[data-slice-grid-overlay-canvas]")?.dataset.gridOverlayCells === "8"`, 60_000);
+    await client.evaluate(`document.querySelector('input[type="radio"][value="background"]')?.click()`);
     await client.waitFor(`Boolean(document.querySelector('button[aria-label="Pick color from canvas"]'))`);
 
     const initial = await client.evaluate(`(() => {
       const canvas = document.querySelector("[data-studio-source-canvas]");
       const picker = document.querySelector('button[aria-label="Pick color from canvas"]');
-      const color = document.querySelector('input[aria-label="Background removal target color"]');
+      const color = document.querySelector('[aria-label="Chroma key color swatch"] [data-color]');
       const rect = canvas?.getBoundingClientRect();
       const overlay = document.querySelector("[data-slice-grid-overlay-canvas]");
       return {
@@ -175,7 +200,7 @@ export async function runGridEyedropperBrowserGate(options = {}) {
         offset: overlay?.dataset.gridOverlayOffset,
         pickerLabel: picker?.getAttribute("aria-label"),
         pickerPressed: picker?.getAttribute("aria-pressed"),
-        color: color?.getAttribute("value") ?? color?.value,
+        color: color?.getAttribute("data-color"),
         chromaColor: document.querySelector("[data-slice-chroma-controls]")?.getAttribute("data-chroma-color"),
       };
     })()`);
@@ -200,7 +225,21 @@ export async function runGridEyedropperBrowserGate(options = {}) {
         controls: root?.querySelectorAll("input,button").length,
       };
     })()`);
+    stage = "picker-open";
+    await client.evaluate(`document.querySelector('button[aria-label="Chroma key color swatch"]')?.click()`);
+    await client.waitFor(`Boolean(document.querySelector('[data-toolcraft-color-picker="Chroma key color"]'))`);
+    const customPicker = await client.evaluate(`(() => ({
+      surface: Boolean(document.querySelector('[aria-label="Chroma key color saturation and brightness"]')),
+      hue: Boolean(document.querySelector('input[aria-label="Chroma key color hue"]')),
+      format: Boolean(document.querySelector('[aria-label="Chroma key color color format"]')),
+      nativeColorInputs: document.querySelectorAll('input[type="color"]').length,
+    }))()`);
     const chromaScreenshot = await capture(client, chromaScreenshotPath);
+    stage = "picker-close";
+    await client.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await client.waitFor(`!document.querySelector('[data-toolcraft-color-picker="Chroma key color"]')`);
+    stage = "chroma-controls";
     await client.evaluate(`document.querySelector('button[aria-label="Reset chroma settings"]')?.click()`);
     await client.waitFor(`(() => {
       const root = document.querySelector("[data-slice-chroma-controls]");
@@ -295,9 +334,9 @@ export async function runGridEyedropperBrowserGate(options = {}) {
     await client.evaluate(`document.querySelector('button[aria-label="Pick color from canvas"]')?.click()`);
     await client.waitFor(`document.querySelector('button[aria-label="Cancel canvas color picker"]')?.getAttribute("aria-pressed") === "true"`);
     await dispatchCanvasPointer(client, "mousedown", samplePoint);
-    await client.waitFor(`document.querySelector('input[aria-label="Background removal target color"]')?.value === "#123456"`);
+    await client.waitFor(`document.querySelector('[aria-label="Chroma key color swatch"] [data-color]')?.getAttribute('data-color') === "#123456"`);
     const sampled = await client.evaluate(`(() => ({
-      color: document.querySelector('input[aria-label="Background removal target color"]')?.value,
+      color: document.querySelector('[aria-label="Chroma key color swatch"] [data-color]')?.getAttribute('data-color'),
       chromaColor: document.querySelector("[data-slice-chroma-controls]")?.getAttribute("data-chroma-color"),
       active: Boolean(document.querySelector('[data-eyedropper-status="active"]')),
       pickerLabel: document.querySelector('button[aria-label^="Pick color from canvas"], button[aria-label="Cancel canvas color picker"]')?.getAttribute("aria-label"),
@@ -325,12 +364,14 @@ export async function runGridEyedropperBrowserGate(options = {}) {
       && sampled.chromaColor === "#123456"
       && configuredChroma.enabled === "true" && configuredChroma.color === "#ff00aa"
       && configuredChroma.tolerance === "35" && configuredChroma.smoothness === "20"
-      && configuredChroma.spill === "15" && configuredChroma.summary?.includes("Chroma key on")
+      && configuredChroma.spill === "15" && configuredChroma.summary?.startsWith("On ·")
+      && customPicker.surface && customPicker.hue && customPicker.format
+      && customPicker.nativeColorInputs === 0
       && resetChroma.enabled === "false" && resetChroma.color === "#00ff00"
       && sampled.active === false && accessibility.unlabeledInteractiveCount === 0
       && layout.horizontalOverflow === false && layout.verticalOverflow === false
       && Object.values(errors).every((value) => value === 0);
-    if (!passed) throw new Error(`G4-02 browser evidence failed closed: ${JSON.stringify({ initial, zoom, pan, escaped, sampled, accessibility, layout, errors })}`);
+    if (!passed) throw new Error(`G4-02 browser evidence failed closed: ${JSON.stringify({ initial, configuredChroma, customPicker, resetChroma, zoom, pan, escaped, sampled, accessibility, layout, errors })}`);
     stage = "accepted";
     return {
       schemaVersion: 1,
@@ -341,6 +382,7 @@ export async function runGridEyedropperBrowserGate(options = {}) {
       pan,
       escaped,
       configuredChroma,
+      customPicker,
       resetChroma,
       sampled,
       accessibility,

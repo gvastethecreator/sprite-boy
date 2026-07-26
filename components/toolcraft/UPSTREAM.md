@@ -4,19 +4,24 @@ This folder adapts selected controls from
 [`pixel-point/toolcraft`](https://github.com/pixel-point/toolcraft) at commit
 `682a159f985af71798296f15c1cd6434b5fe7151`, retrieved on 2026-07-25.
 
-Adapted surfaces:
+Ported surfaces:
 
 - slider and range-slider value policy and controls;
-- color input;
+- color picker popover, saturation/brightness surface, hue and channel inputs;
 - segmented input;
 - select input;
 - file drop target;
 - live history grouping types.
 
-SpriteBoy keeps the public ideas and behavior that fit the Studio, but uses
-native browser controls, existing React/Lucide packages and local design
-tokens. It does not copy Toolcraft's starter, shell, navigation, global styles,
-drag-and-drop stack or Base UI dependency.
+SpriteBoy keeps the public ideas and behavior that fit the Studio. Slider and
+range slider use Toolcraft's Base UI primitive contract, editable value, fill,
+markers and variants through `@base-ui/react@1.4.1`. Discrete sliders keep fine
+thumb motion and snap to the public step at change and commit. Color uses Base
+UI Popover plus the upstream HSV conversion and channel layout; it does not use
+the operating system color input. The Studio adds explicit commit and cancel
+boundaries for canonical history. Segmented, select and file drop keep small
+native adapters with local tokens. The port does not include Toolcraft's
+starter, shell, navigation, global styles or drag-and-drop stack.
 
 ## Upstream notice
 

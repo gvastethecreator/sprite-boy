@@ -12,9 +12,9 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import SlicerTools from "../panels/left/SlicerTools";
-import BgRemovalTool from "../panels/left/BgRemovalTool";
 import AnimationList from "../panels/left/AnimationList";
 import NumberControl from "../common/NumberControl";
+import { ColorControl } from "../toolcraft";
 import { useProject } from "../../contexts/ProjectContext";
 
 const SectionHeader = ({
@@ -78,26 +78,26 @@ const ViewTools: React.FC = () => {
           <div className="space-y-3 rounded-md border border-white/8 bg-black/20 p-3 shadow-inner-depth">
             <div className="flex items-center justify-between">
               <span className="text-xs text-textMuted">Background</span>
-                <input
-                  type="color"
-                  aria-label="Background color"
-                  value={templateConfig.backgroundColor}
-                onChange={(e) =>
-                  setTemplateConfig({ ...templateConfig, backgroundColor: e.target.value })
+              <ColorControl
+                className="w-32"
+                name="Background color"
+                showLabel={false}
+                hex={templateConfig.backgroundColor}
+                onValueChange={({ hex }) =>
+                  setTemplateConfig({ ...templateConfig, backgroundColor: hex.toLowerCase() })
                 }
-                className="h-7 w-7 cursor-pointer overflow-hidden rounded border-0 p-0"
               />
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-textMuted">Grid</span>
-                <input
-                  type="color"
-                  aria-label="Grid color"
-                  value={templateConfig.gridColor}
-                onChange={(e) =>
-                  setTemplateConfig({ ...templateConfig, gridColor: e.target.value })
+              <ColorControl
+                className="w-32"
+                name="Grid color"
+                showLabel={false}
+                hex={templateConfig.gridColor}
+                onValueChange={({ hex }) =>
+                  setTemplateConfig({ ...templateConfig, gridColor: hex.toLowerCase() })
                 }
-                className="h-7 w-7 cursor-pointer overflow-hidden rounded border-0 p-0"
               />
             </div>
             <NumberControl
@@ -167,17 +167,9 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace, irregularTool
     selectedIndex,
     handleDuplicateFrame,
     handleFrameToAsset,
-    handleRemoveBackground,
-    handlePreviewBackground,
-    handleCancelPreview,
-    isPreviewActive,
-    isEyedropperActive,
-    setIsEyedropperActive,
-    eyedropperColor,
   } = useProject();
 
   const hasWorkspace = !!builderCanvas || !!slicerImage;
-  const hasSourceImage = !!slicerImage;
   const selectedFrame = selectedIndex !== null ? frames[selectedIndex] : null;
 
   return (
@@ -213,16 +205,6 @@ const BuildTools: React.FC<BuildToolsProps> = ({ isSliceWorkspace, irregularTool
 
               {isSliceWorkspace ? irregularTools : null}
 
-              <BgRemovalTool
-                onRemoveBackground={handleRemoveBackground}
-                onPreviewBackground={handlePreviewBackground}
-                onCancelPreview={handleCancelPreview}
-                isPreviewActive={isPreviewActive}
-                isEyedropperActive={isEyedropperActive}
-                setIsEyedropperActive={setIsEyedropperActive}
-                eyedropperColor={eyedropperColor}
-                hasImage={hasSourceImage}
-              />
             </>
         )}
       </div>

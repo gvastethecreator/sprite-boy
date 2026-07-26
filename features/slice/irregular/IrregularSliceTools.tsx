@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Copy, Eye, EyeOff, Hand, MousePointer2, Plus, Trash2, Wand2 } from "lucide-react";
+import { SliderControl } from "../../../components/toolcraft";
 import type { DeepReadonly } from "../../../core/stores";
 import type { EntityId, StudioProject } from "../../../core/project";
 import { WandSelectionProbe } from "./WandSelectionProbe";
@@ -108,10 +109,16 @@ export function IrregularSliceTools({
                 </button>
               ))}
             </div>
-            <label className="block text-[10px] font-semibold text-textMuted">
-              Alpha threshold <span className="font-mono text-textMain">{wandAlphaThreshold}</span>
-              <input aria-label="Wand alpha threshold" type="range" min={0} max={255} value={wandAlphaThreshold} onChange={(event) => onWandAlphaThresholdChange(Number(event.target.value))} className="mt-1 w-full accent-accent" />
-            </label>
+            <SliderControl
+              name="Wand alpha threshold"
+              min={0}
+              max={255}
+              step={1}
+              value={wandAlphaThreshold}
+              disabled={!hasSource || busy}
+              baseValue={0}
+              onValueChange={onWandAlphaThresholdChange}
+            />
             <label className="block text-[10px] font-semibold text-textMuted">
               Connectivity
               <select aria-label="Wand connectivity" value={wandConnectivity} onChange={(event) => onWandConnectivityChange(Number(event.target.value) as 4 | 8)} className="mt-1 w-full rounded-md border border-white/10 bg-input px-2 py-2 text-xs text-textMain">

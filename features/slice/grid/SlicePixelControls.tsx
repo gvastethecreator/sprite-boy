@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from "react";
 import { Grid3X3, Palette, RotateCcw } from "lucide-react";
+import { SliderControl } from "../../../components/toolcraft";
 
 import type { SliceGridController } from "./useSliceGridController";
 import {
@@ -231,28 +232,20 @@ export const SlicePixelControls: React.FC<SlicePixelControlsProps> = ({ controll
       )}
 
       {paletteMode === "auto" && draft.quantize && (
-        <label className="block space-y-2 text-[10px] font-bold text-textMuted" htmlFor={`${id}-colors`}>
-          <span className="flex items-center justify-between gap-3">
-            <span>Color count</span>
-            <span className="font-mono text-textMain" aria-hidden="true">{draft.colors}</span>
-          </span>
-          <input
-            id={`${id}-colors`}
-            type="range"
-            min={2}
-            max={256}
-            step={1}
-            value={draft.colors}
-            aria-label="Palette color count"
-            aria-valuetext={`${draft.colors} colors`}
-            onChange={(event) => setDraft((current) => ({ ...current, colors: event.currentTarget.valueAsNumber }))}
-            onPointerUp={(event) => commit("colors", event.currentTarget.valueAsNumber)}
-            onPointerCancel={(event) => commit("colors", event.currentTarget.valueAsNumber)}
-            onKeyUp={(event) => commit("colors", event.currentTarget.valueAsNumber)}
-            onBlur={(event) => commit("colors", event.currentTarget.valueAsNumber)}
-            className="w-full accent-accent"
-          />
-        </label>
+        <SliderControl
+          id={`${id}-colors`}
+          name="Palette color count"
+          min={2}
+          max={256}
+          step={1}
+          value={draft.colors}
+          valueLabel={`${draft.colors} colors`}
+          disabled={disabled}
+          variant="discrete"
+          markerCount={9}
+          onValueChange={(colors) => setDraft((current) => ({ ...current, colors }))}
+          onValueCommit={(colors) => commit("colors", colors)}
+        />
       )}
 
       <div id={`${id}-summary`} aria-label="Pixel processing summary" aria-live="polite" aria-atomic="true" className="rounded-md border border-white/6 bg-black/20 px-2.5 py-2 font-mono text-[10px] text-textMuted">

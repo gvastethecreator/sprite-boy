@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Check, Maximize2, RefreshCw, SwatchBook } from "lucide-react";
+import { ColorControl } from "../../../components/toolcraft";
 import { useProjectStoreSelector } from "../../../hooks/useStudioStoreSelector";
 import { isEntityId, isISO8601Timestamp, type EntityId } from "../../../core/project";
 import type { ProjectStore } from "../../../core/stores";
@@ -323,20 +324,19 @@ export function CompositionCanvasSettingsInspector({
           ))}
         </div>
         {draft.backgroundMode === "color" ? (
-          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-input p-2 text-[10px] font-bold uppercase tracking-wider text-textMuted">
-            Color
-            <input
-              aria-label="Canvas background color"
-              type="color"
-              value={colorInputValue(draft.backgroundColor)}
-              className="h-8 min-w-10 flex-1 cursor-pointer rounded border-0 bg-transparent"
-              onChange={(event) => {
-                setDraft((current) => Object.freeze({ ...current, backgroundColor: event.target.value }));
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-input p-2 text-[10px] font-bold uppercase tracking-wider text-textMuted">
+            <span>Color</span>
+            <ColorControl
+              className="min-w-0 flex-1"
+              name="Canvas background color"
+              showLabel={false}
+              hex={colorInputValue(draft.backgroundColor)}
+              onValueChange={({ hex }) => {
+                setDraft((current) => Object.freeze({ ...current, backgroundColor: hex.toLowerCase() }));
                 setFeedback(null);
               }}
             />
-            <span className="font-mono text-textMain">{draft.backgroundColor.toUpperCase()}</span>
-          </label>
+          </div>
         ) : null}
       </fieldset>
 

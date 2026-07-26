@@ -35,7 +35,7 @@ async function selectGridSource(client, name, cloneDelayMs, workerMessageDelayMs
   return client.evaluate(`(async () => {
     globalThis.__gridProbe.cloneDelayMs = ${JSON.stringify(cloneDelayMs)};
     globalThis.__gridProbe.workerMessageDelayMs = ${JSON.stringify(workerMessageDelayMs)};
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     const canvas = document.createElement("canvas");
     canvas.width = 400;

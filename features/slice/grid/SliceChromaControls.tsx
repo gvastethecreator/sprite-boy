@@ -1,12 +1,13 @@
 import React, { useEffect, useId, useState } from "react";
 import { Pipette, RotateCcw, Sparkles } from "lucide-react";
+import { ColorControl, SliderControl } from "../../../components/toolcraft";
 
 import type { SliceGridController } from "./useSliceGridController";
 
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/u;
-
 interface SliceChromaControlsProps {
   readonly controller: SliceGridController;
+  readonly eyedropperActive?: boolean;
+  readonly onEyedropperActiveChange?: (active: boolean) => void;
 }
 
 type ChromaDraft = SliceGridController["chroma"];
@@ -17,10 +18,13 @@ function sameChroma(left: ChromaDraft, right: ChromaDraft): boolean {
     left.spill === right.spill;
 }
 
-export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ controller }) => {
+export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({
+  controller,
+  eyedropperActive = false,
+  onEyedropperActiveChange,
+}) => {
   const id = useId();
   const [draft, setDraft] = useState<ChromaDraft>(controller.chroma);
-  const [colorError, setColorError] = useState<string | null>(null);
   const disabled = controller.sourceDimensions === null;
   const canReset = !sameChroma(draft, {
     enabled: false,
@@ -32,7 +36,6 @@ export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ contro
 
   useEffect(() => {
     setDraft(controller.chroma);
-    setColorError(null);
   }, [
     controller.chroma.color,
     controller.chroma.enabled,
@@ -58,12 +61,6 @@ export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ contro
   };
 
   const commitColor = (value: string): void => {
-    if (!HEX_COLOR.test(value)) {
-      setColorError("Use a six-digit hex color, for example #00ff00.");
-      setDraft((current) => ({ ...current, color: value }));
-      return;
-    }
-    setColorError(null);
     commit("color", value.toLowerCase());
   };
 
@@ -126,76 +123,54 @@ export const SliceChromaControls: React.FC<SliceChromaControlsProps> = ({ contro
         />
       </label>
 
-      <div className="grid grid-cols-[3rem_1fr] items-center gap-2">
-        <label
-          htmlFor={`${id}-color-picker`}
-          className="relative h-10 overflow-hidden rounded-lg border border-white/10 shadow-sm"
-          title="Choose chroma key color"
-        >
-          <input
-            id={`${id}-color-picker`}
-            type="color"
-            aria-label="Chroma key color swatch"
-            value={HEX_COLOR.test(draft.color) ? draft.color : "#00ff00"}
-            onChange={(event) => commitColor(event.currentTarget.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-          <span className="absolute inset-0 pointer-events-none" style={{ backgroundColor: HEX_COLOR.test(draft.color) ? draft.color : "#00ff00" }} />
-        </label>
-        <label className="space-y-1 text-[10px] font-bold text-textMuted" htmlFor={`${id}-color-text`}>
-          <span>Key color</span>
-          <span className="relative flex items-center">
-            <Pipette size={12} className="pointer-events-none absolute left-2 text-textMuted/60" aria-hidden="true" />
-            <input
-              id={`${id}-color-text`}
-              type="text"
-              inputMode="text"
-              spellCheck={false}
-              value={draft.color}
-              aria-label="Chroma key hex color"
-              aria-invalid={colorError ? "true" : undefined}
-              aria-describedby={colorError ? `${id}-color-error` : `${id}-summary`}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setColorError(null);
-                setDraft((current) => ({ ...current, color: value }));
-              }}
-              onBlur={(event) => commitColor(event.currentTarget.value)}
-              className="w-full rounded-md border border-white/10 bg-input py-2 pl-7 pr-2 font-mono text-xs uppercase text-textMain outline-none transition-colors focus:border-accent aria-[invalid=true]:border-red-400"
-            />
-          </span>
-          {colorError && <span id={`${id}-color-error`} className="block font-normal text-red-300">{colorError}</span>}
-        </label>
-      </div>
+      <ColorControl
+        allowShortHex={false}
+        name="Chroma key color"
+        hex={draft.color}
+        disabled={disabled}
+        invalidMessage="Use a six-digit hex color, for example #00FF00."
+        onValueChange={({ hex }) => {
+          setDraft((current) => ({ ...current, color: hex.toLowerCase() }));
+        }}
+        onValueCommit={({ hex }) => commitColor(hex)}
+      />
+
+      <button
+        type="button"
+        disabled={disabled || !onEyedropperActiveChange}
+        aria-label={eyedropperActive ? "Cancel canvas color picker" : "Pick color from canvas"}
+        aria-pressed={eyedropperActive}
+        onClick={() => onEyedropperActiveChange?.(!eyedropperActive)}
+        className={`inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-md border text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40 ${eyedropperActive ? "border-accent bg-accent text-white" : "border-white/10 bg-white/5 text-textMuted hover:bg-white/10 hover:text-textMain"}`}
+      >
+        <Pipette size={13} aria-hidden="true" /> {eyedropperActive ? "Cancel picker" : "Pick from canvas"}
+      </button>
+      {eyedropperActive ? (
+        <p role="status" className="text-[10px] leading-4 text-accent" data-eyedropper-status="active">
+          Click a source pixel to sample its color. Press Escape to cancel.
+        </p>
+      ) : null}
 
       {([
         ["tolerance", "Tolerance", draft.tolerance],
         ["smoothness", "Smoothness", draft.smoothness],
         ["spill", "Spill suppression", draft.spill],
       ] as const).map(([key, label, value]) => (
-        <label key={key} className="block space-y-2 text-[10px] font-bold text-textMuted" htmlFor={`${id}-${key}`}>
-          <span className="flex items-center justify-between gap-3">
-            <span>{label}</span>
-            <span className="font-mono text-textMain" aria-hidden="true">{value}%</span>
-          </span>
-          <input
-            id={`${id}-${key}`}
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={value}
-            aria-label={label}
-            aria-valuetext={`${value}%`}
-            aria-describedby={`${id}-summary`}
-            onChange={(event) => updateSlider(key, event.currentTarget.valueAsNumber)}
-            onPointerUp={(event) => commitSlider(key, event.currentTarget.valueAsNumber)}
-            onPointerCancel={(event) => commitSlider(key, event.currentTarget.valueAsNumber)}
-            onKeyUp={(event) => commitSlider(key, event.currentTarget.valueAsNumber)}
-            onBlur={(event) => commitSlider(key, event.currentTarget.valueAsNumber)}
-            className="w-full accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-          />
-        </label>
+        <SliderControl
+          key={key}
+          id={`${id}-${key}`}
+          ariaDescribedBy={`${id}-summary`}
+          name={label}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          baseValue={0}
+          value={value}
+          disabled={disabled}
+          onValueChange={(next) => updateSlider(key, next)}
+          onValueCommit={(next) => commitSlider(key, next)}
+        />
       ))}
 
       <div

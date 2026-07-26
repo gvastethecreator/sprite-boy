@@ -79,7 +79,6 @@ export interface SliceRuntimeUrlHost {
 
 export interface SliceOwnedRuntimeUrls {
   readonly source?: string | null;
-  readonly backgroundPreview?: string | null;
   readonly protectedAssetUrls?: readonly string[];
 }
 
@@ -102,7 +101,7 @@ export function revokeSliceOwnedRuntimeUrls(
   }
   if (host === null) return 0;
   const protectedUrls = new Set(ownedUrls.protectedAssetUrls ?? []);
-  const uniqueUrls = new Set([ownedUrls.source, ownedUrls.backgroundPreview].filter(
+  const uniqueUrls = new Set([ownedUrls.source].filter(
     (url): url is string => typeof url === "string" && url.startsWith("blob:") &&
       !protectedUrls.has(url),
   ));
@@ -187,11 +186,8 @@ export function useProjectController() {
   } = useUndo<ProjectState>(INITIAL_STATE, { historyKey: projectStateHistoryKey });
   const ui = useUIController();
   const projectRef = useRef(project);
-  const backgroundPreviewUrlRef = useRef(ui.bgPreviewBlobUrl);
-  const backgroundOperationRef = useRef<AbortController | null>(null);
   const ownedAssetBlobUrlsRef = useRef<Set<string>>(new Set());
   projectRef.current = project;
-  backgroundPreviewUrlRef.current = ui.bgPreviewBlobUrl;
   const uiState = loadUIState();
   const defaultGrid: GridConfig = {
     rows: 2,
@@ -333,35 +329,17 @@ export function useProjectController() {
     if (rgb.length === 3) root.style.setProperty("--accent-rgb", preferences.accentColor);
   }, [preferences.theme, preferences.accentColor]);
 
-  const cancelLegacyBackgroundOperations = useCallback((): void => {
-    const operation = backgroundOperationRef.current;
-    backgroundOperationRef.current = null;
-    try { operation?.abort(); } catch {}
-    const previewUrl = backgroundPreviewUrlRef.current;
-    backgroundPreviewUrlRef.current = null;
-    revokeSliceOwnedRuntimeUrls({ backgroundPreview: previewUrl });
-    runSliceTerminalEffects([
-      () => ui.setBgPreviewBlobUrl(null),
-      () => ui.setIsLoading(false),
-      () => ui.setLoadingMessage(""),
-    ]);
-  }, [ui.setBgPreviewBlobUrl, ui.setIsLoading, ui.setLoadingMessage]);
-
   const clearLegacyCanvasInteractionState = useCallback((): void => {
-    cancelLegacyBackgroundOperations();
     runSliceTerminalEffects([
       () => setSelectedIndex(null),
       () => animLogic.setActiveAnimationId(null),
       () => animLogic.setIsPlaying(false),
       () => ui.setIsEyedropperActive(false),
-      () => ui.setEyedropperColor(null),
       () => ui.setIsMagicWandActive(false),
     ]);
   }, [
     animLogic.setActiveAnimationId,
     animLogic.setIsPlaying,
-    cancelLegacyBackgroundOperations,
-    ui.setEyedropperColor,
     ui.setIsEyedropperActive,
     ui.setIsMagicWandActive,
   ]);
@@ -446,7 +424,6 @@ export function useProjectController() {
 
           let nextProject: ProjectState;
           let previousSourceRuntimeUrl: string | null | undefined;
-          let previousBackgroundPreviewUrl: string | null;
           let protectedAssetUrls: string[];
           try {
             const width = image.width;
@@ -459,7 +436,6 @@ export function useProjectController() {
             }
             const currentProject = projectRef.current;
             previousSourceRuntimeUrl = currentProject.imageMeta?.src;
-            previousBackgroundPreviewUrl = backgroundPreviewUrlRef.current;
             protectedAssetUrls = currentProject.builderAssets.map((asset) => asset.src);
             nextProject = replaceSliceSourceProjectState(currentProject, {
               imageMeta: {
@@ -489,10 +465,8 @@ export function useProjectController() {
           settled = true;
           runSliceTerminalEffects([
             () => { projectRef.current = nextProject; },
-            () => { backgroundPreviewUrlRef.current = null; },
             clearLegacyCanvasInteractionState,
             () => revokeSliceOwnedRuntimeUrls({
-              backgroundPreview: previousBackgroundPreviewUrl,
               source: previousSourceRuntimeUrl,
               protectedAssetUrls,
             }),
@@ -597,13 +571,11 @@ export function useProjectController() {
   const handleResetSliceSource = () => {
     let nextProject: ProjectState;
     let sourceRuntimeUrl: string | null | undefined;
-    let backgroundPreviewUrl: string | null;
     let protectedAssetUrls: string[];
     try {
       const currentProject = projectRef.current;
       nextProject = resetSliceSourceProjectState(currentProject);
       sourceRuntimeUrl = currentProject.imageMeta?.src;
-      backgroundPreviewUrl = backgroundPreviewUrlRef.current;
       protectedAssetUrls = currentProject.builderAssets.map((asset) => asset.src);
       setProject(nextProject);
     } catch {
@@ -615,10 +587,8 @@ export function useProjectController() {
 
     runSliceTerminalEffects([
       () => { projectRef.current = nextProject; },
-      () => { backgroundPreviewUrlRef.current = null; },
       clearLegacyCanvasInteractionState,
       () => revokeSliceOwnedRuntimeUrls({
-        backgroundPreview: backgroundPreviewUrl,
         source: sourceRuntimeUrl,
         protectedAssetUrls,
       }),
@@ -657,50 +627,6 @@ export function useProjectController() {
     }));
     setSelectedIndex(null);
     notify("Frame removed", "info");
-  };
-
-  const handlePreviewBackground = (color: string, tolerance: number, softness: number) => {
-    cancelLegacyBackgroundOperations();
-    const operation = new AbortController();
-    backgroundOperationRef.current = operation;
-    void slicerLogic.handlePreviewBackground(
-      color,
-      tolerance,
-      softness,
-      (url) => {
-        if (operation.signal.aborted || backgroundOperationRef.current !== operation) {
-          revokeSliceOwnedRuntimeUrls({ backgroundPreview: url });
-          return;
-        }
-        backgroundPreviewUrlRef.current = url;
-        ui.setBgPreviewBlobUrl(url);
-      },
-      { signal: operation.signal },
-    ).finally(() => {
-      if (backgroundOperationRef.current === operation && !operation.signal.aborted) {
-        backgroundOperationRef.current = null;
-      }
-    });
-  };
-
-  const handleCancelPreview = () => {
-    cancelLegacyBackgroundOperations();
-  };
-
-  const handleRemoveBackground = (color: string, tolerance: number, softness: number) => {
-    cancelLegacyBackgroundOperations();
-    const operation = new AbortController();
-    backgroundOperationRef.current = operation;
-    void slicerLogic.handleRemoveBackground(
-      color,
-      tolerance,
-      softness,
-      { signal: operation.signal },
-    ).finally(() => {
-      if (backgroundOperationRef.current === operation && !operation.signal.aborted) {
-        backgroundOperationRef.current = null;
-      }
-    });
   };
 
   const setBuilderCanvas = (size: BuilderCanvasSize | null) => {
@@ -781,10 +707,6 @@ export function useProjectController() {
     },
     handleSmartFillSlot: (idx: number) =>
       builderLogic.handleSmartFillSlot(idx, builderGrid.cols, setSelectedIndex),
-    isPreviewActive: !!ui.bgPreviewBlobUrl,
-    handleRemoveBackground,
-    handlePreviewBackground,
-    handleCancelPreview,
     handleExportZip: exportLogic.handleExportZip,
     handleExportGif: exportLogic.handleExportGif,
     handleDeleteFrame,

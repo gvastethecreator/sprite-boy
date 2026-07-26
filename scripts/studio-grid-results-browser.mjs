@@ -29,7 +29,7 @@ async function capture(client, outputPath) {
 
 async function selectSource(client) {
   return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     const canvas = document.createElement("canvas");
     canvas.width = 400;

@@ -41,7 +41,7 @@ describe("CompositionCanvasSettingsInspector", () => {
     expect(screen.getByRole("textbox", { name: /Width/i })).toHaveValue("128");
     expect(screen.getByRole("textbox", { name: /Height/i })).toHaveValue("72");
     fireEvent.click(screen.getByRole("radio", { name: /Color/i }));
-    fireEvent.change(screen.getByLabelText("Canvas background color"), { target: { value: "#13579b" } });
+    fireEvent.change(screen.getByLabelText("Canvas background color hex"), { target: { value: "#13579b" } });
     const preview = screen.getByLabelText("Canvas preview").querySelector("[data-canvas-preview]");
     expect(preview).toHaveStyle({ aspectRatio: "128 / 72", backgroundColor: "#13579b" });
     fireEvent.click(screen.getByRole("button", { name: /Apply/i }));

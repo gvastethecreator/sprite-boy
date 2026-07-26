@@ -167,24 +167,30 @@ describe("SliceGridInspector (G2-03)", () => {
 
     const threshold = screen.getByRole("slider", { name: "Alpha threshold" });
     const padding = screen.getByRole("slider", { name: "Padding" });
+    const thresholdPrimitive = threshold.closest("[data-toolcraft-slider]");
+    const paddingPrimitive = padding.closest("[data-toolcraft-slider]");
+    expect(threshold.closest('[data-toolcraft-control="slider"]')).toBeInTheDocument();
+    expect(padding.closest('[data-toolcraft-control="slider"]')).toBeInTheDocument();
     expect(threshold).toHaveValue("24");
     expect(padding).toHaveValue("3");
     expect(threshold).toHaveAccessibleDescription(/8 cells use 24% alpha threshold/i);
     expect(screen.getByLabelText("Crop preview summary"))
       .toHaveTextContent(/Reduction is measured after processing/i);
 
-    fireEvent.change(threshold, { target: { value: "30" } });
-    fireEvent.change(threshold, { target: { value: "35" } });
-    fireEvent.change(threshold, { target: { value: "40" } });
-    expect(setCropThreshold).not.toHaveBeenCalled();
+    fireEvent.pointerDown(thresholdPrimitive!);
+    fireEvent.input(threshold, { target: { value: "30" } });
+    fireEvent.input(threshold, { target: { value: "35" } });
+    fireEvent.input(threshold, { target: { value: "40" } });
+    expect(setCropThreshold).toHaveBeenLastCalledWith(40);
     expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/40% alpha threshold/i);
-    fireEvent.pointerUp(threshold);
+    fireEvent.pointerUp(thresholdPrimitive!);
     expect(setCropThreshold).toHaveBeenCalledWith(40);
 
-    fireEvent.change(padding, { target: { value: "5" } });
-    fireEvent.change(padding, { target: { value: "6" } });
-    expect(setCropPadding).not.toHaveBeenCalled();
-    fireEvent.keyUp(padding, { key: "ArrowRight", code: "ArrowRight" });
+    fireEvent.pointerDown(paddingPrimitive!);
+    fireEvent.input(padding, { target: { value: "5" } });
+    fireEvent.input(padding, { target: { value: "6" } });
+    expect(setCropPadding).toHaveBeenLastCalledWith(6);
+    fireEvent.pointerUp(paddingPrimitive!);
     expect(setCropPadding).toHaveBeenCalledWith(6);
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(resetCrop).toHaveBeenCalledOnce();
@@ -197,18 +203,17 @@ describe("SliceGridInspector (G2-03)", () => {
       setCropThreshold: rejectThreshold,
     })} />);
     const threshold = screen.getByRole("slider", { name: "Alpha threshold" });
+    const thresholdPrimitive = threshold.closest("[data-toolcraft-slider]");
 
-    fireEvent.change(threshold, { target: { value: "65" } });
-    expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/65% alpha threshold/i);
-    fireEvent.pointerUp(threshold);
-
+    fireEvent.pointerDown(thresholdPrimitive!);
+    fireEvent.input(threshold, { target: { value: "65" } });
     expect(rejectThreshold).toHaveBeenCalledOnce();
     expect(threshold).toHaveValue("0");
     expect(screen.getByLabelText("Crop preview summary")).toHaveTextContent(/Auto crop is off/i);
     expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
   });
 
-  it("edits chroma controls, keeps slider commits coalesced and rejects malformed hex", () => {
+  it("edits chroma controls, persists accessible slider updates and rejects malformed hex", () => {
     const setChromaEnabled = vi.fn(() => true);
     const setChromaColor = vi.fn(() => true);
     const setChromaTolerance = vi.fn(() => true);
@@ -229,14 +234,16 @@ describe("SliceGridInspector (G2-03)", () => {
     expect(enabled).toBeChecked();
 
     const tolerance = screen.getByRole("slider", { name: "Tolerance" });
-    fireEvent.change(tolerance, { target: { value: "30" } });
-    fireEvent.change(tolerance, { target: { value: "35" } });
-    expect(setChromaTolerance).not.toHaveBeenCalled();
-    fireEvent.pointerUp(tolerance);
+    const tolerancePrimitive = tolerance.closest("[data-toolcraft-slider]");
+    fireEvent.pointerDown(tolerancePrimitive!);
+    fireEvent.input(tolerance, { target: { value: "30" } });
+    fireEvent.input(tolerance, { target: { value: "35" } });
+    expect(setChromaTolerance).toHaveBeenLastCalledWith(35);
+    fireEvent.pointerUp(tolerancePrimitive!);
     expect(setChromaTolerance).toHaveBeenCalledWith(35);
     expect(screen.getByLabelText("Chroma preview summary")).toHaveTextContent(/tolerance 35%/i);
 
-    const color = screen.getByRole("textbox", { name: "Chroma key hex color" });
+    const color = screen.getByRole("textbox", { name: "Chroma key color hex" });
     fireEvent.change(color, { target: { value: "#bad" } });
     fireEvent.blur(color);
     expect(screen.getByText(/six-digit hex color/i)).toBeInTheDocument();
@@ -248,6 +255,30 @@ describe("SliceGridInspector (G2-03)", () => {
     expect(setChromaEnabled).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByRole("button", { name: "Reset chroma settings" }));
     expect(resetChroma).toHaveBeenCalledOnce();
+  });
+
+  it("owns the canvas color picker in the canonical chroma panel", () => {
+    const onEyedropperActiveChange = vi.fn();
+    const view = render(
+      <SliceGridInspector
+        controller={controller()}
+        eyedropperActive={false}
+        onEyedropperActiveChange={onEyedropperActiveChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Pick color from canvas" }));
+    expect(onEyedropperActiveChange).toHaveBeenCalledWith(true);
+
+    view.rerender(
+      <SliceGridInspector
+        controller={controller()}
+        eyedropperActive
+        onEyedropperActiveChange={onEyedropperActiveChange}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Cancel canvas color picker" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("status", { name: "" })).toHaveTextContent(/Press Escape to cancel/i);
   });
 
   it("edits pixel stage, auto/fixed palette mode and preset controls", () => {

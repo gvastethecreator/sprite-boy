@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createControlHistoryGroupId,
   type ControlValueChangeHandler,
@@ -8,6 +8,7 @@ import {
   normalizeSliderRange,
   snapSliderValue,
 } from "./sliderValue";
+import { ToolcraftSliderPrimitive } from "./SliderPrimitive";
 
 export type RangeSliderControlProps = {
   baseValue?: readonly [number, number];
@@ -102,22 +103,6 @@ export function RangeSliderControl({
     onValueCommit?.(latestRef.current);
   };
 
-  const handleStartChange = (raw: string) => {
-    if (disabled) return;
-    let start = snapSliderValue(Number(raw), range);
-    const end = rendered[1];
-    if (start > end) start = end;
-    emitLive([start, end]);
-  };
-
-  const handleEndChange = (raw: string) => {
-    if (disabled) return;
-    const start = rendered[0];
-    let end = snapSliderValue(Number(raw), range);
-    if (end < start) end = start;
-    emitLive([start, end]);
-  };
-
   const handleReset = () => {
     if (disabled || baseValue === undefined) return;
     const next = normalizePair(baseValue, range);
@@ -136,13 +121,11 @@ export function RangeSliderControl({
     .filter(Boolean)
     .join(" ");
 
-  const inputClass =
-    "w-full accent-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent";
-
   return (
     <fieldset
       className={rootClass}
       data-disabled={disabled ? "true" : undefined}
+      data-toolcraft-control="range-slider"
       disabled={disabled}
     >
       <legend className="sr-only">{name}</legend>
@@ -152,52 +135,24 @@ export function RangeSliderControl({
         </span>
         <span className="text-xs tabular-nums text-textMain">{displayText}</span>
       </div>
-      <div className="flex flex-col gap-1">
-        <input
-          type="range"
-          name={startName}
-          aria-label={startName}
-          aria-valuemin={range.min}
-          aria-valuemax={range.max}
-          aria-valuenow={rendered[0]}
-          aria-valuetext={formatSliderValueWithUnit(rendered[0], range.step, unit)}
-          min={range.min}
-          max={range.max}
-          step={range.step}
-          value={rendered[0]}
-          disabled={disabled}
-          className={inputClass}
-          style={{ accentColor: "var(--color-accent)" } as CSSProperties}
-          onChange={(event) => handleStartChange(event.target.value)}
-          onPointerUp={finishInteraction}
-          onPointerCancel={finishInteraction}
-          onKeyUp={finishInteraction}
-          onBlur={finishInteraction}
-          onDoubleClick={handleReset}
-        />
-        <input
-          type="range"
-          name={endName}
-          aria-label={endName}
-          aria-valuemin={range.min}
-          aria-valuemax={range.max}
-          aria-valuenow={rendered[1]}
-          aria-valuetext={formatSliderValueWithUnit(rendered[1], range.step, unit)}
-          min={range.min}
-          max={range.max}
-          step={range.step}
-          value={rendered[1]}
-          disabled={disabled}
-          className={inputClass}
-          style={{ accentColor: "var(--color-accent)" } as CSSProperties}
-          onChange={(event) => handleEndChange(event.target.value)}
-          onPointerUp={finishInteraction}
-          onPointerCancel={finishInteraction}
-          onKeyUp={finishInteraction}
-          onBlur={finishInteraction}
-          onDoubleClick={handleReset}
-        />
-      </div>
+      <ToolcraftSliderPrimitive
+        disabled={disabled}
+        max={range.max}
+        min={range.min}
+        names={[startName, endName]}
+        onReset={handleReset}
+        onValueChange={(values) => emitLive(normalizePair([
+          values[0] ?? rendered[0],
+          values[1] ?? rendered[1],
+        ], range))}
+        onValueCommit={finishInteraction}
+        step={range.step}
+        values={rendered}
+        valueTexts={[
+          formatSliderValueWithUnit(rendered[0], range.step, unit),
+          formatSliderValueWithUnit(rendered[1], range.step, unit),
+        ]}
+      />
     </fieldset>
   );
 }

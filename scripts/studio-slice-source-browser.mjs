@@ -110,7 +110,7 @@ async function clickDialogButton(client, label) {
 
 async function selectPng(client, name, width, height) {
   const selected = await client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     const canvas = document.createElement("canvas");
     canvas.width = ${width};
@@ -134,7 +134,7 @@ async function selectPng(client, name, width, height) {
 
 async function selectInvalidPng(client) {
   const selected = await client.evaluate(`(() => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     const transfer = new DataTransfer();
     transfer.items.add(new File(["invalid source"], "replacement-invalid.png", { type: "image/png" }));
@@ -147,7 +147,7 @@ async function selectInvalidPng(client) {
 
 async function cancelPicker(client) {
   const cancelled = await client.evaluate(`(() => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     input.files = new DataTransfer().files;
     input.dispatchEvent(new Event("change", { bubbles: true }));

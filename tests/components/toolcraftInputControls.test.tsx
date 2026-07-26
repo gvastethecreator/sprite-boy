@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ColorControl, normalizeHexColor } from "../../components/toolcraft/ColorControl";
+import { hexToHsv, hsvToHex } from "../../components/toolcraft/colorValue";
 import { FileDropControl, normalizeFileAccept } from "../../components/toolcraft/FileDropControl";
 import { SegmentedControl } from "../../components/toolcraft/SegmentedControl";
 import { SelectControl } from "../../components/toolcraft/SelectControl";
@@ -136,7 +138,7 @@ describe("ColorControl", () => {
     const text = screen.getByRole("textbox", { name: "Mask hex" });
     const swatch = screen.getByLabelText("Mask swatch");
     fireEvent.change(text, { target: { value: "#123456" } });
-    expect(swatch).toHaveValue("#123456");
+    expect(swatch.querySelector("[data-color]")).toHaveAttribute("data-color", "#123456");
     expect(onValueChange).toHaveBeenCalledWith(
       { hex: "#123456" },
       expect.objectContaining({ history: "merge", historyGroup: expect.any(String) }),
@@ -145,6 +147,48 @@ describe("ColorControl", () => {
     fireEvent.blur(text);
     expect(onValueCommit).toHaveBeenCalledTimes(1);
     expect(onValueCommit).toHaveBeenCalledWith({ hex: "#123456" });
+  });
+
+  it("keeps one live group when the host controls the value", () => {
+    const onValueChange = vi.fn();
+    const onValueCommit = vi.fn();
+    function ControlledColor() {
+      const [hex, setHex] = useState("#000000");
+      return (
+        <ColorControl
+          name="Controlled"
+          hex={hex}
+          onValueChange={(next, meta) => {
+            onValueChange(next, meta);
+            setHex(next.hex);
+          }}
+          onValueCommit={onValueCommit}
+        />
+      );
+    }
+    render(<ControlledColor />);
+    const text = screen.getByRole("textbox", { name: "Controlled hex" });
+    fireEvent.change(text, { target: { value: "#123456" } });
+    fireEvent.blur(text);
+
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueCommit).toHaveBeenCalledTimes(1);
+    expect(onValueCommit).toHaveBeenCalledWith({ hex: "#123456" });
+  });
+
+  it("opens the Toolcraft surface, hue and channel picker without a native color input", () => {
+    render(<ColorControl name="Mask" hex="#336699" />);
+    fireEvent.click(screen.getByRole("button", { name: "Mask swatch" }));
+    expect(screen.getByLabelText("Mask color picker")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Mask saturation and brightness" })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Mask hue" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Mask color format" })).toBeInTheDocument();
+    expect(document.querySelector('input[type="color"]')).toBeNull();
+  });
+
+  it("round-trips Toolcraft HSV conversion", () => {
+    expect(hsvToHex(hexToHsv("#336699"))).toBe("#336699");
+    expect(hsvToHex({ h: 0, s: 1, v: 1 })).toBe("#FF0000");
   });
 
   it("commits short hex, restores invalid drafts, and cancels with Escape", () => {
@@ -180,7 +224,11 @@ describe("ColorControl", () => {
     onValueChange.mockClear();
     fireEvent.keyDown(text, { key: "Escape" });
     expect(text).toHaveValue("#112233");
-    expect(onValueChange).not.toHaveBeenCalled();
+    expect(onValueChange).toHaveBeenCalledWith(
+      { hex: "#112233" },
+      expect.objectContaining({ history: "merge", historyGroup: expect.any(String) }),
+    );
+    expect(onValueCommit).not.toHaveBeenCalled();
   });
 
   it("syncs controlled changes and blocks disabled callbacks", () => {

@@ -27,11 +27,8 @@ export function useUIController() {
   const [exportModal, setExportModal] = useState<ExportModalState>({ isOpen: false, type: null });
   // Feature UI States (Transferred from ProjectController for cleanliness)
   const [isEyedropperActive, setIsEyedropperActive] = useState(false);
-  const [eyedropperColor, setEyedropperColor] = useState<string | null>(null);
   const [isMagicWandActive, setIsMagicWandActive] = useState(false);
   const [wandTolerance, setWandTolerance] = useState(30);
-
-  const [bgPreviewBlobUrl, setBgPreviewBlobUrl] = useState<string | null>(null);
 
   // Toast Logic
   const showToast = useCallback(
@@ -74,12 +71,8 @@ export function useUIController() {
     setIsCommandPaletteOpen,
     exportModal,
     setExportModal,
-    bgPreviewBlobUrl,
-    setBgPreviewBlobUrl,
     isEyedropperActive,
     setIsEyedropperActive,
-    eyedropperColor,
-    setEyedropperColor,
     isMagicWandActive,
     setIsMagicWandActive,
     wandTolerance,

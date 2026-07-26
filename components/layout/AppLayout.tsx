@@ -223,6 +223,8 @@ const AppLayout: React.FC = () => {
     sliceGridState,
     initializeSliceGridState,
     commitSliceGridState,
+    isEyedropperActive,
+    setIsEyedropperActive,
   } = controller;
 
   const canvasRef = useRef<CanvasHandle>(null);
@@ -1562,6 +1564,8 @@ const AppLayout: React.FC = () => {
                     controller={sliceGridController}
                     store={canonical.store}
                     assets={canonical.assets}
+                    eyedropperActive={isEyedropperActive}
+                    onEyedropperActiveChange={setIsEyedropperActive}
                     onCleanupDebtChange={canonical.reportAssetCleanupDebt}
                   />
                 : <RightSidebar />
@@ -1604,6 +1608,8 @@ const AppLayout: React.FC = () => {
                     controller={sliceGridController}
                     store={canonical.store}
                     assets={canonical.assets}
+                    eyedropperActive={isEyedropperActive}
+                    onEyedropperActiveChange={setIsEyedropperActive}
                     onCleanupDebtChange={canonical.reportAssetCleanupDebt}
                   />
                 : <RightSidebar />

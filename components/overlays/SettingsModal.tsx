@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { UserPreferences, FrameLabelPosition } from "../../types";
 import NumberControl from "../common/NumberControl";
+import { ColorControl } from "../toolcraft";
 import { StudioDialog } from "../studio/StudioDialog";
 import { ControlBridgeSettings } from "../../features/control/ControlBridgeSettings";
 
@@ -173,7 +174,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div>
                   <label className="text-xs text-textMuted block mb-2">Background Color</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {LABEL_COLORS.map((c) => (
                       <button
                         key={c.name}
@@ -181,11 +182,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         className={`w-6 h-6 rounded border border-white/10 ${c.class} transition-transform hover:scale-110 ${preferences.frameLabel.color === c.value ? "ring-2 ring-white ring-offset-1 ring-offset-black" : ""}`}
                       />
                     ))}
-                    <input
-                      type="color"
-                      value={preferences.frameLabel.color}
-                      onChange={(e) => updateLabel("color", e.target.value)}
-                      className="w-6 h-6 p-0 border-0 rounded overflow-hidden cursor-pointer opacity-50 hover:opacity-100"
+                    <ColorControl
+                      className="w-32"
+                      name="Frame label color"
+                      showLabel={false}
+                      hex={preferences.frameLabel.color}
+                      onValueChange={({ hex }) => updateLabel("color", hex.toLowerCase())}
                     />
                   </div>
                 </div>

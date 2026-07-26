@@ -37,14 +37,14 @@ async function selectSource(client, sourcePath) {
     const documentNode = await client.send("DOM.getDocument", { depth: 0 });
     const input = await client.send("DOM.querySelector", {
       nodeId: documentNode.root.nodeId,
-      selector: 'input[accept="image/png,image/jpeg,image/webp"]',
+      selector: 'input[type="file"][accept*="image/png"]',
     });
     if (!input.nodeId) return false;
     await client.send("DOM.setFileInputFiles", { files: [sourcePath], nodeId: input.nodeId });
     return true;
   }
   return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     const canvas = document.createElement("canvas");
     canvas.width = 400;

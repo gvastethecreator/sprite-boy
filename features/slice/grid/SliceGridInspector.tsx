@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Scissors,
 } from "lucide-react";
+import { SliderControl } from "../../../components/toolcraft";
 
 import type { GridLayoutValidationIssue } from "./gridLayoutDraft";
 import type { SliceGridController } from "./useSliceGridController";
@@ -16,6 +17,9 @@ import SlicePixelControls from "./SlicePixelControls";
 
 export interface SliceGridInspectorProps {
   readonly controller: SliceGridController;
+  readonly eyedropperActive?: boolean;
+  readonly onEyedropperActiveChange?: (active: boolean) => void;
+  readonly showChromaControls?: boolean;
 }
 
 function issueFor(
@@ -25,7 +29,12 @@ function issueFor(
   return issues.find((issue) => issue.path === path || issue.path === "layout.manual") ?? null;
 }
 
-export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controller }) => {
+export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({
+  controller,
+  eyedropperActive,
+  onEyedropperActiveChange,
+  showChromaControls = true,
+}) => {
   const id = useId();
   const rowsError = issueFor(controller.validationIssues, "layout.manual.rows");
   const colsError = issueFor(controller.validationIssues, "layout.manual.cols");
@@ -60,21 +69,25 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
   const cells = detected ? detected.rows * detected.cols : 0;
   const cropDisabled = controller.sourceDimensions === null;
   const cropCanReset = cropDraft.threshold !== 0 || cropDraft.padding !== 0;
-  const commitCropThreshold = (value: number): void => {
-    setCropDraft(controller.setCropThreshold(value)
+  const commitCropThreshold = (value: number): boolean => {
+    const accepted = controller.setCropThreshold(value);
+    setCropDraft(accepted
       ? (current) => ({ ...current, threshold: value })
       : {
           threshold: controller.cropPreview.threshold,
           padding: controller.cropPreview.padding,
         });
+    return accepted;
   };
-  const commitCropPadding = (value: number): void => {
-    setCropDraft(controller.setCropPadding(value)
+  const commitCropPadding = (value: number): boolean => {
+    const accepted = controller.setCropPadding(value);
+    setCropDraft(accepted
       ? (current) => ({ ...current, padding: value })
       : {
           threshold: controller.cropPreview.threshold,
           padding: controller.cropPreview.padding,
         });
+    return accepted;
   };
 
   return (
@@ -207,63 +220,36 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
             </button>
           </div>
 
-          <label className="block space-y-2 text-[10px] font-bold text-textMuted" htmlFor={`${id}-crop-threshold`}>
-            <span className="flex items-center justify-between gap-3">
-              <span>Alpha threshold</span>
-              <span className="font-mono text-textMain" aria-hidden="true">
-                {cropDraft.threshold === 0 ? "Off" : `${cropDraft.threshold}%`}
-              </span>
-            </span>
-            <input
-              id={`${id}-crop-threshold`}
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={cropDraft.threshold}
-              aria-valuetext={cropDraft.threshold === 0
-                ? "Off"
-                : `${cropDraft.threshold}%`}
-              aria-describedby={`${id}-crop-summary`}
-              onChange={(event) => {
-                const threshold = event.currentTarget.valueAsNumber;
-                setCropDraft((current) => ({ ...current, threshold }));
-              }}
-              onPointerUp={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
-              onPointerCancel={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
-              onKeyUp={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
-              onBlur={(event) => commitCropThreshold(event.currentTarget.valueAsNumber)}
-              className="w-full accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-            />
-          </label>
+          <SliderControl
+            id={`${id}-crop-threshold`}
+            ariaDescribedBy={`${id}-crop-summary`}
+            name="Alpha threshold"
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            baseValue={0}
+            value={cropDraft.threshold}
+            valueLabel={cropDraft.threshold === 0 ? "Off" : undefined}
+            disabled={cropDisabled}
+            onValueChange={(threshold) => setCropDraft((current) => ({ ...current, threshold }))}
+            onValueCommit={commitCropThreshold}
+          />
 
-          <label className="block space-y-2 text-[10px] font-bold text-textMuted" htmlFor={`${id}-crop-padding`}>
-            <span className="flex items-center justify-between gap-3">
-              <span>Padding</span>
-              <span className="font-mono text-textMain" aria-hidden="true">
-                {cropDraft.padding}px
-              </span>
-            </span>
-            <input
-              id={`${id}-crop-padding`}
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={cropDraft.padding}
-              aria-valuetext={`${cropDraft.padding}px`}
-              aria-describedby={`${id}-crop-summary`}
-              onChange={(event) => {
-                const padding = event.currentTarget.valueAsNumber;
-                setCropDraft((current) => ({ ...current, padding }));
-              }}
-              onPointerUp={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
-              onPointerCancel={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
-              onKeyUp={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
-              onBlur={(event) => commitCropPadding(event.currentTarget.valueAsNumber)}
-              className="w-full accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-            />
-          </label>
+          <SliderControl
+            id={`${id}-crop-padding`}
+            ariaDescribedBy={`${id}-crop-summary`}
+            name="Padding"
+            min={0}
+            max={100}
+            step={1}
+            unit="px"
+            baseValue={0}
+            value={cropDraft.padding}
+            disabled={cropDisabled}
+            onValueChange={(padding) => setCropDraft((current) => ({ ...current, padding }))}
+            onValueCommit={commitCropPadding}
+          />
 
           <div
             id={`${id}-crop-summary`}
@@ -280,7 +266,13 @@ export const SliceGridInspector: React.FC<SliceGridInspectorProps> = ({ controll
           </div>
         </fieldset>
 
-        <SliceChromaControls controller={controller} />
+        {showChromaControls ? (
+          <SliceChromaControls
+            controller={controller}
+            eyedropperActive={eyedropperActive}
+            onEyedropperActiveChange={onEyedropperActiveChange}
+          />
+        ) : null}
 
         <SlicePixelControls controller={controller} />
 

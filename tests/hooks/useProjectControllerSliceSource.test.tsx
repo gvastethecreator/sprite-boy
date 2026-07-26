@@ -22,7 +22,6 @@ describe("useProjectController Slice ownership boundary", () => {
       result.current.handleCreateCanvas(32, 16);
       result.current.setSelectedIndex(0);
       result.current.setIsEyedropperActive(true);
-      result.current.setEyedropperColor("#ff00ff");
       result.current.setIsMagicWandActive(true);
     });
     const projectBefore = {
@@ -35,7 +34,6 @@ describe("useProjectController Slice ownership boundary", () => {
 
     expect(result.current.selectedIndex).toBeNull();
     expect(result.current.isEyedropperActive).toBe(false);
-    expect(result.current.eyedropperColor).toBeNull();
     expect(result.current.isMagicWandActive).toBe(false);
     expect({
       builderCanvas: result.current.builderCanvas,
@@ -64,8 +62,7 @@ describe("useProjectController Slice ownership boundary", () => {
     vi.unstubAllGlobals();
   });
 
-  it("reset clears derived interaction/playback and revokes the owned BG preview once", async () => {
-    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  it("reset clears derived interaction and playback state", async () => {
     const { result } = renderHook(() => useProjectController());
     await act(async () => Promise.resolve());
 
@@ -74,7 +71,6 @@ describe("useProjectController Slice ownership boundary", () => {
       result.current.handleAddAnimation();
       result.current.setSelectedIndex(0);
       result.current.setIsPlaying(true);
-      result.current.setBgPreviewBlobUrl("blob:bg-preview-owned");
     });
     expect(result.current.frames).not.toHaveLength(0);
     expect(result.current.activeAnimationId).not.toBeNull();
@@ -90,9 +86,7 @@ describe("useProjectController Slice ownership boundary", () => {
     expect(result.current.activeAnimationId).toBeNull();
     expect(result.current.selectedIndex).toBeNull();
     expect(result.current.isPlaying).toBe(false);
-    expect(result.current.bgPreviewBlobUrl).toBeNull();
     expect(result.current.preferences).toBe(preferencesBefore);
-    expect(revoke).toHaveBeenCalledExactlyOnceWith("blob:bg-preview-owned");
   });
 
   it("resolves a committed replacement despite hostile listener and handler cleanup", async () => {

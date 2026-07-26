@@ -22,8 +22,6 @@ export interface LegacyCanvasInteraction {
   frames: FrameData[];
   builderSlots: Record<number, SlotData> | undefined;
   selectedFrameIndex: number | null;
-  isEyedropperActive: boolean;
-  onPickColor: ((hex: string) => void) | undefined;
   onSelectFrame: (index: number) => void;
   onUpload: (file: File) => void;
   onUpdateSlot: ((idx: number, data: any) => void) | undefined;
@@ -255,29 +253,6 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
         return;
       }
 
-      // Eyedropper
-      if (legacyInteraction.isEyedropperActive && legacyInteraction.onPickColor && canvasRef.current) {
-        e.stopPropagation();
-        e.preventDefault();
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          try {
-            const ix = Math.floor(Math.max(0, Math.min(x, canvas.width - 1)));
-            const iy = Math.floor(Math.max(0, Math.min(y, canvas.height - 1)));
-            const pixel = ctx.getImageData(ix, iy, 1, 1).data;
-            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
-            legacyInteraction.onPickColor(hex);
-          } catch (err) {
-            console.warn("Could not pick color:", err);
-          }
-        }
-        return;
-      }
-
       if (e.button === 1 || (isSpacePressed && e.button === 0)) {
         setDragMode(DragMode.PAN);
         return;
@@ -430,7 +405,6 @@ export function useCanvasMouse(deps: CanvasMouseDeps) {
     if (canonicalEyedropper?.isActive) return "crosshair";
     if (legacyInteraction && dragMode === DragMode.MOVE_FRAME) return "move";
     if (legacyInteraction && dragMode === DragMode.SWAP_SLOTS) return "grabbing";
-    if (legacyInteraction?.isEyedropperActive) return "crosshair";
     return "default";
   }, [isEmpty, dragMode, legacyInteraction, canonicalEyedropper]);
 

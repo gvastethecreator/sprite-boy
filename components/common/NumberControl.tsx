@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { SliderControl } from "../toolcraft";
 
 interface NumberControlProps {
   label?: string;
@@ -115,11 +116,6 @@ const NumberControl: React.FC<NumberControlProps> = ({
     }
   };
 
-  const percentage =
-    min !== undefined && max !== undefined
-      ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
-      : 0;
-
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       <div className="flex items-center gap-2">
@@ -188,19 +184,20 @@ const NumberControl: React.FC<NumberControlProps> = ({
         </div>
       </div>
 
-      {slider && !disabled && min !== undefined && max !== undefined && (
+      {slider && min !== undefined && max !== undefined && (
         <div className="px-1 pt-1">
-          <input
-            type="range"
+          <SliderControl
+            name={label ? `${label} slider` : "Slider"}
             min={min}
             max={max}
             step={step}
             value={value}
-            onChange={(e) => onChange(parseFloat(e.target.value))}
-            onMouseUp={() => onAfterChange && onAfterChange(value)}
-            aria-label={label ? `${label} slider` : "Slider"}
-            className="custom-slider block w-full cursor-pointer accent-accent"
-            style={{ "--slider-progress": `${percentage}%` } as React.CSSProperties}
+            unit={unit}
+            disabled={disabled}
+            baseValue={defaultValue}
+            showHeader={false}
+            onValueChange={onChange}
+            onValueCommit={onAfterChange}
           />
         </div>
       )}

@@ -167,61 +167,6 @@ export async function detectSpriteAt(
   );
 }
 
-/** Removes a target color from an image with tolerance and edge softness (runs in Worker). */
-export async function removeBackground(
-  imgSrc: string,
-  targetHex: string,
-  tolerance: number = 0,
-  softness: number = 20,
-): Promise<Blob | null> {
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = imgSrc;
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = reject;
-  });
-
-  const { width, height, data } = getImageData(img);
-
-  const payload = {
-    width,
-    height,
-    buffer: data.buffer,
-    targetHex,
-    tolerance,
-    softness,
-  };
-  const result: any = await runWorkerTask(
-    "REMOVE_BG",
-    payload,
-    workerTransferListForPayload(payload),
-  );
-
-  try {
-    const pixels = result.buffer instanceof ArrayBuffer
-      ? new Uint8ClampedArray(result.buffer)
-      : new Uint8ClampedArray(result.buffer.slice(0));
-    const resultImageData = new ImageData(
-      pixels,
-      result.width,
-      result.height,
-    );
-
-    const canvas = document.createElement("canvas");
-    canvas.width = resultImageData.width;
-    canvas.height = resultImageData.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.putImageData(resultImageData, 0, 0);
-
-    return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  } catch (e) {
-    console.error("Failed to reconstruct ImageData", e);
-    return null;
-  }
-}
-
 /** Crops a region from an image source and returns a data URI. */
 export async function cropImage(
   sourceSrc: string,

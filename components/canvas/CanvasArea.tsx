@@ -100,7 +100,6 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     loadingMessage,
     isEyedropperActive,
     setIsEyedropperActive,
-    setEyedropperColor: onPickColor,
     handleUpdateFrame: onUpdateFrame,
     handleUpdateFrameEphemeral: onUpdateFrameEphemeral,
     handleSwapSlots: onSwapSlots,
@@ -220,9 +219,7 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
   }, [canonicalRegionTool]);
   const handleCanonicalPickColor = React.useCallback((hex: string) => {
     onCanonicalPickColor?.(hex);
-    // Keep the shared legacy swatch in sync while Slice owns the recipe commit.
-    onPickColor(hex);
-  }, [onCanonicalPickColor, onPickColor]);
+  }, [onCanonicalPickColor]);
   const canonicalEyedropper = React.useMemo(() => canonicalCanvasOwnership ? {
     isActive: isEyedropperActive,
     sourceWidth: contentDimensions.width,
@@ -234,7 +231,6 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
     contentDimensions.height,
     contentDimensions.width,
     isEyedropperActive,
-    onPickColor,
     handleCanonicalPickColor,
     setIsEyedropperActive,
   ]);
@@ -256,8 +252,6 @@ const CanvasArea = forwardRef<CanvasHandle, CanvasAreaProps>(({
           frames,
           builderSlots,
           selectedFrameIndex,
-          isEyedropperActive,
-          onPickColor,
           onSelectFrame,
           onUpload,
           onUpdateSlot,

@@ -35,14 +35,10 @@ export interface SidebarProps {
   setTemplateConfig?: (config: TemplateConfig) => void;
   onDownloadSnapshot?: () => void;
   onAutoSlice?: () => void;
-  onRemoveBackground?: (color: string, tolerance: number, softness: number) => void;
-  onPreviewBackground?: (color: string, tolerance: number, softness: number) => void;
-  onCancelPreview?: () => void;
   isEyedropperActive?: boolean;
   setIsEyedropperActive?: (active: boolean) => void;
   isMagicWandActive?: boolean;
   setIsMagicWandActive?: (active: boolean) => void;
-  eyedropperColor?: string | null;
   isLoading?: boolean;
   onFrameToAsset?: (frameId: number) => void;
   onSyncGridConfig?: () => void;

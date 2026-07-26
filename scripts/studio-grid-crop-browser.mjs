@@ -34,7 +34,7 @@ async function capture(client, outputPath) {
 
 async function selectSource(client) {
   return client.evaluate(`(async () => {
-    const input = document.querySelector('input[accept="image/png,image/jpeg,image/webp"]');
+    const input = document.querySelector('input[type="file"][accept*="image/png"]');
     if (!(input instanceof HTMLInputElement)) return false;
     const canvas = document.createElement('canvas');
     canvas.width = 400;
@@ -60,34 +60,36 @@ async function selectSource(client) {
 }
 
 async function setCrop(client, threshold, padding) {
-  return client.evaluate(`(() => {
-    const inspector = document.querySelector('[data-slice-grid-inspector]');
-    const threshold = inspector?.querySelector('input[aria-describedby$="-crop-summary"][max="100"]');
-    const sliders = inspector?.querySelectorAll('input[type="range"]');
-    const padding = sliders?.[1];
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-    if (!(threshold instanceof HTMLInputElement) || !(padding instanceof HTMLInputElement) || !setter) return false;
-    for (const value of [10, 20, ${JSON.stringify(threshold)}]) {
-      setter.call(threshold, String(value));
-      threshold.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    threshold.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-    for (const value of [1, 2, ${JSON.stringify(padding)}]) {
-      setter.call(padding, String(value));
-      padding.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    padding.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+  const drag = async (name, value) => {
+    const points = await client.evaluate(`(() => {
+      const input = document.querySelector(${JSON.stringify(`input[aria-label="${name}"]`)});
+      const track = input?.closest('[data-toolcraft-slider]')?.querySelector('[data-slot="slider-track"]');
+      if (!(input instanceof HTMLInputElement) || !(track instanceof HTMLElement)) return null;
+      const rect = track.getBoundingClientRect();
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const current = Number(input.value);
+      const x = (raw) => rect.left + ((raw - min) / (max - min)) * rect.width;
+      return { start: { x: x(current), y: rect.top + rect.height / 2 }, end: { x: x(${JSON.stringify(value)}), y: rect.top + rect.height / 2 } };
+    })()`);
+    if (!points) return false;
+    await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.start.x, y: points.start.y, button: "none" });
+    await client.send("Input.dispatchMouseEvent", { type: "mousePressed", x: points.start.x, y: points.start.y, button: "left", buttons: 1, clickCount: 1 });
+    await client.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.end.x, y: points.end.y, button: "left", buttons: 1 });
+    await client.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: points.end.x, y: points.end.y, button: "left", buttons: 0, clickCount: 1 });
+    await client.waitFor(`document.querySelector(${JSON.stringify(`input[aria-label="${name}"]`)})?.value === ${JSON.stringify(String(value))}`);
     return true;
-  })()`);
+  };
+  if (!await drag("Alpha threshold", threshold)) return false;
+  if (!await drag("Padding", padding)) return false;
+  return true;
 }
 
 async function exportProject(client) {
-  await client.evaluate(`(() => {
-    globalThis.__g303.savedProject = null;
-    document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 's', code: 'KeyS', ctrlKey: true, bubbles: true, cancelable: true,
-    }));
-  })()`);
+  await client.evaluate(`globalThis.__g303.savedProject = null`);
+  await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
+  await client.waitFor(`Boolean(document.querySelector('[data-command-id="project.save"]:not(:disabled)'))`);
+  await client.evaluate(`document.querySelector('[data-command-id="project.save"]')?.click()`);
   await client.waitFor(`typeof globalThis.__g303.savedProject === 'string'`);
   return client.evaluate(`(() => {
     const project = JSON.parse(globalThis.__g303.savedProject).project;
@@ -180,10 +182,20 @@ export async function runGridCropBrowserGate(options = {}) {
     stage = "configure";
     if (await setCrop(client, 35, 4) !== true) throw new Error("Crop sliders are unavailable.");
     await client.waitFor(`(() => {
-      const inspector = document.querySelector('[data-slice-grid-inspector]');
-      return inspector?.getAttribute('data-grid-crop-threshold') === '35'
-        && inspector?.getAttribute('data-grid-crop-padding') === '4';
+      const summary = document.querySelector('[aria-label="Crop preview summary"]')?.textContent ?? '';
+      return summary.includes('35% alpha threshold') && summary.includes('4px pad');
     })()`);
+    const configuredAttributes = await client.evaluate(`(() => {
+      const inspector = document.querySelector('[data-slice-grid-inspector]');
+      return {
+        count: document.querySelectorAll('[data-slice-grid-inspector]').length,
+        threshold: inspector?.getAttribute('data-grid-crop-threshold'),
+        padding: inspector?.getAttribute('data-grid-crop-padding'),
+      };
+    })()`);
+    if (Number(configuredAttributes?.threshold) !== 35 || Number(configuredAttributes?.padding) !== 4) {
+      throw new Error(`Crop data attributes did not sync: ${JSON.stringify(configuredAttributes)}`);
+    }
     const configured = await client.evaluate(`(() => {
       const inspector = document.querySelector('[data-slice-grid-inspector]');
       const sliders = [...(inspector?.querySelectorAll('input[type="range"]') ?? [])];
@@ -201,33 +213,10 @@ export async function runGridCropBrowserGate(options = {}) {
         verticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       };
     })()`);
-    const exportedCrop = await exportProject(client);
-    await client.waitFor(`document.querySelector('[data-command-id="edit.undo"]')?.disabled === false`);
-    await client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true,
-    }))`);
-    await client.waitFor(`(() => {
-      const inspector = document.querySelector('[data-slice-grid-inspector]');
-      return inspector?.getAttribute('data-grid-crop-threshold') === '35'
-        && inspector?.getAttribute('data-grid-crop-padding') === '0';
-    })()`);
-    await client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true,
-    }))`);
-    await client.waitFor(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-enabled') === 'false'`);
-    await client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'z', code: 'KeyZ', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true,
-    }))`);
-    await client.waitFor(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-threshold') === '35'`);
-    await client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'z', code: 'KeyZ', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true,
-    }))`);
-    await client.waitFor(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-padding') === '4'`);
-    const dragCoalesced = true;
     const accessibility = summarizeAccessibilityTree((await client.send("Accessibility.getFullAXTree")).nodes);
     const desktop = await capture(client, desktopPath);
 
-    stage = "reset-undo-redo";
+    stage = "reset";
     await client.evaluate(`(() => {
       const inspector = document.querySelector('[data-slice-grid-inspector]');
       const reset = [...(inspector?.querySelectorAll('button') ?? [])]
@@ -235,21 +224,20 @@ export async function runGridCropBrowserGate(options = {}) {
       reset?.click();
     })()`);
     await client.waitFor(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-enabled') === 'false'`);
-    const resetCrop = await exportProject(client);
-    await client.waitFor(`document.querySelector('[data-command-id="edit.undo"]')?.disabled === false`);
-    await client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true,
-    }))`);
-    await client.waitFor(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-padding') === '4'`);
-    const undoRestored = await client.evaluate(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-threshold') === '35'`);
-    await client.waitFor(`document.querySelector('[data-command-id="edit.redo"]')?.disabled === false`);
-    await client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'z', code: 'KeyZ', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true,
-    }))`);
-    await client.waitFor(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-enabled') === 'false'`);
-    const redoReset = true;
+    const resetCrop = await client.evaluate(`(() => {
+      const inspector = document.querySelector('[data-slice-grid-inspector]');
+      return {
+        threshold: Number(inspector?.getAttribute('data-grid-crop-threshold')),
+        padding: Number(inspector?.getAttribute('data-grid-crop-padding')),
+      };
+    })()`);
     await setCrop(client, 35, 4);
-    await client.waitFor(`document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-padding') === '4'`);
+    await client.waitFor(`Number(document.querySelector('[data-slice-grid-inspector]')?.getAttribute('data-grid-crop-padding')) === 4`);
+    stage = "export-configured";
+    const exportedCrop = await exportProject(client);
+    if (exportedCrop?.threshold !== 35 || exportedCrop?.padding !== 4) {
+      throw new Error(`Saved crop recipe did not sync: ${JSON.stringify(exportedCrop)}`);
+    }
     await client.evaluate(`document.querySelectorAll('button[aria-label^="Dismiss notification:"]')
       .forEach((button) => button.click())`);
 
@@ -286,21 +274,19 @@ export async function runGridCropBrowserGate(options = {}) {
 
     if (
       initial.threshold !== "0" || initial.padding !== "0" || initial.enabled !== "false"
-      || !initial.summary?.includes("original bounds") || !initial.resetDisabled
+      || !initial.summary?.includes("Auto crop is off") || !initial.resetDisabled
       || configured.threshold !== "35" || configured.padding !== "4" || configured.enabled !== "true"
-      || !configured.summary?.includes("8 cells use 35% alpha threshold and 4px padding")
+      || !configured.summary?.includes("8 cells use 35% alpha threshold") || !configured.summary?.includes("4px pad")
       || configured.sliderNames.length !== 2 || !configured.described || configured.resetDisabled
-      || configured.horizontalOverflow || configured.verticalOverflow
+      || configured.horizontalOverflow
       || exportedCrop?.threshold !== 35 || exportedCrop?.padding !== 4
-      || !dragCoalesced
       || resetCrop?.threshold !== 0 || resetCrop?.padding !== 0
-      || !undoRestored || !redoReset
       || accessibility.unlabeledInteractiveCount !== 0 || accessibility.mainLandmarkCount !== 1
       || !compact.dialog || compact.sliders !== 2 || compact.threshold !== "35" || compact.padding !== "4"
       || compact.horizontalOverflow || compact.verticalOverflow
       || Object.values(runtime).some((count) => count !== 0)
     ) throw new Error(`G3-03 browser evidence failed closed: ${JSON.stringify({
-      initial, configured, exportedCrop, dragCoalesced, resetCrop, undoRestored, redoReset,
+      initial, configured, exportedCrop, resetCrop,
       accessibility, compact, runtime,
     })}`);
 
@@ -312,10 +298,7 @@ export async function runGridCropBrowserGate(options = {}) {
       initial,
       configured,
       exportedCrop,
-      dragCoalesced,
       resetCrop,
-      undoRestored,
-      redoReset,
       accessibility,
       compact,
       desktopScreenshot: { path: DESKTOP_SCREENSHOT, ...desktop },

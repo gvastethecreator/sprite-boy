@@ -108,108 +108,6 @@ export function detectSpriteAt(
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-function rgbToHsl(r: number, g: number, b: number) {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  const max = Math.max(r, g, b),
-    min = Math.min(r, g, b);
-  let h = 0,
-    s = 0;
-  const l = (max + min) / 2;
-  if (max === min) {
-    h = s = 0;
-  } else {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r:
-        h = (g - b) / d + (g < b ? 6 : 0);
-        break;
-      case g:
-        h = (b - r) / d + 2;
-        break;
-      case b:
-        h = (r - g) / d + 4;
-        break;
-    }
-    h /= 6;
-  }
-  return [h * 360, s, l];
-}
-
-export function removeBackground(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  targetHex: string,
-  tolerance: number,
-  softness: number,
-) {
-  const hex = targetHex.replace("#", "");
-  let rT = 0,
-    gT = 0,
-    bT = 0;
-
-  if (hex.length === 3) {
-    rT = parseInt(hex[0] + hex[0], 16);
-    gT = parseInt(hex[1] + hex[1], 16);
-    bT = parseInt(hex[2] + hex[2], 16);
-  } else if (hex.length >= 6) {
-    rT = parseInt(hex.substring(0, 2), 16);
-    gT = parseInt(hex.substring(2, 4), 16);
-    bT = parseInt(hex.substring(4, 6), 16);
-  }
-
-  if (isNaN(rT) || isNaN(gT) || isNaN(bT)) return data;
-
-  const [hT, sT, lT] = rgbToHsl(rT, gT, bT);
-  const tolNorm = Math.max(0.001, tolerance / 100);
-  const softNorm = Math.max(0.001, softness / 100);
-  const isGrayscaleTarget = sT < 0.1;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i],
-      g = data[i + 1],
-      b = data[i + 2];
-    let matchScore = 0;
-
-    if (isGrayscaleTarget) {
-      const rDist = Math.abs(r - rT) / 255;
-      const gDist = Math.abs(g - gT) / 255;
-      const bDist = Math.abs(b - bT) / 255;
-      matchScore = Math.sqrt(rDist * rDist + gDist * gDist + bDist * bDist) / 1.732;
-    } else {
-      const [h, s, l] = rgbToHsl(r, g, b);
-      let hDist = Math.abs(h - hT);
-      if (hDist > 180) hDist = 360 - hDist;
-      const hScore = hDist / 180;
-      const sScore = Math.abs(s - sT);
-      const lScore = Math.abs(l - lT);
-
-      matchScore = hScore * 0.5 + sScore * 0.3 + lScore * 0.2;
-    }
-
-    let alpha = 1.0;
-    if (matchScore < tolNorm) {
-      alpha = 0;
-    } else if (matchScore < tolNorm + softNorm) {
-      const t = (matchScore - tolNorm) / softNorm;
-      alpha = t * t * (3 - 2 * t);
-
-      if (!isGrayscaleTarget && alpha < 0.9) {
-        const factor = (1 - alpha) * 0.8;
-        data[i] = Math.max(0, data[i] - (rT - data[i]) * factor);
-        data[i + 1] = Math.max(0, data[i + 1] - (gT - data[i + 1]) * factor);
-        data[i + 2] = Math.max(0, data[i + 2] - (bT - data[i + 2]) * factor);
-      }
-    }
-
-    data[i + 3] = Math.floor(data[i + 3] * alpha);
-  }
-  return data;
-}
-
 self.onmessage = async (e) => {
   const { type, id, payload } = e.data;
   try {
@@ -223,19 +121,6 @@ self.onmessage = async (e) => {
           payload.height,
           payload.threshold,
         );
-        break;
-
-      case "REMOVE_BG":
-        const data = new Uint8ClampedArray(payload.buffer);
-        removeBackground(
-          data,
-          payload.width,
-          payload.height,
-          payload.targetHex,
-          payload.tolerance,
-          payload.softness,
-        );
-        result = { width: payload.width, height: payload.height, buffer: data.buffer };
         break;
 
       case "DETECT_ONE":

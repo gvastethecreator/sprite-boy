@@ -66,13 +66,89 @@ describe("createControlHistoryGroupId", () => {
 
 describe("SliderControl", () => {
   it("exposes accessible name and value text", () => {
-    render(
+    const view = render(
       <SliderControl name="Opacity" value={40} min={0} max={100} unit="%" />,
     );
     const slider = screen.getByRole("slider", { name: "Opacity" });
     expect(slider).toHaveAttribute("aria-valuetext", "40%");
     expect(screen.getByText("Opacity")).toBeInTheDocument();
     expect(screen.getByText("40%")).toBeInTheDocument();
+    expect(view.container.querySelector("[data-toolcraft-slider]")).toHaveAttribute("role", "group");
+  });
+
+  it("edits the exact value and commits through the Toolcraft value label", () => {
+    const onValueChange = vi.fn();
+    const onValueCommit = vi.fn();
+    render(
+      <SliderControl
+        name="Opacity"
+        value={40}
+        min={0}
+        max={100}
+        unit="%"
+        onValueChange={onValueChange}
+        onValueCommit={onValueCommit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Opacity value" }));
+    const editor = screen.getByRole("textbox", { name: "Opacity value" });
+    fireEvent.change(editor, { target: { value: "63%" } });
+    fireEvent.blur(editor);
+
+    expect(onValueChange).toHaveBeenCalledWith(63, expect.objectContaining({ history: "merge" }));
+    expect(onValueCommit).toHaveBeenCalledWith(63);
+  });
+
+  it("rolls editor arrow changes back on Escape and closes their history group", () => {
+    const onValueChange = vi.fn();
+    const onValueCommit = vi.fn();
+    render(
+      <SliderControl
+        name="Opacity"
+        value={40}
+        min={0}
+        max={100}
+        onValueChange={onValueChange}
+        onValueCommit={onValueCommit}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit Opacity value" }));
+    const editor = screen.getByRole("textbox", { name: "Opacity value" });
+    fireEvent.keyDown(editor, { key: "ArrowUp" });
+    fireEvent.keyDown(editor, { key: "Escape" });
+
+    expect(onValueChange.mock.calls.map((call) => call[0])).toEqual([41, 40]);
+    expect(onValueChange.mock.calls[0]![1]?.historyGroup)
+      .toBe(onValueChange.mock.calls[1]![1]?.historyGroup);
+    expect(onValueCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole("slider", { name: "Opacity" })).toHaveValue("40");
+
+    fireEvent.input(screen.getByRole("slider", { name: "Opacity" }), { target: { value: "50" } });
+    expect(onValueChange.mock.calls[2]![1]?.historyGroup)
+      .not.toBe(onValueChange.mock.calls[1]![1]?.historyGroup);
+  });
+
+  it("uses fine internal movement and snaps the discrete variant to its public step", () => {
+    const onValueChange = vi.fn();
+    const onValueCommit = vi.fn();
+    render(
+      <SliderControl
+        name="Colors"
+        value={20}
+        min={0}
+        max={100}
+        step={10}
+        variant="discrete"
+        onValueChange={onValueChange}
+        onValueCommit={onValueCommit}
+      />,
+    );
+    const slider = screen.getByRole("slider", { name: "Colors" });
+    expect(slider).toHaveAttribute("step", "0.1");
+    fireEvent.input(slider, { target: { value: "26" } });
+    expect(onValueChange).toHaveBeenLastCalledWith(30, expect.objectContaining({ history: "merge" }));
+    expect(onValueCommit).toHaveBeenLastCalledWith(30);
   });
 
   it("syncs controlled prop changes and blocks callbacks when disabled", () => {
@@ -140,7 +216,7 @@ describe("SliderControl", () => {
     expect(onValueCommit).toHaveBeenCalledWith(50);
   });
 
-  it("reuses one history group across live changes and starts a new group after commit", () => {
+  it("starts a new history group after each committed accessible input", () => {
     const onValueChange = vi.fn();
     const onValueCommit = vi.fn();
     render(
@@ -154,26 +230,24 @@ describe("SliderControl", () => {
       />,
     );
     const slider = screen.getByRole("slider", { name: "Amount" });
+    const primitive = slider.closest("[data-toolcraft-slider]");
+    expect(primitive).toBeInTheDocument();
 
-    fireEvent.change(slider, { target: { value: "10" } });
-    fireEvent.change(slider, { target: { value: "20" } });
-    fireEvent.change(slider, { target: { value: "30" } });
+    fireEvent.input(slider, { target: { value: "10" } });
+    fireEvent.input(slider, { target: { value: "20" } });
+    fireEvent.input(slider, { target: { value: "30" } });
+    fireEvent.pointerUp(slider.closest("[data-toolcraft-slider]")!);
 
     expect(onValueChange).toHaveBeenCalledTimes(3);
-    const groupA = onValueChange.mock.calls[0]![1]?.historyGroup as string;
-    expect(groupA.length).toBeGreaterThan(0);
-    for (const call of onValueChange.mock.calls) {
-      expect(call[1]).toEqual({ history: "merge", historyGroup: groupA });
-    }
+    const groups = onValueChange.mock.calls.map((call) => call[1]?.historyGroup as string);
+    expect(new Set(groups).size).toBe(3);
+    expect(groups.every((group) => group.length > 0)).toBe(true);
+    expect(onValueCommit.mock.calls.map((call) => call[0])).toEqual([10, 20, 30]);
 
-    fireEvent.pointerUp(slider);
-    expect(onValueCommit).toHaveBeenCalledTimes(1);
-    expect(onValueCommit).toHaveBeenCalledWith(30);
-
-    fireEvent.change(slider, { target: { value: "40" } });
+    fireEvent.input(slider, { target: { value: "40" } });
     const groupB = onValueChange.mock.calls[3]![1]?.historyGroup as string;
     expect(groupB.length).toBeGreaterThan(0);
-    expect(groupB).not.toBe(groupA);
+    expect(groups).not.toContain(groupB);
     expect(onValueChange.mock.calls[3]![1]).toEqual({
       history: "merge",
       historyGroup: groupB,
@@ -192,7 +266,7 @@ describe("SliderControl", () => {
       />,
     );
     expect(screen.getByText("Original")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("slider", { name: "Labeled" }), {
+    fireEvent.input(screen.getByRole("slider", { name: "Labeled" }), {
       target: { value: "25" },
     });
     expect(screen.queryByText("Original")).not.toBeInTheDocument();
@@ -219,22 +293,24 @@ describe("RangeSliderControl", () => {
 
     const start = screen.getByRole("slider", { name: "Trim start" });
     const end = screen.getByRole("slider", { name: "Trim end" });
-    expect(start).toHaveAttribute("name", "Trim start");
-    expect(end).toHaveAttribute("name", "Trim end");
+    const primitive = start.closest("[data-toolcraft-slider]");
+    expect(start).toHaveAccessibleName("Trim start");
+    expect(end).toHaveAccessibleName("Trim end");
 
-    fireEvent.change(start, { target: { value: "80" } });
+    fireEvent.pointerDown(primitive!);
+    fireEvent.input(start, { target: { value: "80" } });
     expect(onValueChange).toHaveBeenLastCalledWith(
       [60, 60],
       expect.objectContaining({ history: "merge" }),
     );
 
-    fireEvent.change(end, { target: { value: "10" } });
+    fireEvent.input(end, { target: { value: "10" } });
     expect(onValueChange).toHaveBeenLastCalledWith(
       [60, 60],
       expect.objectContaining({ history: "merge" }),
     );
 
-    fireEvent.pointerUp(end);
+    fireEvent.pointerUp(primitive!);
     expect(onValueCommit).toHaveBeenCalledWith([60, 60]);
   });
 
@@ -251,7 +327,7 @@ describe("RangeSliderControl", () => {
     expect(screen.getByRole("group", { name: "Trim" })).toBeInTheDocument();
     expect(screen.getByText("Original range")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("slider", { name: "Trim start" }), {
+    fireEvent.input(screen.getByRole("slider", { name: "Trim start" }), {
       target: { value: "30" },
     });
     expect(screen.queryByText("Original range")).not.toBeInTheDocument();
