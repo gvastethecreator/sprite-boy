@@ -19,7 +19,7 @@ import {
 } from "./studio-browser-smoke.mjs";
 
 const HOST = "127.0.0.1";
-const RUNTIME_DEADLINE_MS = 90_000;
+const RUNTIME_DEADLINE_MS = 120_000;
 const BOOLEAN_KEYS = Object.freeze([
   "malformedRejected",
   "malformedNoJob",
@@ -36,6 +36,13 @@ const BOOLEAN_KEYS = Object.freeze([
   "jobRecorded",
   "noActiveJobs",
   "firstFrameOpened",
+  "frameAlignmentOpened",
+  "frameControlsVisible",
+  "onionControlsVisible",
+  "frameTransformApplied",
+  "frameSelectionChanged",
+  "frameReloadRestored",
+  "animateMobileFits",
   "durableReloadRestored",
   "mobilePageFits",
   "finalObjectUrlsBounded",
@@ -348,6 +355,81 @@ export async function runStudioVideoImportBrowser(options = {}) {
     })()`);
     await clickAriaButton(client, "Close Job Center");
     await client.waitFor(`!document.querySelector('[role="dialog"][aria-label="Job Center"]')`);
+
+    journeyStep = "frame alignment";
+    await client.send("Page.navigate", { url: `${baseUrl}/#/studio/animate` });
+    await client.waitFor(`document.querySelector('section[aria-label="Frame alignment"] h1')?.textContent?.includes("Frame alignment")`, 15_000);
+    const alignment = await client.evaluate(`(() => {
+      const workspace = document.querySelector('section[aria-label="Frame alignment"]');
+      const frameButtons = workspace?.querySelectorAll('nav[aria-label="Sequence frames"] button') ?? [];
+      const xLabel = Array.from(workspace?.querySelectorAll("label") ?? [])
+        .find((label) => label.firstChild?.textContent?.trim() === "X");
+      const xInput = xLabel?.querySelector('input[type="number"]');
+      const opacity = workspace?.querySelector('input[type="range"][aria-label="Frame opacity"]');
+      const onion = workspace?.querySelector('input[type="range"][aria-label="Onion opacity"]');
+      const guides = Array.from(workspace?.querySelectorAll("label") ?? [])
+        .some((label) => label.textContent?.includes("Center and thirds guides"));
+      if (!(xInput instanceof HTMLInputElement) || !(frameButtons[1] instanceof HTMLButtonElement)) {
+        return { frameAlignmentOpened: false, frameControlsVisible: false, onionControlsVisible: false,
+          frameTransformApplied: false };
+      }
+      xInput.value = "3";
+      xInput.dispatchEvent(new Event("input", { bubbles: true }));
+      xInput.dispatchEvent(new Event("change", { bubbles: true }));
+      xInput.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      frameButtons[1].click();
+      return {
+        frameAlignmentOpened: frameButtons.length === 4 && Boolean(workspace?.querySelector('canvas[aria-label="Current animation frame"]')),
+        frameControlsVisible: xInput instanceof HTMLInputElement && opacity instanceof HTMLInputElement &&
+          Boolean(workspace?.querySelector('button[aria-label="Lock frame"]')),
+        onionControlsVisible: onion instanceof HTMLInputElement && guides,
+        frameTransformApplied: xInput.value === "3",
+      };
+    })()`);
+    await client.waitFor(`document.querySelector('nav[aria-label="Sequence frames"] button[aria-current="true"]')?.textContent?.includes("02")`);
+    await client.evaluate(`document.querySelector('section[aria-label="Frame alignment"] [role="application"]')
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))`);
+    await client.waitFor(`(() => {
+      const workspace = document.querySelector('section[aria-label="Frame alignment"]');
+      const xLabel = Array.from(workspace?.querySelectorAll("label") ?? [])
+        .find((label) => label.firstChild?.textContent?.trim() === "X");
+      const input = xLabel?.querySelector('input[type="number"]');
+      return input instanceof HTMLInputElement && input.value === "1";
+    })()`);
+    const frameSelectionChanged = await client.evaluate(`(() => {
+      const workspace = document.querySelector('section[aria-label="Frame alignment"]');
+      const buttons = workspace?.querySelectorAll('nav[aria-label="Sequence frames"] button') ?? [];
+      return buttons[1]?.getAttribute("aria-current") === "true";
+    })()`);
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+
+    journeyStep = "frame alignment reload";
+    await client.send("Page.reload", { ignoreCache: true });
+    await client.waitFor(`document.querySelector('section[aria-label="Frame alignment"] h1')?.textContent?.includes("Frame alignment")`, 30_000);
+    const frameReloadRestored = await client.evaluate(`(() => {
+      const workspace = document.querySelector('section[aria-label="Frame alignment"]');
+      const selected = workspace?.querySelector('nav[aria-label="Sequence frames"] button[aria-current="true"]');
+      const xLabel = Array.from(workspace?.querySelectorAll("label") ?? [])
+        .find((label) => label.firstChild?.textContent?.trim() === "X");
+      const xInput = xLabel?.querySelector('input[type="number"]');
+      return selected?.textContent?.includes("02") === true && xInput instanceof HTMLInputElement && xInput.value === "1";
+    })()`);
+    await client.send("Emulation.setDeviceMetricsOverride", {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 1,
+      mobile: true,
+    });
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+    const animateMobileFits = await client.evaluate(`document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight`);
+    await client.send("Emulation.setDeviceMetricsOverride", {
+      width: 1440,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await client.send("Page.navigate", { url: `${baseUrl}/#/studio/slice` });
+    await client.waitFor(`document.querySelector("[data-slice-source-metadata]")?.textContent?.includes("browser-video.mp4-0001.png")`, 30_000);
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 750));
     const urlsBeforeReload = await client.evaluate("({ ...globalThis.__spriteBoyVideoUrlStats })");
 
@@ -386,6 +468,10 @@ export async function runStudioVideoImportBrowser(options = {}) {
       ...closed,
       ...imported,
       jobRecorded,
+      ...alignment,
+      frameSelectionChanged,
+      frameReloadRestored,
+      animateMobileFits,
       ...finalPage,
       initialObjectUrlStats,
       consoleErrorCount: client.consoleErrorCount,

@@ -22,6 +22,13 @@ function passingEvidence() {
     jobRecorded: true,
     noActiveJobs: true,
     firstFrameOpened: true,
+    frameAlignmentOpened: true,
+    frameControlsVisible: true,
+    onionControlsVisible: true,
+    frameTransformApplied: true,
+    frameSelectionChanged: true,
+    frameReloadRestored: true,
+    animateMobileFits: true,
     durableReloadRestored: true,
     mobilePageFits: true,
     finalObjectUrlsBounded: true,
@@ -71,6 +78,7 @@ describe("V1-05 video import browser evidence", () => {
   it("fails closed on any proof, scalar or diagnostic drift", () => {
     for (const mutate of [
       (value: ReturnType<typeof passingEvidence>) => { value.closeNoJob = false; },
+      (value: ReturnType<typeof passingEvidence>) => { value.frameReloadRestored = false; },
       (value: ReturnType<typeof passingEvidence>) => { value.route = "#/studio/compose"; },
       (value: ReturnType<typeof passingEvidence>) => { value.frameCount = 3; },
       (value: ReturnType<typeof passingEvidence>) => { value.dimensions = "32x32"; },
