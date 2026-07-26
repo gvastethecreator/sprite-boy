@@ -47,6 +47,7 @@ type ImpactCommandType = ProjectCommand["type"] | "command.batch";
 const IMPACT_COMMAND_KEYS: Partial<Record<ImpactCommandType, readonly string[]>> = {
   "composition.update": ["type", "compositionId", "patch"],
   "region.create": ["type", "region", "atIndex"],
+  "artifact.record": ["type", "artifact", "outputAsset", "recipe", "atIndex"],
   "asset.remove": ["type", "assetId", "policy"],
   "region.remove": ["type", "regionId", "policy"],
   "processingRecipe.remove": ["type", "recipeId", "policy"],
@@ -73,6 +74,7 @@ const IMPACT_COMMAND_KEYS: Partial<Record<ImpactCommandType, readonly string[]>>
 
 const IMPACT_COMMAND_OPTIONAL_KEYS: Partial<Record<ImpactCommandType, readonly string[]>> = {
   "region.create": ["atIndex"],
+  "artifact.record": ["outputAsset", "recipe", "atIndex"],
 };
 
 function reference(collection: ProjectRecordCollection, id: EntityId): EntityReference {
@@ -854,6 +856,56 @@ export function analyzeProjectCommandImpact(
       return entityExists(project, source)
         ? { direct: [direct], referencedBy: [], cascades: [], blockers: [] }
         : { direct: [direct], referencedBy: [], cascades: [], blockers: [missingTargetBlocker(source)] };
+    }
+
+    if (impactType === "artifact.record") {
+      const artifact = dataRecord(record.artifact);
+      if (!artifact || !isEntityId(artifact.id)) {
+        return invalidImpact("artifact.record requires a data-only artifact with a valid id.", "$.artifact");
+      }
+      const direct = [reference("generatedArtifacts", artifact.id)];
+      const blockers: ProjectCommandDiagnostic[] = [];
+      if (entityExists(project, direct[0]!)) blockers.push(commandDiagnostic(
+        "ENTITY_ALREADY_EXISTS",
+        `Entity ${artifact.id} already exists in generatedArtifacts.`,
+        "$.artifact.id",
+        direct[0],
+      ));
+      if (record.outputAsset !== undefined) {
+        const outputAsset = dataRecord(record.outputAsset);
+        if (!outputAsset || !isEntityId(outputAsset.id)) {
+          return invalidImpact("artifact.record outputAsset must have a valid id.", "$.outputAsset");
+        }
+        const target = reference("assets", outputAsset.id);
+        direct.push(target);
+        if (entityExists(project, target)) blockers.push(commandDiagnostic(
+          "ENTITY_ALREADY_EXISTS",
+          `Entity ${outputAsset.id} already exists in assets.`,
+          "$.outputAsset.id",
+          target,
+        ));
+        if (
+          record.atIndex !== undefined
+          && (!Number.isSafeInteger(record.atIndex) || (record.atIndex as number) < 0 || (record.atIndex as number) > project.rootOrder.assetIds.length)
+        ) return invalidImpact("artifact.record atIndex is outside the Asset order.", "$.atIndex");
+      } else if (record.atIndex !== undefined) {
+        return invalidImpact("artifact.record atIndex requires an outputAsset.", "$.atIndex");
+      }
+      if (record.recipe !== undefined) {
+        const recipe = dataRecord(record.recipe);
+        if (!recipe || !isEntityId(recipe.id)) {
+          return invalidImpact("artifact.record recipe must have a valid id.", "$.recipe");
+        }
+        const target = reference("processingRecipes", recipe.id);
+        direct.push(target);
+        if (entityExists(project, target)) blockers.push(commandDiagnostic(
+          "ENTITY_ALREADY_EXISTS",
+          `Entity ${recipe.id} already exists in processingRecipes.`,
+          "$.recipe.id",
+          target,
+        ));
+      }
+      return { direct: uniqueSortedReferences(direct), referencedBy: [], cascades: [], blockers };
     }
 
     const { target, policy } = removeTarget(impactType, record);

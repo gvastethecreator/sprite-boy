@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyProjectCommand,
+  applyProjectCommandBatch,
   applyProjectCommandInverse,
   createEmptyStudioProject,
   validateStudioProject,
@@ -170,5 +171,45 @@ describe("background-removal durable project contract", () => {
     expect(result.ok).toBe(false);
     expect(result.project).toBe(project);
     if (!result.ok) expect(result.diagnostics[0]).toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("reports created entities in batch impact", () => {
+    const result = applyProjectCommandBatch(baseProject(), {
+      type: "command.batch",
+      commands: [{
+        type: "artifact.record",
+        recipe: recipe(),
+        outputAsset: outputAsset(),
+        artifact: artifact(),
+      }],
+    }, context);
+    if (!result.ok) throw new Error(result.diagnostics.map((item) => item.message).join("; "));
+    expect(result.impact.direct).toEqual([
+      { collection: "assets", id: "output" },
+      { collection: "processingRecipes", id: "recipe-background" },
+      { collection: "generatedArtifacts", id: "artifact-background" },
+    ]);
+  });
+
+  it("rejects nested getters without executing them", () => {
+    let reads = 0;
+    const hostileArtifact = artifact() as GeneratedArtifact & { provenance: GeneratedArtifact["provenance"] };
+    Object.defineProperty(hostileArtifact.provenance, "model", {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return "hostile";
+      },
+    });
+    const project = baseProject();
+    const result = applyProjectCommand(project, {
+      type: "artifact.record",
+      recipe: recipe(),
+      outputAsset: outputAsset(),
+      artifact: hostileArtifact,
+    }, context);
+    expect(result.ok).toBe(false);
+    expect(result.project).toBe(project);
+    expect(reads).toBe(0);
   });
 });

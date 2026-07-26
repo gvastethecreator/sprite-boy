@@ -869,18 +869,21 @@ function applyArtifactRecord(
   command: Extract<ProjectCommand, { type: "artifact.record" }>,
   context: ProjectCommandContext,
 ): ProjectCommandResult {
-  if (!isPlainRecord(command.artifact)) {
+  const artifactPayload = cloneDataOnly(command.artifact);
+  if (!artifactPayload.ok || !isPlainRecord(artifactPayload.value)) {
     return failure(original, [diagnostic("INVALID_PATCH", "artifact.record requires an artifact record.", "$.artifact")]);
   }
-  if (command.outputAsset !== undefined && !isPlainRecord(command.outputAsset)) {
+  const outputPayload = command.outputAsset === undefined ? undefined : cloneDataOnly(command.outputAsset);
+  if (outputPayload && (!outputPayload.ok || !isPlainRecord(outputPayload.value))) {
     return failure(original, [diagnostic("INVALID_PATCH", "outputAsset must be an asset record when provided.", "$.outputAsset")]);
   }
-  if (command.recipe !== undefined && !isPlainRecord(command.recipe)) {
+  const recipePayload = command.recipe === undefined ? undefined : cloneDataOnly(command.recipe);
+  if (recipePayload && (!recipePayload.ok || !isPlainRecord(recipePayload.value))) {
     return failure(original, [diagnostic("INVALID_PATCH", "recipe must be a processing recipe when provided.", "$.recipe")]);
   }
-  const artifact = command.artifact;
-  const outputAsset = command.outputAsset;
-  const recipe = command.recipe;
+  const artifact = artifactPayload.value as typeof command.artifact;
+  const outputAsset = outputPayload?.ok ? outputPayload.value as NonNullable<typeof command.outputAsset> : undefined;
+  const recipe = recipePayload?.ok ? recipePayload.value as NonNullable<typeof command.recipe> : undefined;
   if (!isEntityId(artifact.id)) {
     return failure(original, [diagnostic("INVALID_PATCH", "Artifact ID is invalid.", "$.artifact.id")]);
   }
