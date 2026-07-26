@@ -266,6 +266,14 @@ export async function runDeferredFeatureBrowser(options = {}) {
     const initialRequestPaths = requestedPaths.slice();
 
     await seedExportFixture(client);
+    await client.waitFor(`(() => {
+      const labels = ["PNG sequence (.zip)", "Individual PNGs (.zip)"];
+      return Array.from(document.querySelectorAll("button")).some((button) =>
+        !button.disabled && labels.some((label) =>
+          button.textContent?.replace(/\\s+/gu, " ").trim().includes(label),
+        ),
+      );
+    })()`);
     // Accept either legacy copy or current Export sidebar polish labels.
     const zipOpened =
       (await client.evaluate(clickButtonExpression("PNG sequence (.zip)"))) === true ||

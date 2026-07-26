@@ -28,6 +28,7 @@ import {
 } from "../../hooks/useStudioStoreSelector";
 import { SegmentedControl, SelectControl, SliderControl, type ControlChangeMeta } from "../../components/toolcraft";
 import { ComposeCanvasWorkspace } from "../compose/canvas/ComposeCanvasWorkspace";
+import { resolveFittedSceneViewport } from "../compose/canvas/sceneViewportFit";
 import { snapComposeLayer } from "../compose/guides/composeGuideGeometry";
 import { createCelTransformEditor, type CelTransformHistory } from "./frame/celTransformEditor";
 import {
@@ -189,7 +190,7 @@ export function AnimateFrameWorkspace({ store, assets, disabled = false }: Anima
     observer.observe(target);
     setHostSize({ width: target.clientWidth, height: target.clientHeight });
     return () => observer.disconnect();
-  }, []);
+  }, [celId]);
 
   useEffect(() => () => {
     interactionStore.dispatch({ type: "interaction.setGuides", guides: [] });
@@ -234,18 +235,13 @@ export function AnimateFrameWorkspace({ store, assets, disabled = false }: Anima
     );
   }
 
-  const fitScale = hostSize.width > 0 && hostSize.height > 0
-    ? Math.min(hostSize.width / dimensions.width, hostSize.height / dimensions.height)
-    : 1;
-  const displayViewport = animateViewport.scale > fitScale
-    ? {
-        scale: fitScale,
-        offset: {
-          x: (hostSize.width - dimensions.width * fitScale) / 2,
-          y: (hostSize.height - dimensions.height * fitScale) / 2,
-        },
-      }
-    : animateViewport;
+  const displayViewport = resolveFittedSceneViewport(
+    animateViewport,
+    dimensions.width,
+    dimensions.height,
+    hostSize.width,
+    hostSize.height,
+  );
   const guidePositions = guidesEnabled
     ? [
         ...[dimensions.width / 3, dimensions.width / 2, dimensions.width * 2 / 3]

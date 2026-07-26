@@ -23,10 +23,10 @@ import {
 } from "../../features/slice/grid";
 import {
   ManualRegionOverlay,
-  mapWandClientPointToSource,
   type ManualRegionOverlayRegion,
-  type WandSeedPoint,
-} from "../../features/slice/irregular";
+} from "../../features/slice/irregular/ManualRegionOverlay";
+import { mapWandClientPointToSource } from "../../features/slice/irregular/wandCoordinates";
+import type { WandSeedPoint } from "../../features/slice/irregular/wandSelection";
 
 export interface CanonicalRegionToolInteraction {
   readonly mode: "wand" | "manual" | null;

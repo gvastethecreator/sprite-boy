@@ -157,9 +157,9 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
     })()`);
     if (!imported) throw new Error("A1-02 browser import could not be injected.");
     stage = "wait-composition";
-    await client.waitFor(`document.body.innerText.includes("Composition graph ready")`, 60_000);
+    await client.waitFor(`Boolean(document.querySelector('[data-compose-canvas]'))`, 60_000);
     const importOutcome = await client.evaluate(`(() => ({
-      ready: document.body.innerText.includes('Composition graph ready'),
+      ready: Boolean(document.querySelector('[data-compose-canvas]')),
       alert: document.querySelector('main [role="alert"]')?.textContent?.trim() ?? null,
       mainText: document.querySelector('main')?.innerText?.slice(-500) ?? ''
     }))()`);
@@ -246,7 +246,11 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
 
     stage = "reload";
     await client.send("Page.reload", { ignoreCache: false });
-    await client.waitFor(`document.body.innerText.includes("Composition graph ready")`, 60_000);
+    await client.waitFor(`Boolean(document.querySelector('[data-compose-canvas]'))`, 60_000);
+    await client.waitFor(
+      `Boolean(document.querySelector('form[aria-label="Canvas settings"]'))`,
+      30_000,
+    );
     await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
     await client.waitFor(`document.body.innerText.includes("Saved locally")`, 60_000);
     const reloaded = await client.evaluate(`(() => ({

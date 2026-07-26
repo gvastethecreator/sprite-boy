@@ -1,8 +1,8 @@
 /** Production-Chrome proof for Slice video import, close and durable reload. */
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { cfrMp4Blob } from "../tests/contract/fixtures/videoFixtures.ts";
@@ -20,6 +20,17 @@ import {
 
 const HOST = "127.0.0.1";
 const RUNTIME_DEADLINE_MS = 120_000;
+
+async function captureOptional(client, outputPath) {
+  if (typeof outputPath !== "string" || outputPath.trim().length === 0) return;
+  const result = await client.send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: false,
+  });
+  const resolved = resolve(outputPath);
+  mkdirSync(dirname(resolved), { recursive: true });
+  writeFileSync(resolved, Buffer.from(result.data, "base64"));
+}
 const BOOLEAN_KEYS = Object.freeze([
   "malformedRejected",
   "malformedNoJob",
@@ -402,6 +413,7 @@ export async function runStudioVideoImportBrowser(options = {}) {
       return buttons[1]?.getAttribute("aria-current") === "true";
     })()`);
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+    await captureOptional(client, options.animateDesktopScreenshot);
 
     journeyStep = "frame alignment reload";
     await client.send("Page.reload", { ignoreCache: true });
@@ -422,6 +434,7 @@ export async function runStudioVideoImportBrowser(options = {}) {
     });
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
     const animateMobileFits = await client.evaluate(`document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight`);
+    await captureOptional(client, options.animateCompactScreenshot);
     await client.send("Emulation.setDeviceMetricsOverride", {
       width: 1440,
       height: 900,

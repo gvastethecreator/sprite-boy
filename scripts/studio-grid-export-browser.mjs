@@ -264,7 +264,7 @@ export async function runGridExportBrowserGate(options = {}) {
     stage = "compose-handoff";
     if (!await clickSelector(client, '[data-grid-export-center] button[aria-label="Open in Compose"]')) throw new Error("Compose handoff button was not available.");
     await client.waitFor(`location.hash === "#/studio/compose" && Boolean(document.querySelector('[data-studio-workspace-content="compose"]'))`, 30_000);
-    await client.waitFor(`document.body.innerText.includes("Composition graph ready")`, 30_000);
+    await client.waitFor(`Boolean(document.querySelector('[data-compose-canvas]'))`, 30_000);
     if (!await clickSelector(client, 'button[aria-label="Project"]')) throw new Error("Project menu was not available after Compose handoff.");
     await client.waitFor(`document.body.innerText.includes("Saved locally")`, 60_000);
     await clickSelector(client, 'button[aria-label="Project"]');

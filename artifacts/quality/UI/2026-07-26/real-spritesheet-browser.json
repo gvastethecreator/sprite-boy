@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "check": "real-spritesheet-ui",
+  "status": "pass",
+  "asset": {
+    "path": "artifacts/quality/UI/2026-07-26/spritesheet-forest-scout-4x2.png",
+    "sha256": "08b0a7e33090aca9ca8d0cf3d66fc6a999655dbe82fbef6da4c0c901662bbd13",
+    "mimeType": "image/png",
+    "width": 512,
+    "height": 256,
+    "columns": 4,
+    "rows": 2,
+    "cellWidth": 128,
+    "cellHeight": 128,
+    "transparentCorners": true
+  },
+  "generation": {
+    "mode": "built-in imagegen",
+    "useCase": "stylized-concept",
+    "prompt": "Create one complete spritesheet of the same agile forest scout performing an 8-frame run cycle. Use crisp hand-authored 32-bit pixel art, a limited palette and hard pixel edges. Lay out exactly 4 columns by 2 rows with equal square cells, one centered full-body character per cell, stable scale, baseline, pivot and padding, ordered left-to-right then top-to-bottom. Use one flat #00ff00 chroma-key background with no shadows, grid, text, labels, watermark, extra characters or cropped body parts. Keep short dark hair, a rust-red scarf, navy tunic and tan boots consistent across every frame."
+  },
+  "postprocess": {
+    "detectedKeyColor": "#04f702",
+    "alphaValidated": true,
+    "normalizedGrid": "512x256 to eight 128x128 cells",
+    "resizeFilter": "nearest"
+  },
+  "journey": {
+    "stagedSlices": 8,
+    "committedSlices": 8,
+    "collisionHitboxes": 1,
+    "composeSources": 9,
+    "composeLayers": 1,
+    "horizontalOverflow": false,
+    "verticalOverflow": false,
+    "unlabeledInteractiveCount": 0,
+    "mainLandmarkCount": 1,
+    "consoleErrorCount": 0,
+    "exceptionCount": 0,
+    "logErrorCount": 0,
+    "networkFailureCount": 0,
+    "httpErrorCount": 0
+  },
+  "screenshots": [
+    {
+      "workspace": "slice",
+      "path": "artifacts/quality/UI/2026-07-26/real-spritesheet-slice.png",
+      "sha256": "32b95d6c89b24148c81b3a50bf4289c29f5a8b06b662893af533fd734ff95231"
+    },
+    {
+      "workspace": "compose",
+      "path": "artifacts/quality/UI/2026-07-26/real-spritesheet-compose.png",
+      "sha256": "3bd1a2b34d1f01c875c21b622f6e807879c046c1bfc74f438f617bb4bfef17d8"
+    },
+    {
+      "workspace": "collision",
+      "path": "artifacts/quality/UI/2026-07-26/real-spritesheet-collision.png",
+      "sha256": "e549f4909b6c3559934900b58d88f33367461b73c74199efc48d84ca546a87e5"
+    },
+    {
+      "workspace": "export",
+      "path": "artifacts/quality/UI/2026-07-26/real-spritesheet-export.png",
+      "sha256": "89b47ed8c0eccf3b28db4f507fddc2b82504eb478540698749bc795b5e3b71ec"
+    }
+  ]
+}

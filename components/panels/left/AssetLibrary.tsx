@@ -51,10 +51,12 @@ const AssetLibrary: React.FC<AssetLibraryProps> = (props) => {
         action={
           <>
             <button
+              type="button"
+              aria-label="Add assets"
               onClick={() => inputRef.current?.click()}
               className="p-1 hover:bg-tool rounded text-textMain"
             >
-              <Plus size={14} />
+              <Plus size={14} aria-hidden="true" />
             </button>
             <input
               type="file"
@@ -70,8 +72,9 @@ const AssetLibrary: React.FC<AssetLibraryProps> = (props) => {
       />
       <div className="px-2 py-2 bg-surface/50 border-b border-border/20">
         <div className="flex items-center gap-2 bg-input rounded px-2 py-1 border border-border/50 focus-within:border-accent">
-          <Search size={12} className="text-textMuted" />
+          <Search size={12} className="text-textMuted" aria-hidden="true" />
           <input
+            aria-label="Search assets"
             className="w-full bg-transparent text-[10px] outline-none text-textMain"
             placeholder="Search..."
             value={searchQuery}
@@ -88,12 +91,18 @@ const AssetLibrary: React.FC<AssetLibraryProps> = (props) => {
             className="aspect-square bg-input border border-border rounded flex items-center justify-center relative group hover:border-accent cursor-grab active:cursor-grabbing overflow-hidden"
           >
             <div className="absolute inset-0 bg-checkered opacity-30 pointer-events-none"></div>
-            <img src={asset.src} className="max-w-[90%] max-h-[90%] object-contain relative z-10" />
+            <img
+              src={asset.src}
+              alt={asset.name}
+              className="max-w-[90%] max-h-[90%] object-contain relative z-10"
+            />
             <button
+              type="button"
+              aria-label={`Delete ${asset.name}`}
               onClick={() => props.onDeleteAsset?.(asset.id)}
-              className="absolute top-0 right-0 p-1 bg-black/80 text-white opacity-0 group-hover:opacity-100 z-20"
+              className="absolute right-0 top-0 z-20 rounded-bl bg-black/80 p-1 text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
             >
-              <X size={10} />
+              <X size={10} aria-hidden="true" />
             </button>
           </div>
         ))}

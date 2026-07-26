@@ -23,6 +23,7 @@ import {
   useProjectStoreSelector,
   useWorkspaceStoreSelector,
 } from "../../../hooks/useStudioStoreSelector";
+import { resolveFittedSceneViewport } from "./sceneViewportFit";
 
 export type ComposeViewportFactory = (
   options: BrowserSceneViewportOptions,
@@ -50,7 +51,7 @@ export interface ComposeCanvasWorkspaceProps {
 
 const MAX_BITMAP_CACHE = 8;
 
-function shrinkProjectionToFit(
+function fitProjectionToHost(
   projection: SceneProjection,
   width: number,
   height: number,
@@ -66,18 +67,14 @@ function shrinkProjectionToFit(
     return projection;
   }
 
-  const fitScale = Math.min(width / canvas.width, height / canvas.height);
-  if (!Number.isFinite(fitScale) || projection.viewport.scale <= fitScale) {
-    return projection;
-  }
-
-  const viewport = Object.freeze({
-    scale: fitScale,
-    offset: Object.freeze({
-      x: (width - canvas.width * fitScale) / 2,
-      y: (height - canvas.height * fitScale) / 2,
-    }),
-  });
+  const viewport = resolveFittedSceneViewport(
+    projection.viewport,
+    canvas.width,
+    canvas.height,
+    width,
+    height,
+  );
+  if (viewport === projection.viewport) return projection;
   return Object.freeze({ ...projection, viewport });
 }
 
@@ -427,7 +424,7 @@ export function ComposeCanvasWorkspace(
           const projection = projectionFactory
             ? projectionFactory(projectSnapshot, workspaceSnapshot)
             : createSceneProjection(projectSnapshot, workspaceSnapshot);
-          return shrinkProjectionToFit(
+          return fitProjectionToHost(
             projection,
             resizeTarget.clientWidth,
             resizeTarget.clientHeight,

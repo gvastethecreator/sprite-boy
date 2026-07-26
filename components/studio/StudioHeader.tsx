@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Activity,
+  Clapperboard,
   ChevronDown,
   CircleHelp,
   Download,
@@ -46,7 +47,7 @@ export interface StudioHeaderProps {
 const WORKSPACE_ICONS = {
   slice: Scissors,
   compose: Layers3,
-  animate: Layers3,
+  animate: Clapperboard,
   collision: Target,
   export: Download,
 } as const satisfies Record<StudioWorkspaceId, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>>;

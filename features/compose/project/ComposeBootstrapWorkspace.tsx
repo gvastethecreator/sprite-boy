@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronRight,
   Image as ImageIcon,
   Layers3,
   LoaderCircle,
@@ -126,6 +127,12 @@ export function ComposeBootstrapWorkspace({
     feedbackRef.current?.focus({ preventScroll: true });
   }, [feedback]);
 
+  useEffect(() => {
+    if (feedback?.kind !== "success") return;
+    const timeoutId = window.setTimeout(() => setFeedback(null), 5_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [feedback]);
+
   const importFile = async (file: File): Promise<void> => {
     if (disabled) return;
     importControllerRef.current?.abort();
@@ -214,10 +221,35 @@ export function ComposeBootstrapWorkspace({
     onCompositionReady?.();
   };
 
+  const sourceCards = sources.length > 0 ? (
+    <ul data-compose-sources className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {sources.map((item) => (
+        <li key={`${item.source.type}:${item.source.id}`}>
+          <button
+            type="button"
+            disabled={interactionDisabled}
+            onClick={() => openSource(item.source)}
+            className="group flex min-h-16 w-full items-center gap-2.5 rounded-md border border-white/10 bg-surface p-2.5 text-left transition-colors hover:border-white/20 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-black/25 text-textMuted group-hover:text-textMain">
+              <ImageIcon size={16} aria-hidden="true" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-semibold text-textMain">{item.name}</span>
+              <span className="mt-0.5 block font-mono text-[10px] text-textMuted">
+                {sourceLabel(item.source)} · {item.dimensions}
+              </span>
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  ) : null;
+
   return (
     <section
       aria-labelledby="compose-bootstrap-title"
-      className="flex h-full min-h-0 flex-col overflow-y-auto bg-workspace p-4 sm:p-5"
+      className="flex h-full min-h-0 flex-col overflow-y-auto bg-workspace p-3 sm:p-4 md:overflow-hidden"
       onDragEnter={(event) => {
         if (interactionDisabled) return;
         event.preventDefault();
@@ -240,8 +272,8 @@ export function ComposeBootstrapWorkspace({
     >
       <div
         className={[
-          "mx-auto flex w-full flex-1 flex-col gap-4",
-          composition ? "max-w-6xl min-h-0" : "max-w-4xl justify-center",
+          "mx-auto flex w-full flex-1 flex-col gap-3",
+          composition ? "min-h-0 max-w-[1600px]" : "max-w-4xl justify-center",
         ].join(" ")}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -259,10 +291,10 @@ export function ComposeBootstrapWorkspace({
             type="button"
             disabled={interactionDisabled}
             onClick={() => fileInputRef.current?.click()}
-            className="btn-primary inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md px-3.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait disabled:opacity-55"
+            className={`${composition ? "btn-secondary" : "btn-primary"} inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md px-3.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait disabled:opacity-55`}
           >
             {busy || disabled ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" /> : <Upload size={14} aria-hidden="true" />}
-            {disabled ? "Loading…" : busy ? "Importing…" : composition ? "Import image" : "Import image"}
+            {disabled ? "Loading…" : busy ? "Importing…" : "Import image"}
           </button>
           <input
             ref={fileInputRef}
@@ -278,78 +310,6 @@ export function ComposeBootstrapWorkspace({
           />
         </div>
 
-        {composition ? (
-          <div
-            data-compose-canvas
-            className="grid min-h-[420px] flex-1 overflow-hidden rounded-lg border border-white/12 bg-panel/70 lg:grid-cols-[minmax(0,1fr)_18rem]"
-          >
-            <div className="min-h-[320px] min-w-0">
-              <ComposeCanvasWorkspace store={store} assets={assets} />
-            </div>
-            <ComposeLayersPanel store={store} disabled={interactionDisabled} />
-          </div>
-        ) : null}
-
-        <div
-          className={[
-            "rounded-lg border border-dashed p-3 transition-colors sm:p-4",
-            dragActive ? "border-accent bg-accent/10" : "border-white/12 bg-panel/70",
-          ].join(" ")}
-        >
-          {sources.length === 0 ? (
-            <button
-              type="button"
-              disabled={interactionDisabled}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex min-h-40 w-full flex-col items-center justify-center rounded-md text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
-            >
-              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-surface text-textMain">
-                <ImageIcon size={20} aria-hidden="true" />
-              </span>
-              <span className="text-sm font-semibold text-textMain">Drop PNG, JPEG or WebP</span>
-            </button>
-          ) : (
-            <div>
-              <div className="mb-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-textMain">
-                  <Layers3 size={14} className="text-textMuted" aria-hidden="true" />
-                  Sources
-                </div>
-                <span className="font-mono text-[10px] text-textMuted">{sources.length}</span>
-              </div>
-              <ul data-compose-sources className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {sources.map((item) => (
-                  <li key={`${item.source.type}:${item.source.id}`}>
-                    <button
-                      type="button"
-                      disabled={interactionDisabled}
-                      onClick={() => openSource(item.source)}
-                      className="group flex min-h-16 w-full items-center gap-2.5 rounded-md border border-white/10 bg-surface p-2.5 text-left transition-colors hover:border-white/20 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
-                    >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-black/25 text-textMuted group-hover:text-textMain">
-                        <ImageIcon size={16} aria-hidden="true" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-semibold text-textMain">{item.name}</span>
-                        <span className="mt-0.5 block font-mono text-[10px] text-textMuted">
-                          {sourceLabel(item.source)} · {item.dimensions}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {composition ? (
-          <div className="flex items-center gap-2 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-emerald-100">
-            <CheckCircle2 size={15} className="shrink-0" aria-hidden="true" />
-            <p className="text-xs font-semibold">Composition graph ready</p>
-          </div>
-        ) : null}
-
         {feedback ? (
           <div
             ref={feedbackRef}
@@ -357,7 +317,7 @@ export function ComposeBootstrapWorkspace({
             role={feedback.kind === "error" ? "alert" : "status"}
             aria-label={feedback.message}
             className={[
-              "flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
+              "flex shrink-0 items-start gap-2 rounded-md border px-3 py-2 text-xs",
               feedback.kind === "error"
                 ? "border-red-400/30 bg-red-400/10 text-red-100"
                 : "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
@@ -377,6 +337,64 @@ export function ComposeBootstrapWorkspace({
                 Retry cleanup
               </button>
             ) : null}
+          </div>
+        ) : null}
+
+        {composition ? (
+          <div
+            data-compose-canvas
+            className="grid min-h-[360px] flex-1 overflow-hidden rounded-lg border border-white/12 bg-panel/70 md:min-h-0 md:grid-cols-[minmax(0,1fr)_17rem]"
+          >
+            <div className="min-h-[280px] min-w-0 md:min-h-0">
+              <ComposeCanvasWorkspace store={store} assets={assets} />
+            </div>
+            <ComposeLayersPanel store={store} disabled={interactionDisabled} />
+          </div>
+        ) : null}
+
+        {composition && sourceCards ? (
+          <details className="group shrink-0 overflow-hidden rounded-lg border border-white/10 bg-panel/70">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent">
+              <ChevronRight size={14} className="text-textMuted transition-transform group-open:rotate-90" aria-hidden="true" />
+              <Layers3 size={14} className="text-textMuted" aria-hidden="true" />
+              Sources
+              <span className="ml-auto font-mono text-[10px] text-textMuted">{sources.length}</span>
+            </summary>
+            <div className="custom-scrollbar max-h-48 overflow-y-auto border-t border-white/10 p-3">
+              {sourceCards}
+            </div>
+          </details>
+        ) : !composition ? (
+          <div
+            className={[
+              "rounded-lg border border-dashed p-3 transition-colors sm:p-4",
+              dragActive ? "border-accent bg-accent/10" : "border-white/12 bg-panel/70",
+            ].join(" ")}
+          >
+            {sources.length === 0 ? (
+            <button
+              type="button"
+              disabled={interactionDisabled}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex min-h-40 w-full flex-col items-center justify-center rounded-md text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+            >
+              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-surface text-textMain">
+                <ImageIcon size={20} aria-hidden="true" />
+              </span>
+              <span className="text-sm font-semibold text-textMain">Drop PNG, JPEG or WebP</span>
+            </button>
+            ) : (
+              <div>
+              <div className="mb-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-textMain">
+                  <Layers3 size={14} className="text-textMuted" aria-hidden="true" />
+                  Sources
+                </div>
+                <span className="font-mono text-[10px] text-textMuted">{sources.length}</span>
+              </div>
+                {sourceCards}
+              </div>
+            )}
           </div>
         ) : null}
       </div>

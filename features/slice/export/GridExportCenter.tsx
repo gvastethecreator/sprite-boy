@@ -38,6 +38,8 @@ export function GridExportCenter({ project, revision, repository, onOpenCompose,
   );
   const [busy, setBusy] = useState<"one" | "all" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Readonly<Record<EntityId, string>>>({});
+  const [previewsSettled, setPreviewsSettled] = useState(false);
   useEffect(() => () => {
     controllerRef.current?.abort();
   }, []);
@@ -53,6 +55,35 @@ export function GridExportCenter({ project, revision, repository, onOpenCompose,
     () => project.rootOrder.regionIds.map((id) => project.regions[id]).filter((region): region is NonNullable<typeof region> => Boolean(region)),
     [project.regions, project.rootOrder.regionIds],
   );
+  useEffect(() => {
+    const controller = new AbortController();
+    const createdUrls: string[] = [];
+    let active = true;
+    setPreviewUrls({});
+    setPreviewsSettled(false);
+    void Promise.all(regions.map(async (region) => {
+      try {
+        const payload = await resolveGridRegionBlob(project, repository, region.id, controller.signal);
+        if (!active) return [region.id, null] as const;
+        const url = URL.createObjectURL(payload.blob);
+        createdUrls.push(url);
+        return [region.id, url] as const;
+      } catch {
+        return [region.id, null] as const;
+      }
+    })).then((entries) => {
+      if (!active) return;
+      setPreviewUrls(Object.fromEntries(
+        entries.filter((entry): entry is readonly [EntityId, string] => entry[1] !== null),
+      ));
+      setPreviewsSettled(true);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+      for (const url of createdUrls) URL.revokeObjectURL(url);
+    };
+  }, [project, repository, regions, revision]);
   useEffect(() => {
     setSelectedRegionId((current) => current && project.regions[current]
       ? current
@@ -158,6 +189,7 @@ export function GridExportCenter({ project, revision, repository, onOpenCompose,
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                 {regions.map((region, index) => {
                   const active = selectedRegionId === region.id;
+                  const previewUrl = previewUrls[region.id];
                   return (
                     <button
                       type="button"
@@ -167,7 +199,17 @@ export function GridExportCenter({ project, revision, repository, onOpenCompose,
                       onClick={() => setSelectedRegionId(region.id)}
                       className={["rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent", active ? "border-accent/60 bg-accent/10" : "border-white/10 bg-surface/60 hover:border-white/20"].join(" ")}
                     >
-                      <span className="flex aspect-square items-center justify-center rounded-md border border-white/10 bg-black/30 text-xs font-bold text-textMuted">#{String(index + 1).padStart(2, "0")}</span>
+                      <span className="relative flex aspect-square items-center justify-center overflow-hidden rounded-md border border-white/10 bg-checkered text-xs font-bold text-textMuted">
+                        {previewUrl ? (
+                          <img
+                            src={previewUrl}
+                            alt=""
+                            className="h-full w-full object-contain [image-rendering:pixelated]"
+                          />
+                        ) : (
+                          <span aria-hidden="true">#{String(index + 1).padStart(2, "0")}</span>
+                        )}
+                      </span>
                       <span className="mt-2 block truncate text-xs font-semibold text-textMain">{region.name}</span>
                       <span className="mt-1 block font-mono text-[9px] text-textMuted">{region.bounds.width}×{region.bounds.height}</span>
                     </button>
@@ -179,6 +221,24 @@ export function GridExportCenter({ project, revision, repository, onOpenCompose,
               <h2 className="truncate text-base font-semibold text-textMain">{selected?.name ?? "None"}</h2>
               {selected ? (
                 <p className="mt-1 font-mono text-xs text-textMuted">{selected.bounds.width}×{selected.bounds.height}</p>
+              ) : null}
+              {selected ? (
+                <div className="mt-4 flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-checkered p-2">
+                  {previewUrls[selected.id] ? (
+                    <img
+                      src={previewUrls[selected.id]}
+                      alt={`${selected.name} preview`}
+                      className="h-full w-full object-contain [image-rendering:pixelated]"
+                    />
+                  ) : previewsSettled ? (
+                    <span className="px-3 text-center text-xs text-textMuted">Preview unavailable</span>
+                  ) : (
+                    <span role="status" className="inline-flex items-center gap-2 text-xs text-textMuted">
+                      <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
+                      Loading preview…
+                    </span>
+                  )}
+                </div>
               ) : null}
               <div className="mt-auto grid gap-2 pt-6">
                 <button type="button" aria-label="Download PNG" onClick={() => void exportOne()} disabled={!selected || busy !== null} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-white/15 bg-surface px-3 text-xs font-bold text-textMain hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">

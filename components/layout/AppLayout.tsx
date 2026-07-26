@@ -1,11 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
-import LeftSidebar from "./LeftSidebar";
-import RightSidebar from "./RightSidebar";
 import CanvasArea, { type CanonicalRegionToolInteraction } from "../canvas/CanvasArea";
 import TimelinePanel from "./TimelinePanel";
-import SettingsModal from "../overlays/SettingsModal";
-import HelpModal from "../overlays/HelpModal";
 import ToastContainer from "../overlays/ToastContainer";
 import CommandPalette from "../overlays/CommandPalette";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
@@ -62,19 +58,22 @@ import {
 } from "../../core/processing/irregularRegionDetection";
 import {
   adaptManualRegionIntentToProjectCommand,
+} from "../../features/slice/irregular/manualRegionCommands";
+import {
   adaptWandRegionIntentToProjectBatch,
+} from "../../features/slice/irregular/wandRegionCommands";
+import {
   createEmptyWandSelection,
   selectWandComponent,
   type WandSelectionMode,
   type WandSelectionSnapshot,
-} from "../../features/slice/irregular";
-import IrregularSliceTools, {
-  type IrregularToolMode,
-  type ManualRegionDraft,
+} from "../../features/slice/irregular/wandSelection";
+import type {
+  IrregularToolMode,
+  ManualRegionDraft,
 } from "../../features/slice/irregular/IrregularSliceTools";
 import { browserRegionCrop, convertRegionToAsset } from "../../features/slice/assets";
 import { useSliceGridController } from "../../features/slice/grid/useSliceGridController";
-import SlicePropertiesPanel from "../../features/slice/SlicePropertiesPanel";
 import {
   commitStagedGridResults,
   SliceResultsTray,
@@ -85,7 +84,6 @@ import {
   importSliceSource,
   restoreCanonicalSliceSource,
 } from "../../features/slice/source/importSliceSource";
-import GridExportCenter from "../../features/slice/export/GridExportCenter";
 import {
   clearDurableGridCommitUndo,
   durableGridCommitMatchesProject,
@@ -93,22 +91,40 @@ import {
   writeDurableGridCommitUndo,
   type DurableGridCommitUndo,
 } from "../../features/slice/results/durableGridCommitUndo";
-import ComposeBootstrapWorkspace from "../../features/compose/project/ComposeBootstrapWorkspace";
-import CompositionCanvasSettingsInspector from "../../features/compose/canvasSettings/CompositionCanvasSettingsInspector";
-import AnimateFrameWorkspace from "../../features/animate/AnimateFrameWorkspace";
 import { handoffRegionToCompose } from "../../features/slice/handoff/sliceToComposeHandoff";
 import StudioWorkspaceErrorBoundary from "../studio/StudioWorkspaceErrorBoundary";
 import { DUAL_ENGINE_FREEZE_ACTIVE } from "../../core/studio/dualEngineFreeze";
 import {
   createVideoImportJobTask,
-  SliceVideoImportPanel,
   type VideoImportJobResult,
   type VideoImportSelection,
-} from "../../features/slice/video";
+} from "../../features/slice/video/videoImportJobTask";
 
-const CollisionWorkspacePanel = React.lazy(
-  () => import("../../features/collision/CollisionWorkspacePanel"),
-);
+const loadComposeWorkspace = () => import("../../features/compose/project/ComposeBootstrapWorkspace");
+const loadComposeProperties = () => import("../../features/compose/canvasSettings/CompositionCanvasSettingsInspector");
+const loadAnimateWorkspace = () => import("../../features/animate/AnimateFrameWorkspace");
+const loadCollisionWorkspace = () => import("../../features/collision/CollisionWorkspacePanel");
+const loadLeftSidebar = () => import("./LeftSidebar");
+const loadRightSidebar = () => import("./RightSidebar");
+const loadSliceProperties = () => import("../../features/slice/SlicePropertiesPanel");
+const loadGridExport = () => import("../../features/slice/export/GridExportCenter");
+const loadIrregularSliceTools = () => import("../../features/slice/irregular/IrregularSliceTools");
+const loadSliceVideoImportPanel = () => import("../../features/slice/video/SliceVideoImportPanel");
+const loadSettingsModal = () => import("../overlays/SettingsModal");
+const loadHelpModal = () => import("../overlays/HelpModal");
+
+const ComposeBootstrapWorkspace = React.lazy(loadComposeWorkspace);
+const CompositionCanvasSettingsInspector = React.lazy(loadComposeProperties);
+const AnimateFrameWorkspace = React.lazy(loadAnimateWorkspace);
+const CollisionWorkspacePanel = React.lazy(loadCollisionWorkspace);
+const LeftSidebar = React.lazy(loadLeftSidebar);
+const RightSidebar = React.lazy(loadRightSidebar);
+const SlicePropertiesPanel = React.lazy(loadSliceProperties);
+const GridExportCenter = React.lazy(loadGridExport);
+const IrregularSliceTools = React.lazy(loadIrregularSliceTools);
+const SliceVideoImportPanel = React.lazy(loadSliceVideoImportPanel);
+const SettingsModal = React.lazy(loadSettingsModal);
+const HelpModal = React.lazy(loadHelpModal);
 
 const LEGACY_MODE_BY_WORKSPACE = {
   slice: AppMode.BUILDER,
@@ -691,10 +707,46 @@ const AppLayout: React.FC = () => {
   const canonicalSequenceAvailable = canonicalProject.rootOrder.sequenceIds.some(
     (id) => canonicalProject.sequences[id]?.celIds.some((celId) => canonicalProject.cels[celId]),
   );
-  const showLegacyPanels = hasWorkspace && activeWorkspace !== "compose" && activeWorkspace !== "animate";
+  const showToolsPanel = (
+    (activeWorkspace === "slice" && hasWorkspace)
+    || (activeWorkspace === "export" && (hasWorkspace || canonicalSliceSourceAvailable))
+  );
+  const showPropertiesPanel = (
+    (activeWorkspace === "slice" && hasWorkspace)
+    || (activeWorkspace === "compose" && Boolean(canonicalComposition))
+  );
   const showComposeProperties = activeWorkspace === "compose" && Boolean(canonicalComposition);
-  const hasStudioPanels = showLegacyPanels || showComposeProperties;
+  const hasStudioPanels = showToolsPanel || showPropertiesPanel;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void Promise.allSettled([
+        loadComposeWorkspace(),
+        loadComposeProperties(),
+        loadAnimateWorkspace(),
+        loadCollisionWorkspace(),
+        loadLeftSidebar(),
+        loadRightSidebar(),
+        loadSliceProperties(),
+        loadGridExport(),
+        loadIrregularSliceTools(),
+        loadSliceVideoImportPanel(),
+        loadSettingsModal(),
+        loadHelpModal(),
+      ]);
+    }, 1_000);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    if (
+      (compactPanel === "tools" && !showToolsPanel)
+      || (compactPanel === "properties" && !showPropertiesPanel)
+    ) {
+      setCompactPanel(null);
+    }
+  }, [compactPanel, showPropertiesPanel, showToolsPanel]);
 
   useEffect(() => {
     if (canonical.persistenceState === "loading") return;
@@ -1395,7 +1447,7 @@ const AppLayout: React.FC = () => {
           aria-label="Compact Studio panels"
           className="flex h-9 shrink-0 items-center justify-between rounded-md border border-border/30 bg-panel px-2 xl:hidden"
         >
-          {showLegacyPanels ? (
+          {showToolsPanel ? (
             <button
               type="button"
               aria-haspopup="dialog"
@@ -1407,30 +1459,34 @@ const AppLayout: React.FC = () => {
               Tools
             </button>
           ) : <span aria-hidden="true" />}
-          <span className="truncate px-3 text-[10px] font-medium uppercase tracking-wider text-textMuted/70">
+          <span className="truncate px-3 text-xs font-medium text-textMuted/80">
             {activeWorkspaceDefinition.label} workspace
           </span>
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={compactPanel === "properties"}
-            onClick={() => setCompactPanel("properties")}
-            className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Properties
-            <PanelRightOpen size={14} aria-hidden="true" />
-          </button>
+          {showPropertiesPanel ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={compactPanel === "properties"}
+              onClick={() => setCompactPanel("properties")}
+              className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Properties
+              <PanelRightOpen size={14} aria-hidden="true" />
+            </button>
+          ) : <span aria-hidden="true" />}
         </div>
       )}
 
       <div className="flex-1 flex min-h-0 gap-2">
-        {showLegacyPanels && !isCompactLayout && (
+        {showToolsPanel && !isCompactLayout && (
           <StudioPanel
             label="Tools"
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
-            <LeftSidebar key={`desktop-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
+            <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading tools…</div>}>
+              <LeftSidebar key={`desktop-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
+            </React.Suspense>
           </StudioPanel>
         )}
 
@@ -1444,22 +1500,26 @@ const AppLayout: React.FC = () => {
               className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
             {activeWorkspace === "compose" ? (
-              <ComposeBootstrapWorkspace
-                key={canonicalProject.id}
-                store={canonical.store}
-                assets={canonical.assets}
-                importRequestToken={composeImportRequestToken}
-                disabled={canonical.persistenceState === "loading"}
-                onBusyChange={setComposeImportBusy}
-                onCleanupDebtChange={canonical.reportAssetCleanupDebt}
-                onCompositionReady={() => navigate("compose")}
-              />
+              <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Compose…</div>}>
+                <ComposeBootstrapWorkspace
+                  key={canonicalProject.id}
+                  store={canonical.store}
+                  assets={canonical.assets}
+                  importRequestToken={composeImportRequestToken}
+                  disabled={canonical.persistenceState === "loading"}
+                  onBusyChange={setComposeImportBusy}
+                  onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                  onCompositionReady={() => navigate("compose")}
+                />
+              </React.Suspense>
             ) : activeWorkspace === "animate" ? (
-              <AnimateFrameWorkspace
-                store={canonical.store}
-                assets={canonical.assets}
-                disabled={canonical.persistenceState === "loading"}
-              />
+              <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Animate…</div>}>
+                <AnimateFrameWorkspace
+                  store={canonical.store}
+                  assets={canonical.assets}
+                  disabled={canonical.persistenceState === "loading"}
+                />
+              </React.Suspense>
             ) : activeWorkspace === "collision" ? (
               <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading collision…</div>}>
                 <CollisionWorkspacePanel />
@@ -1482,13 +1542,15 @@ const AppLayout: React.FC = () => {
               />
             ) : workspaceState.kind === "ready" ? (
               activeWorkspace === "export" && canonicalSliceSourceAvailable ? (
-                <GridExportCenter
-                  project={canonicalProject}
-                  revision={canonical.store.getSnapshot().revision}
-                  repository={canonical.assets}
-                  onOpenCompose={openGridRegionInCompose}
-                  onToast={showToast}
-                />
+                <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Export…</div>}>
+                  <GridExportCenter
+                    project={canonicalProject}
+                    revision={canonical.store.getSnapshot().revision}
+                    repository={canonical.assets}
+                    onOpenCompose={openGridRegionInCompose}
+                    onToast={showToast}
+                  />
+                </React.Suspense>
               ) : activeWorkspace === "slice" ? (
                 <SliceSourceCanvasFrame
                   snapshot={sourceSessionSnapshot}
@@ -1547,28 +1609,34 @@ const AppLayout: React.FC = () => {
           )}
         </div>
 
-        {(showLegacyPanels || showComposeProperties) && !isCompactLayout && (
+        {showPropertiesPanel && !isCompactLayout && (
           <StudioPanel
             label="Properties"
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
             {showComposeProperties && canonicalCompositionId ? (
-              <CompositionCanvasSettingsInspector
-                store={canonical.store}
-                compositionId={canonicalCompositionId}
-              />
+              <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                <CompositionCanvasSettingsInspector
+                  store={canonical.store}
+                  compositionId={canonicalCompositionId}
+                />
+              </React.Suspense>
             ) : (
               activeWorkspace === "slice"
-                ? <SlicePropertiesPanel
-                    controller={sliceGridController}
-                    store={canonical.store}
-                    assets={canonical.assets}
-                    eyedropperActive={isEyedropperActive}
-                    onEyedropperActiveChange={setIsEyedropperActive}
-                    onCleanupDebtChange={canonical.reportAssetCleanupDebt}
-                  />
-                : <RightSidebar />
+                ? <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                    <SlicePropertiesPanel
+                      controller={sliceGridController}
+                      store={canonical.store}
+                      assets={canonical.assets}
+                      eyedropperActive={isEyedropperActive}
+                      onEyedropperActiveChange={setIsEyedropperActive}
+                      onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                    />
+                  </React.Suspense>
+                : <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                    <RightSidebar />
+                  </React.Suspense>
             )}
           </StudioPanel>
         )}
@@ -1581,16 +1649,18 @@ const AppLayout: React.FC = () => {
         backdropClassName="!items-stretch !justify-start !p-0 !pt-0 bg-black/70"
         panelClassName="!h-dvh !max-h-dvh !max-w-[360px] !rounded-none !border-y-0 !border-l-0"
       >
-        {compactPanel === "tools" && showLegacyPanels ? (
+        {compactPanel === "tools" && showToolsPanel ? (
           <StudioPanel
             label="Tools"
             variant="drawer"
             onClose={() => setCompactPanel(null)}
             className="h-full border-0"
           >
-            <LeftSidebar key={`compact-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
+            <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading tools…</div>}>
+              <LeftSidebar key={`compact-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
+            </React.Suspense>
           </StudioPanel>
-        ) : compactPanel === "properties" ? (
+        ) : compactPanel === "properties" && showPropertiesPanel ? (
           <StudioPanel
             label="Properties"
             variant="drawer"
@@ -1598,21 +1668,27 @@ const AppLayout: React.FC = () => {
             className="h-full border-0"
           >
             {showComposeProperties && canonicalCompositionId ? (
-              <CompositionCanvasSettingsInspector
-                store={canonical.store}
-                compositionId={canonicalCompositionId}
-              />
+              <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                <CompositionCanvasSettingsInspector
+                  store={canonical.store}
+                  compositionId={canonicalCompositionId}
+                />
+              </React.Suspense>
             ) : (
               activeWorkspace === "slice"
-                ? <SlicePropertiesPanel
-                    controller={sliceGridController}
-                    store={canonical.store}
-                    assets={canonical.assets}
-                    eyedropperActive={isEyedropperActive}
-                    onEyedropperActiveChange={setIsEyedropperActive}
-                    onCleanupDebtChange={canonical.reportAssetCleanupDebt}
-                  />
-                : <RightSidebar />
+                ? <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                    <SlicePropertiesPanel
+                      controller={sliceGridController}
+                      store={canonical.store}
+                      assets={canonical.assets}
+                      eyedropperActive={isEyedropperActive}
+                      onEyedropperActiveChange={setIsEyedropperActive}
+                      onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                    />
+                  </React.Suspense>
+                : <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                    <RightSidebar />
+                  </React.Suspense>
             )}
           </StudioPanel>
         ) : null}
@@ -1626,17 +1702,19 @@ const AppLayout: React.FC = () => {
         panelClassName="max-w-xl"
       >
         {videoImportFile ? (
-          <SliceVideoImportPanel
-            adapter={videoAdapterRef.current!}
-            file={videoImportFile}
-            disabled={canonical.persistenceState === "loading"}
-            onClose={() => setVideoImportFile(null)}
-            onChooseAnother={() => {
-              setVideoImportFile(null);
-              queueMicrotask(() => openSourcePicker(videoImportRestoreFocusRef.current));
-            }}
-            onStart={startVideoImport}
-          />
+          <React.Suspense fallback={<div className="p-6 text-sm text-textMuted" role="status">Loading video controls…</div>}>
+            <SliceVideoImportPanel
+              adapter={videoAdapterRef.current!}
+              file={videoImportFile}
+              disabled={canonical.persistenceState === "loading"}
+              onClose={() => setVideoImportFile(null)}
+              onChooseAnother={() => {
+                setVideoImportFile(null);
+                queueMicrotask(() => openSourcePicker(videoImportRestoreFocusRef.current));
+              }}
+              onStart={startVideoImport}
+            />
+          </React.Suspense>
         ) : null}
       </StudioDialog>
 
@@ -1709,13 +1787,29 @@ const AppLayout: React.FC = () => {
           />
         </React.Suspense>
       ) : null}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        preferences={preferences}
-        onUpdatePreferences={setPreferences}
-      />
-      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      {isSettingsOpen ? (
+        <React.Suspense fallback={(
+          <StudioDialog isOpen onClose={() => setIsSettingsOpen(false)} ariaLabel="Preparing settings">
+            <div role="status" className="p-6 text-sm text-textMuted">Preparing settings…</div>
+          </StudioDialog>
+        )}>
+          <SettingsModal
+            isOpen
+            onClose={() => setIsSettingsOpen(false)}
+            preferences={preferences}
+            onUpdatePreferences={setPreferences}
+          />
+        </React.Suspense>
+      ) : null}
+      {isHelpOpen ? (
+        <React.Suspense fallback={(
+          <StudioDialog isOpen onClose={() => setIsHelpOpen(false)} ariaLabel="Preparing help">
+            <div role="status" className="p-6 text-sm text-textMuted">Preparing help…</div>
+          </StudioDialog>
+        )}>
+          <HelpModal isOpen onClose={() => setIsHelpOpen(false)} />
+        </React.Suspense>
+      ) : null}
     </div>
   );
 };

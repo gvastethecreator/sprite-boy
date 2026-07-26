@@ -145,7 +145,7 @@ describe("ComposeCanvasWorkspace", () => {
     expect(canvas.tagName).toBe("CANVAS");
   });
 
-  it("shrinks and centers an oversized composition without changing the store viewport", () => {
+  it("fits and centers an oversized composition without changing the store viewport", () => {
     const assets = repository(vi.fn(async () => new Blob()));
     const { captures } = renderComposeCanvas({ assets });
     const canvas = screen.getByLabelText("Compose canvas");
@@ -158,10 +158,9 @@ describe("ComposeCanvasWorkspace", () => {
 
     const projection = requireEntry(captures, 0).getProjection();
 
-    expect(projection.viewport).toEqual({
-      scale: 0.5,
-      offset: { x: 0, y: 16 },
-    });
+    expect(projection.viewport.scale).toBeCloseTo(0.45);
+    expect(projection.viewport.offset.x).toBeCloseTo(3.2);
+    expect(projection.viewport.offset.y).toBeCloseTo(19.2);
   });
 
   it("reuses a decoded bitmap and closes it with the viewport", async () => {
