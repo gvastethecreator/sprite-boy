@@ -168,10 +168,10 @@ export type RegionPatch = Partial<
   Pick<Region, "name" | "bounds" | "pivot" | "hidden" | "updatedAt" | "provenance">
 >;
 export type LayerPatch = Partial<
-  Pick<Layer, "name" | "source" | "transform" | "visible" | "locked" | "updatedAt">
+  Pick<Layer, "name" | "source" | "transform" | "cellIndex" | "visible" | "locked" | "updatedAt">
 >;
 export type CompositionPatch = Partial<
-  Pick<Composition, "name" | "width" | "height" | "background" | "updatedAt">
+  Pick<Composition, "name" | "width" | "height" | "background" | "layout" | "updatedAt">
 >;
 export type CelPatch = Partial<
   Pick<Cel, "durationMs" | "pivot" | "transform" | "locked" | "prompt" | "updatedAt">

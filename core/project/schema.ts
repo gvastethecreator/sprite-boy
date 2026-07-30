@@ -147,6 +147,8 @@ export interface Layer {
   name?: string;
   source: LayerSource;
   transform: LayerTransform;
+  /** Optional managed grid destination. Free-layout layers may keep it for roundtrips. */
+  cellIndex?: number;
   visible?: boolean;
   locked?: boolean;
   createdAt: ISO8601Timestamp;
@@ -158,12 +160,23 @@ export type CompositionOwner =
   | { type: "cel"; celId: EntityId }
   | { type: "variantSet"; variantSetId: EntityId; variant: VariantKey };
 
+export type CompositionLayout =
+  | { mode: "free" }
+  | {
+      mode: "grid";
+      rows: number;
+      columns: number;
+      gap: number;
+    };
+
 export interface Composition extends Dimensions {
   id: EntityId;
   name: string;
   owner: CompositionOwner;
   layerIds: EntityId[];
   background?: string | null;
+  /** Durable authoring layout. The renderer still consumes canonical Layers. */
+  layout?: CompositionLayout;
   createdAt: ISO8601Timestamp;
   updatedAt: ISO8601Timestamp;
 }

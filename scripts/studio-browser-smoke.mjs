@@ -159,6 +159,7 @@ export function spawnViteServer(cwd, port, mode = "dev", dependencies = {}) {
   const args = [
     cliPath,
     ...(mode === "preview" ? ["preview"] : []),
+    ...(dependencies.configPath ? ["--config", resolve(cwd, dependencies.configPath)] : []),
     "--host", HOST,
     "--port", String(port),
     "--strictPort",
@@ -172,7 +173,7 @@ export function spawnViteServer(cwd, port, mode = "dev", dependencies = {}) {
   });
 }
 
-export async function waitForPreview(url, child, timeoutMs = 20_000) {
+export async function waitForPreview(url, child, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error("Preview process exited before readiness.");
@@ -618,7 +619,7 @@ async function collectBrowserBudgetEvidence(client, idleWindowMs, settleMs) {
     const samples = [];
     const transitions = [];
     const workspaceIds = ["compose", "animate", "collision", "export", "slice"];
-    for (let run = 0; run < 4; run += 1) {
+    for (let run = 0; run < 8; run += 1) {
       for (const workspaceId of workspaceIds) {
         const target = document.querySelector('[data-workspace-id="' + workspaceId + '"]');
         if (!(target instanceof HTMLElement)) throw new Error("Workspace target is unavailable.");

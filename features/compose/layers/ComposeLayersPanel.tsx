@@ -255,6 +255,11 @@ export function ComposeLayersPanel({ store, disabled = false }: ComposeLayersPan
 
       {selectedLayer ? (
         <div className="space-y-3 p-3">
+          {selectedLayer.cellIndex !== undefined ? (
+            <p className="rounded-md border border-accent/20 bg-accent/10 px-2.5 py-2 text-[10px] text-textMuted">
+              Cell {selectedLayer.cellIndex + 1}. A position or scale change detaches this layer from the cell.
+            </p>
+          ) : null}
           <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wider text-textMuted">
             Name
             <input

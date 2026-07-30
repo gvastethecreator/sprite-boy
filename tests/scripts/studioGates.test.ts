@@ -101,6 +101,7 @@ describe("studio gate manifest", () => {
       "build",
       "browser-smoke",
       "video-import-browser",
+      "compose-canvas-browser",
     ]);
     expect(STUDIO_GATE_MANIFEST.gates.reproducibility.steps.map(({ id }) => id)).toEqual([
       "reproducibility",
@@ -114,14 +115,15 @@ describe("studio gate manifest", () => {
       "audit",
       "typecheck",
       "lint",
+      "persistence-browser",
       "unit",
       "contract",
       "integration",
       "coverage",
       "fixtures",
-      "persistence-browser",
       "build",
       "video-import-browser",
+      "compose-canvas-browser",
       "bundle-budget",
       "browser-budget",
       "deferred-feature-browser",
@@ -192,6 +194,13 @@ describe("studio gate manifest", () => {
           args: ["scripts/studio-video-import-browser.mjs"],
           timeoutMs: 120_000,
         },
+        {
+          id: "compose-canvas-browser",
+          label: "Canvas-first Compose image grid journey",
+          command: "bun",
+          args: ["scripts/studio-compose-bootstrap-browser.mjs"],
+          timeoutMs: 180_000,
+        },
       ],
     });
   });
@@ -227,12 +236,12 @@ describe("studio gate execution", () => {
     expect(result).toEqual({
       status: "passed",
       gateId: "e2e",
-      completed: ["build", "browser-smoke", "video-import-browser"],
+      completed: ["build", "browser-smoke", "video-import-browser", "compose-canvas-browser"],
       failedStep: null,
       reason: null,
       exitCode: 0,
     });
-    expect(spawn).toHaveBeenCalledTimes(3);
+    expect(spawn).toHaveBeenCalledTimes(4);
     expect(calls[0]?.[0]).toBe("C:/bun.exe");
     expect(calls[0]?.[1]).toEqual(["x", "vite", "build"]);
     expect(calls[0]?.[2]).toMatchObject({
@@ -275,11 +284,11 @@ describe("studio gate execution", () => {
   it("propagates a non-zero result from every ordered all/e2e step", () => {
     const expectedSteps = {
       all: [
-        "reproducibility", "audit", "typecheck", "lint", "unit", "contract", "integration",
-        "coverage", "fixtures", "persistence-browser", "build", "video-import-browser",
-        "bundle-budget", "browser-budget", "deferred-feature-browser",
+        "reproducibility", "audit", "typecheck", "lint", "persistence-browser", "unit", "contract",
+        "integration", "coverage", "fixtures", "build", "video-import-browser",
+        "compose-canvas-browser", "bundle-budget", "browser-budget", "deferred-feature-browser",
       ],
-      e2e: ["build", "browser-smoke", "video-import-browser"],
+      e2e: ["build", "browser-smoke", "video-import-browser", "compose-canvas-browser"],
     } as const;
     for (const [gateId, stepIds] of Object.entries(expectedSteps)) {
       stepIds.forEach((stepId, index) => {
@@ -421,6 +430,30 @@ describe("Chrome executable resolution", () => {
       }),
     );
     expect(spawn.mock.calls[0]?.[1]).not.toContain("x");
+  });
+
+  it("supports a dedicated Vite config for isolated browser harnesses", () => {
+    const spawn = vi.fn().mockReturnValue({ exitCode: null });
+    spawnViteServer("D:/repo", 4173, "dev", {
+      configPath: "scripts/vite.persistence-browser.config.mjs",
+      createRequire: () => ({
+        resolve: () => "D:/repo/node_modules/vite/package.json",
+      }),
+      execPath: "C:/node.exe",
+      existsSync: () => true,
+      spawn,
+    });
+
+    expect(spawn.mock.calls[0]?.[1]).toEqual([
+      expect.stringMatching(/vite[\\/]bin[\\/]vite\.js$/u),
+      "--config",
+      expect.stringMatching(/scripts[\\/]vite\.persistence-browser\.config\.mjs$/u),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "4173",
+      "--strictPort",
+    ]);
   });
 
   it("fails closed and escalates when a child process never exits", async () => {

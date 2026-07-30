@@ -11,7 +11,7 @@ import { createComposeLayerEditor } from "../../features/compose/layers/layerEdi
 
 const NOW = "2026-07-26T08:00:00.000Z";
 
-function runtime() {
+function runtime(managed = false) {
   const project = createEmptyStudioProject({ id: "project-layers", now: NOW });
   const asset = (id: string): AssetRecord => ({
     id,
@@ -70,6 +70,10 @@ function runtime() {
     createdAt: NOW,
     updatedAt: NOW,
   };
+  if (managed) {
+    composition.layout = { mode: "grid", rows: 2, columns: 2, gap: 0 };
+    layer.cellIndex = 0;
+  }
   project.compositions[composition.id] = composition;
   project.layers[layer.id] = layer;
   project.rootOrder.compositionIds.push(composition.id);
@@ -145,6 +149,17 @@ describe("compose layer editor", () => {
     });
     expect(history.undo()).toMatchObject({ ok: true });
     expect(store.getSnapshot().project.layers.base.transform.x).toBe(50);
+  });
+
+  it("keeps cell binding for visual edits and detaches on manual geometry", () => {
+    const { store, editor } = runtime(true);
+    expect(editor.setTransform("base", { opacity: 0.5, rotation: 10 }).ok).toBe(true);
+    expect(store.getSnapshot().project.layers.base.cellIndex).toBe(0);
+    expect(editor.setTransform("base", { x: 12 }).ok).toBe(true);
+    expect(store.getSnapshot().project.layers.base).toMatchObject({
+      transform: { x: 12, opacity: 0.5, rotation: 10 },
+    });
+    expect(store.getSnapshot().project.layers.base.cellIndex).toBeUndefined();
   });
 
   it("blocks locked mutations while visibility and unlock stay available", () => {

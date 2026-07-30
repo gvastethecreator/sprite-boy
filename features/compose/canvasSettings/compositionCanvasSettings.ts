@@ -1,6 +1,15 @@
-import { isEntityId, isISO8601Timestamp, type Composition, type EntityId } from "../../../core/project";
+import {
+  isEntityId,
+  isISO8601Timestamp,
+  type Composition,
+  type EntityId,
+  type ProjectCommand,
+  type ProjectDispatchCommand,
+  type StudioProject,
+} from "../../../core/project";
 import { cloneDataOnly } from "../../../core/project/dataBoundary";
 import type { DeepReadonly, ProjectStore } from "../../../core/stores";
+import { createGridLayerReflowCommands } from "../layout/gridLayerPlacement";
 
 export const COMPOSITION_CANVAS_MAX_EDGE = 16_384;
 export const COMPOSITION_CANVAS_MAX_PIXELS = 64 * 1024 * 1024;
@@ -227,7 +236,11 @@ function readStoreMethod(store: unknown, key: "getSnapshot" | "dispatch"): ((...
 function readCanvasSnapshot(
   store: unknown,
   compositionId: string,
-): { readonly revision: number; readonly composition: CompositionCanvasTarget | null } | null {
+): {
+  readonly revision: number;
+  readonly composition: CompositionCanvasTarget | null;
+  readonly project: DeepReadonly<StudioProject>;
+} | null {
   const getSnapshot = readStoreMethod(store, "getSnapshot");
   if (!getSnapshot) return null;
   try {
@@ -240,6 +253,7 @@ function readCanvasSnapshot(
     return Object.freeze({
       revision: revisionValue as number,
       composition: composition === undefined ? null : normalizeCompositionTarget(composition),
+      project: project as DeepReadonly<StudioProject>,
     });
   } catch {
     return null;
@@ -289,6 +303,7 @@ function safeMessageArray(value: unknown): boolean {
 function validateChangedIds(
   value: unknown,
   compositionId: EntityId,
+  layerIds: readonly EntityId[],
 ): "updated" | "unchanged" | null {
   if (!isPlainRecord(value)) return null;
   let keys: readonly PropertyKey[];
@@ -297,11 +312,19 @@ function validateChangedIds(
   } catch {
     return null;
   }
-  if (keys.length === 0) return "unchanged";
-  if (keys.length !== 1 || keys[0] !== "compositions") return null;
+  if (keys.length === 0) return layerIds.length === 0 ? "unchanged" : null;
+  const expectedKeys = layerIds.length === 0 ? ["compositions"] : ["compositions", "layers"];
+  if (keys.length !== expectedKeys.length || expectedKeys.some((key) => !keys.includes(key))) return null;
   const compositions = readOwnData(value, "compositions");
   if (!safeArrayShape(compositions, 1)) return null;
-  return readOwnData(compositions, "0") === compositionId ? "updated" : null;
+  if (readOwnData(compositions, "0") !== compositionId) return null;
+  if (layerIds.length > 0) {
+    const layers = readOwnData(value, "layers");
+    if (!safeArrayShape(layers, layerIds.length) || safeArrayLength(layers) !== layerIds.length) return null;
+    const actual = Array.from({ length: layerIds.length }, (_, index) => readOwnData(layers, String(index))).sort();
+    if (actual.some((id, index) => id !== [...layerIds].sort()[index])) return null;
+  }
+  return "updated";
 }
 
 function validateDispatchResult(
@@ -309,6 +332,7 @@ function validateDispatchResult(
   before: { readonly revision: number; readonly composition: CompositionCanvasTarget },
   compositionId: EntityId,
   requested: CompositionCanvasSettingsValue,
+  reflowedLayerIds: readonly EntityId[] = [],
 ): { readonly ok: true; readonly revision: number; readonly outcome: "updated" | "unchanged" } |
   { readonly ok: false; readonly rejected: boolean } {
   if (!ownKeysExactly(value, ["revision", "result"])) return { ok: false, rejected: false };
@@ -331,7 +355,7 @@ function validateDispatchResult(
     return { ok: false, rejected: false };
   }
   if (!safeMessageArray(readOwnData(result, "warnings"))) return { ok: false, rejected: false };
-  const outcome = validateChangedIds(readOwnData(result, "changedIds"), compositionId);
+  const outcome = validateChangedIds(readOwnData(result, "changedIds"), compositionId, reflowedLayerIds);
   if (outcome === null) return { ok: false, rejected: false };
   const expectedRevision = outcome === "updated" ? before.revision + 1 : before.revision;
   if (revision !== expectedRevision || !Number.isSafeInteger(expectedRevision)) {
@@ -528,13 +552,25 @@ export function applyCompositionCanvasSettings(
     return Object.freeze({ ok: false, code: "BOUNDARY_FAILED", message: "Canvas settings are temporarily unavailable. Try again.", revision: before.revision });
   }
   let rawResult: unknown;
+  let reflowedLayerIds: readonly EntityId[] = [];
   try {
-    rawResult = Reflect.apply(dispatch, store, [{
-    command: {
+    const canvasCommand: ProjectCommand = {
       type: "composition.update",
       compositionId,
       patch: validation.value,
-    },
+    };
+    const reflowCommands = createGridLayerReflowCommands(
+      before.project,
+      compositionId,
+      { width: validation.value.width, height: validation.value.height },
+      issuedAt,
+    );
+    reflowedLayerIds = reflowCommands.flatMap((command) => command.type === "layer.update" ? [command.layerId] : []);
+    const dispatchCommand: ProjectDispatchCommand = reflowCommands.length > 0
+      ? { type: "command.batch", commands: [canvasCommand, ...reflowCommands] }
+      : canvasCommand;
+    rawResult = Reflect.apply(dispatch, store, [{
+    command: dispatchCommand,
     metadata: {
       commandId,
       origin: "user",
@@ -550,6 +586,7 @@ export function applyCompositionCanvasSettings(
     { revision: before.revision, composition },
     compositionId,
     validation.value,
+    reflowedLayerIds,
   );
   if (!validatedResult.ok && validatedResult.rejected) {
     return Object.freeze({

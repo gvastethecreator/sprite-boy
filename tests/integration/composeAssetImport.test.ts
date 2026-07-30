@@ -12,6 +12,11 @@ import {
 } from "../../core/project";
 import { createProjectStoreWithHistory } from "../../core/stores";
 import {
+  applyCompositionCanvasSettings,
+  createCompositionCanvasBaseline,
+} from "../../features/compose/canvasSettings";
+import {
+  createBlankComposition,
   deriveCompositionEntryIdentity,
   importComposeAsset,
   retryComposeAssetCleanup,
@@ -97,9 +102,11 @@ function ports(
   return {
     store,
     assets,
-    nextId: (kind: "asset" | "command") => kind === "asset"
+    nextId: (kind: "asset" | "command" | "layer") => kind === "asset"
       ? "asset-imported"
-      : `command-import-${++command}`,
+      : kind === "layer"
+        ? "layer-imported"
+        : `command-import-${++command}`,
     now: () => NOW,
     decoder: {
       decode: vi.fn(async () => ({
@@ -113,6 +120,68 @@ function ports(
 }
 
 describe("canonical Compose asset import", () => {
+  it("adds an image to an existing grid cell without resizing the canvas", async () => {
+    const { store, history } = runtime();
+    const repo = fakeRepository(store.getSnapshot().project.id);
+    expect(createBlankComposition(store, {
+      compositionId: "composition-grid",
+      commandId: "command-create-grid",
+      issuedAt: NOW,
+      width: 192,
+      height: 96,
+      layout: { mode: "grid", rows: 2, columns: 2, gap: 0 },
+    }).ok).toBe(true);
+
+    const result = await importComposeAsset(
+      imageFile(),
+      ports(store, repo.repository),
+      { target: { compositionId: "composition-grid", cellIndex: 1 } },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      outcome: "layer-added",
+      compositionId: "composition-grid",
+      layerId: "layer-imported",
+      dimensions: { width: 192, height: 96 },
+    });
+    const project = store.getSnapshot().project;
+    expect(project.compositions["composition-grid"]).toMatchObject({
+      width: 192,
+      height: 96,
+      layerIds: ["layer-imported"],
+    });
+    expect(project.layers["layer-imported"]?.transform).toMatchObject({
+      x: 144,
+      y: 24,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    expect(project.layers["layer-imported"]?.cellIndex).toBe(1);
+
+    const beforeResize = store.getSnapshot();
+    expect(applyCompositionCanvasSettings(store, {
+      compositionId: "composition-grid",
+      draft: { width: "96", height: "192", backgroundMode: "color", backgroundColor: "#ffffff" },
+      baseline: createCompositionCanvasBaseline(beforeResize.revision, beforeResize.project.compositions["composition-grid"]),
+      commandId: "command-resize-grid",
+      issuedAt: NOW,
+    })).toMatchObject({ ok: true, outcome: "updated" });
+    expect(store.getSnapshot().project.layers["layer-imported"]?.transform).toMatchObject({
+      x: 72,
+      y: 48,
+      scaleX: 0.5,
+      scaleY: 0.5,
+    });
+    expect(history.getSnapshot().undoEntries).toHaveLength(3);
+    expect(history.undo()).toMatchObject({ ok: true });
+    expect(store.getSnapshot().project.compositions["composition-grid"]).toMatchObject({ width: 192, height: 96 });
+    expect(store.getSnapshot().project.layers["layer-imported"]?.transform).toMatchObject({ x: 144, y: 24, scaleX: 1 });
+    expect(history.undo()).toMatchObject({ ok: true });
+    expect(store.getSnapshot().project.compositions["composition-grid"]?.layerIds).toEqual([]);
+    expect(store.getSnapshot().project.assets["asset-imported"]).toBeUndefined();
+  });
+
   it("treats an already-removed cleanup record as resolved", async () => {
     const repo = fakeRepository("project-idempotent-cleanup");
     repo.remove.mockRejectedValueOnce(new AssetRepositoryError(

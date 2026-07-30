@@ -340,6 +340,12 @@ export function createComposeLayerEditor(
         layerId,
         patch: {
           transform: mergeTransform(layer.transform, normalized),
+          ...(
+            layer.cellIndex !== undefined &&
+            ["x", "y", "scaleX", "scaleY"].some((key) => Object.hasOwn(normalized, key))
+              ? { cellIndex: undefined }
+              : {}
+          ),
           updatedAt: options.now(),
         },
       }, history);
@@ -351,6 +357,7 @@ export function createComposeLayerEditor(
         type: "layer.update",
         layerId,
         patch: {
+          ...(layer.cellIndex === undefined ? {} : { cellIndex: undefined }),
           transform: {
             x: 0,
             y: 0,

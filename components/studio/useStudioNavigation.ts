@@ -5,7 +5,7 @@ import {
   type StudioWorkspaceId,
 } from "../../core/studio";
 
-const FALLBACK_WORKSPACE: StudioWorkspaceId = "slice";
+const FALLBACK_WORKSPACE: StudioWorkspaceId = "compose";
 const FALLBACK_HREF = getStudioWorkspace(FALLBACK_WORKSPACE).href;
 
 type NavigationListener = () => void;

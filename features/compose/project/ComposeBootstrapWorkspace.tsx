@@ -1,25 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronRight,
-  Image as ImageIcon,
-  Layers3,
   LoaderCircle,
-  Upload,
 } from "lucide-react";
+
 import type { AssetRepository } from "../../../core/assets";
 import type { EntityId } from "../../../core/project";
 import type { ProjectStore } from "../../../core/stores";
 import { useProjectStoreSelector } from "../../../hooks/useStudioStoreSelector";
-import { ComposeCanvasWorkspace } from "../canvas/ComposeCanvasWorkspace";
 import { ComposeLayersPanel } from "../layers/ComposeLayersPanel";
+import {
+  ComposeCanvasStage,
+  ComposeLayoutToolbar,
+  resolveCompositionLayout,
+} from "../layout";
+import { createBlankComposition } from "./blankComposition";
 import {
   importComposeAsset,
   retryComposeAssetCleanup,
   type ComposeAssetImportFailure,
 } from "./importComposeAsset";
-import { openCompositionFromSource, type CompositionEntrySource } from "./compositionEntry";
 
 export interface ComposeBootstrapWorkspaceProps {
   readonly store: ProjectStore;
@@ -31,13 +32,16 @@ export interface ComposeBootstrapWorkspaceProps {
     assetId: EntityId,
     pending: boolean,
   ) => void;
+  readonly onOpenCanvasSettings?: () => void;
   readonly importRequestToken?: number;
   readonly disabled?: boolean;
 }
 
+type IdentityKind = "asset" | "command" | "composition" | "layer";
+
 let identityCounter = 0;
 
-function nextId(kind: "asset" | "command"): EntityId {
+function nextId(kind: IdentityKind): EntityId {
   identityCounter += 1;
   try {
     const value = globalThis.crypto?.randomUUID?.();
@@ -52,8 +56,16 @@ function timestamp(): string {
   return new Date().toISOString();
 }
 
-function sourceLabel(source: CompositionEntrySource): string {
-  return source.type === "asset" ? "Asset" : "Region";
+function fileList(input: FileList | null): readonly File[] {
+  return input ? Array.from(input) : [];
+}
+
+function dropCell(target: EventTarget | null): number | undefined {
+  if (!(target instanceof Element)) return undefined;
+  const raw = target.closest<HTMLElement>("[data-compose-grid-cell]")?.dataset.composeGridCell;
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 export function ComposeBootstrapWorkspace({
@@ -62,16 +74,20 @@ export function ComposeBootstrapWorkspace({
   onCompositionReady,
   onBusyChange,
   onCleanupDebtChange,
+  onOpenCanvasSettings,
   importRequestToken = 0,
   disabled = false,
 }: ComposeBootstrapWorkspaceProps) {
   const project = useProjectStoreSelector(store, (state) => state.project);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingCellRef = useRef<number | undefined>(undefined);
   const feedbackRef = useRef<HTMLDivElement>(null);
   const importControllerRef = useRef<AbortController | null>(null);
-  const cleanupDebtRef = useRef<EntityId | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const dragDepthRef = useRef(0);
   const [busy, setBusy] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [selectedCell, setSelectedCell] = useState(0);
   const [feedback, setFeedback] = useState<{
     readonly kind: "success" | "error";
     readonly message: string;
@@ -79,107 +95,171 @@ export function ComposeBootstrapWorkspace({
   } | null>(null);
   const interactionDisabled = busy || disabled;
 
+  const composition = project.workspace.selectedCompositionId
+    ? project.compositions[project.workspace.selectedCompositionId]
+    : undefined;
+  const layers = composition
+    ? composition.layerIds.flatMap((id) => {
+        const layer = project.layers[id];
+        return layer ? [layer] : [];
+      })
+    : [];
+
+  useEffect(() => {
+    if (disabled) return;
+    const current = store.getSnapshot().project;
+    const selectedId = current.workspace.selectedCompositionId;
+    if (selectedId && current.compositions[selectedId]) return;
+    const existingId = current.rootOrder.compositionIds[0];
+    const issuedAt = timestamp();
+    if (existingId) {
+      store.dispatch({
+        command: {
+          type: "workspace.update",
+          patch: {
+            activeWorkspace: "compose",
+            selectedCompositionId: existingId,
+            selectedLayerId: undefined,
+          },
+        },
+        metadata: {
+          commandId: nextId("command"),
+          origin: "migration",
+          history: "ignore",
+          issuedAt,
+        },
+      });
+      return;
+    }
+    createBlankComposition(store, {
+      compositionId: nextId("composition"),
+      commandId: nextId("command"),
+      issuedAt,
+      origin: "migration",
+      history: "ignore",
+    });
+  }, [disabled, project.rootOrder.compositionIds.length, project.workspace.selectedCompositionId, store]);
+
   useEffect(() => {
     onBusyChange?.(busy);
     return () => onBusyChange?.(false);
   }, [busy, onBusyChange]);
 
-  const composition = project.workspace.selectedCompositionId
-    ? project.compositions[project.workspace.selectedCompositionId]
-    : undefined;
-  const sources = useMemo<ReadonlyArray<{
-    readonly source: CompositionEntrySource;
-    readonly name: string;
-    readonly dimensions: string;
-  }>>(() => [
-    ...project.rootOrder.assetIds.flatMap((id) => {
-      const asset = project.assets[id];
-      return asset ? [{
-        source: { type: "asset" as const, id },
-        name: asset.name,
-        dimensions: `${asset.width} × ${asset.height}`,
-      }] : [];
-    }),
-    ...project.rootOrder.regionIds.flatMap((id) => {
-      const region = project.regions[id];
-      return region ? [{
-        source: { type: "region" as const, id },
-        name: region.name?.trim() || `Region ${project.rootOrder.regionIds.indexOf(id) + 1}`,
-        dimensions: `${region.bounds.width} × ${region.bounds.height}`,
-      }] : [];
-    }),
-  ], [project]);
-
   useEffect(() => () => {
     importControllerRef.current?.abort();
   }, [store, assets]);
+
+  const openPicker = (cell?: number): void => {
+    if (interactionDisabled) return;
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    pendingCellRef.current = cell;
+    fileInputRef.current?.click();
+  };
 
   const handledImportRequestRef = useRef(importRequestToken);
   useEffect(() => {
     if (importRequestToken === handledImportRequestRef.current) return;
     handledImportRequestRef.current = importRequestToken;
-    if (disabled) return;
-    fileInputRef.current?.click();
+    if (!disabled) openPicker();
+  // openPicker intentionally resolves the live disabled/busy state for an external request.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disabled, importRequestToken]);
 
   useEffect(() => {
-    if (!feedback) return;
+    if (feedback?.kind !== "error") return;
     feedbackRef.current?.focus({ preventScroll: true });
   }, [feedback]);
 
   useEffect(() => {
     if (feedback?.kind !== "success") return;
-    const timeoutId = window.setTimeout(() => setFeedback(null), 5_000);
+    const timeoutId = window.setTimeout(() => setFeedback(null), 4_000);
     return () => window.clearTimeout(timeoutId);
   }, [feedback]);
 
-  const importFile = async (file: File): Promise<void> => {
-    if (disabled) return;
+  useEffect(() => {
+    if (busy || feedback?.kind !== "success") return;
+    const target = restoreFocusRef.current;
+    restoreFocusRef.current = null;
+    if (!target?.isConnected) return;
+    target.focus({ preventScroll: true });
+  }, [busy, feedback]);
+
+  const importFiles = async (files: readonly File[], requestedCell?: number): Promise<void> => {
+    if (disabled || files.length === 0) return;
     importControllerRef.current?.abort();
     const controller = new AbortController();
     importControllerRef.current = controller;
     setBusy(true);
     setFeedback(null);
+    let cell = requestedCell ?? selectedCell;
+    let imported = 0;
     try {
-      const result = await importComposeAsset(file, {
+      for (const file of files) {
+        const snapshot = store.getSnapshot().project;
+        const compositionId = snapshot.workspace.selectedCompositionId;
+        const targetComposition = compositionId ? snapshot.compositions[compositionId] : undefined;
+        if (!targetComposition) {
+          setFeedback({ kind: "error", message: "The canvas is not ready yet. Try again." });
+          return;
+        }
+        const layout = resolveCompositionLayout(targetComposition);
+        const targetCell = layout.mode === "grid"
+          ? Math.min(cell, layout.rows * layout.columns - 1)
+          : undefined;
+        const result = await importComposeAsset(file, {
           store,
           assets,
           nextId,
           now: timestamp,
-        }, { signal: controller.signal })
-        .catch((): ComposeAssetImportFailure => ({
-          ok: false as const,
-          code: "STORAGE_FAILED" as const,
+        }, {
+          signal: controller.signal,
+          target: {
+            compositionId: targetComposition.id,
+            ...(targetCell === undefined ? {} : { cellIndex: targetCell }),
+          },
+        }).catch((): ComposeAssetImportFailure => ({
+          ok: false,
+          code: "STORAGE_FAILED",
           message: "Image import could not be completed.",
         }));
-      if (controller.signal.aborted) {
-        if (!result.ok && result.cleanup) {
-          onCleanupDebtChange?.(assets.projectId, result.cleanup.assetId, true);
+        if (controller.signal.aborted) {
+          if (!result.ok && result.cleanup) {
+            onCleanupDebtChange?.(assets.projectId, result.cleanup.assetId, true);
+          }
+          return;
         }
-        return;
+        if (!result.ok) {
+          if (result.cleanup) {
+            onCleanupDebtChange?.(assets.projectId, result.cleanup.assetId, true);
+          }
+          setFeedback({
+            kind: "error",
+            message: result.message,
+            ...(result.cleanup ? { cleanupAssetId: result.cleanup.assetId } : {}),
+          });
+          return;
+        }
+        imported += 1;
+        if (layout.mode === "grid") {
+          cell = (targetCell! + 1) % (layout.rows * layout.columns);
+          setSelectedCell(cell);
+        }
+        onCompositionReady?.();
       }
-      if (!result.ok) {
-        cleanupDebtRef.current = result.cleanup?.assetId ?? null;
-        if (result.cleanup) {
-          onCleanupDebtChange?.(assets.projectId, result.cleanup.assetId, true);
-        }
+      if (imported > 0 && !controller.signal.aborted) {
         setFeedback({
-          kind: "error",
-          message: result.message,
-          ...(result.cleanup ? { cleanupAssetId: result.cleanup.assetId } : {}),
+          kind: "success",
+          message: `${imported} ${imported === 1 ? "image" : "images"} added to the canvas.`,
         });
-        return;
       }
-      setFeedback({
-        kind: "success",
-        message: `${result.assetName} is ready as a ${result.dimensions.width} × ${result.dimensions.height} composition.`,
-      });
-      onCompositionReady?.();
     } finally {
       if (importControllerRef.current === controller) {
         importControllerRef.current = null;
         setBusy(false);
       }
+      pendingCellRef.current = undefined;
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -188,215 +268,138 @@ export function ComposeBootstrapWorkspace({
     setBusy(true);
     try {
       const result = await retryComposeAssetCleanup(assets, assetId);
-      cleanupDebtRef.current = result.ok ? null : assetId;
       onCleanupDebtChange?.(assets.projectId, assetId, !result.ok);
       setFeedback(result.ok
         ? { kind: "success", message: "Temporary image data was removed." }
-        : {
-            kind: "error",
-            message: result.message,
-            cleanupAssetId: assetId,
-          });
+        : { kind: "error", message: result.message, cleanupAssetId: assetId });
     } finally {
       setBusy(false);
     }
   };
 
-  const openSource = (source: CompositionEntrySource): void => {
-    if (disabled) return;
-    setFeedback(null);
-    const result = openCompositionFromSource(store, {
-      source,
-      commandId: nextId("command"),
-      issuedAt: timestamp(),
-    });
-    if (!result.ok) {
-      setFeedback({ kind: "error", message: result.message });
-      return;
-    }
-    setFeedback({
-      kind: "success",
-      message: `${sourceLabel(source)} opened in Compose.`,
-    });
-    onCompositionReady?.();
+  const resetDrag = (): void => {
+    dragDepthRef.current = 0;
+    setDragActive(false);
   };
-
-  const sourceCards = sources.length > 0 ? (
-    <ul data-compose-sources className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {sources.map((item) => (
-        <li key={`${item.source.type}:${item.source.id}`}>
-          <button
-            type="button"
-            disabled={interactionDisabled}
-            onClick={() => openSource(item.source)}
-            className="group flex min-h-16 w-full items-center gap-2.5 rounded-md border border-white/10 bg-surface p-2.5 text-left transition-colors hover:border-white/20 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-black/25 text-textMuted group-hover:text-textMain">
-              <ImageIcon size={16} aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-xs font-semibold text-textMain">{item.name}</span>
-              <span className="mt-0.5 block font-mono text-[10px] text-textMuted">
-                {sourceLabel(item.source)} · {item.dimensions}
-              </span>
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  ) : null;
 
   return (
     <section
-      aria-labelledby="compose-bootstrap-title"
-      className="flex h-full min-h-0 flex-col overflow-y-auto bg-workspace p-3 sm:p-4 md:overflow-hidden"
+      aria-labelledby="compose-canvas-title"
+      className="flex h-full min-h-0 flex-col overflow-y-auto bg-workspace p-2 sm:p-3 md:overflow-hidden"
+      data-compose-canvas-first
       onDragEnter={(event) => {
-        if (interactionDisabled) return;
+        if (interactionDisabled || !event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
+        dragDepthRef.current += 1;
         setDragActive(true);
       }}
       onDragOver={(event) => {
-        if (interactionDisabled) return;
+        if (interactionDisabled || !event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "copy";
       }}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragActive(false);
+      onDragLeave={() => {
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setDragActive(false);
       }}
       onDrop={(event) => {
         event.preventDefault();
-        setDragActive(false);
-        const file = event.dataTransfer.files.item(0);
-        if (file && !interactionDisabled) void importFile(file);
+        const cell = dropCell(event.target);
+        if (cell !== undefined) setSelectedCell(cell);
+        const files = fileList(event.dataTransfer.files);
+        resetDrag();
+        if (!interactionDisabled) void importFiles(files, cell);
       }}
     >
-      <div
-        className={[
-          "mx-auto flex w-full flex-1 flex-col gap-3",
-          composition ? "min-h-0 max-w-[1600px]" : "max-w-4xl justify-center",
-        ].join(" ")}
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-panel/70 shadow-xl">
+        <header className="flex min-h-12 shrink-0 items-center gap-3 border-b border-white/10 px-3">
           <div className="min-w-0">
-            <h1 id="compose-bootstrap-title" className="truncate text-lg font-semibold tracking-tight text-textMain">
-              {composition ? composition.name : "Start a composition"}
+            <h1 id="compose-canvas-title" className="truncate text-sm font-semibold tracking-tight text-textMain">
+              {composition?.name ?? "Preparing canvas…"}
             </h1>
-            {composition ? (
-              <p className="mt-0.5 font-mono text-[11px] text-textMuted">
-                {composition.width} × {composition.height} · {composition.layerIds.length} {composition.layerIds.length === 1 ? "layer" : "layers"}
-              </p>
-            ) : null}
+            <p className="font-mono text-[9px] text-textMuted">
+              {composition ? `${composition.layerIds.length} ${composition.layerIds.length === 1 ? "layer" : "layers"}` : "Local project"}
+            </p>
           </div>
-          <button
-            type="button"
-            disabled={interactionDisabled}
-            onClick={() => fileInputRef.current?.click()}
-            className={`${composition ? "btn-secondary" : "btn-primary"} inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md px-3.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait disabled:opacity-55`}
-          >
-            {busy || disabled ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" /> : <Upload size={14} aria-hidden="true" />}
-            {disabled ? "Loading…" : busy ? "Importing…" : "Import image"}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="sr-only"
-            aria-label="Import image into Compose"
-            disabled={interactionDisabled}
-            onChange={(event) => {
-              const file = event.currentTarget.files?.item(0);
-              if (file) void importFile(file);
-            }}
+          <span className="ml-auto hidden text-[10px] text-textMuted sm:block">Drop images anywhere on the canvas</span>
+          {interactionDisabled ? <LoaderCircle size={14} className="animate-spin text-textMuted" aria-label="Importing image" /> : null}
+        </header>
+
+        {composition ? (
+          <ComposeLayoutToolbar
+            store={store}
+            composition={composition}
+            selectedCell={selectedCell}
+            busy={interactionDisabled}
+            onSelectedCellChange={setSelectedCell}
+            onImport={() => openPicker(selectedCell)}
+            onOpenCanvasSettings={onOpenCanvasSettings}
           />
-        </div>
+        ) : null}
 
         {feedback ? (
           <div
             ref={feedbackRef}
-            tabIndex={-1}
+            tabIndex={feedback.kind === "error" ? -1 : undefined}
             role={feedback.kind === "error" ? "alert" : "status"}
+            aria-live={feedback.kind === "error" ? "assertive" : "polite"}
             aria-label={feedback.message}
-            className={[
-              "flex shrink-0 items-start gap-2 rounded-md border px-3 py-2 text-xs",
-              feedback.kind === "error"
-                ? "border-red-400/30 bg-red-400/10 text-red-100"
-                : "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
-            ].join(" ")}
+            className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 text-[10px] ${feedback.kind === "error" ? "border-red-400/25 bg-red-400/10 text-red-100" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-100"}`}
           >
-            {feedback.kind === "error"
-              ? <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-              : <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden="true" />}
+            {feedback.kind === "error" ? <AlertTriangle size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
             <span className="min-w-0 flex-1">{feedback.message}</span>
             {feedback.cleanupAssetId ? (
               <button
                 type="button"
                 disabled={interactionDisabled}
                 onClick={() => void retryCleanup(feedback.cleanupAssetId as EntityId)}
-                className="shrink-0 rounded-md border border-current/30 px-2 py-1 text-[10px] font-semibold hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current disabled:opacity-50"
+                className="rounded-md border border-current/30 px-2 py-1 font-semibold hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current disabled:opacity-50"
               >
                 Retry cleanup
+              </button>
+            ) : null}
+            {feedback.kind === "error" ? (
+              <button
+                type="button"
+                disabled={interactionDisabled}
+                onClick={() => openPicker(selectedCell)}
+                className="rounded-md border border-current/30 px-2 py-1 font-semibold hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current disabled:opacity-50"
+              >
+                Choose another
               </button>
             ) : null}
           </div>
         ) : null}
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/png,image/jpeg,image/webp"
+          className="sr-only"
+          aria-label="Import images into Compose"
+          disabled={interactionDisabled}
+          onChange={(event) => void importFiles(fileList(event.currentTarget.files), pendingCellRef.current)}
+        />
+
         {composition ? (
-          <div
-            data-compose-canvas
-            className="grid min-h-[360px] flex-1 overflow-hidden rounded-lg border border-white/12 bg-panel/70 md:min-h-0 md:grid-cols-[minmax(0,1fr)_17rem]"
-          >
-            <div className="min-h-[280px] min-w-0 md:min-h-0">
-              <ComposeCanvasWorkspace store={store} assets={assets} />
-            </div>
+          <div data-compose-canvas className="grid min-h-[420px] flex-1 overflow-hidden md:min-h-0 md:grid-cols-[minmax(0,1fr)_17rem]">
+            <ComposeCanvasStage
+              store={store}
+              assets={assets}
+              composition={composition}
+              layers={layers}
+              selectedCell={selectedCell}
+              dragActive={dragActive}
+              disabled={interactionDisabled}
+              onSelectedCellChange={setSelectedCell}
+              onImport={openPicker}
+            />
             <ComposeLayersPanel store={store} disabled={interactionDisabled} />
           </div>
-        ) : null}
-
-        {composition && sourceCards ? (
-          <details className="group shrink-0 overflow-hidden rounded-lg border border-white/10 bg-panel/70">
-            <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent">
-              <ChevronRight size={14} className="text-textMuted transition-transform group-open:rotate-90" aria-hidden="true" />
-              <Layers3 size={14} className="text-textMuted" aria-hidden="true" />
-              Sources
-              <span className="ml-auto font-mono text-[10px] text-textMuted">{sources.length}</span>
-            </summary>
-            <div className="custom-scrollbar max-h-48 overflow-y-auto border-t border-white/10 p-3">
-              {sourceCards}
-            </div>
-          </details>
-        ) : !composition ? (
-          <div
-            className={[
-              "rounded-lg border border-dashed p-3 transition-colors sm:p-4",
-              dragActive ? "border-accent bg-accent/10" : "border-white/12 bg-panel/70",
-            ].join(" ")}
-          >
-            {sources.length === 0 ? (
-            <button
-              type="button"
-              disabled={interactionDisabled}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex min-h-40 w-full flex-col items-center justify-center rounded-md text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
-            >
-              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-surface text-textMain">
-                <ImageIcon size={20} aria-hidden="true" />
-              </span>
-              <span className="text-sm font-semibold text-textMain">Drop PNG, JPEG or WebP</span>
-            </button>
-            ) : (
-              <div>
-              <div className="mb-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-textMain">
-                  <Layers3 size={14} className="text-textMuted" aria-hidden="true" />
-                  Sources
-                </div>
-                <span className="font-mono text-[10px] text-textMuted">{sources.length}</span>
-              </div>
-                {sourceCards}
-              </div>
-            )}
-          </div>
-        ) : null}
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-xs text-textMuted" role="status">Preparing blank canvas…</div>
+        )}
       </div>
     </section>
   );

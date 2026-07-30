@@ -350,6 +350,7 @@ export function CompositionCanvasSettingsInspector({
           ref={feedbackRef}
           tabIndex={-1}
           role={feedback.kind === "error" ? "alert" : "status"}
+          aria-label={feedback.message}
           className={`rounded-lg border p-2.5 text-[10px] ${feedback.kind === "error" ? "border-red-400/30 bg-red-400/10 text-red-200" : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"}`}
         >
           {feedback.message}

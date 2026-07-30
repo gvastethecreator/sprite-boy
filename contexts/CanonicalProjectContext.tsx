@@ -109,13 +109,29 @@ function writeActiveProjectId(projectId: EntityId): void {
 
 function createUntitledProject(projectId = nextIdentity("project"), name = "Untitled project") {
   const timestamp = now();
-  return createEmptyStudioProject({
+  const project = createEmptyStudioProject({
     id: projectId,
     name,
     now: timestamp,
     createdAt: timestamp,
     updatedAt: timestamp,
   });
+  const compositionId = nextIdentity("composition");
+  project.compositions[compositionId] = {
+    id: compositionId,
+    name: "Untitled composition",
+    owner: { type: "project" },
+    layerIds: [],
+    width: 512,
+    height: 512,
+    background: "#ffffff",
+    layout: { mode: "free" },
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  project.rootOrder.compositionIds.push(compositionId);
+  project.workspace.selectedCompositionId = compositionId;
+  return project;
 }
 
 function createBundle(

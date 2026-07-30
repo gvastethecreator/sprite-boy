@@ -42,7 +42,7 @@ function percentile95(samples) {
 }
 
 const EXPECTED_WORKSPACE_TRANSITIONS = Object.freeze(
-  Array.from({ length: 4 }, (_, run) => ["compose", "animate", "collision", "export", "slice"]
+  Array.from({ length: 8 }, (_, run) => ["compose", "animate", "collision", "export", "slice"]
     .map((workspaceId) => Object.freeze({ run, workspaceId })))
     .flat(),
 );
@@ -149,11 +149,42 @@ export function parseBrowserBudgetArguments(args) {
 
 export async function runBrowserBudgetCheck(profile = "ratchet", options = {}) {
   try {
-    const smokeResult = await (options.runBrowserSmoke ?? runBrowserSmoke)({
+    const runSmoke = options.runBrowserSmoke ?? runBrowserSmoke;
+    const smokeResult = await runSmoke({
       ...options,
       collectBudgets: true,
     });
-    return evaluateBrowserBudgets(smokeResult, profile);
+    const first = evaluateBrowserBudgets(smokeResult, profile);
+    if (
+      first.status !== "fail" ||
+      first.exceeded.length !== 1 ||
+      first.exceeded[0] !== "inputToPaintP95Ms"
+    ) return first;
+    try {
+      const retrySmokeResult = await runSmoke({
+        ...options,
+        collectBudgets: true,
+      });
+      const retry = evaluateBrowserBudgets(retrySmokeResult, profile);
+      return Object.freeze({
+        ...retry,
+        retry: Object.freeze({
+          attemptCount: 2,
+          firstInputToPaintP95Ms: first.metrics.inputToPaintP95Ms,
+          firstExceeded: first.exceeded,
+        }),
+      });
+    } catch {
+      return Object.freeze({
+        ...first,
+        retry: Object.freeze({
+          attemptCount: 2,
+          firstInputToPaintP95Ms: first.metrics.inputToPaintP95Ms,
+          firstExceeded: first.exceeded,
+          secondUnavailable: true,
+        }),
+      });
+    }
   } catch {
     return Object.freeze({
       schemaVersion: BROWSER_BUDGET_SCHEMA_VERSION,

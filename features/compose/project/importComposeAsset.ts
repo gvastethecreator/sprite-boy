@@ -5,9 +5,12 @@ import {
 } from "../../../core/assets";
 import {
   applyProjectCommand,
+  applyProjectCommandBatch,
   type EntityId,
   type ISO8601Timestamp,
+  type Layer,
   type ProjectCommand,
+  type ProjectDispatchCommand,
   type ProjectCommandDiagnostic,
   type StudioProject,
 } from "../../../core/project";
@@ -25,6 +28,7 @@ import {
   createCompositionEntryIntent,
   type CompositionEntryOpenSuccess,
 } from "./compositionEntry";
+import { resolveCompositionDropTransform } from "../layout";
 
 export type ComposeAssetImportFailureCode =
   | "INVALID_FILE"
@@ -44,7 +48,8 @@ export interface ComposeAssetImportFailure {
   readonly cleanup?: { readonly assetId: EntityId };
 }
 
-export interface ComposeAssetImportSuccess extends CompositionEntryOpenSuccess {
+export interface ComposeAssetImportSuccess extends Omit<CompositionEntryOpenSuccess, "outcome"> {
+  readonly outcome: CompositionEntryOpenSuccess["outcome"] | "layer-added";
   readonly assetId: EntityId;
   readonly assetName: string;
 }
@@ -54,9 +59,19 @@ export type ComposeAssetImportResult = ComposeAssetImportSuccess | ComposeAssetI
 export interface ComposeAssetImportPorts {
   readonly store: ProjectStore;
   readonly assets: AssetRepository;
-  readonly nextId: (kind: "asset" | "command") => EntityId;
+  readonly nextId: (kind: "asset" | "command" | "layer") => EntityId;
   readonly now: () => ISO8601Timestamp;
   readonly decoder?: SourceDecoder;
+}
+
+export interface ComposeAssetImportTarget {
+  readonly compositionId: EntityId;
+  readonly cellIndex?: number;
+}
+
+export interface ComposeAssetImportOptions {
+  readonly signal?: AbortSignal;
+  readonly target?: ComposeAssetImportTarget;
 }
 
 function failure(
@@ -132,7 +147,7 @@ export function retryComposeAssetCleanup(
 async function importComposeAssetUnlocked(
   input: SourceFileInput,
   ports: ComposeAssetImportPorts,
-  options: { readonly signal?: AbortSignal } = {},
+  options: ComposeAssetImportOptions = {},
 ): Promise<ComposeAssetImportResult> {
   const signal = options.signal;
   if (cancelled(signal)) return failure("CANCELLED", "Image import was cancelled.");
@@ -198,6 +213,96 @@ async function importComposeAssetUnlocked(
     }
 
     const importCommand: ProjectCommand = { type: "asset.import", asset: record };
+    if (options.target) {
+      const composition = latest.project.compositions[options.target.compositionId];
+      if (!composition) {
+        const cleaned = await removeRepositoryAsset(ports.assets, assetId);
+        if (!cleaned) return cleanupFailure(assetId);
+        repositoryCommitted = false;
+        return failure("COMPOSITION_REJECTED", "The target canvas is no longer available.");
+      }
+      const layerId = ports.nextId("layer");
+      const layer: Layer = {
+        id: layerId,
+        compositionId: composition.id,
+        name: record.name,
+        source: { type: "asset", id: assetId },
+        transform: resolveCompositionDropTransform({
+          composition,
+          source: { width: record.width, height: record.height },
+          ...(options.target.cellIndex === undefined ? {} : { cellIndex: options.target.cellIndex }),
+        }),
+        ...(options.target.cellIndex === undefined ? {} : { cellIndex: options.target.cellIndex }),
+        visible: true,
+        locked: false,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      const targetCommand: ProjectDispatchCommand = {
+        type: "command.batch",
+        commands: [
+          importCommand,
+          { type: "layer.add", compositionId: composition.id, layer },
+          {
+            type: "workspace.update",
+            patch: {
+              activeWorkspace: "compose",
+              selectedAssetId: assetId,
+              selectedRegionId: undefined,
+              selectedCompositionId: composition.id,
+              selectedLayerId: layerId,
+            },
+          },
+        ],
+      };
+      const preview = applyProjectCommandBatch(
+        latest.project as StudioProject,
+        targetCommand,
+        { nextId: () => "compose-import-target-preview", now: () => timestamp },
+      );
+      if (!preview.ok) {
+        const cleaned = await removeRepositoryAsset(ports.assets, assetId);
+        if (!cleaned) return cleanupFailure(assetId, preview.diagnostics);
+        repositoryCommitted = false;
+        return failure(
+          "COMPOSITION_REJECTED",
+          "The image could not be placed on the target canvas.",
+          preview.diagnostics,
+        );
+      }
+      const placed = ports.store.dispatch({
+        command: targetCommand,
+        metadata: {
+          commandId: ports.nextId("command"),
+          origin: "user",
+          history: "record",
+          issuedAt: timestamp,
+        },
+      });
+      if (!placed.result.ok) {
+        const cleaned = await removeRepositoryAsset(ports.assets, assetId);
+        if (!cleaned) return cleanupFailure(assetId, placed.result.diagnostics);
+        repositoryCommitted = false;
+        return failure(
+          "COMPOSITION_REJECTED",
+          "The image could not be placed on the target canvas.",
+          placed.result.diagnostics,
+        );
+      }
+      return Object.freeze({
+        ok: true,
+        outcome: "layer-added",
+        source: { type: "asset" as const, id: assetId },
+        sourceAssetId: assetId,
+        compositionId: composition.id,
+        layerId,
+        dimensions: { width: composition.width, height: composition.height },
+        revision: placed.revision,
+        dispatched: true,
+        assetId,
+        assetName: record.name,
+      });
+    }
     const preview = applyProjectCommand(
       latest.project as StudioProject,
       importCommand,
@@ -306,7 +411,7 @@ async function importComposeAssetUnlocked(
 export function importComposeAsset(
   input: SourceFileInput,
   ports: ComposeAssetImportPorts,
-  options: { readonly signal?: AbortSignal } = {},
+  options: ComposeAssetImportOptions = {},
 ): Promise<ComposeAssetImportResult> {
   return withAssetRepositoryMutation(ports.assets, () => importComposeAssetUnlocked(input, ports, options));
 }

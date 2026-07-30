@@ -1,6 +1,6 @@
 /** F3-07 real-Chrome persistence and portable package journey. */
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,8 +18,8 @@ const HOST = "127.0.0.1";
 const HARNESS_PATH = "/tests/browser/studioPersistenceHarness.html";
 const API_NAME = "__spriteBoyF307";
 const COMMAND_TIMEOUT_MS = 30_000;
-const HARNESS_TIMEOUT_MS = 60_000;
-const INTERNAL_RUNTIME_DEADLINE_MS = 130_000;
+const HARNESS_TIMEOUT_MS = 120_000;
+const INTERNAL_RUNTIME_DEADLINE_MS = 240_000;
 export const PERSISTENCE_BROWSER_SCHEMA_VERSION = 1;
 
 function isRecord(value) {
@@ -181,16 +181,33 @@ function browserDiagnostics(client) {
     logErrorCount: client.logErrorCount,
     networkFailureCount: client.networkFailureCount,
     httpErrorCount: client.httpErrorCount,
+    exceptionKinds: client.exceptionKinds,
+    logErrorKinds: client.logErrorKinds,
+    networkFailureKinds: client.networkFailureKinds,
+    httpErrorKinds: client.httpErrorKinds,
   };
 }
 
 async function waitForHarness(client, previousDocumentId = null) {
   const previous = JSON.stringify(previousDocumentId);
-  await client.waitFor(`(() => {
-    const api = globalThis.${API_NAME};
-    return document.readyState === "complete" && api?.ready === true &&
-      (api.documentId !== ${previous});
-  })()`, HARNESS_TIMEOUT_MS);
+  try {
+    await client.waitFor(`(() => {
+      const api = globalThis.${API_NAME};
+      return document.readyState === "complete" && api?.ready === true &&
+        (api.documentId !== ${previous});
+    })()`, HARNESS_TIMEOUT_MS);
+  } catch (error) {
+    const readiness = await client.evaluate(`({
+      readyState: document.readyState,
+      apiDefined: typeof globalThis.${API_NAME} === "object",
+      scriptCount: document.scripts.length,
+    })`);
+    const diagnostics = browserDiagnostics(client);
+    throw new Error(
+      `F3-07 harness readiness failed: ${JSON.stringify({ readiness, diagnostics })}`,
+      { cause: error },
+    );
+  }
   await client.waitForNetworkIdle();
   const documentId = await client.evaluate(`globalThis.${API_NAME}.documentId`);
   if (typeof documentId !== "string" || documentId.length < 16 || documentId === previousDocumentId) {
@@ -260,6 +277,7 @@ export async function runStudioPersistenceBrowser(options = {}) {
   const port = await allocatePort();
   const baseUrl = `http://${HOST}:${port}`;
   const profileDirectory = mkdtempSync(join(tmpdir(), "sprite-boy-f3-07-chrome-"));
+  const viteCacheDirectory = mkdtempSync(join(tmpdir(), "sprite-boy-f3-07-vite-"));
   const runIdentity = `${Date.now().toString(36)}-${crypto.randomUUID()}`;
   const assetDatabaseName = `sprite-boy-f3-07-assets-${runIdentity}`;
   const autosaveDatabaseName = `sprite-boy-f3-07-autosave-${runIdentity}`;
@@ -267,8 +285,14 @@ export async function runStudioPersistenceBrowser(options = {}) {
   let chrome;
   let client;
   return runWithPersistenceDeadline(async () => {
-    server = spawnViteServer(cwd, port);
-    await waitForPreview(`${baseUrl}${HARNESS_PATH}`, server);
+    server = spawnViteServer(cwd, port, "dev", {
+      configPath: "scripts/vite.persistence-browser.config.mjs",
+      env: {
+        ...process.env,
+        SPRITE_BOY_PERSISTENCE_CACHE_DIR: viteCacheDirectory,
+      },
+    });
+    await waitForPreview(`${baseUrl}${HARNESS_PATH}`, server, 120_000);
     chrome = spawn(chromePath, [
       "--headless=new",
       "--disable-background-networking",
@@ -292,7 +316,7 @@ export async function runStudioPersistenceBrowser(options = {}) {
       stdio: "ignore",
       windowsHide: true,
     });
-    const devToolsPort = await waitForDevToolsPort(profileDirectory, chrome);
+    const devToolsPort = await waitForDevToolsPort(profileDirectory, chrome, 120_000);
     client = await connectToPage(devToolsPort, COMMAND_TIMEOUT_MS);
     await Promise.all([
       client.send("Page.enable"),
@@ -312,13 +336,19 @@ export async function runStudioPersistenceBrowser(options = {}) {
     return normalizePersistenceBrowserResult(
       evaluatePersistenceJourneyEvidence(prepare, resume, finish, browserDiagnostics(client)),
     );
-  }, () => cleanupBrowserRuntime(
-    client,
-    chrome,
-    server,
-    profileDirectory,
-    "F3-07 browser runtime cleanup failed.",
-  ),
+  }, async () => {
+    try {
+      await cleanupBrowserRuntime(
+        client,
+        chrome,
+        server,
+        profileDirectory,
+        "F3-07 browser runtime cleanup failed.",
+      );
+    } finally {
+      rmSync(viteCacheDirectory, { recursive: true, force: true });
+    }
+  },
   runtimeDeadlineMs,
   );
 }

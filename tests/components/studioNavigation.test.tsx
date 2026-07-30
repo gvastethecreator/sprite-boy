@@ -33,14 +33,14 @@ describe("useStudioNavigation", () => {
     expect(result.current.activeWorkspace).toBe(workspace);
   });
 
-  it("normalizes an invalid direct route to Slice without another history entry", async () => {
+  it("normalizes an invalid direct route to Compose without another history entry", async () => {
     setHash("#/studio/not-a-workspace");
     const historyLength = window.history.length;
     const { result } = renderHook(() => useStudioNavigation());
 
     await waitFor(() => {
-      expect(result.current.activeWorkspace).toBe("slice");
-      expect(window.location.hash).toBe("#/studio/slice");
+      expect(result.current.activeWorkspace).toBe("compose");
+      expect(window.location.hash).toBe("#/studio/compose");
     });
     expect(window.history.length).toBe(historyLength);
     expect(window.history.state).toBe(initialState);

@@ -544,6 +544,7 @@ function validateLayer(
       "name",
       "source",
       "transform",
+      "cellIndex",
       "visible",
       "locked",
       "createdAt",
@@ -554,6 +555,12 @@ function validateLayer(
     id,
   );
   if (item.name !== undefined) validateString(item.name, pathFor(path, "name"), diagnostics);
+  if (
+    item.cellIndex !== undefined &&
+    (!Number.isSafeInteger(item.cellIndex) || item.cellIndex < 0 || item.cellIndex >= 144)
+  ) {
+    push(diagnostics, "INVALID_DOCUMENT", pathFor(path, "cellIndex"), "Layer cellIndex must be a safe integer from 0 to 143.", id);
+  }
   validateReference(item.compositionId, pathFor(path, "compositionId"), compositions, diagnostics, id);
   const sourcePath = pathFor(path, "source");
   const source = item.source as unknown;
@@ -618,7 +625,7 @@ function validateComposition(
 ): void {
   validateAllowedKeys(
     item as unknown as UnknownRecord,
-    ["id", "name", "owner", "layerIds", "width", "height", "background", "createdAt", "updatedAt"],
+    ["id", "name", "owner", "layerIds", "width", "height", "background", "layout", "createdAt", "updatedAt"],
     path,
     diagnostics,
     id,
@@ -631,6 +638,54 @@ function validateComposition(
   });
   if (item.background !== undefined && item.background !== null) {
     validateString(item.background, pathFor(path, "background"), diagnostics);
+  }
+  if (item.layout !== undefined) {
+    const layoutPath = pathFor(path, "layout");
+    if (!isRecord(item.layout)) {
+      push(diagnostics, "INVALID_DOCUMENT", layoutPath, "Composition layout must be an object.", id);
+    } else if (item.layout.mode === "free") {
+      validateAllowedKeys(item.layout, ["mode"], layoutPath, diagnostics, id);
+    } else if (item.layout.mode === "grid") {
+      validateAllowedKeys(item.layout, ["mode", "rows", "columns", "gap"], layoutPath, diagnostics, id);
+      const rowsValid = validatePositiveSafeInteger(
+        item.layout.rows,
+        pathFor(layoutPath, "rows"),
+        diagnostics,
+        "Grid rows must be a positive safe integer.",
+        id,
+      );
+      const columnsValid = validatePositiveSafeInteger(
+        item.layout.columns,
+        pathFor(layoutPath, "columns"),
+        diagnostics,
+        "Grid columns must be a positive safe integer.",
+        id,
+      );
+      const gapValid = validateNonNegativeSafeInteger(
+        item.layout.gap,
+        pathFor(layoutPath, "gap"),
+        diagnostics,
+        "Grid gap must be a non-negative safe integer.",
+        id,
+      );
+      if (rowsValid && item.layout.rows > 12) {
+        push(diagnostics, "INVALID_DOCUMENT", pathFor(layoutPath, "rows"), "Grid rows cannot exceed 12.", id);
+      }
+      if (columnsValid && item.layout.columns > 12) {
+        push(diagnostics, "INVALID_DOCUMENT", pathFor(layoutPath, "columns"), "Grid columns cannot exceed 12.", id);
+      }
+      if (gapValid && item.layout.gap > 1_024) {
+        push(diagnostics, "INVALID_DOCUMENT", pathFor(layoutPath, "gap"), "Grid gap cannot exceed 1024 pixels.", id);
+      }
+      if (columnsValid && gapValid && item.layout.gap * (item.layout.columns - 1) >= item.width) {
+        push(diagnostics, "INVALID_DOCUMENT", pathFor(layoutPath, "gap"), "Grid column gaps leave no usable cell width.", id);
+      }
+      if (rowsValid && gapValid && item.layout.gap * (item.layout.rows - 1) >= item.height) {
+        push(diagnostics, "INVALID_DOCUMENT", pathFor(layoutPath, "gap"), "Grid row gaps leave no usable cell height.", id);
+      }
+    } else {
+      push(diagnostics, "INVALID_DOCUMENT", pathFor(layoutPath, "mode"), "Composition layout mode must be free or grid.", id);
+    }
   }
   const ownerPath = pathFor(path, "owner");
   if (!isRecord(item.owner)) {
@@ -2121,6 +2176,25 @@ function validateEntityCollections(root: UnknownRecord, diagnostics: ProjectDiag
     validateLayer(item as unknown as Layer, `$.layers.${id}`, id, records.assets, records.regions, records.compositions, diagnostics);
     if (item.visible !== undefined) validateBoolean(item.visible, `$.layers.${id}.visible`, diagnostics);
     if (item.locked !== undefined) validateBoolean(item.locked, `$.layers.${id}.locked`, diagnostics);
+    const composition = typeof item.compositionId === "string"
+      ? records.compositions.get(item.compositionId)
+      : undefined;
+    const layout = composition && isRecord(composition.layout) ? composition.layout : undefined;
+    if (
+      Number.isSafeInteger(item.cellIndex) &&
+      layout?.mode === "grid" &&
+      Number.isSafeInteger(layout.rows) &&
+      Number.isSafeInteger(layout.columns) &&
+      (item.cellIndex as number) >= (layout.rows as number) * (layout.columns as number)
+    ) {
+      push(
+        diagnostics,
+        "INVALID_DOCUMENT",
+        `$.layers.${id}.cellIndex`,
+        "Layer cellIndex must address a cell in the composition grid.",
+        id,
+      );
+    }
   }
   for (const [id, item] of records.variantSets) {
     validateVariantSet(item as unknown as VariantSet, `$.variantSets.${id}`, id, records.cels, records.compositions, diagnostics);

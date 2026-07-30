@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type ReactElement,
 } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
@@ -47,6 +48,7 @@ export interface ComposeCanvasWorkspaceProps {
   readonly hideDiagnostics?: boolean;
   readonly transparentBackground?: boolean;
   readonly style?: CSSProperties;
+  readonly overlay?: ReactNode;
 }
 
 const MAX_BITMAP_CACHE = 8;
@@ -344,6 +346,7 @@ export function ComposeCanvasWorkspace(
     hideDiagnostics = false,
     transparentBackground = false,
     style,
+    overlay,
   } = props;
   const workspace = useWorkspaceStore();
   const projectRevision = useProjectStoreSelector(
@@ -521,6 +524,7 @@ export function ComposeCanvasWorkspace(
           aria-hidden={ariaLabel === null ? true : undefined}
           className="block h-full min-h-[240px] w-full"
         />
+        {overlay}
       </div>
     </div>
   );

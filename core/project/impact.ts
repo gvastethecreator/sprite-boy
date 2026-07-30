@@ -816,7 +816,7 @@ export function analyzeProjectCommandImpact(
       }
       const patch = dataRecord(record.patch);
       const patchKeys = patch ? Object.keys(patch) : [];
-      const allowedPatchKeys = new Set(["name", "width", "height", "background", "updatedAt"]);
+      const allowedPatchKeys = new Set(["name", "width", "height", "background", "layout", "updatedAt"]);
       if (!patch || patchKeys.length === 0) {
         return invalidImpact("composition.update patch must be a non-empty data-only record.", "$.patch");
       }

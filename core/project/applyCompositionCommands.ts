@@ -38,6 +38,8 @@ import { isEntityId, isISO8601Timestamp } from "./primitives";
 const MAX_COMPOSITION_EDGE = 16_384;
 const MAX_COMPOSITION_PIXELS = 64 * 1024 * 1024;
 const MAX_COMPOSITION_NAME_LENGTH = 256;
+const MAX_COMPOSITION_GRID_TRACKS = 12;
+const MAX_COMPOSITION_GRID_GAP = 1_024;
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 const COMPOSITION_PATCH_FIELDS = [
@@ -45,6 +47,7 @@ const COMPOSITION_PATCH_FIELDS = [
   "width",
   "height",
   "background",
+  "layout",
   "updatedAt",
 ] as const;
 
@@ -52,6 +55,7 @@ const LAYER_PATCH_FIELDS = [
   "name",
   "source",
   "transform",
+  "cellIndex",
   "visible",
   "locked",
   "updatedAt",
@@ -59,7 +63,7 @@ const LAYER_PATCH_FIELDS = [
 
 type LayerPatchField = (typeof LAYER_PATCH_FIELDS)[number];
 
-const OPTIONAL_LAYER_FIELDS: readonly LayerPatchField[] = ["name", "visible", "locked"];
+const OPTIONAL_LAYER_FIELDS: readonly LayerPatchField[] = ["name", "cellIndex", "visible", "locked"];
 const VARIANT_KEYS: readonly VariantKey[] = ["A", "B", "C", "D"];
 
 type FamilyCommand = Extract<
@@ -102,6 +106,93 @@ function requireArray(
   label: string,
 ): ProjectCommandDiagnostic | undefined {
   return Array.isArray(value) ? undefined : invalidPatch(`${label} must be an array.`, path);
+}
+
+function validateCompositionLayout(
+  value: unknown,
+  width: unknown,
+  height: unknown,
+  path: string,
+): ProjectCommandDiagnostic | undefined {
+  const recordDiagnostic = requirePlainRecord(value, path, "Composition layout");
+  if (recordDiagnostic) return recordDiagnostic;
+  const record = value as Record<string, unknown>;
+  const fields = new Map<string, unknown>();
+  for (const key of Reflect.ownKeys(record)) {
+    if (typeof key !== "string") return invalidPatch("Composition layout cannot use symbol fields.", path);
+    const descriptor = Object.getOwnPropertyDescriptor(record, key);
+    if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+      return invalidPatch("Composition layout fields must be own enumerable data properties.", `${path}.${key}`);
+    }
+    fields.set(key, descriptor.value);
+  }
+  const mode = fields.get("mode");
+  if (mode === "free") {
+    return fields.size === 1
+      ? undefined
+      : invalidPatch("Free composition layout accepts only mode.", path);
+  }
+  if (mode !== "grid") {
+    return invalidPatch("Composition layout mode must be free or grid.", `${path}.mode`);
+  }
+  const allowed = new Set(["mode", "rows", "columns", "gap"]);
+  for (const key of fields.keys()) {
+    if (!allowed.has(key)) return invalidPatch(`Field ${key} is not valid on a grid layout.`, `${path}.${key}`);
+  }
+  if (fields.size !== allowed.size) {
+    return invalidPatch("Grid layout requires mode, rows, columns and gap.", path);
+  }
+  const rows = fields.get("rows");
+  const columns = fields.get("columns");
+  const gap = fields.get("gap");
+  for (const [key, candidate] of [["rows", rows], ["columns", columns]] as const) {
+    if (!Number.isSafeInteger(candidate) || (candidate as number) < 1 || (candidate as number) > MAX_COMPOSITION_GRID_TRACKS) {
+      return invalidPatch(
+        `Grid ${key} must be a safe integer from 1 to ${MAX_COMPOSITION_GRID_TRACKS}.`,
+        `${path}.${key}`,
+      );
+    }
+  }
+  if (!Number.isSafeInteger(gap) || (gap as number) < 0 || (gap as number) > MAX_COMPOSITION_GRID_GAP) {
+    return invalidPatch(
+      `Grid gap must be a safe integer from 0 to ${MAX_COMPOSITION_GRID_GAP}.`,
+      `${path}.gap`,
+    );
+  }
+  if (
+    typeof width === "number" && typeof height === "number" &&
+    (gap as number) * ((columns as number) - 1) >= width
+  ) {
+    return invalidPatch("Grid column gaps leave no usable cell width.", `${path}.gap`);
+  }
+  if (
+    typeof width === "number" && typeof height === "number" &&
+    (gap as number) * ((rows as number) - 1) >= height
+  ) {
+    return invalidPatch("Grid row gaps leave no usable cell height.", `${path}.gap`);
+  }
+  return undefined;
+}
+
+function validateLayerCellIndex(
+  value: unknown,
+  composition: unknown,
+  path: string,
+): ProjectCommandDiagnostic | undefined {
+  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) >= 144) {
+    return invalidPatch("Layer cellIndex must be a safe integer from 0 to 143.", path);
+  }
+  if (!isPlainRecord(composition) || !isPlainRecord(composition.layout)) return undefined;
+  const layout = composition.layout;
+  if (
+    layout.mode === "grid" &&
+    Number.isSafeInteger(layout.rows) &&
+    Number.isSafeInteger(layout.columns) &&
+    (value as number) >= (layout.rows as number) * (layout.columns as number)
+  ) {
+    return invalidPatch("Layer cellIndex must address a cell in the composition grid.", path);
+  }
+  return undefined;
 }
 
 function duplicatePayloadIds(
@@ -201,6 +292,15 @@ function validateCompositionCreatePayload(
     "Composition layerIds",
   );
   if (layerIdsDiagnostic) return layerIdsDiagnostic;
+  if (hasOwn(composition, "layout")) {
+    const layoutDiagnostic = validateCompositionLayout(
+      composition.layout,
+      composition.width,
+      composition.height,
+      "$.composition.layout",
+    );
+    if (layoutDiagnostic) return layoutDiagnostic;
+  }
   const layers = command.layers as unknown as readonly unknown[];
   const duplicateLayer = duplicatePayloadIds(layers, "layers", "$.layers");
   if (duplicateLayer) return duplicateLayer;
@@ -246,6 +346,14 @@ function validateCompositionCreatePayload(
         `$.layers[${index}].compositionId`,
         entityReference("compositions", compositionId),
       );
+    }
+    if (hasOwn(layer, "cellIndex")) {
+      const cellDiagnostic = validateLayerCellIndex(
+        layer.cellIndex,
+        composition,
+        `$.layers[${index}].cellIndex`,
+      );
+      if (cellDiagnostic) return cellDiagnostic;
     }
     const sourceDiagnostic = validateLayerSourceReference(
       original,
@@ -342,6 +450,14 @@ function validateLayerAddPayload(
       entityReference("compositions", command.compositionId),
     );
   }
+  if (hasOwn(layer, "cellIndex")) {
+    const cellDiagnostic = validateLayerCellIndex(
+      layer.cellIndex,
+      original.compositions[command.compositionId],
+      "$.layer.cellIndex",
+    );
+    if (cellDiagnostic) return cellDiagnostic;
+  }
   return validateLayerSourceReference(original, layer.source, "$.layer.source");
 }
 
@@ -382,6 +498,7 @@ function applyLayerAdd(
 
 function validateLayerPatch(
   original: StudioProject,
+  layer: Layer,
   patch: unknown,
 ): ProjectCommandDiagnostic | undefined {
   const patchDiagnostic = requirePlainRecord(patch, "$.patch", "layer.update patch");
@@ -402,6 +519,14 @@ function validateLayerPatch(
     if (key === "source" && value !== undefined) {
       const sourceDiagnostic = validateLayerSourceReference(original, value, "$.patch.source");
       if (sourceDiagnostic) return sourceDiagnostic;
+    }
+    if (key === "cellIndex" && value !== undefined) {
+      const cellDiagnostic = validateLayerCellIndex(
+        value,
+        original.compositions[layer.compositionId],
+        "$.patch.cellIndex",
+      );
+      if (cellDiagnostic) return cellDiagnostic;
     }
   }
   return undefined;
@@ -505,6 +630,16 @@ function validateCompositionPatch(
     }
   }
 
+  if (hasOwn(patchRecord, "layout")) {
+    const layoutDiagnostic = validateCompositionLayout(
+      read("layout"),
+      width,
+      height,
+      "$.patch.layout",
+    );
+    if (layoutDiagnostic) return layoutDiagnostic;
+  }
+
   if (hasOwn(patchRecord, "updatedAt") && !isISO8601Timestamp(read("updatedAt"))) {
     return invalidPatch(
       "Composition updatedAt must be an ISO-8601 timestamp with a timezone.",
@@ -591,7 +726,7 @@ function applyLayerUpdate(
       missingEntityDiagnostic("compositions", layer.compositionId, "$.layer.compositionId"),
     ]);
   }
-  const patchDiagnostic = validateLayerPatch(original, command.patch);
+  const patchDiagnostic = validateLayerPatch(original, layer, command.patch);
   if (patchDiagnostic) return commandFailure(original, [patchDiagnostic]);
 
   const previous = original.layers[command.layerId] as unknown as Record<string, unknown>;

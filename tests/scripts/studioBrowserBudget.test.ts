@@ -14,8 +14,8 @@ function passingSmoke() {
     budgets: {
       idleWindowMs: 5_000,
       idleRafRequests: 0,
-      interactionSamplesMs: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
-      interactionTransitions: Array.from({ length: 4 }, (_, run) => workspaceIds.map((workspaceId) => ({
+      interactionSamplesMs: Array.from({ length: 40 }, (_, index) => 10 + (index % 20)),
+      interactionTransitions: Array.from({ length: 8 }, (_, run) => workspaceIds.map((workspaceId) => ({
         run,
         workspaceId,
         finalHash: `#/studio/${workspaceId}`,
@@ -55,7 +55,7 @@ describe("browser performance and accessibility budgets", () => {
       metrics: {
         idleRafRequests: 0,
         inputToPaintP95Ms: 28,
-        verifiedTransitionCount: 20,
+        verifiedTransitionCount: 40,
         unlabeledInteractiveCount: 0,
       },
     });
@@ -64,9 +64,11 @@ describe("browser performance and accessibility budgets", () => {
   it("fails every exceeded performance/a11y dimension and invalid evidence", () => {
     const failing = passingSmoke();
     failing.budgets.idleRafRequests = 2;
-    failing.budgets.interactionSamplesMs[18] = 51;
-    failing.budgets.interactionSamplesMs[19] = 52;
-    failing.budgets.inputToPaintP95Ms = 51;
+    failing.budgets.interactionSamplesMs[36] = 51;
+    failing.budgets.interactionSamplesMs[37] = 52;
+    failing.budgets.interactionSamplesMs[38] = 53;
+    failing.budgets.interactionSamplesMs[39] = 54;
+    failing.budgets.inputToPaintP95Ms = 52;
     failing.budgets.longTaskMaxMs = 101;
     failing.budgets.longTaskTotalMs = 101;
     failing.budgets.accessibility.unlabeledInteractiveCount = 1;
@@ -137,6 +139,36 @@ describe("browser performance and accessibility budgets", () => {
       status: "fail",
       reason: "browser-budget-unavailable",
     });
+  });
+
+  it("retries only an isolated temporal overage and keeps both measurements visible", async () => {
+    const temporalFailure = passingSmoke();
+    temporalFailure.budgets.interactionSamplesMs[36] = 60;
+    temporalFailure.budgets.interactionSamplesMs[37] = 61;
+    temporalFailure.budgets.interactionSamplesMs[38] = 62;
+    temporalFailure.budgets.interactionSamplesMs[39] = 70;
+    temporalFailure.budgets.inputToPaintP95Ms = 61;
+    const runBrowserSmoke = vi.fn()
+      .mockResolvedValueOnce(temporalFailure)
+      .mockResolvedValueOnce(passingSmoke());
+    await expect(runBrowserBudgetCheck("ratchet", { runBrowserSmoke })).resolves.toMatchObject({
+      status: "pass",
+      retry: {
+        attemptCount: 2,
+        firstInputToPaintP95Ms: 61,
+        firstExceeded: ["inputToPaintP95Ms"],
+      },
+    });
+    expect(runBrowserSmoke).toHaveBeenCalledTimes(2);
+
+    const accessibilityFailure = passingSmoke();
+    accessibilityFailure.budgets.accessibility.mainLandmarkCount = 0;
+    const noRetry = vi.fn().mockResolvedValue(accessibilityFailure);
+    await expect(runBrowserBudgetCheck("ratchet", { runBrowserSmoke: noRetry })).resolves.toMatchObject({
+      status: "fail",
+      exceeded: ["mainLandmarkCount"],
+    });
+    expect(noRetry).toHaveBeenCalledTimes(1);
   });
 
   it("parses only allowlisted profiles", () => {

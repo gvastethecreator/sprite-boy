@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
+
 import {
   allocatePort,
   cleanupBrowserRuntime,
@@ -15,30 +16,64 @@ import {
   waitForPreview,
 } from "./studio-browser-smoke.mjs";
 
-const DESKTOP_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-26/a2-compose-layers.png";
-const COMPACT_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-26/a2-compose-layers-compact.png";
+const DESKTOP_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-30/b1-00-canvas-grid.png";
+const NARROW_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-30/b1-00-canvas-grid-narrow.png";
+const SETTINGS_SCREENSHOT = "artifacts/quality/EDITOR/2026-07-30/b1-00-canvas-settings-narrow.png";
 
 async function capture(client, outputPath) {
-  const result = await client.send("Page.captureScreenshot", {
-    format: "png",
-    captureBeyondViewport: false,
-  });
+  const result = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
   const bytes = Buffer.from(result.data, "base64");
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, bytes);
-  return {
-    bytes: bytes.byteLength,
-    sha256: createHash("sha256").update(bytes).digest("hex"),
-  };
+  return { bytes: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
+async function injectImage(client, input) {
+  const result = await client.evaluate(`(async () => {
+    const cellIndex = ${input.cellIndex};
+    const source = document.createElement('canvas');
+    source.width = 96;
+    source.height = 48;
+    const context = source.getContext('2d');
+    if (!context) return { ok: false, reason: 'canvas-2d' };
+    context.fillStyle = '${input.color}';
+    context.fillRect(0, 0, 96, 48);
+    context.fillStyle = '#ffffff';
+    context.fillRect(${input.cellIndex === 0 ? 8 : 56}, 8, 32, 32);
+    const blob = await new Promise((resolveBlob) => source.toBlob(resolveBlob, 'image/png'));
+    if (!(blob instanceof Blob)) return { ok: false, reason: 'blob' };
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([blob], '${input.name}', { type: 'image/png', lastModified: cellIndex + 1 }));
+    if ('${input.method}' === 'drop') {
+      const target = document.querySelector('[data-compose-grid-cell="${input.cellIndex}"]');
+      if (!(target instanceof HTMLElement)) return { ok: false, reason: 'drop-target' };
+      target.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+      return { ok: true, method: 'drop' };
+    }
+    const add = document.querySelector('button[aria-label^="Add image to cell ${input.cellIndex + 1},"]');
+    const file = document.querySelector('input[aria-label="Import images into Compose"]');
+    if (!(add instanceof HTMLButtonElement) || !(file instanceof HTMLInputElement)) {
+      return { ok: false, reason: 'picker-target' };
+    }
+    add.focus();
+    add.click();
+    Object.defineProperty(file, 'files', { configurable: true, value: transfer.files });
+    file.dispatchEvent(new Event('change', { bubbles: true }));
+    return { ok: true, method: 'picker' };
+  })()`);
+  if (!result?.ok) throw new Error(`Compose image injection failed: ${JSON.stringify(result)}`);
+  return result;
 }
 
 export async function runComposeBootstrapBrowserGate(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const desktopPath = resolve(cwd, options.desktopScreenshot ?? DESKTOP_SCREENSHOT);
-  const compactPath = resolve(cwd, options.compactScreenshot ?? COMPACT_SCREENSHOT);
+  const narrowPath = resolve(cwd, options.narrowScreenshot ?? NARROW_SCREENSHOT);
+  const settingsPath = resolve(cwd, options.settingsScreenshot ?? SETTINGS_SCREENSHOT);
   const port = await allocatePort();
   const baseUrl = `http://127.0.0.1:${port}`;
-  const profile = mkdtempSync(join(tmpdir(), "sprite-boy-a102-browser-"));
+  const profile = mkdtempSync(join(tmpdir(), "sprite-boy-canvas-first-browser-"));
   let vite;
   let chrome;
   let client;
@@ -56,7 +91,6 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
       "--disable-extensions",
       "--disable-renderer-backgrounding",
       "--disable-sync",
-      "--metrics-recording-only",
       "--no-default-browser-check",
       "--no-first-run",
       "--remote-debugging-port=0",
@@ -73,24 +107,26 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
       client.send("Network.enable"),
       client.send("Accessibility.enable"),
     ]);
-    stage = "navigate-empty-compose";
-    await client.send("Page.navigate", { url: `${baseUrl}/#/studio/compose` });
-    await client.waitFor(`document.body.innerText.includes("Start a composition")`, 60_000);
-    stage = "wait-startup-runtime";
-    await client.waitFor(`(() => {
-      const button = [...document.querySelectorAll('button')].find((candidate) => candidate.textContent?.trim() === 'Import image');
-      return Boolean(button && !button.disabled);
-    })()`, 60_000);
 
-    const emptyState = await client.evaluate(`(() => ({
-      heading: document.querySelector('#compose-bootstrap-title')?.textContent?.trim(),
-      importLabel: document.querySelector('input[aria-label="Import image into Compose"]')?.getAttribute('accept'),
-      projectButton: document.querySelector('button[aria-label="Project"]')?.textContent?.trim(),
+    stage = "blank-canvas";
+    await client.send("Page.navigate", { url: `${baseUrl}/` });
+    await client.waitFor(`Boolean(document.querySelector('[data-compose-canvas-stage]'))`, 60_000);
+    stage = "blank-settings";
+    await client.waitFor(`Boolean(document.querySelector('form[aria-label="Canvas settings"]'))`, 60_000);
+    const empty = await client.evaluate(`(() => ({
+      route: location.hash,
+      heading: document.querySelector('#compose-canvas-title')?.textContent?.trim() ?? null,
+      mode: document.querySelector('[data-compose-layout-mode]')?.getAttribute('data-compose-layout-mode'),
+      size: document.querySelector('[data-compose-layout-mode]')?.innerText?.match(/\\d+\\s*×\\s*\\d+/)?.[0] ?? null,
+      layerCount: document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length,
+      dropSurface: Boolean(document.querySelector('[data-compose-drop-surface]')),
+      lightweightCanvas: Boolean(document.querySelector('[data-compose-lightweight-canvas]')),
+      settings: Boolean(document.querySelector('form[aria-label="Canvas settings"]')),
       horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      verticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight
+      verticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight,
     }))()`);
 
-    stage = "open-rename";
+    stage = "rename-project";
     await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
     await client.waitFor(`Boolean(document.querySelector('[data-project-rename-trigger]'))`);
     await client.evaluate(`document.querySelector('[data-project-rename-trigger]')?.click()`);
@@ -98,224 +134,179 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
     const renamed = await client.evaluate(`(() => {
       const input = document.querySelector('#studio-project-name');
       if (!(input instanceof HTMLInputElement)) return false;
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-      setter?.call(input, 'Atlas Studio');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Canvas Studio');
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.closest('form')?.requestSubmit();
       return true;
     })()`);
-    if (!renamed) throw new Error("A1-02 browser rename controls are unavailable.");
-    stage = "commit-rename";
-    await client.waitFor(`document.querySelector('button[aria-label="Project"]')?.textContent?.includes("Atlas Studio")`);
+    if (!renamed) throw new Error("Project rename controls are unavailable.");
+    await client.waitFor(`document.querySelector('button[aria-label="Project"]')?.textContent?.includes('Canvas Studio')`);
     await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
 
-    stage = "inject-invalid-import";
+    stage = "recover-invalid-image";
     const invalidInjected = await client.evaluate(`(() => {
-      const input = document.querySelector('input[aria-label="Import image into Compose"]');
+      const input = document.querySelector('input[aria-label="Import images into Compose"]');
       if (!(input instanceof HTMLInputElement)) return false;
       const transfer = new DataTransfer();
-      transfer.items.add(new File([
-        new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
-      ], 'broken.png', { type: 'image/png', lastModified: 1 }));
+      transfer.items.add(new File([new Uint8Array([137,80,78,71,13,10,26,10])], 'broken.png', { type: 'image/png' }));
       Object.defineProperty(input, 'files', { configurable: true, value: transfer.files });
       input.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     })()`);
-    if (!invalidInjected) throw new Error("A1-02 invalid browser import could not be injected.");
-    await client.waitFor(`document.querySelector('main [role="alert"]')?.textContent?.includes("could not be decoded")`, 60_000);
-    const invalidFeedback = await client.evaluate(`(() => {
-      const alert = document.querySelector('main [role="alert"]');
+    if (!invalidInjected) throw new Error("Invalid image fixture could not be injected.");
+    await client.waitFor(`document.querySelector('[data-compose-canvas-first] [role="alert"]')?.textContent?.includes('could not be decoded')`, 60_000);
+    const recovery = await client.evaluate(`(() => {
+      const alert = document.querySelector('[data-compose-canvas-first] [role="alert"]');
       return {
-        message: alert?.textContent?.trim() ?? null,
         focused: document.activeElement === alert,
+        canvasPreserved: Boolean(document.querySelector('[data-compose-canvas-stage]')),
+        chooseAnother: Boolean([...alert.querySelectorAll('button')].find((button) => button.textContent?.includes('Choose another'))),
       };
     })()`);
 
-    stage = "drop-valid-import";
-    const imported = await client.evaluate(`(async () => {
-      const target = document.querySelector('section[aria-labelledby="compose-bootstrap-title"]');
-      if (!(target instanceof HTMLElement)) return false;
-      const canvas = document.createElement('canvas');
-      canvas.width = 64;
-      canvas.height = 32;
-      const context = canvas.getContext('2d');
-      if (!context) return false;
-      context.fillStyle = '#7c3aed';
-      context.fillRect(0, 0, 64, 32);
-      context.fillStyle = '#f8fafc';
-      context.fillRect(8, 6, 20, 18);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-      if (!(blob instanceof Blob)) return false;
-      const transfer = new DataTransfer();
-      transfer.items.add(new File([blob], 'atlas-hero.png', { type: 'image/png', lastModified: 1 }));
-      target.dispatchEvent(new DragEvent('drop', {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: transfer,
-      }));
+    stage = "grid-imports";
+    await client.evaluate(`[...document.querySelectorAll('[role="radio"]')].find((button) => button.textContent?.includes('Grid'))?.click()`);
+    await client.waitFor(`document.querySelectorAll('[data-compose-grid-cell]').length === 4`);
+    await client.evaluate(`(() => {
+      const first = document.querySelector('[data-compose-grid-cell="0"]');
+      if (!(first instanceof HTMLButtonElement)) return false;
+      first.focus();
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
       return true;
     })()`);
-    if (!imported) throw new Error("A1-02 browser import could not be injected.");
-    stage = "wait-composition";
-    await client.waitFor(`Boolean(document.querySelector('[data-compose-canvas]'))`, 60_000);
-    const importOutcome = await client.evaluate(`(() => ({
-      ready: Boolean(document.querySelector('[data-compose-canvas]')),
-      alert: document.querySelector('main [role="alert"]')?.textContent?.trim() ?? null,
-      mainText: document.querySelector('main')?.innerText?.slice(-500) ?? ''
+    await client.waitFor(`document.activeElement === document.querySelector('[data-compose-grid-cell="1"]') && document.activeElement?.getAttribute('aria-selected') === 'true'`);
+    await client.evaluate(`document.querySelector('[data-compose-grid-cell="1"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))`);
+    await client.waitFor(`document.activeElement === document.querySelector('[data-compose-grid-cell="0"]') && document.activeElement?.getAttribute('aria-selected') === 'true'`);
+    const keyboardNavigation = await client.evaluate(`(() => ({
+      ok: document.activeElement === document.querySelector('[data-compose-grid-cell="0"]'),
+      tabStops: [...document.querySelectorAll('[data-compose-grid-cell]')].filter((cell) => cell.tabIndex === 0).length,
     }))()`);
-    if (!importOutcome.ready) {
-      throw new Error(`import failed: ${importOutcome.alert ?? importOutcome.mainText}`);
-    }
-    stage = "wait-autosave";
-    await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
-    await client.waitFor(`document.body.innerText.includes("Saved locally")`, 60_000);
-    await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
+    stage = "grid-first-import";
+    const firstImport = await injectImage(client, { cellIndex: 0, name: "hero-a.png", color: "#6d5dfc", method: "drop" });
+    await client.waitFor(`document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length === 1`, 60_000);
+    stage = "grid-second-import";
+    const secondImport = await injectImage(client, { cellIndex: 1, name: "hero-b.png", color: "#ef5da8", method: "picker" });
+    await client.waitFor(`document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length === 2`, 60_000);
+    stage = "success-focus";
+    await client.waitFor(`document.activeElement?.getAttribute('aria-label')?.startsWith('Add image to cell 2,')`, 30_000);
+    const successFocus = await client.evaluate(`document.activeElement?.getAttribute('aria-label') ?? null`);
+    await client.waitFor(`document.querySelector('[data-compose-grid-cell="0"]')?.getAttribute('data-compose-cell-occupancy') === '1' && document.querySelector('[data-compose-grid-cell="1"]')?.getAttribute('data-compose-cell-occupancy') === '1'`);
 
-    stage = "edit-layers";
-    const layerEdited = await client.evaluate(`(() => {
-      const duplicate = document.querySelector('button[aria-label="Duplicate layer"]');
-      if (!(duplicate instanceof HTMLButtonElement)) return false;
-      duplicate.click();
+    stage = "resize-canvas";
+    const settingsApplied = await client.evaluate(`(() => {
+      const ratio = document.querySelector('select[id^="composition-ratio-"]');
+      if (!(ratio instanceof HTMLSelectElement)) return false;
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(ratio, '16:9');
+      ratio.dispatchEvent(new Event('change', { bubbles: true }));
+      ratio.closest('form')?.requestSubmit();
       return true;
     })()`);
-    if (!layerEdited) throw new Error("Compose layer controls were unavailable.");
-    await client.waitFor(`document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length === 2`);
-    const layerXEntered = await client.evaluate(`(() => {
-      const x = document.querySelector('input[aria-label="Layer X"]');
-      if (!(x instanceof HTMLInputElement)) return false;
-      const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-      x.focus();
-      inputSetter?.call(x, '7');
-      x.dispatchEvent(new Event('input', { bubbles: true }));
-      return true;
-    })()`);
-    if (!layerXEntered) throw new Error("Compose layer X control was unavailable.");
-    await client.waitFor(`document.querySelector('input[aria-label="Layer X"]')?.value === '7'`);
+    if (!settingsApplied) throw new Error("Canvas settings controls are unavailable.");
+    await client.waitFor(`document.querySelector('[data-compose-layout-mode]')?.innerText?.includes('512 × 288')`, 60_000);
+    await client.waitFor(`document.querySelector('input[aria-label="Layer Y"]')?.value === '72'`, 60_000);
+    await client.waitForNetworkIdle();
+
+    const composed = await client.evaluate(`(() => ({
+      projectName: document.querySelector('button[aria-label="Project"]')?.textContent?.trim() ?? null,
+      mode: document.querySelector('[data-compose-layout-mode]')?.getAttribute('data-compose-layout-mode'),
+      rows: document.querySelector('select[aria-label="Grid rows"]')?.value,
+      columns: document.querySelector('select[aria-label="Grid columns"]')?.value,
+      size: document.querySelector('[data-compose-layout-mode]')?.innerText?.match(/\\d+\\s*×\\s*\\d+/)?.[0] ?? null,
+      layerCount: document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length,
+      occupiedCells: [...document.querySelectorAll('[data-compose-grid-cell]')].filter((cell) => cell.getAttribute('data-compose-cell-occupancy') === '1').length,
+      selectedLayerY: document.querySelector('input[aria-label="Layer Y"]')?.value,
+      fileInputCount: document.querySelectorAll('input[aria-label="Import images into Compose"]').length,
+      durableUrlText: /(?:blob:|data:image)/.test(document.body.innerText),
+      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      verticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+    }))()`);
+    const accessibility = summarizeAccessibilityTree((await client.send("Accessibility.getFullAXTree")).nodes);
+    const desktop = await capture(client, desktopPath);
+
+    stage = "edit-layer-controls";
     const layerControlsApplied = await client.evaluate(`(() => {
       const x = document.querySelector('input[aria-label="Layer X"]');
       const opacity = document.querySelector('input[aria-label="Layer opacity"]');
-      if (!(x instanceof HTMLInputElement) || !(opacity instanceof HTMLInputElement)) {
-        return { ok: false, reason: 'inputs', arias: [...document.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label')).filter(Boolean) };
-      }
-      const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      if (!(x instanceof HTMLInputElement) || !(opacity instanceof HTMLInputElement)) return false;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(x, '380');
+      x.dispatchEvent(new Event('input', { bubbles: true }));
       x.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
       x.blur();
+      setter?.call(opacity, '55');
       const opacityRoot = opacity.closest('[data-toolcraft-slider]');
       opacityRoot?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-      inputSetter?.call(opacity, '55');
       opacity.dispatchEvent(new Event('input', { bubbles: true }));
       opacityRoot?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-      const hide = document.querySelector('button[aria-label^="Hide "][aria-label$=" copy"]');
-      const lock = document.querySelector('button[aria-label^="Lock "][aria-label$=" copy"]');
-      if (!(hide instanceof HTMLButtonElement) || !(lock instanceof HTMLButtonElement)) {
-        return { ok: false, reason: 'buttons', arias: [...document.querySelectorAll('[data-compose-layers] button[aria-label]')].map((node) => node.getAttribute('aria-label')) };
-      }
+      const hide = document.querySelector('button[aria-label^="Hide "]');
+      const lock = document.querySelector('button[aria-label^="Lock "]');
+      if (!(hide instanceof HTMLButtonElement) || !(lock instanceof HTMLButtonElement)) return false;
       hide.click();
       lock.click();
-      return { ok: true };
+      return true;
     })()`);
-    if (!layerControlsApplied?.ok) throw new Error(`Compose layer edits could not be applied: ${JSON.stringify(layerControlsApplied)}`);
-    await client.waitFor(`Boolean(document.querySelector('button[aria-label^="Show "][aria-label$=" copy"]')) && Boolean(document.querySelector('button[aria-label^="Unlock "][aria-label$=" copy"]'))`);
+    if (!layerControlsApplied) throw new Error("Compose layer controls were unavailable.");
+    await client.waitFor(`document.querySelector('input[aria-label="Layer X"]')?.value === '380' && document.querySelector('input[aria-label="Layer opacity"]')?.value === '55' && Boolean(document.querySelector('button[aria-label^="Show "]')) && Boolean(document.querySelector('button[aria-label^="Unlock "]'))`);
+    const layerEdits = await client.evaluate(`(() => ({
+      x: document.querySelector('input[aria-label="Layer X"]')?.value,
+      opacity: document.querySelector('input[aria-label="Layer opacity"]')?.value,
+      hidden: Boolean(document.querySelector('button[aria-label^="Show "]')),
+      locked: Boolean(document.querySelector('button[aria-label^="Unlock "]')),
+      detached: !document.body.innerText.includes('A position or scale change detaches this layer from the cell.'),
+    }))()`);
+    stage = "save-layer-controls";
     await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
     await client.waitFor(`Boolean(document.querySelector('[data-command-id="project.save"]:not(:disabled)'))`);
     await client.evaluate(`document.querySelector('[data-command-id="project.save"]')?.click()`);
     await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
-    await client.waitFor(`document.body.innerText.includes("Saved locally")`, 60_000);
+    await client.waitFor(`document.body.innerText.includes('Saved locally')`, 60_000);
     await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
-
-    const composed = await client.evaluate(`(() => ({
-      heading: document.querySelector('#compose-bootstrap-title')?.textContent?.trim(),
-      body: document.body.innerText,
-      projectName: document.querySelector('button[aria-label="Project"]')?.textContent?.trim(),
-      sourceButtons: document.querySelectorAll('[data-compose-sources] > li > button').length,
-      layerCount: document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length,
-      selectedLayerX: document.querySelector('input[aria-label="Layer X"]')?.value,
-      selectedLayerOpacity: document.querySelector('input[aria-label="Layer opacity"]')?.value,
-      selectedLayerLocked: Boolean(document.querySelector('button[aria-label^="Unlock "][aria-label$=" copy"]')),
-      selectedLayerHidden: Boolean(document.querySelector('button[aria-label^="Show "][aria-label$=" copy"]')),
-      settingsVisible: Boolean(document.querySelector('form[aria-label="Canvas settings"]')),
-      fileInputCount: document.querySelectorAll('input[aria-label="Import image into Compose"]').length,
-      durableUrlText: /(?:blob:|data:image)/.test(document.body.innerText),
-      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      verticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight
-    }))()`);
-    const accessibility = summarizeAccessibilityTree(
-      (await client.send("Accessibility.getFullAXTree")).nodes,
-    );
-    const desktop = await capture(client, desktopPath);
 
     stage = "reload";
     await client.send("Page.reload", { ignoreCache: false });
-    await client.waitFor(`Boolean(document.querySelector('[data-compose-canvas]'))`, 60_000);
-    await client.waitFor(
-      `Boolean(document.querySelector('form[aria-label="Canvas settings"]'))`,
-      30_000,
-    );
-    await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
-    await client.waitFor(`document.body.innerText.includes("Saved locally")`, 60_000);
+    await client.waitFor(`document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length === 2`, 60_000);
+    await client.waitFor(`document.querySelectorAll('[data-compose-grid-cell]').length === 4`, 60_000);
     const reloaded = await client.evaluate(`(() => ({
-      projectName: document.querySelector('button[aria-label="Project"]')?.textContent?.trim(),
-      heading: document.querySelector('#compose-bootstrap-title')?.textContent?.trim(),
-      sourceButtons: document.querySelectorAll('[data-compose-sources] > li > button').length,
+      route: location.hash,
+      projectName: document.querySelector('button[aria-label="Project"]')?.textContent?.trim() ?? null,
+      mode: document.querySelector('[data-compose-layout-mode]')?.getAttribute('data-compose-layout-mode'),
+      size: document.querySelector('[data-compose-layout-mode]')?.innerText?.match(/\\d+\\s*×\\s*\\d+/)?.[0] ?? null,
       layerCount: document.querySelectorAll('[data-compose-layers] [aria-label^="Select "]').length,
+      occupiedCells: [...document.querySelectorAll('[data-compose-grid-cell]')].filter((cell) => cell.getAttribute('data-compose-cell-occupancy') === '1').length,
+      selectedLayerY: document.querySelector('input[aria-label="Layer Y"]')?.value,
       selectedLayerX: document.querySelector('input[aria-label="Layer X"]')?.value,
       selectedLayerOpacity: document.querySelector('input[aria-label="Layer opacity"]')?.value,
-      selectedLayerLocked: Boolean(document.querySelector('button[aria-label^="Unlock "][aria-label$=" copy"]')),
-      selectedLayerHidden: Boolean(document.querySelector('button[aria-label^="Show "][aria-label$=" copy"]')),
-      saved: document.body.innerText.includes('Saved locally'),
-      openProjectDisabled: document.querySelector('[data-command-id="project.open"]')?.disabled === true,
-      openProjectReason: document.querySelector('[data-command-id="project.open"]')?.getAttribute('title'),
-      settingsVisible: Boolean(document.querySelector('form[aria-label="Canvas settings"]'))
+      selectedLayerHidden: Boolean(document.querySelector('button[aria-label^="Show "]')),
+      selectedLayerLocked: Boolean(document.querySelector('button[aria-label^="Unlock "]')),
     }))()`);
-    const durableAsset = await client.evaluate(`(async () => {
+    const durableAssets = await client.evaluate(`(async () => {
       const { IndexedDbAssetRepository } = await import('/core/assets/index.ts');
       const projectId = localStorage.getItem('sprite-boy-studio:active-project:v1');
-      if (!projectId) return null;
+      if (!projectId) return [];
       const repository = new IndexedDbAssetRepository(projectId);
       try {
-        const records = await repository.list();
-        if (records.length !== 1) return { count: records.length };
-        const record = records[0];
-        const blob = await repository.getBlob(record.id);
-        return {
-          count: 1,
-          name: record.name,
-          width: record.width,
-          height: record.height,
-          mimeType: blob.type,
-          byteSize: blob.size,
-        };
+        return (await repository.list()).map((record) => ({ name: record.name, width: record.width, height: record.height })).sort((a, b) => a.name.localeCompare(b.name));
       } finally {
         repository.dispose();
       }
     })()`);
-    reloaded.durableAsset = durableAsset;
-    await client.evaluate(`document.querySelector('button[aria-label="Project"]')?.click()`);
 
-    stage = "compact";
-    await client.send("Emulation.setDeviceMetricsOverride", {
-      width: 900,
-      height: 700,
-      deviceScaleFactor: 1,
-      mobile: false,
-    });
-    await client.waitFor(`Boolean(document.querySelector('[role="toolbar"][aria-label="Compact Studio panels"]'))`);
-    const compactOpen = await client.evaluate(`(() => {
-      const toolbar = document.querySelector('[role="toolbar"][aria-label="Compact Studio panels"]');
-      const properties = toolbar && [...toolbar.querySelectorAll('button')]
-        .find((button) => button.textContent?.includes('Properties'));
-      properties?.click();
-      return { toolbar: Boolean(toolbar), properties: Boolean(properties) };
-    })()`);
-    await client.waitFor(`Boolean(document.querySelector('[role="dialog"] form[aria-label="Canvas settings"]'))`);
-    const compact = await client.evaluate(`(() => ({
-      dialog: Boolean(document.querySelector('[role="dialog"]')),
-      canvasSettings: Boolean(document.querySelector('[role="dialog"] form[aria-label="Canvas settings"]')),
+    await client.evaluate(`document.querySelector('button[aria-label^="Unlock "]')?.click(); document.querySelector('button[aria-label^="Show "]')?.click();`);
+    await client.waitFor(`Boolean(document.querySelector('button[aria-label^="Lock "]')) && Boolean(document.querySelector('button[aria-label^="Hide "]'))`);
+
+    stage = "narrow";
+    await client.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: false });
+    await client.waitFor(`innerWidth === 390 && document.querySelectorAll('[data-compose-grid-cell]').length === 4`);
+    const narrowState = await client.evaluate(`(() => ({
+      canvas: Boolean(document.querySelector('[data-compose-canvas-stage]')),
+      canvasSettingsButton: Boolean([...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Canvas settings')),
       horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       verticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight,
-      focusedElement: document.activeElement?.tagName
     }))()`);
-    const compactCapture = await capture(client, compactPath);
+    const narrow = await capture(client, narrowPath);
+    await client.evaluate(`([...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Canvas settings'))?.click()`);
+    await client.waitFor(`Boolean(document.querySelector('[role="dialog"] form[aria-label="Canvas settings"]'))`, 30_000);
+    const settings = await capture(client, settingsPath);
 
     const runtime = {
       consoleErrorCount: client.consoleErrorCount,
@@ -325,82 +316,60 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
       httpErrorCount: client.httpErrorCount,
     };
     if (
-      emptyState.heading !== "Start a composition"
-      || emptyState.importLabel !== "image/png,image/jpeg,image/webp"
-      || emptyState.horizontalOverflow
-      || emptyState.verticalOverflow
-      || invalidFeedback.message !== "Image source could not be decoded."
-      || !invalidFeedback.focused
-      || composed.heading !== "atlas-hero.png composition"
-      || !composed.projectName?.includes("Atlas Studio")
-      || composed.sourceButtons !== 1
-      || composed.layerCount !== 2
-      || composed.selectedLayerX !== "7"
-      || composed.selectedLayerOpacity !== "55"
-      || !composed.selectedLayerLocked
-      || !composed.selectedLayerHidden
-      || composed.fileInputCount !== 1
-      || composed.durableUrlText
-      || composed.horizontalOverflow
-      || composed.verticalOverflow
-      || !composed.settingsVisible
-      || accessibility.unlabeledInteractiveCount !== 0
-      || accessibility.mainLandmarkCount !== 1
-      || !reloaded.projectName?.includes("Atlas Studio")
-      || reloaded.heading !== "atlas-hero.png composition"
-      || reloaded.sourceButtons !== 1
-      || reloaded.layerCount !== 2
-      || reloaded.selectedLayerX !== "7"
-      || reloaded.selectedLayerOpacity !== "55"
-      || !reloaded.selectedLayerLocked
-      || !reloaded.selectedLayerHidden
-      || !reloaded.saved
-      || !reloaded.openProjectDisabled
-      || reloaded.openProjectReason !== "Portable project opening is not available in Compose yet."
-      || !reloaded.settingsVisible
-      || reloaded.durableAsset?.count !== 1
-      || reloaded.durableAsset?.name !== "atlas-hero.png"
-      || reloaded.durableAsset?.width !== 64
-      || reloaded.durableAsset?.height !== 32
-      || reloaded.durableAsset?.mimeType !== "image/png"
-      || !(reloaded.durableAsset?.byteSize > 8)
-      || !compactOpen.toolbar
-      || !compactOpen.properties
-      || !compact.dialog
-      || !compact.canvasSettings
-      || compact.horizontalOverflow
-      || compact.verticalOverflow
-      || Object.values(runtime).some((count) => count !== 0)
-    ) throw new Error(`A1-02 browser evidence failed closed: ${JSON.stringify({
-      emptyState,
-      invalidFeedback,
-      composed: { ...composed, body: undefined },
-      reloaded,
-      compactOpen,
-      compact,
-      accessibility,
-      runtime,
-    })}`);
+      empty.route !== "#/studio/compose" || empty.heading !== "Untitled composition" || empty.mode !== "free" ||
+      empty.size !== "512 × 512" || empty.layerCount !== 0 || !empty.dropSurface || !empty.lightweightCanvas || !empty.settings ||
+      empty.horizontalOverflow || empty.verticalOverflow ||
+      !recovery.focused || !recovery.canvasPreserved || !recovery.chooseAnother ||
+      !keyboardNavigation.ok || keyboardNavigation.tabStops !== 1 ||
+      firstImport.method !== "drop" || secondImport.method !== "picker" ||
+      !successFocus?.startsWith("Add image to cell 2,") ||
+      !composed.projectName?.includes("Canvas Studio") || composed.mode !== "grid" || composed.rows !== "2" ||
+      composed.columns !== "2" || composed.size !== "512 × 288" || composed.layerCount !== 2 ||
+      composed.occupiedCells !== 2 || composed.selectedLayerY !== "72" || composed.fileInputCount !== 1 ||
+      composed.durableUrlText || composed.horizontalOverflow || composed.verticalOverflow ||
+      accessibility.unlabeledInteractiveCount !== 0 || accessibility.mainLandmarkCount !== 1 ||
+      reloaded.route !== "#/studio/compose" || !reloaded.projectName?.includes("Canvas Studio") ||
+      reloaded.mode !== "grid" || reloaded.size !== "512 × 288" || reloaded.layerCount !== 2 ||
+      reloaded.occupiedCells !== 2 || reloaded.selectedLayerY !== "72" ||
+      layerEdits.x !== "380" || layerEdits.opacity !== "55" || !layerEdits.hidden || !layerEdits.locked || !layerEdits.detached ||
+      reloaded.selectedLayerX !== "380" || reloaded.selectedLayerOpacity !== "55" || !reloaded.selectedLayerHidden || !reloaded.selectedLayerLocked ||
+      JSON.stringify(durableAssets) !== JSON.stringify([
+        { name: "hero-a.png", width: 96, height: 48 },
+        { name: "hero-b.png", width: 96, height: 48 },
+      ]) ||
+      !narrowState.canvas || !narrowState.canvasSettingsButton || narrowState.horizontalOverflow || narrowState.verticalOverflow ||
+      Object.values(runtime).some((count) => count !== 0)
+    ) {
+      throw new Error(`Canvas-first browser evidence failed closed: ${JSON.stringify({
+        empty, recovery, keyboardNavigation, firstImport, secondImport, successFocus, composed, layerEdits, accessibility, reloaded, durableAssets, narrowState, runtime,
+      })}`);
+    }
 
     stage = "accepted";
     return Object.freeze({
       status: "pass",
       url: `${baseUrl}/#/studio/compose`,
-      viewports: ["1440x900", "900x700"],
-      emptyState,
-      invalidFeedback,
-      composed: { ...composed, body: undefined },
+      viewports: ["1440x900", "390x844"],
+      empty,
+      recovery,
+      keyboardNavigation,
+      imports: [firstImport, secondImport],
+      successFocus,
+      composed,
+      layerEdits,
       accessibility,
       reloaded,
-      compact,
-      desktopScreenshot: { path: DESKTOP_SCREENSHOT, ...desktop },
-      compactScreenshot: { path: COMPACT_SCREENSHOT, ...compactCapture },
+      durableAssets,
+      narrow: narrowState,
+      desktopScreenshot: { path: desktopPath, ...desktop },
+      narrowScreenshot: { path: narrowPath, ...narrow },
+      settingsScreenshot: { path: settingsPath, ...settings },
       ...runtime,
     });
   } catch (error) {
     throw new Error(`${stage}: ${error instanceof Error ? error.message : "unknown browser failure"}`);
   } finally {
-    await cleanupBrowserRuntime(client, chrome, vite, profile, "A1-02 browser cleanup failed.");
+    await cleanupBrowserRuntime(client, chrome, vite, profile, "Canvas-first browser cleanup failed.");
   }
 }
 
@@ -408,11 +377,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     process.stdout.write(`${JSON.stringify(await runComposeBootstrapBrowserGate())}\n`);
   } catch (error) {
-    process.stderr.write(`${JSON.stringify({
-      status: "fail",
-      check: "a2-compose-layers-browser",
-      message: error instanceof Error ? error.message : "unknown",
-    })}\n`);
+    process.stderr.write(`${error instanceof Error ? error.message : "Canvas-first browser gate failed."}\n`);
     process.exitCode = 1;
   }
 }

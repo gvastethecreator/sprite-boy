@@ -756,9 +756,12 @@ const AppLayout: React.FC = () => {
       if (restored && restored !== "assets" && restored !== activeWorkspace) navigate(restored);
       return;
     }
-    if (canonicalProject.workspace.activeWorkspace !== activeWorkspace) {
-      canonical.setActiveWorkspace(activeWorkspace);
-    }
+    if (canonicalProject.workspace.activeWorkspace === activeWorkspace) return;
+    const timeoutId = window.setTimeout(() => {
+      const current = canonical.store.getSnapshot().project.workspace.activeWorkspace;
+      if (current !== activeWorkspace) canonical.setActiveWorkspace(activeWorkspace);
+    }, 100);
+    return () => window.clearTimeout(timeoutId);
   }, [
     activeWorkspace,
     canonical,
@@ -773,9 +776,10 @@ const AppLayout: React.FC = () => {
   }, [canonicalCanvasOwnership, clearLegacyCanvasInteractionState]);
 
   useEffect(() => {
+    if (activeWorkspace === "animate" && !canonicalSequenceAvailable) return;
     const legacyMode = LEGACY_MODE_BY_WORKSPACE[activeWorkspace];
     if (currentMode !== legacyMode) handleSetMode(legacyMode);
-  }, [activeWorkspace, currentMode, handleSetMode]);
+  }, [activeWorkspace, canonicalSequenceAvailable, currentMode, handleSetMode]);
 
   useEffect(() => {
     setCompactPanel(null);
@@ -929,8 +933,9 @@ const AppLayout: React.FC = () => {
       const targetOwnsCanonicalCanvas = workspaceId === "slice" ||
         (workspaceId === "export" && canonicalSliceSourceAvailable);
       if (targetOwnsCanonicalCanvas) clearLegacyCanvasInteractionState();
-      handleSetMode(LEGACY_MODE_BY_WORKSPACE[workspaceId]);
-      canonical.setActiveWorkspace(workspaceId);
+      if (workspaceId !== "animate" || canonicalSequenceAvailable) {
+        handleSetMode(LEGACY_MODE_BY_WORKSPACE[workspaceId]);
+      }
       navigate(workspaceId);
     },
     resetCanvas: () => canvasRef.current?.resetView(),
@@ -1499,7 +1504,21 @@ const AppLayout: React.FC = () => {
               aria-label={`${activeWorkspaceDefinition.label} workspace content`}
               className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-            {activeWorkspace === "compose" ? (
+            {!canonicalSequenceAvailable ? (
+              <section
+                aria-hidden={activeWorkspace !== "animate"}
+                className={`absolute inset-0 flex min-h-0 items-center justify-center bg-workspace p-6 ${activeWorkspace === "animate" ? "visible" : "invisible pointer-events-none"}`}
+                aria-label="Frame alignment"
+              >
+                <div className="max-w-md rounded-xl border border-white/10 bg-panel p-6 text-center">
+                  <h1 className="text-base font-semibold text-textMain">No frames to align</h1>
+                  <p className="mt-2 text-xs leading-relaxed text-textMuted">
+                    Import a video in Slice to create a sequence, then return here to edit each frame.
+                  </p>
+                </div>
+              </section>
+            ) : null}
+            {activeWorkspace === "animate" && !canonicalSequenceAvailable ? null : activeWorkspace === "compose" ? (
               <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Compose…</div>}>
                 <ComposeBootstrapWorkspace
                   key={canonicalProject.id}
@@ -1509,6 +1528,7 @@ const AppLayout: React.FC = () => {
                   disabled={canonical.persistenceState === "loading"}
                   onBusyChange={setComposeImportBusy}
                   onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                  onOpenCanvasSettings={() => setCompactPanel("properties")}
                   onCompositionReady={() => navigate("compose")}
                 />
               </React.Suspense>
@@ -1609,37 +1629,44 @@ const AppLayout: React.FC = () => {
           )}
         </div>
 
-        {showPropertiesPanel && !isCompactLayout && (
+        {canonicalCompositionId && !isCompactLayout ? (
+          <StudioPanel
+            label="Properties"
+            variant="sidebar"
+            hidden={!showComposeProperties}
+            className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
+          >
+            <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+              <CompositionCanvasSettingsInspector
+                store={canonical.store}
+                compositionId={canonicalCompositionId}
+              />
+            </React.Suspense>
+          </StudioPanel>
+        ) : null}
+
+        {showPropertiesPanel && !showComposeProperties && !isCompactLayout ? (
           <StudioPanel
             label="Properties"
             variant="sidebar"
             className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
           >
-            {showComposeProperties && canonicalCompositionId ? (
-              <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                <CompositionCanvasSettingsInspector
-                  store={canonical.store}
-                  compositionId={canonicalCompositionId}
-                />
-              </React.Suspense>
-            ) : (
-              activeWorkspace === "slice"
-                ? <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                    <SlicePropertiesPanel
-                      controller={sliceGridController}
-                      store={canonical.store}
-                      assets={canonical.assets}
-                      eyedropperActive={isEyedropperActive}
-                      onEyedropperActiveChange={setIsEyedropperActive}
-                      onCleanupDebtChange={canonical.reportAssetCleanupDebt}
-                    />
-                  </React.Suspense>
-                : <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                    <RightSidebar />
-                  </React.Suspense>
-            )}
+            {activeWorkspace === "slice"
+              ? <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                  <SlicePropertiesPanel
+                    controller={sliceGridController}
+                    store={canonical.store}
+                    assets={canonical.assets}
+                    eyedropperActive={isEyedropperActive}
+                    onEyedropperActiveChange={setIsEyedropperActive}
+                    onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                  />
+                </React.Suspense>
+              : <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
+                  <RightSidebar />
+                </React.Suspense>}
           </StudioPanel>
-        )}
+        ) : null}
       </div>
 
       <StudioDialog

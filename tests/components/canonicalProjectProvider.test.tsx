@@ -38,6 +38,7 @@ function Probe() {
       <output aria-label="Project identity">{project.id}</output>
       <output aria-label="Project name">{project.name}</output>
       <output aria-label="Workspace">{project.workspace.activeWorkspace ?? "none"}</output>
+      <output aria-label="Composition count">{project.rootOrder.compositionIds.length}</output>
       <output aria-label="Persistence">{runtime.persistenceState}</output>
       <button type="button" onClick={() => runtime.renameProject("Renamed project")}>Rename</button>
       <button type="button" onClick={() => runtime.history.undo()}>Undo</button>
@@ -124,6 +125,7 @@ describe("CanonicalProjectProvider", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "New" }));
     await waitFor(() => expect(screen.getByLabelText("Project name")).toHaveTextContent("Fresh project"));
+    expect(screen.getByLabelText("Composition count")).toHaveTextContent("1");
     expect(screen.getByLabelText("Project identity")).not.toHaveTextContent("project-provider");
     expect(repositories).toHaveLength(2);
     expect(repositories[0]?.dispose).toHaveBeenCalledTimes(1);
