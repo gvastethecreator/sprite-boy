@@ -76,14 +76,14 @@ const Timeline: React.FC = () => {
     }
   }, [playbackFrameIndex, isAnimationMode, isPlaying]);
 
-  // Slicer Sources: Representan la grilla base. Ahora son reactivos a los slots.
+  // Slicer sources represent the base grid and react to slot changes.
   const slicerSources = useMemo(() => {
     return frames.map((f) => {
       const slot = builderSlots?.[f.id];
       const asset = slot ? builderAssets?.find((a) => a.id === slot.assetId) : null;
       return {
         id: f.id,
-        type: asset ? "slot" : "frame", // Si hay asset, se comporta como un slot renderizable
+        type: asset ? "slot" : "frame", // Assets behave as renderable slots.
         src: asset ? asset.src : imageMeta?.src,
         flipX: slot?.flipX,
         flipY: slot?.flipY,

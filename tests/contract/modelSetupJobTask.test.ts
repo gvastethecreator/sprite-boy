@@ -56,7 +56,7 @@ describe("model setup job task (M1-02)", () => {
     });
     await expect(unknown(context)).rejects.toMatchObject({
       code: "runtime-failure",
-      message: "No se pudo preparar el modelo local.",
+      message: "The local model could not be prepared.",
     });
   });
 });

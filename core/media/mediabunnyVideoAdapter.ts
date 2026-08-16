@@ -32,7 +32,7 @@ interface OpenVideo {
 }
 
 function cancelledError(cause?: unknown): VideoMediaError {
-  return new VideoMediaError("VIDEO_CANCELLED", "La extracción de video fue cancelada.", { cause });
+  return new VideoMediaError("VIDEO_CANCELLED", "Video extraction was cancelled.", { cause });
 }
 
 function assertNotAborted(signal?: AbortSignal): void {
@@ -41,10 +41,10 @@ function assertNotAborted(signal?: AbortSignal): void {
 
 function assertBlob(blob: Blob): void {
   if (!(blob instanceof Blob) || blob.size <= 0) {
-    throw new VideoMediaError("VIDEO_INVALID_INPUT", "Selecciona un archivo de video con contenido.");
+    throw new VideoMediaError("VIDEO_INVALID_INPUT", "Choose a non-empty video file.");
   }
   if (blob.size > VIDEO_IMPORT_LIMITS.maxFileBytes) {
-    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "El archivo de video excede el límite permitido.", {
+    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "The video file exceeds the allowed size.", {
       details: { byteSize: blob.size, maxFileBytes: VIDEO_IMPORT_LIMITS.maxFileBytes },
     });
   }
@@ -58,11 +58,11 @@ function mapReadError(error: unknown, signal?: AbortSignal): VideoMediaError {
   if (error instanceof VideoMediaError) return error;
   if (signal?.aborted || error instanceof InputDisposedError) return cancelledError(error);
   if (error instanceof UnsupportedInputFormatError) {
-    return new VideoMediaError("VIDEO_UNSUPPORTED_FORMAT", "El formato del archivo no se puede leer.", {
+    return new VideoMediaError("VIDEO_UNSUPPORTED_FORMAT", "The file format cannot be read.", {
       cause: error,
     });
   }
-  return new VideoMediaError("VIDEO_DECODE_FAILED", "No se pudo leer el video.", { cause: error });
+  return new VideoMediaError("VIDEO_DECODE_FAILED", "The video could not be read.", { cause: error });
 }
 
 async function encodeCanvasAsPng(canvas: WrappedCanvas["canvas"]): Promise<Blob> {
@@ -75,16 +75,16 @@ async function encodeCanvasAsPng(canvas: WrappedCanvas["canvas"]): Promise<Blob>
       if (blob) return blob;
     }
   } catch (error) {
-    throw new VideoMediaError("VIDEO_ENCODE_FAILED", "No se pudo codificar el frame como PNG.", {
+    throw new VideoMediaError("VIDEO_ENCODE_FAILED", "The frame could not be encoded as PNG.", {
       cause: error,
     });
   }
-  throw new VideoMediaError("VIDEO_ENCODE_FAILED", "El navegador no puede codificar este frame.");
+  throw new VideoMediaError("VIDEO_ENCODE_FAILED", "The browser cannot encode this frame.");
 }
 
 function validateDimensions(width: number, height: number): void {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) {
-    throw new VideoMediaError("VIDEO_INVALID_INPUT", "La pista de video tiene dimensiones inválidas.");
+    throw new VideoMediaError("VIDEO_INVALID_INPUT", "The video track has invalid dimensions.");
   }
   const pixels = width * height;
   if (
@@ -92,7 +92,7 @@ function validateDimensions(width: number, height: number): void {
     height > VIDEO_IMPORT_LIMITS.maxDimension ||
     pixels > VIDEO_IMPORT_LIMITS.maxFramePixels
   ) {
-    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "Las dimensiones del video exceden el límite.", {
+    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "The video dimensions exceed the allowed limit.", {
       details: { width, height, maxDimension: VIDEO_IMPORT_LIMITS.maxDimension },
     });
   }
@@ -116,12 +116,12 @@ export class MediabunnyVideoAdapter {
       if (!opened.preflight.decodable) {
         throw new VideoMediaError(
           "VIDEO_CODEC_UNSUPPORTED",
-          `El navegador no puede decodificar el códec ${opened.preflight.track.codec}.`,
+          `The browser cannot decode the ${opened.preflight.track.codec} codec.`,
           { details: { codec: opened.preflight.track.codec } },
         );
       }
       if (options.range.endUs > opened.preflight.durationUs) {
-        throw new VideoMediaError("VIDEO_INVALID_INPUT", "El rango supera la duración del video.");
+        throw new VideoMediaError("VIDEO_INVALID_INPUT", "The range exceeds the video duration.");
       }
 
       const timestampsUs = selectVideoFrameTimestamps(
@@ -135,7 +135,7 @@ export class MediabunnyVideoAdapter {
         timestampsUs.length > VIDEO_IMPORT_LIMITS.maxOutputFrames ||
         outputPixels > VIDEO_IMPORT_LIMITS.maxOutputPixels
       ) {
-        throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "La extracción produciría demasiados frames.", {
+        throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "The extraction would produce too many frames.", {
           details: {
             frameCount: timestampsUs.length,
             maxOutputFrames: VIDEO_IMPORT_LIMITS.maxOutputFrames,
@@ -149,7 +149,7 @@ export class MediabunnyVideoAdapter {
       const actualTimestamps = timestampsUs.map((timestampUs) => {
         const seconds = opened.actualSecondsByTimestampUs.get(timestampUs);
         if (seconds === undefined) {
-          throw new VideoMediaError("VIDEO_FRAME_UNAVAILABLE", "No se encontró el tiempo del frame.");
+          throw new VideoMediaError("VIDEO_FRAME_UNAVAILABLE", "The frame timestamp is unavailable.");
         }
         return seconds;
       });
@@ -160,12 +160,12 @@ export class MediabunnyVideoAdapter {
       for await (const wrapped of sink.canvasesAtTimestamps(actualTimestamps)) {
         assertNotAborted(options.signal);
         if (!wrapped) {
-          throw new VideoMediaError("VIDEO_FRAME_UNAVAILABLE", "No se pudo decodificar uno de los frames.");
+          throw new VideoMediaError("VIDEO_FRAME_UNAVAILABLE", "One of the frames could not be decoded.");
         }
         const blob = await encodeCanvasAsPng(wrapped.canvas);
         assertNotAborted(options.signal);
         if (blob.size <= 0 || blob.type !== "image/png") {
-          throw new VideoMediaError("VIDEO_ENCODE_FAILED", "El PNG del frame está vacío o es inválido.");
+          throw new VideoMediaError("VIDEO_ENCODE_FAILED", "The frame PNG is empty or invalid.");
         }
         const timestampUs = timestampsUs[index];
         frames.push({
@@ -185,7 +185,7 @@ export class MediabunnyVideoAdapter {
       }
 
       if (frames.length !== timestampsUs.length) {
-        throw new VideoMediaError("VIDEO_FRAME_UNAVAILABLE", "La extracción devolvió menos frames de los pedidos.");
+        throw new VideoMediaError("VIDEO_FRAME_UNAVAILABLE", "The extraction returned fewer frames than requested.");
       }
       return frames;
     } catch (error) {
@@ -200,7 +200,7 @@ export class MediabunnyVideoAdapter {
     assertNotAborted(signal);
     assertBlob(blob);
     if (!Number.isSafeInteger(trackIndex) || trackIndex < 0) {
-      throw new VideoMediaError("VIDEO_TRACK_NOT_FOUND", "El índice de pista no es válido.");
+      throw new VideoMediaError("VIDEO_TRACK_NOT_FOUND", "The track index is invalid.");
     }
 
     const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
@@ -209,15 +209,15 @@ export class MediabunnyVideoAdapter {
 
     try {
       if (!(await input.canRead())) {
-        throw new VideoMediaError("VIDEO_UNSUPPORTED_FORMAT", "El formato del archivo no se puede leer.");
+        throw new VideoMediaError("VIDEO_UNSUPPORTED_FORMAT", "The file format cannot be read.");
       }
       const tracks = await input.getVideoTracks();
       if (tracks.length === 0) {
-        throw new VideoMediaError("VIDEO_TRACK_MISSING", "El archivo no contiene una pista de video.");
+        throw new VideoMediaError("VIDEO_TRACK_MISSING", "The file does not contain a video track.");
       }
       const track = tracks[trackIndex];
       if (!track) {
-        throw new VideoMediaError("VIDEO_TRACK_NOT_FOUND", "La pista de video elegida no existe.", {
+        throw new VideoMediaError("VIDEO_TRACK_NOT_FOUND", "The selected video track does not exist.", {
           details: { trackIndex, trackCount: tracks.length },
         });
       }
@@ -242,7 +242,7 @@ export class MediabunnyVideoAdapter {
         secondsToMicroseconds(end),
       );
       if (durationUs > VIDEO_IMPORT_LIMITS.maxDurationUs) {
-        throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "La duración del video excede el límite.", {
+        throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "The video duration exceeds the allowed limit.", {
           details: { durationUs, maxDurationUs: VIDEO_IMPORT_LIMITS.maxDurationUs },
         });
       }
@@ -258,14 +258,14 @@ export class MediabunnyVideoAdapter {
         sampleTimestampsUs.push(timestampUs);
         actualSecondsByTimestampUs.set(timestampUs, packet.timestamp);
         if (sampleTimestampsUs.length > VIDEO_IMPORT_LIMITS.maxMetadataFrames) {
-          throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "El video contiene demasiados frames.", {
+          throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "The video contains too many frames.", {
             details: { maxMetadataFrames: VIDEO_IMPORT_LIMITS.maxMetadataFrames },
           });
         }
       }
       sampleTimestampsUs.sort((left, right) => left - right);
       if (sampleTimestampsUs.length === 0) {
-        throw new VideoMediaError("VIDEO_TRACK_MISSING", "La pista de video no contiene frames visibles.");
+        throw new VideoMediaError("VIDEO_TRACK_MISSING", "The video track contains no visible frames.");
       }
 
       let decodable = false;

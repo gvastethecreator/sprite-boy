@@ -55,7 +55,7 @@ function contained(root: string, target: string): boolean {
 
 function safePath(root: string, path: string): string {
   const target = resolve(root, path);
-  if (!contained(root, target)) throw portError("invalid-input", "La ruta del modelo no es segura.", false);
+  if (!contained(root, target)) throw portError("invalid-input", "The model path is not safe.", false);
   return target;
 }
 
@@ -68,7 +68,7 @@ async function ensureDirectory(root: string, relativePath: string): Promise<stri
     });
     const info = await lstat(current);
     if (!info.isDirectory() || info.isSymbolicLink()) {
-      throw portError("storage-failed", "El directorio del modelo no es seguro.", false);
+      throw portError("storage-failed", "The model directory is not safe.", false);
     }
   }
   return current;
@@ -78,13 +78,13 @@ async function prepareRoot(root: string, model: LocalModelDefinition): Promise<{
   await mkdir(root, { recursive: true });
   const rootInfo = await lstat(root);
   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) {
-    throw portError("storage-failed", "El directorio de modelos no es seguro.", false);
+    throw portError("storage-failed", "The models directory is not safe.", false);
   }
   const canonicalRoot = await realpath(root);
   const modelRoot = await ensureDirectory(canonicalRoot, model.id);
   const canonicalModelRoot = await realpath(modelRoot);
   if (!contained(canonicalRoot, canonicalModelRoot)) {
-    throw portError("storage-failed", "El directorio del modelo sale del almacén local.", false);
+    throw portError("storage-failed", "The model directory escapes the local store.", false);
   }
   return { root: canonicalRoot, modelRoot: canonicalModelRoot };
 }
@@ -197,10 +197,10 @@ async function downloadFile(options: {
     response = await options.fetch(options.file.downloadUrl, { headers, signal: options.signal });
   } catch (error) {
     if (options.signal.aborted) throw error;
-    throw portError("download-failed", `Falló la descarga de ${options.file.path}.`, true);
+    throw portError("download-failed", `Failed to download ${options.file.path}.`, true);
   }
   if (!response.ok || !response.body) {
-    throw portError("download-failed", `El servidor rechazó ${options.file.path}.`, response.status >= 500);
+    throw portError("download-failed", `The server rejected ${options.file.path}.`, response.status >= 500);
   }
   if (offset > 0 && (response.status !== 206 || responseStart(response) !== offset)) {
     offset = 0;
@@ -216,12 +216,12 @@ async function downloadFile(options: {
         chunk = await reader.read();
       } catch (error) {
         if (options.signal.aborted) throw error;
-        throw portError("download-failed", `Se cortó la descarga de ${options.file.path}.`, true);
+        throw portError("download-failed", `The download of ${options.file.path} was interrupted.`, true);
       }
       const { done, value } = chunk;
       if (done) break;
       if (downloaded + value.byteLength > options.file.byteSize) {
-        throw portError("verification-failed", `El tamaño de ${options.file.path} no coincide.`, true);
+        throw portError("verification-failed", `The size of ${options.file.path} does not match.`, true);
       }
       await handle.write(value);
       downloaded += value.byteLength;
@@ -237,12 +237,12 @@ async function downloadFile(options: {
   }
   const info = await stat(partial);
   if (info.size !== options.file.byteSize) {
-    throw portError("download-failed", `La descarga de ${options.file.path} quedó incompleta.`, true);
+    throw portError("download-failed", `The download of ${options.file.path} is incomplete.`, true);
   }
   const digest = await digestFile(partial, info.size, options.file.digest.algorithm);
   if (digest !== options.file.digest.value) {
     await rm(partial, { force: true });
-    throw portError("verification-failed", `La firma de ${options.file.path} no coincide.`, true);
+    throw portError("verification-failed", `The signature of ${options.file.path} does not match.`, true);
   }
   await rm(target, { force: true });
   await rename(partial, target);
@@ -285,7 +285,7 @@ export function createNodeModelSetupPort(options: NodeModelSetupOptions): ModelS
       const markerPath = safePath(prepared.modelRoot, MODEL_DOWNLOAD_MARKER);
       const errorPath = safePath(prepared.modelRoot, MODEL_ERROR_MARKER);
       if (!await hasLicense(model, prepared.modelRoot)) {
-        throw portError("license-required", "Acepta la licencia del modelo antes de descargarlo.", false);
+        throw portError("license-required", "Accept the model license before downloading it.", false);
       }
       await rm(errorPath, { force: true });
       await atomicJson(markerPath, downloadMarker(model, requestId, now()));
@@ -317,18 +317,18 @@ export function createNodeModelSetupPort(options: NodeModelSetupOptions): ModelS
           smoke = await options.smoke.run({ model, modelsRoot: prepared.root, signal });
         } catch (error) {
           if (signal.aborted) throw error;
-          throw portError("smoke-failed", "La prueba local del modelo falló.", true);
+          throw portError("smoke-failed", "The local model smoke test failed.", true);
         }
         if (
           smoke.status !== "passed"
           || !model.runtime.preferredBackends.includes(smoke.backend)
           || smoke.catalogFingerprint !== modelCatalogFingerprint(model)
-        ) throw portError("smoke-failed", "La prueba local del modelo falló.", true);
+        ) throw portError("smoke-failed", "The local model smoke test failed.", true);
         if (signal.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
         const manifest = createModelInstallManifest(model, { installedAt, files, smoke });
         await atomicJson(manifestPath, manifest);
         await rm(markerPath, { force: true });
-        onProgress({ ratio: 1, phase: "smoke", message: `${model.label} listo` });
+        onProgress({ ratio: 1, phase: "smoke", message: `${model.label} ready` });
         return manifest;
       } catch (error) {
         await rm(markerPath, { force: true }).catch(() => undefined);
@@ -337,7 +337,7 @@ export function createNodeModelSetupPort(options: NodeModelSetupOptions): ModelS
           await atomicJson(errorPath, errorMarker(model, code, now())).catch(() => undefined);
         }
         if (error instanceof ModelSetupPortError || signal.aborted) throw error;
-        throw portError("storage-failed", "No se pudo escribir el modelo local.", true);
+        throw portError("storage-failed", "The local model could not be written.", true);
       }
     },
   });

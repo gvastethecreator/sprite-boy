@@ -47,26 +47,26 @@ export interface RenderContext {
 }
 
 /**
- * Calcula las dimensiones exactas de las celdas basadas en la grilla.
- * Aplica márgenes externos y espaciado (gap) interno entre celdas.
+ * Calculates exact cell dimensions from the grid.
+ * Applies outer margins and internal spacing between cells.
  */
 /** Pre-computes derived grid geometry (cell size, total cols/rows) from image dimensions and GridConfig. */
 export function calculateGeometry(width: number, height: number, grid: GridConfig) {
   const { rows, cols, marginX, marginY, paddingX, paddingY } = grid;
 
-  // El gap total es el espacio entre celdas (cols - 1)
+  // Total gap is the space between cells (cols - 1).
   const totalGapW = Math.max(0, paddingX * (cols - 1));
   const totalGapH = Math.max(0, paddingY * (rows - 1));
 
-  // Los márgenes son hacia adentro desde ambos lados
+  // Margins extend inward from both sides.
   const totalMarginW = marginX * 2;
   const totalMarginH = marginY * 2;
 
-  // Espacio disponible real para el contenido de las celdas
+  // Actual space available for cell content.
   const availableW = width - totalMarginW - totalGapW;
   const availableH = height - totalMarginH - totalGapH;
 
-  // Tamaño de cada celda (mínimo 1px para evitar errores de división)
+  // Size of each cell (at least 1 px to avoid division errors).
   const cellW = Math.max(1, availableW / cols);
   const cellH = Math.max(1, availableH / rows);
 
@@ -191,23 +191,23 @@ export class CanvasRenderer {
       builderGrid,
     );
 
-    // Dibujar guías de la grilla
+    // Draw grid guides.
     if (currentMode === AppMode.BUILDER && rows * cols < 5000) {
       ctx.save();
       ctx.beginPath();
       ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
       ctx.lineWidth = 1 / scale;
 
-      // Líneas horizontales
+      // Horizontal lines.
       for (let r = 0; r <= rows; r++) {
         const y = marginY + r * (cellH + paddingY);
-        // Ajuste para que la última línea no sume un padding extra
+        // Keep the final line from adding extra padding.
         const finalY = r === rows ? marginY + r * cellH + Math.max(0, r - 1) * paddingY : y;
         ctx.moveTo(marginX, finalY);
         ctx.lineTo(width - marginX, finalY);
       }
 
-      // Líneas verticales
+      // Vertical lines.
       for (let c = 0; c <= cols; c++) {
         const x = marginX + c * (cellW + paddingX);
         const finalX = c === cols ? marginX + c * cellW + Math.max(0, c - 1) * paddingX : x;

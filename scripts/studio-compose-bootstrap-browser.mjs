@@ -79,7 +79,7 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
   let client;
   let stage = "launch";
   try {
-    vite = spawnViteServer(cwd, port, "dev");
+    vite = spawnViteServer(cwd, port, "preview");
     await waitForPreview(baseUrl, vite);
     chrome = spawn(resolveChromeExecutable(options), [
       "--headless=new",
@@ -280,14 +280,26 @@ export async function runComposeBootstrapBrowserGate(options = {}) {
       selectedLayerLocked: Boolean(document.querySelector('button[aria-label^="Unlock "]')),
     }))()`);
     const durableAssets = await client.evaluate(`(async () => {
-      const { IndexedDbAssetRepository } = await import('/core/assets/index.ts');
       const projectId = localStorage.getItem('sprite-boy-studio:active-project:v1');
       if (!projectId) return [];
-      const repository = new IndexedDbAssetRepository(projectId);
+      const database = await new Promise((resolveDatabase, reject) => {
+        const request = indexedDB.open('sprite-boy-studio-assets');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolveDatabase(request.result);
+      });
       try {
-        return (await repository.list()).map((record) => ({ name: record.name, width: record.width, height: record.height })).sort((a, b) => a.name.localeCompare(b.name));
+        const entries = await new Promise((resolveEntries, reject) => {
+          const transaction = database.transaction('asset-metadata', 'readonly');
+          const request = transaction.objectStore('asset-metadata').index('by-project').getAll(projectId);
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolveEntries(request.result);
+        });
+        return entries
+          .map((entry) => entry.record)
+          .map((record) => ({ name: record.name, width: record.width, height: record.height }))
+          .sort((a, b) => a.name.localeCompare(b.name));
       } finally {
-        repository.dispose();
+        database.close();
       }
     })()`);
 

@@ -26,10 +26,14 @@ export const REPRO_BUN_VERSION = "1.3.14";
 export const REPRO_NODE_MAJOR = 24;
 export const REPRO_TIMEOUT_MS = 120_000;
 export const EXPECTED_OVERRIDES = Object.freeze({
-  "brace-expansion": "5.0.8",
-  protobufjs: "7.6.5",
-  undici: "7.28.0",
-  ws: "8.21.1",
+  "brace-expansion": "5.0.9",
+  "fast-uri": "3.1.5",
+  nanoid: "3.3.18",
+  postcss: "8.5.26",
+  protobufjs: "8.7.2",
+  undici: "8.10.0",
+  vite: "8.2.1",
+  ws: "8.21.3",
 });
 export const REPRO_INSTALL_ARGV = Object.freeze([
   "install",
@@ -42,8 +46,8 @@ export const GITATTRIBUTES_POLICY = "bun.lock text eol=lf";
 export const WORKFLOW_ACTIONS = Object.freeze([
   Object.freeze({
     name: "actions/checkout",
-    ref: "de0fac2e4500dabe0009e67214ff5f5447ce83dd",
-    version: "v6.0.2",
+    ref: "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    version: "v7.0.1",
   }),
   Object.freeze({
     name: "oven-sh/setup-bun",
@@ -52,8 +56,8 @@ export const WORKFLOW_ACTIONS = Object.freeze([
   }),
   Object.freeze({
     name: "actions/setup-node",
-    ref: "395ad3262231945c25e8478fd5baf05154b1d79f",
-    version: "v6.1.0",
+    ref: "820762786026740c76f36085b0efc47a31fe5020",
+    version: "v7.0.0",
   }),
 ]);
 

@@ -22,9 +22,9 @@ import {
 } from "../../scripts/studio-reproducibility.mjs";
 
 const ACTIONS = [
-  "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+  "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
   "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
-  "actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f",
+  "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
 ];
 const EXPECTED_INSTALL_ARGV = [
   "install",
@@ -35,10 +35,14 @@ const EXPECTED_INSTALL_ARGV = [
 const EXPECTED_TIMEOUT_MS = 120_000;
 const PINNED_BUN_RUNTIME = { runtimeVersion: "1.3.14", execPath: "C:/bun.exe" };
 const EXPECTED_OVERRIDES = {
-  "brace-expansion": "5.0.8",
-  protobufjs: "7.6.5",
-  undici: "7.28.0",
-  ws: "8.21.1",
+  "brace-expansion": "5.0.9",
+  "fast-uri": "3.1.5",
+  nanoid: "3.3.18",
+  postcss: "8.5.26",
+  protobufjs: "8.7.2",
+  undici: "8.10.0",
+  vite: "8.2.1",
+  ws: "8.21.3",
 };
 const roots: string[] = [];
 const managedReproRoots: string[] = [];

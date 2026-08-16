@@ -1,6 +1,31 @@
-# 👹 SpriteBoy Studio
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/header/document.svg?title=SpriteBoy+Studio&subtitle=Slice.+Compose.+Animate.+Export.&logo=grid3x3&theme=purple&align=center&mode=dark" />
+    <img alt="SpriteBoy Studio — slice, compose, animate, and export" src="https://shieldcn.dev/header/document.svg?title=SpriteBoy+Studio&subtitle=Slice.+Compose.+Animate.+Export.&logo=grid3x3&theme=purple&align=center&mode=light" />
+  </picture>
+</p>
 
-A web-based sprite sheet editor, animation sequencer, and sprite composition tool built with React 19 and Canvas 2D.
+<p align="center">
+  <a href="https://github.com/gvastethecreator/sprite-boy/actions/workflows/studio-quality.yml"><img alt="Studio quality status" src="https://shieldcn.dev/github/ci/gvastethecreator/sprite-boy.svg?workflow=studio-quality&branch=main&variant=secondary&size=xs" /></a>
+  <a href="https://gvastethecreator.github.io/sprite-boy/"><img alt="Project site" src="https://shieldcn.dev/badge/site-field%20guide-6c5ce7.svg?logo=githubpages&variant=branded&size=xs" /></a>
+  <a href="https://bun.sh/"><img alt="Bun 1.3.14" src="https://shieldcn.dev/badge/Bun-1.3.14-14151a.svg?logo=bun&variant=secondary&size=xs" /></a>
+  <a href="#product-tour"><img alt="Canvas 2D" src="https://shieldcn.dev/badge/render-Canvas%202D-1f8f75.svg?variant=secondary&size=xs" /></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://shieldcn.dev/github/license/gvastethecreator/sprite-boy.svg?variant=secondary&size=xs" /></a>
+</p>
+
+Local-first sprite sheet editor, animation sequencer, collision workspace, and composition tool built with React 19 and Canvas 2D.
+
+[Project site](https://gvastethecreator.github.io/sprite-boy/) · [Install](#getting-started) · [Architecture](#dual-stack-short) · [Contributing](CONTRIBUTING.md) · [Sponsor](https://github.com/sponsors/gvastethecreator) · [Ko-fi](https://ko-fi.com/gvaste)
+
+## Product tour
+
+These captures come from the real forest-scout browser journey and the committed quality fixture. They show rendered pixels and working product states, not presentation mockups.
+
+| Slice and stage | Compose a region |
+| --- | --- |
+| ![SpriteBoy Slice workspace with eight detected running frames and staged results](docs/assets/screenshots/slice-workspace.png) | ![SpriteBoy Compose workspace rendering one selected forest-scout region](docs/assets/screenshots/compose-workspace.png) |
+| **Draw collision data** | **Review and export** |
+| ![SpriteBoy Collision workspace with a hitbox over the selected frame](docs/assets/screenshots/collision-workspace.png) | ![SpriteBoy Export workspace with the eight committed frames and export formats](docs/assets/screenshots/export-workspace.png) |
 
 ## Features
 
@@ -142,3 +167,7 @@ Open the Command Palette (`Ctrl+Shift+P`) → **Tasks: Run Task** to access:
 ## License
 
 Released under the [MIT License](./LICENSE). See the file for the full text.
+
+## Support
+
+If SpriteBoy helps your asset workflow, you can [sponsor ongoing maintenance](https://github.com/sponsors/gvastethecreator) or [support continued development on Ko-fi](https://ko-fi.com/gvaste). Focused bug reports and pull requests are welcome through [GitHub Issues](https://github.com/gvastethecreator/sprite-boy/issues).

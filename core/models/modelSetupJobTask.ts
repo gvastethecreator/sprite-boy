@@ -31,7 +31,7 @@ export class ModelSetupPortError extends Error {
 
 function toJobError(error: unknown): JobTaskError {
   if (!(error instanceof ModelSetupPortError)) {
-    return new JobTaskError("runtime-failure", "No se pudo preparar el modelo local.", true);
+    return new JobTaskError("runtime-failure", "The local model could not be prepared.", true);
   }
   const code = error.code === "invalid-input" || error.code === "license-required"
     ? "invalid-input"

@@ -9,32 +9,32 @@ export const MICROSECONDS_PER_SECOND = 1_000_000;
 
 export function secondsToMicroseconds(seconds: number): number {
   if (!Number.isFinite(seconds)) {
-    throw new VideoMediaError("VIDEO_INVALID_INPUT", "El tiempo del video no es finito.");
+    throw new VideoMediaError("VIDEO_INVALID_INPUT", "The video time must be finite.");
   }
 
   const microseconds = Math.round(seconds * MICROSECONDS_PER_SECOND);
   if (!Number.isSafeInteger(microseconds)) {
-    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "El tiempo del video excede el rango seguro.");
+    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "The video time exceeds the safe range.");
   }
   return microseconds;
 }
 
 export function microsecondsToSeconds(microseconds: number): number {
   if (!Number.isSafeInteger(microseconds)) {
-    throw new VideoMediaError("VIDEO_INVALID_INPUT", "El tiempo debe ser un entero seguro.");
+    throw new VideoMediaError("VIDEO_INVALID_INPUT", "The video time must be a safe integer.");
   }
   return microseconds / MICROSECONDS_PER_SECOND;
 }
 
 export function normalizeVideoTimeline(firstTimestampUs: number, endTimestampUs: number) {
   if (!Number.isSafeInteger(firstTimestampUs) || !Number.isSafeInteger(endTimestampUs)) {
-    throw new VideoMediaError("VIDEO_INVALID_INPUT", "La línea de tiempo del video no es válida.");
+    throw new VideoMediaError("VIDEO_INVALID_INPUT", "The video timeline is invalid.");
   }
 
   const timelineOffsetUs = Math.max(0, firstTimestampUs);
   const durationUs = endTimestampUs - timelineOffsetUs;
   if (durationUs <= 0) {
-    throw new VideoMediaError("VIDEO_INVALID_INPUT", "El video no contiene una duración visible.");
+    throw new VideoMediaError("VIDEO_INVALID_INPUT", "The video has no visible duration.");
   }
   return { durationUs, timelineOffsetUs };
 }
@@ -54,7 +54,7 @@ export function validateVideoSelection(range: VideoTimeRange, sampling: VideoSam
     range.startUs < 0 ||
     range.endUs <= range.startUs
   ) {
-    throw new VideoMediaError("VIDEO_INVALID_INPUT", "El rango de extracción no es válido.");
+    throw new VideoMediaError("VIDEO_INVALID_INPUT", "The extraction range is invalid.");
   }
 
   if (
@@ -63,7 +63,7 @@ export function validateVideoSelection(range: VideoTimeRange, sampling: VideoSam
       sampling.fps <= 0 ||
       sampling.fps > VIDEO_IMPORT_LIMITS.maxSamplingFps)
   ) {
-    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "La tasa de muestreo está fuera del límite.", {
+    throw new VideoMediaError("VIDEO_LIMIT_EXCEEDED", "The sampling rate is outside the allowed range.", {
       details: { maxSamplingFps: VIDEO_IMPORT_LIMITS.maxSamplingFps },
     });
   }

@@ -94,6 +94,7 @@ describe("node model setup adapter (M1-02)", () => {
     });
     const smokeRunner = smoke();
     const progress: number[] = [];
+    const progressMessages: string[] = [];
     const port = createNodeModelSetupPort({
       root,
       fetch: fetchMock as typeof fetch,
@@ -106,7 +107,10 @@ describe("node model setup adapter (M1-02)", () => {
       modelId: tinyModel.id,
       requestId: "request-1",
       signal: new AbortController().signal,
-      onProgress: ({ ratio }) => progress.push(ratio),
+      onProgress: ({ ratio, message }) => {
+        progress.push(ratio);
+        progressMessages.push(message);
+      },
     });
 
     expect(await readFile(join(modelRoot, "model_fp16.onnx"), "utf8")).toBe("abc");
@@ -115,6 +119,7 @@ describe("node model setup adapter (M1-02)", () => {
     expect(manifest.smoke?.status).toBe("passed");
     expect(smokeRunner.run).toHaveBeenCalledOnce();
     expect(progress.at(-1)).toBe(1);
+    expect(progressMessages.at(-1)).toBe(`${tinyModel.label} ready`);
   });
 
   it("restarts from byte zero when a server ignores the requested range", async () => {
@@ -204,7 +209,7 @@ describe("node model setup adapter (M1-02)", () => {
       onProgress: () => undefined,
     })).rejects.toMatchObject({
       code: "download-failed",
-      message: "Se cortó la descarga de onnx/model_fp16.onnx.",
+      message: "The download of onnx/model_fp16.onnx was interrupted.",
     });
     expect((await stat(join(root, tinyModel.id, "onnx", "model_fp16.onnx.part"))).size).toBe(1);
     expect(JSON.parse(await readFile(join(root, tinyModel.id, MODEL_ERROR_MARKER), "utf8"))).toMatchObject({
@@ -323,7 +328,7 @@ describe("node model setup adapter (M1-02)", () => {
       onProgress: () => undefined,
     })).rejects.toMatchObject({
       code: "smoke-failed",
-      message: "La prueba local del modelo falló.",
+      message: "The local model smoke test failed.",
       retryable: true,
     });
     expect(JSON.parse(await readFile(join(root, tinyModel.id, MODEL_ERROR_MARKER), "utf8"))).toMatchObject({
