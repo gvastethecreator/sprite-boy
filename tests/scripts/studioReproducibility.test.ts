@@ -41,7 +41,7 @@ const EXPECTED_OVERRIDES = {
   postcss: "8.5.26",
   protobufjs: "8.7.2",
   undici: "8.10.0",
-  vite: "8.2.1",
+  vite: "8.2.2",
   ws: "8.21.3",
 };
 const roots: string[] = [];
