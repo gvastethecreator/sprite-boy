@@ -150,19 +150,23 @@ Workspaces: Slice · Compose · Animate · Collision · Export (hash navigation 
 
 ## VS Code Tasks
 
-Open the Command Palette (`Ctrl+Shift+P`) → **Tasks: Run Task** to access:
+Open the Command Palette (`Ctrl+Shift+P`) → **Tasks: Run Task**:
 
-| Task             | Description               |
-| ---------------- | ------------------------- |
-| 🚀 Dev Server    | Start Vite dev server     |
-| 📦 Build         | Production build with log |
-| 🔍 Lint          | Run oxlint with log       |
-| 🧪 Test          | Run vitest with log       |
-| 📊 Test Coverage | Coverage report           |
-| ✅ Typecheck     | TypeScript check          |
-| 🔎 Full Check    | Typecheck + lint          |
-| 👁️ Preview       | Preview production build  |
-| 🧹 Clean         | Remove dist & logs        |
+| Task | Description |
+| --- | --- |
+| 🚀 Dev | Start the Vite dev server |
+| 🧪 Test | Run Vitest once and log to `logs/` |
+| 👀 Test Watch | Watch mode |
+| 🧹 Lint | Run oxlint and log to `logs/` |
+| 🔧 Lint Fix | Auto-fix lint |
+| 🧠 Typecheck | TypeScript check |
+| ✅ Check | Typecheck + lint |
+| 🏗️ Build | Production build and log to `logs/` |
+| 📊 Coverage | Coverage report |
+| 👁️ Preview | Preview the production build |
+| 🚪 Studio Gates | `bun scripts/studio-gates.mjs --gate all` |
+| 🌐 E2E Gate | Browser E2E gate (needs Chrome) |
+| 🗑️ Clean | Remove `dist/` and `logs/` |
 
 ## License
 

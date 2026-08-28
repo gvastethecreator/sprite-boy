@@ -19,43 +19,6 @@
       }
     },
     {
-      "label": "🏗️ Build",
-      "type": "shell",
-      "command": "bun run build:log",
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": ["$tsc"]
-    },
-    {
-      "label": "✅ Check",
-      "type": "shell",
-      "command": "bun run check",
-      "group": "build",
-      "problemMatcher": ["$tsc"]
-    },
-    {
-      "label": "🧠 Typecheck",
-      "type": "shell",
-      "command": "bun run typecheck",
-      "group": "build",
-      "problemMatcher": ["$tsc"]
-    },
-    {
-      "label": "🧹 Lint",
-      "type": "shell",
-      "command": "bun run lint:log",
-      "group": "test",
-      "problemMatcher": ["$eslint-stylish"]
-    },
-    {
-      "label": "🔧 Lint Fix",
-      "type": "shell",
-      "command": "bun run lint:fix",
-      "group": "test"
-    },
-    {
       "label": "🧪 Test",
       "type": "shell",
       "command": "bun run test:log",
@@ -73,6 +36,43 @@
       "problemMatcher": []
     },
     {
+      "label": "🧹 Lint",
+      "type": "shell",
+      "command": "bun run lint:log",
+      "group": "test",
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "🔧 Lint Fix",
+      "type": "shell",
+      "command": "bun run lint:fix",
+      "group": "test"
+    },
+    {
+      "label": "🧠 Typecheck",
+      "type": "shell",
+      "command": "bun run typecheck",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "✅ Check",
+      "type": "shell",
+      "command": "bun run check",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "🏗️ Build",
+      "type": "shell",
+      "command": "bun run build:log",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$tsc"]
+    },
+    {
       "label": "📊 Coverage",
       "type": "shell",
       "command": "bun run test:coverage",
@@ -85,6 +85,18 @@
       "group": "build",
       "isBackground": true,
       "problemMatcher": []
+    },
+    {
+      "label": "🚪 Studio Gates",
+      "type": "shell",
+      "command": "bun scripts/studio-gates.mjs --gate all",
+      "group": "test"
+    },
+    {
+      "label": "🌐 E2E Gate",
+      "type": "shell",
+      "command": "bun scripts/studio-gates.mjs --gate e2e",
+      "group": "test"
     },
     {
       "label": "🗑️ Clean",
