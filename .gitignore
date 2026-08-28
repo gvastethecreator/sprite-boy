@@ -19,7 +19,11 @@ bun-debug.log*
 .env
 .env.*
 *.local
+.local/
 .spriteboy/models/
+
+# Operator scratch (never track Chrome profiles, cookies, caches, or notes)
+.scratch/
 
 # Editor / IDE
 .vscode/*
@@ -37,7 +41,7 @@ Thumbs.db
 # Testing
 coverage/
 .snapshots/
-.scratch/agent-cli-delegation/
+test-files/
 
 # Vite
 .vite/
