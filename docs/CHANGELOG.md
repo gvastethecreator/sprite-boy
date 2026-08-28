@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-28 — hygiene and docs English
+
+- Stopped tracking `.scratch/` (including Chrome profiles and cookie stores). Those files remain in git history until an approved rewrite.
+- Translated the integration ledger, ADRs, and control docs to American English.
+- Archived dated operator dumps locally. They are no longer on the public tree.
+- Bumped in-stack packages: lucide-react, Vite 8.2.2, Vitest 4.1.11, oxlint 1.80.0, and related types.
+
 ## 2026-08-15 — public project refresh
 
 - Updated Mediabunny to 1.54.0.
