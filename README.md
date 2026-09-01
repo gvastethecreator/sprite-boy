@@ -15,7 +15,7 @@
 
 Local-first sprite sheet editor, animation sequencer, collision workspace, and composition tool built with React 19 and Canvas 2D.
 
-[Project site](https://gvastethecreator.github.io/sprite-boy/) · [Install](#getting-started) · [Architecture](#dual-stack-short) · [Contributing](CONTRIBUTING.md) · [Sponsor](https://github.com/sponsors/gvastethecreator) · [Ko-fi](https://ko-fi.com/gvaste)
+[Project site](https://gvastethecreator.github.io/sprite-boy/) · [Install](#getting-started) · [Contributing](CONTRIBUTING.md) · [Sponsor](https://github.com/sponsors/gvastethecreator) · [Ko-fi](https://ko-fi.com/gvaste)
 
 ## Product tour
 
@@ -82,7 +82,7 @@ bun run test:watch      # Watch mode
 bun run test:coverage   # Coverage report
 ```
 
-### Linting & Type Checking
+### Linting and type checking
 
 ```bash
 bun run lint        # OXC linter
@@ -112,26 +112,16 @@ bun run test:log    # → logs/test.log
 bun run lint:log    # → logs/lint.log
 ```
 
-## Dual stack (short)
-
-The app runs **two** project stacks during migration:
-
-1. **Canonical** (`core/`, `features/`, `CanonicalProjectProvider`) — durable Studio V1 graph, package codec, jobs, Slice/Compose.
-2. **Legacy host** (`useProjectController`, `ProjectContext`, `utils/*` bridges) — builder/slicer/animation panels still on `FrameData`. **Do not grow durable logic here** (see `AGENTS.md`).
-
-Workspaces: Slice · Compose · Animate · Collision · Export (hash navigation via `core/studio/workspaceRegistry`).
-
 ## Project Structure
 
 ```
 ├── index.html / index.tsx / index.css
-├── App.tsx                 # StudioLocalStores → CanonicalProject → ProjectProvider → AppLayout
-├── AGENTS.md               # Agent/human dual-stack map + commands
+├── App.tsx                 # App shell and providers
 ├── core/                   # Project engine, stores, persistence, render, export, processing
 ├── features/
 │   ├── slice/              # Source session, grid pipeline, irregular tools, grid export
 │   ├── compose/            # Composition bootstrap + canvas settings
-│   └── collision/          # Canonical collision surface (in progress)
+│   └── collision/          # Collision surface
 ├── components/
 │   ├── layout/             # AppLayout, sidebars, timeline panel
 │   ├── canvas/             # CanvasArea, toolbar, status
@@ -139,13 +129,13 @@ Workspaces: Slice · Compose · Animate · Collision · Export (hash navigation 
 │   ├── overlays/           # Export, Settings, Help, palette, toasts
 │   ├── panels/             # Left/right inspectors
 │   └── common/             # Shared controls
-├── contexts/               # CanonicalProject, StudioStore, legacy Project
-├── hooks/                  # Legacy controller + canvas hooks (freeze durable growth)
-├── types/                  # Legacy host types + enums
-├── utils/                  # Legacy algorithms, renderUtils, db, exportFormats
+├── contexts/               # Project and studio providers
+├── hooks/                  # Controller and canvas hooks
+├── types/                  # Shared types and enums
+├── utils/                  # Algorithms, render helpers, db, export formats
 ├── tests/                  # Vitest contract/hooks/components/integration
 ├── scripts/                # studio-gates and quality smoke
-└── docs/                   # ADRs under architecture/; integration ledger under integration/
+└── docs/                   # Changelog, project site, and screenshots
 ```
 
 ## VS Code Tasks

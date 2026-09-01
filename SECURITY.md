@@ -1,18 +1,16 @@
 # Security Policy
 
-## Supported Versions
+The latest commit on `main` is the only version that receives security updates. Older versions are not patched.
 
-SpriteBoy Studio is a single-version application. The latest commit on the `main` branch is the only version that receives security updates. Older versions are not patched.
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+Do not open a public GitHub issue. Report privately:
 
-If you discover a security vulnerability, please **do not open a public GitHub issue**. Instead, report it privately:
-
-- **GitHub:** Use the "Report a vulnerability" button under the repository's Security tab to file a private security advisory.
+- **GitHub:** Use **Report a vulnerability** on the repository Security tab.
 - **Response time:** The maintainer aims to acknowledge new reports within 7 days.
-- **Disclosure:** Please give us a reasonable amount of time (typically 90 days) to investigate and ship a fix before any public disclosure.
+- **Disclosure:** Give a reasonable amount of time (typically 90 days) to investigate and ship a fix before public disclosure.
 
-When reporting, please include:
+Include:
 
 1. A clear description of the vulnerability and its impact.
 2. Reproduction steps (a minimal demo, screenshot, or screen recording is ideal).
@@ -21,18 +19,18 @@ When reporting, please include:
 
 ## Scope
 
-The following are in scope:
+In scope:
 
-- Code execution via the canvas/image pipelines (e.g. crafted PNG/JSON uploads).
+- Code execution via the canvas/image pipelines (for example, crafted PNG/JSON uploads).
 - Cross-site scripting or content injection in exported files (PNG, JSON, Phaser 3, Godot, ZIP, GIF).
 - Credential or local project-data leakage.
 - Dependency vulnerabilities reported via `bun audit` or GitHub Dependabot.
 
-## Out of Scope
+Out of scope:
 
-- Vulnerabilities in third-party services (GitHub Pages, etc.).
+- Vulnerabilities in third-party services (GitHub Pages, and similar).
 - Issues that require the user to already have compromised local access.
 
 ## Notes
 
-SpriteBoy Studio is a local-first browser app. All image processing happens client-side and no project data is uploaded to a server by the application itself.
+SpriteBoy Studio is a local-first browser app. All image processing happens client-side. The application itself does not upload project data to a server.

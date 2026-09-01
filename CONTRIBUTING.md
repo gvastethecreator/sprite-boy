@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for improving SpriteBoy Studio. Read [AGENTS.md](AGENTS.md) before editing state, persistence, rendering, or workspace behavior: the canonical and legacy stacks have different ownership rules.
+Thanks for improving SpriteBoy Studio.
 
 ## Setup
 
