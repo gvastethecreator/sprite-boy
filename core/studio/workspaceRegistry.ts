@@ -1,6 +1,9 @@
 import { WORKSPACE_IDS, type WorkspaceId } from "../project";
 
-/** Top-level destinations exposed by the unified Studio shell, in navigation order. */
+/**
+ * Workspace editors that lane steps still mount, in the order the canonical
+ * project stores them. Navigation lives in `laneRegistry.ts`.
+ */
 export const STUDIO_WORKSPACE_IDS = Object.freeze([
   "slice",
   "compose",
@@ -19,8 +22,6 @@ export const STUDIO_SUPPORT_CONTEXT_IDS = Object.freeze([
 
 export type StudioWorkspaceId = (typeof STUDIO_WORKSPACE_IDS)[number];
 export type StudioSupportContextId = (typeof STUDIO_SUPPORT_CONTEXT_IDS)[number];
-export type StudioWorkspaceHref = `#/studio/${StudioWorkspaceId}`;
-export type StudioWorkspaceCommandId = `workspace.open.${StudioWorkspaceId}`;
 
 type MissingWorkspaceId = Exclude<
   WorkspaceId,
@@ -56,8 +57,6 @@ export interface StudioWorkspaceDefinition<
   readonly order: number;
   readonly label: string;
   readonly description: string;
-  readonly href: `#/studio/${TId}`;
-  readonly commandId: `workspace.open.${TId}`;
   readonly capabilities: StudioWorkspaceCapabilities;
 }
 
@@ -77,8 +76,6 @@ function defineWorkspace<TId extends StudioWorkspaceId>(
     order,
     label: input.label,
     description: input.description,
-    href: `#/studio/${id}` as const,
-    commandId: `workspace.open.${id}` as const,
     capabilities: Object.freeze({ ...input.capabilities }),
   });
 }
@@ -140,9 +137,6 @@ export const STUDIO_WORKSPACES: readonly StudioWorkspaceDefinition[] = Object.fr
 );
 
 const WORKSPACE_ID_SET: ReadonlySet<string> = new Set(STUDIO_WORKSPACE_IDS);
-const WORKSPACE_BY_HREF: ReadonlyMap<string, StudioWorkspaceId> = new Map(
-  STUDIO_WORKSPACES.map((workspace) => [workspace.href, workspace.id]),
-);
 
 export function isStudioWorkspaceId(value: unknown): value is StudioWorkspaceId {
   return typeof value === "string" && WORKSPACE_ID_SET.has(value);
@@ -152,12 +146,6 @@ export function getStudioWorkspace(
   workspaceId: StudioWorkspaceId,
 ): StudioWorkspaceDefinition {
   return STUDIO_WORKSPACE_REGISTRY[workspaceId];
-}
-
-/** Parse only canonical hashes. Query/suffix aliases cannot create hidden routes. */
-export function parseStudioWorkspaceHref(value: unknown): StudioWorkspaceId | null {
-  if (typeof value !== "string") return null;
-  return WORKSPACE_BY_HREF.get(value) ?? null;
 }
 
 /**

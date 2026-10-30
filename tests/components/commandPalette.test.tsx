@@ -15,7 +15,7 @@ function handlers(): StudioCommandHandlers {
     importAsset: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
-    openWorkspace: vi.fn(),
+    openRoute: vi.fn(),
     resetCanvas: vi.fn(),
     openCommandPalette: vi.fn(),
     openPreferences: vi.fn(),
@@ -49,11 +49,11 @@ describe("CommandPalette registry adapter", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Search commands" }), {
       target: { value: "collision" },
     });
-    const command = screen.getByRole("button", { name: /Open Collision/i });
+    const command = screen.getByRole("button", { name: /Go to Animation › Collision/i });
     expect(command).toHaveTextContent("workspace");
     fireEvent.click(command);
 
-    expect(onExecute).toHaveBeenCalledWith("workspace.open.collision");
+    expect(onExecute).toHaveBeenCalledWith("lane.go.animation.collision");
     expect(onClose).toHaveBeenCalledOnce();
   });
 

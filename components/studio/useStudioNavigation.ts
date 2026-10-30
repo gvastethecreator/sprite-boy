@@ -1,20 +1,23 @@
 import { useEffect, useSyncExternalStore } from "react";
 import {
-  getStudioWorkspace,
-  parseStudioWorkspaceHref,
+  STUDIO_FALLBACK_ROUTE,
+  getLaneMount,
+  getRouteForMount,
+  parseStudioRouteHref,
+  routeHref,
+  type StudioLaneRoute,
   type StudioWorkspaceId,
 } from "../../core/studio";
 
-const FALLBACK_WORKSPACE: StudioWorkspaceId = "compose";
-const FALLBACK_HREF = getStudioWorkspace(FALLBACK_WORKSPACE).href;
+const FALLBACK_HREF = routeHref(STUDIO_FALLBACK_ROUTE);
 
 type NavigationListener = () => void;
 
 const listeners = new Set<NavigationListener>();
 
-function readWorkspace(): StudioWorkspaceId {
-  if (typeof window === "undefined") return FALLBACK_WORKSPACE;
-  return parseStudioWorkspaceHref(window.location.hash) ?? FALLBACK_WORKSPACE;
+function readRoute(): StudioLaneRoute {
+  if (typeof window === "undefined") return STUDIO_FALLBACK_ROUTE;
+  return parseStudioRouteHref(window.location.hash) ?? STUDIO_FALLBACK_ROUTE;
 }
 
 function notify(): void {
@@ -23,9 +26,9 @@ function notify(): void {
 
 function normalizeLocation(): void {
   if (typeof window === "undefined") return;
-  if (parseStudioWorkspaceHref(window.location.hash) !== null) return;
+  if (parseStudioRouteHref(window.location.hash) !== null) return;
 
-  // Keep the current pathname/search while replacing only the invalid hash.
+  // Old workspace hashes and unknown routes land on the first Items step.
   // replaceState avoids creating a history entry for an unsupported route.
   window.history.replaceState(window.history.state, "", FALLBACK_HREF);
 }
@@ -53,40 +56,49 @@ function subscribe(listener: NavigationListener): () => void {
   };
 }
 
-function getServerSnapshot(): StudioWorkspaceId {
-  return FALLBACK_WORKSPACE;
+function getServerSnapshot(): StudioLaneRoute {
+  return STUDIO_FALLBACK_ROUTE;
 }
 
 /** Push a canonical Studio route and publish it to subscribers. */
-export function navigateStudioWorkspace(workspaceId: StudioWorkspaceId): void {
+export function navigateStudioRoute(route: StudioLaneRoute): void {
   if (typeof window === "undefined") return;
 
-  const href = getStudioWorkspace(workspaceId).href;
+  const href = routeHref(route);
   if (window.location.hash === href) return;
 
   window.history.pushState(window.history.state, "", href);
   notify();
 }
 
+/** Open the lane step that still mounts an old workspace editor. */
+export function navigateStudioMount(workspaceId: StudioWorkspaceId): void {
+  navigateStudioRoute(getRouteForMount(workspaceId));
+}
+
 export interface StudioNavigation {
-  readonly activeWorkspace: StudioWorkspaceId;
-  readonly navigate: (workspaceId: StudioWorkspaceId) => void;
+  readonly route: StudioLaneRoute;
+  /** Old editor mounted by the current step, or null when the step is native. */
+  readonly mount: StudioWorkspaceId | null;
+  readonly navigate: (route: StudioLaneRoute) => void;
+  readonly navigateMount: (workspaceId: StudioWorkspaceId) => void;
 }
 
 /**
- * Temporary shell navigation boundary. The URL hash is the only source of
- * truth until the canonical ProjectStore is mounted by the host shell.
+ * Shell navigation boundary. The URL hash is the only source of truth for the
+ * active lane and step.
  */
 export function useStudioNavigation(): StudioNavigation {
-  const activeWorkspace = useSyncExternalStore(
-    subscribe,
-    readWorkspace,
-    getServerSnapshot,
-  );
+  const route = useSyncExternalStore(subscribe, readRoute, getServerSnapshot);
 
   useEffect(() => {
     normalizeLocation();
   }, []);
 
-  return { activeWorkspace, navigate: navigateStudioWorkspace };
+  return {
+    route,
+    mount: getLaneMount(route),
+    navigate: navigateStudioRoute,
+    navigateMount: navigateStudioMount,
+  };
 }

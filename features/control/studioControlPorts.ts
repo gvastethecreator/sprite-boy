@@ -35,13 +35,14 @@ import {
   createVideoImportJobTask,
   type VideoImportAdapter,
 } from "../slice/video/videoImportJobTask";
-import { navigateStudioWorkspace } from "../../components/studio/useStudioNavigation";
+import { navigateStudioMount, navigateStudioRoute } from "../../components/studio/useStudioNavigation";
+import { getLaneMount, resolveStudioRoute } from "../../core/studio/laneRegistry";
 
 const BROWSER_STUDIO_CONTROL_BASE_COMMANDS = Object.freeze([
   "capabilities.get",
   "project.get",
   "selection.get",
-  "workspace.navigate",
+  "lane.navigate",
 ] as const);
 
 export interface StudioControlPortDependencies {
@@ -272,24 +273,39 @@ export function createBrowserStudioControlPorts(
       revision: currentRevision,
       result: dependencies.projectStore.getSnapshot().project.workspace,
     })),
-    navigate: (params, context) => guard(context, () => {
-      const result = dependencies.navigate(params.workspaceId);
-      if (result.result.ok) navigateStudioWorkspace(params.workspaceId);
-      return result.result.ok
-        ? {
-            ok: true,
-            revision: result.revision,
-            result: { workspaceId: params.workspaceId },
-          }
-        : {
-            ok: false,
-            revision: result.revision,
-            error: {
-              code: "invalid-request",
-              message: "The Studio could not open that workspace.",
-              retryable: false,
-            },
-          };
+    navigate: (params, context) => guard(context, (currentRevision) => {
+      const route = resolveStudioRoute(params.tab, params.step);
+      if (route === null) {
+        return {
+          ok: false,
+          revision: currentRevision,
+          error: {
+            code: "invalid-request",
+            message: "The Studio does not have that lane or step.",
+            retryable: false,
+          },
+        };
+      }
+      // Steps without an editor yet keep the last mounted workspace in the project.
+      const mount = getLaneMount(route);
+      const result = mount ? dependencies.navigate(mount) : null;
+      if (result && !result.result.ok) {
+        return {
+          ok: false,
+          revision: result.revision,
+          error: {
+            code: "invalid-request",
+            message: "The Studio could not open that step.",
+            retryable: false,
+          },
+        };
+      }
+      navigateStudioRoute(route);
+      return {
+        ok: true,
+        revision: result?.revision ?? currentRevision,
+        result: { tab: route.tab, step: route.step },
+      };
     }),
     importAsset: async (params, context) => {
       const currentRevision = revision();
@@ -329,7 +345,7 @@ export function createBrowserStudioControlPorts(
         } finally {
           closeDecodedSourceImage(decoded);
         }
-        navigateStudioWorkspace("slice");
+        navigateStudioMount("slice");
         return {
           ok: true,
           revision: imported.revision,

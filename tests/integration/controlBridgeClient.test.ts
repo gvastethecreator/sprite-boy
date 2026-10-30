@@ -69,7 +69,7 @@ async function waitFor(assertion: () => void, timeoutMs = 2_000): Promise<void> 
   throw lastError;
 }
 
-describe.sequential("StudioControlBridgeClient with loopback bridge", () => {
+describe("StudioControlBridgeClient with loopback bridge", { concurrent: false }, () => {
   let child: ChildProcessWithoutNullStreams;
   let baseUrl: string;
   let stderr = "";

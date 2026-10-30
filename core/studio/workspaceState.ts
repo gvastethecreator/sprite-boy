@@ -83,25 +83,25 @@ const EMPTY_STATE_DEFINITIONS: Readonly<Record<StudioWorkspaceId, EmptyStateDefi
       title: "Start a composition",
       description: "Import art or open a Slice region.",
       primaryAction: Object.freeze({ commandId: "asset.import", label: "Import artwork" }),
-      secondaryAction: Object.freeze({ commandId: "workspace.open.slice", label: "Go to Slice" }),
+      secondaryAction: Object.freeze({ commandId: "lane.go.grid.source", label: "Go to Grid" }),
     }),
     animate: Object.freeze({
       title: "Add artwork before animating",
       description: "Need a source or composition first.",
       primaryAction: Object.freeze({ commandId: "asset.import", label: "Import artwork" }),
-      secondaryAction: Object.freeze({ commandId: "workspace.open.compose", label: "Go to Compose" }),
+      secondaryAction: Object.freeze({ commandId: "lane.go.items.sheet", label: "Go to Items" }),
     }),
     collision: Object.freeze({
       title: "Create frames before hitboxes",
       description: "Collision shapes attach to sliced frames.",
-      primaryAction: Object.freeze({ commandId: "workspace.open.slice", label: "Go to Slice" }),
+      primaryAction: Object.freeze({ commandId: "lane.go.grid.source", label: "Go to Grid" }),
       secondaryAction: Object.freeze({ commandId: "asset.import", label: "Import source art" }),
     }),
     export: Object.freeze({
       title: "Build something to export",
       description: "Import or compose art first.",
       primaryAction: Object.freeze({ commandId: "asset.import", label: "Import artwork" }),
-      secondaryAction: Object.freeze({ commandId: "workspace.open.compose", label: "Go to Compose" }),
+      secondaryAction: Object.freeze({ commandId: "lane.go.items.sheet", label: "Go to Items" }),
     }),
   });
 

@@ -15,7 +15,7 @@ function handlers(): StudioCommandHandlers {
     importAsset: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
-    openWorkspace: vi.fn(),
+    openRoute: vi.fn(),
     resetCanvas: vi.fn(),
     openCommandPalette: vi.fn(),
     openPreferences: vi.fn(),
@@ -56,11 +56,11 @@ describe("useKeyboardShortcuts", () => {
       legacyCanvasKeyboardEnabled: true,
     }));
 
-    act(() => keyDown(window, "Digit4", { key: "ç", ctrlKey: true }));
+    act(() => keyDown(window, "KeyO", { key: "ø", ctrlKey: true }));
     act(() => keyDown(window, "Comma", { key: ";", metaKey: true }));
 
     expect(executeStudioCommand.mock.calls.map(([commandId]) => commandId)).toEqual([
-      "workspace.open.collision",
+      "project.open",
       "app.openPreferences",
     ]);
   });
@@ -96,7 +96,7 @@ describe("useKeyboardShortcuts", () => {
     expect(nudge).not.toHaveBeenCalled();
 
     rerender({ isModalOpen: true });
-    act(() => keyDown(window, "Digit1", { key: "1", ctrlKey: true }));
+    act(() => keyDown(window, "KeyN", { key: "n", ctrlKey: true }));
     act(() => keyDown(window, "Escape", { key: "Escape" }));
     expect(executeStudioCommand).toHaveBeenCalledOnce();
     expect(closeModals).toHaveBeenCalledOnce();

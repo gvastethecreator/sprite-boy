@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   STUDIO_COMMAND_IDS,
   STUDIO_COMMANDS,
+  STUDIO_LANE_ROUTES,
   auditStudioCommands,
   createStudioCommandRegistry,
   createStudioShortcut,
@@ -32,7 +33,7 @@ function handlers(): MutableHandlers {
     importAsset: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
-    openWorkspace: vi.fn(),
+    openRoute: vi.fn(),
     resetCanvas: vi.fn(),
     openCommandPalette: vi.fn(),
     openPreferences: vi.fn(),
@@ -58,14 +59,13 @@ describe("Studio command metadata", () => {
     }
   });
 
-  it("keeps all five workspaces directly reachable and omits inert Analyze", () => {
-    expect(STUDIO_COMMAND_IDS.filter((id) => id.startsWith("workspace.open."))).toEqual([
-      "workspace.open.slice",
-      "workspace.open.compose",
-      "workspace.open.animate",
-      "workspace.open.collision",
-      "workspace.open.export",
-    ]);
+  it("keeps every lane step and the Library reachable and omits inert Analyze", () => {
+    const laneCommands = STUDIO_COMMAND_IDS.filter((id) => id.startsWith("lane.go."));
+    expect(laneCommands).toHaveLength(STUDIO_LANE_ROUTES.length);
+    expect(laneCommands).toContain("lane.go.items.source");
+    expect(laneCommands).toContain("lane.go.animation.collision");
+    expect(laneCommands).toContain("lane.go.library");
+    expect(STUDIO_COMMAND_IDS.some((id) => id.startsWith("workspace.open."))).toBe(false);
     expect(STUDIO_COMMAND_IDS).not.toContain("ai.analyze" as StudioCommandId);
     expect(STUDIO_COMMANDS.every((command) => !("action" in command))).toBe(true);
   });
@@ -145,11 +145,9 @@ describe("executable Studio command registry", () => {
     expect(port.importAsset).toHaveBeenCalledOnce();
     expect(port.undo).toHaveBeenCalledOnce();
     expect(port.redo).toHaveBeenCalledOnce();
-    expect(port.openWorkspace).toHaveBeenNthCalledWith(1, "slice");
-    expect(port.openWorkspace).toHaveBeenNthCalledWith(2, "compose");
-    expect(port.openWorkspace).toHaveBeenNthCalledWith(3, "animate");
-    expect(port.openWorkspace).toHaveBeenNthCalledWith(4, "collision");
-    expect(port.openWorkspace).toHaveBeenNthCalledWith(5, "export");
+    expect(port.openRoute).toHaveBeenCalledTimes(STUDIO_LANE_ROUTES.length);
+    expect(port.openRoute).toHaveBeenNthCalledWith(1, STUDIO_LANE_ROUTES[0]);
+    expect(port.openRoute).toHaveBeenLastCalledWith(STUDIO_LANE_ROUTES[STUDIO_LANE_ROUTES.length - 1]);
     expect(port.resetCanvas).toHaveBeenCalledOnce();
     expect(port.openCommandPalette).toHaveBeenCalledOnce();
     expect(port.openPreferences).toHaveBeenCalledOnce();
@@ -184,7 +182,7 @@ describe("executable Studio command registry", () => {
       enabled: false,
       code: "CANVAS_UNAVAILABLE",
     });
-    expect(registry.getState("workspace.open.collision", unavailable)).toEqual({ enabled: true });
+    expect(registry.getState("lane.go.animation.collision", unavailable)).toEqual({ enabled: true });
 
     const composeWithoutPortableOpen = { ...readyContext, projectOpenAvailable: false };
     expect(registry.getState("project.open", composeWithoutPortableOpen)).toEqual({
@@ -221,9 +219,12 @@ describe("executable Studio command registry", () => {
 
   it("resolves canonical shortcuts and rejects unknown runtime IDs", () => {
     const registry = createStudioCommandRegistry(handlers());
-    expect(registry.findByShortcut(createStudioShortcut("Digit4", { primary: true }))?.id)
-      .toBe("workspace.open.collision");
+    expect(registry.findByShortcut(createStudioShortcut("KeyO", { primary: true }))?.id)
+      .toBe("project.open");
     expect(registry.findByShortcut(createStudioShortcut("KeyQ", { primary: true }))).toBeNull();
+    for (const digit of [1, 2, 3, 4, 5]) {
+      expect(registry.findByShortcut(createStudioShortcut(`Digit${digit}`, { primary: true }))).toBeNull();
+    }
     expect(() => registry.getCommand("future.command" as StudioCommandId))
       .toThrow(/Unknown Studio command/);
   });
@@ -231,7 +232,7 @@ describe("executable Studio command registry", () => {
   it("matches keyboard codes across Ctrl/Cmd with exact modifiers", () => {
     const registry = createStudioCommandRegistry(handlers());
     const input = {
-      code: "Digit4",
+      code: "KeyO",
       ctrlKey: true,
       metaKey: false,
       altKey: false,
@@ -239,9 +240,9 @@ describe("executable Studio command registry", () => {
       editable: false,
     };
 
-    expect(registry.findByKeyboardInput(input)?.id).toBe("workspace.open.collision");
+    expect(registry.findByKeyboardInput(input)?.id).toBe("project.open");
     expect(registry.findByKeyboardInput({ ...input, ctrlKey: false, metaKey: true })?.id)
-      .toBe("workspace.open.collision");
+      .toBe("project.open");
     expect(registry.findByKeyboardInput({ ...input, altKey: true })).toBeNull();
     expect(registry.findByKeyboardInput({ ...input, code: "" })).toBeNull();
     expect(registry.findByKeyboardInput({ ...input, code: "KeyZ", shiftKey: true })?.id)

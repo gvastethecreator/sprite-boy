@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import CanvasArea, { type CanonicalRegionToolInteraction } from "../canvas/CanvasArea";
 import TimelinePanel from "./TimelinePanel";
 import ToastContainer from "../overlays/ToastContainer";
@@ -24,6 +23,7 @@ import {
 import { useJobStoreSelector, useProjectStoreSelector } from "../../hooks/useStudioStoreSelector";
 import {
   createStudioCommandRegistry,
+  getLaneMount,
   getStudioWorkspace,
   resolveStudioWorkspaceState,
   type StudioCommandContext,
@@ -31,12 +31,15 @@ import {
   type StudioWorkspaceId,
 } from "../../core/studio";
 import {
+  LaneNativeStep,
+  LaneShell,
   StudioDialog,
   StudioHeader,
   JobCenter,
   StudioPanel,
   StudioWorkspaceStateView,
   useStudioNavigation,
+  useStudioViewport,
 } from "../studio";
 import { AppMode, CanvasHandle } from "../../types";
 import SliceSourceDropzone from "../../features/slice/source/SliceSourceDropzone";
@@ -105,7 +108,6 @@ const loadComposeProperties = () => import("../../features/compose/canvasSetting
 const loadAnimateWorkspace = () => import("../../features/animate/AnimateFrameWorkspace");
 const loadCollisionWorkspace = () => import("../../features/collision/CollisionWorkspacePanel");
 const loadLeftSidebar = () => import("./LeftSidebar");
-const loadRightSidebar = () => import("./RightSidebar");
 const loadSliceProperties = () => import("../../features/slice/SlicePropertiesPanel");
 const loadGridExport = () => import("../../features/slice/export/GridExportCenter");
 const loadIrregularSliceTools = () => import("../../features/slice/irregular/IrregularSliceTools");
@@ -118,7 +120,6 @@ const CompositionCanvasSettingsInspector = React.lazy(loadComposeProperties);
 const AnimateFrameWorkspace = React.lazy(loadAnimateWorkspace);
 const CollisionWorkspacePanel = React.lazy(loadCollisionWorkspace);
 const LeftSidebar = React.lazy(loadLeftSidebar);
-const RightSidebar = React.lazy(loadRightSidebar);
 const SlicePropertiesPanel = React.lazy(loadSliceProperties);
 const GridExportCenter = React.lazy(loadGridExport);
 const IrregularSliceTools = React.lazy(loadIrregularSliceTools);
@@ -134,7 +135,6 @@ const LEGACY_MODE_BY_WORKSPACE = {
   export: AppMode.TEMPLATE,
 } as const satisfies Record<StudioWorkspaceId, AppMode>;
 
-const COMPACT_STUDIO_QUERY = "(max-width: 1279px)";
 const VIDEO_IMPORT_TIMEOUT_MS = 30 * 60 * 1_000;
 const ExportModal = React.lazy(() => import("../overlays/ExportModal"));
 
@@ -160,29 +160,6 @@ interface StudioShellError {
   readonly workspaceId: StudioWorkspaceId;
   readonly commandId: StudioCommandId;
   readonly message: string;
-}
-
-function useCompactStudioLayout(): boolean {
-  const readMatch = () =>
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(COMPACT_STUDIO_QUERY).matches
-      : false;
-  const [isCompact, setCompact] = useState(readMatch);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia(COMPACT_STUDIO_QUERY);
-    const update = () => setCompact(query.matches);
-    update();
-    if (typeof query.addEventListener === "function") {
-      query.addEventListener("change", update);
-      return () => query.removeEventListener("change", update);
-    }
-    query.addListener?.(update);
-    return () => query.removeListener?.(update);
-  }, []);
-
-  return isCompact;
 }
 
 const AppLayout: React.FC = () => {
@@ -254,8 +231,11 @@ const AppLayout: React.FC = () => {
   const sourcePickerReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const videoImportRestoreFocusRef = useRef<HTMLButtonElement | null>(null);
   const focusDropzoneAfterResetRef = useRef(false);
-  const { activeWorkspace, navigate } = useStudioNavigation();
-  const [compactPanel, setCompactPanel] = useState<"tools" | "properties" | null>(null);
+  const { route: laneRoute, mount, navigate: navigateRoute, navigateMount: navigate } = useStudioNavigation();
+  // Lane steps without an editor yet fall back to Slice, the empty source view.
+  const activeWorkspace: StudioWorkspaceId = mount ?? "slice";
+  const nativeStep = mount === null;
+  const viewport = useStudioViewport();
   const [isJobCenterOpen, setJobCenterOpen] = useState(false);
   const [studioError, setStudioError] = useState<StudioShellError | null>(null);
   const [isSourceCommitting, setSourceCommitting] = useState(false);
@@ -477,12 +457,12 @@ const AppLayout: React.FC = () => {
       });
       const canonicalCommand = command?.type === "region.create"
         ? {
-            ...command,
-            region: {
-              ...command.region,
-              provenance: { source: "manual", importedAt: timestamp },
-            },
-          }
+          ...command,
+          region: {
+            ...command.region,
+            provenance: { source: "manual", importedAt: timestamp },
+          },
+        }
         : command;
       if (canonicalCommand && dispatchIrregularCommand(canonicalCommand, `manual-region-create:${regionId}`)) {
         setIrregularRegionId(regionId);
@@ -693,7 +673,6 @@ const AppLayout: React.FC = () => {
     activeWorkspace === "export" && canonicalSliceSourceAvailable;
   const canonicalCanvasOwnership =
     activeWorkspace === "slice" || canonicalSliceExportSourceOnly;
-  const isCompactLayout = useCompactStudioLayout();
   const jobStore = useJobStore();
   const jobRunner = useStudioJobRunner();
   const injectedRetryJob = useStudioJobRetryAction();
@@ -716,8 +695,8 @@ const AppLayout: React.FC = () => {
     || (activeWorkspace === "compose" && Boolean(canonicalComposition))
   );
   const showComposeProperties = activeWorkspace === "compose" && Boolean(canonicalComposition);
-  const hasStudioPanels = showToolsPanel || showPropertiesPanel;
   const activeWorkspaceDefinition = getStudioWorkspace(activeWorkspace);
+
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -727,7 +706,6 @@ const AppLayout: React.FC = () => {
         loadAnimateWorkspace(),
         loadCollisionWorkspace(),
         loadLeftSidebar(),
-        loadRightSidebar(),
         loadSliceProperties(),
         loadGridExport(),
         loadIrregularSliceTools(),
@@ -738,15 +716,6 @@ const AppLayout: React.FC = () => {
     }, 1_000);
     return () => window.clearTimeout(timeoutId);
   }, []);
-
-  useEffect(() => {
-    if (
-      (compactPanel === "tools" && !showToolsPanel)
-      || (compactPanel === "properties" && !showPropertiesPanel)
-    ) {
-      setCompactPanel(null);
-    }
-  }, [compactPanel, showPropertiesPanel, showToolsPanel]);
 
   useEffect(() => {
     if (canonical.persistenceState === "loading") return;
@@ -782,9 +751,8 @@ const AppLayout: React.FC = () => {
   }, [activeWorkspace, canonicalSequenceAvailable, currentMode, handleSetMode]);
 
   useEffect(() => {
-    setCompactPanel(null);
     setStudioError(null);
-  }, [activeWorkspace, isCompactLayout]);
+  }, [activeWorkspace]);
 
   useEffect(() => {
     setIsSettingsOpen(false);
@@ -929,14 +897,15 @@ const AppLayout: React.FC = () => {
       if (canonicalHistoryOwned) canonical.history.redo();
       else redo();
     },
-    openWorkspace: (workspaceId) => {
-      const targetOwnsCanonicalCanvas = workspaceId === "slice" ||
-        (workspaceId === "export" && canonicalSliceSourceAvailable);
+    openRoute: (route) => {
+      const target = getLaneMount(route) ?? "slice";
+      const targetOwnsCanonicalCanvas = target === "slice" ||
+        (target === "export" && canonicalSliceSourceAvailable);
       if (targetOwnsCanonicalCanvas) clearLegacyCanvasInteractionState();
-      if (workspaceId !== "animate" || canonicalSequenceAvailable) {
-        handleSetMode(LEGACY_MODE_BY_WORKSPACE[workspaceId]);
+      if (target !== "animate" || canonicalSequenceAvailable) {
+        handleSetMode(LEGACY_MODE_BY_WORKSPACE[target]);
       }
-      navigate(workspaceId);
+      navigateRoute(route);
     },
     resetCanvas: () => canvasRef.current?.resetView(),
     openCommandPalette: () => setIsCommandPaletteOpen(true),
@@ -1353,6 +1322,28 @@ const AppLayout: React.FC = () => {
       onSelectRegion={selectManualRegion}
     />
   ) : null;
+  const loadingFallback = (label: string) => <div className="p-3 text-xs text-textMuted">Loading {label}…</div>;
+  const laneTools = (
+    <React.Suspense fallback={loadingFallback("tools")}>
+      <LeftSidebar key={`tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
+    </React.Suspense>
+  );
+  const laneInspector = (
+    <React.Suspense fallback={loadingFallback("inspector")}>
+      {showComposeProperties && canonicalCompositionId ? (
+        <CompositionCanvasSettingsInspector store={canonical.store} compositionId={canonicalCompositionId} />
+      ) : (
+        <SlicePropertiesPanel
+          controller={sliceGridController}
+          store={canonical.store}
+          assets={canonical.assets}
+          eyedropperActive={isEyedropperActive}
+          onEyedropperActiveChange={setIsEyedropperActive}
+          onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+        />
+      )}
+    </React.Suspense>
+  );
   const cancelActiveCanonicalTool = useCallback((): boolean => {
     if (activeWorkspace === "slice" && wandSelection.components.length > 0) {
       clearWandSelection();
@@ -1376,7 +1367,6 @@ const AppLayout: React.FC = () => {
     stepFrame: handleStepFrame,
     cancelActiveTool: cancelActiveCanonicalTool,
     closeModals: () => {
-      setCompactPanel(null);
       setJobCenterOpen(false);
       setResetSourceDialogOpen(false);
       setVideoImportFile(null);
@@ -1388,7 +1378,6 @@ const AppLayout: React.FC = () => {
       exportModal.isOpen ||
       isCommandPaletteOpen ||
       isResetSourceDialogOpen ||
-      compactPanel !== null ||
       isJobCenterOpen ||
       videoImportFile !== null,
     activeAnimationId,
@@ -1433,7 +1422,7 @@ const AppLayout: React.FC = () => {
       />
 
       <StudioHeader
-        activeWorkspace={activeWorkspace}
+        activeTab={laneRoute.tab}
         registry={commandRegistry}
         commandContext={commandContext}
         onExecute={executeCommand}
@@ -1446,280 +1435,151 @@ const AppLayout: React.FC = () => {
         onRenameProject={renameCanonicalProject}
       />
 
-      {hasStudioPanels && isCompactLayout && (
-        <div
-          role="toolbar"
-          aria-label="Compact Studio panels"
-          className="flex h-9 shrink-0 items-center justify-between rounded-md border border-border/30 bg-panel px-2 xl:hidden"
-        >
-          {showToolsPanel ? (
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={compactPanel === "tools"}
-              onClick={() => setCompactPanel("tools")}
-              className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <PanelLeftOpen size={14} aria-hidden="true" />
-              Tools
-            </button>
-          ) : <span aria-hidden="true" />}
-          <span className="truncate px-3 text-xs font-medium text-textMuted/80">
-            {activeWorkspaceDefinition.label} workspace
-          </span>
-          {showPropertiesPanel ? (
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={compactPanel === "properties"}
-              onClick={() => setCompactPanel("properties")}
-              className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-textMuted hover:bg-white/5 hover:text-textMain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Properties
-              <PanelRightOpen size={14} aria-hidden="true" />
-            </button>
-          ) : <span aria-hidden="true" />}
-        </div>
-      )}
-
-      <div className="flex-1 flex min-h-0 gap-2">
-        {showToolsPanel && !isCompactLayout && (
-          <StudioPanel
-            label="Tools"
-            variant="sidebar"
-            className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
-          >
-            <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading tools…</div>}>
-              <LeftSidebar key={`desktop-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
-            </React.Suspense>
-          </StudioPanel>
-        )}
-
-        <div className="flex-1 flex flex-col min-w-0 gap-2">
-          <StudioWorkspaceErrorBoundary resetKey={`${canonicalProject.id}:${activeWorkspace}`}>
-            <main
-              ref={workspaceContentRef}
-              tabIndex={-1}
-              data-studio-workspace-content={activeWorkspace}
-              aria-label={`${activeWorkspaceDefinition.label} workspace content`}
-              className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-            {!canonicalSequenceAvailable ? (
-              <section
-                aria-hidden={activeWorkspace !== "animate"}
-                className={`absolute inset-0 flex min-h-0 items-center justify-center bg-workspace p-6 ${activeWorkspace === "animate" ? "visible" : "invisible pointer-events-none"}`}
-                aria-label="Frame alignment"
-              >
-                <div className="max-w-md rounded-xl border border-white/10 bg-panel p-6 text-center">
-                  <h1 className="text-base font-semibold text-textMain">No frames to align</h1>
-                  <p className="mt-2 text-xs leading-relaxed text-textMuted">
-                    Import a video in Slice to create a sequence, then return here to edit each frame.
-                  </p>
-                </div>
-              </section>
-            ) : null}
-            {activeWorkspace === "animate" && !canonicalSequenceAvailable ? null : activeWorkspace === "compose" ? (
-              <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Compose…</div>}>
-                <ComposeBootstrapWorkspace
-                  key={canonicalProject.id}
-                  store={canonical.store}
-                  assets={canonical.assets}
-                  importRequestToken={composeImportRequestToken}
-                  disabled={canonical.persistenceState === "loading"}
-                  onBusyChange={setComposeImportBusy}
-                  onCleanupDebtChange={canonical.reportAssetCleanupDebt}
-                  onOpenCanvasSettings={() => setCompactPanel("properties")}
-                  onCompositionReady={() => navigate("compose")}
-                />
-              </React.Suspense>
-            ) : activeWorkspace === "animate" ? (
-              <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Animate…</div>}>
-                <AnimateFrameWorkspace
-                  store={canonical.store}
-                  assets={canonical.assets}
-                  disabled={canonical.persistenceState === "loading"}
-                />
-              </React.Suspense>
-            ) : activeWorkspace === "collision" ? (
-              <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading collision…</div>}>
-                <CollisionWorkspacePanel />
-              </React.Suspense>
-            ) : activeWorkspace === "slice" && !slicerImage && sourceSessionSnapshot.status === "ready" ? (
-              <SliceSourcePreview
-                snapshot={sourceSessionSnapshot}
-                getBlob={getSourceBlob}
-                committing={isSourceCommitting}
-              />
-            ) : activeWorkspace === "slice" && !slicerImage && workspaceState.kind === "empty" ? (
-              <SliceSourceDropzone
-                snapshot={sourceSessionSnapshot}
-                disabled={isSourceCommitting}
-                committing={isSourceCommitting}
-                browseButtonRef={dropzoneBrowseButtonRef}
-                onBrowse={() => openSourcePicker(dropzoneBrowseButtonRef.current)}
-                onSelect={(input) => selectSliceInput(input as File | FileList)}
-                onRetry={retrySliceSource}
-              />
-            ) : workspaceState.kind === "ready" ? (
-              activeWorkspace === "export" && canonicalSliceSourceAvailable ? (
-                <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Export…</div>}>
-                  <GridExportCenter
-                    project={canonicalProject}
-                    revision={canonical.store.getSnapshot().revision}
-                    repository={canonical.assets}
-                    onOpenCompose={openGridRegionInCompose}
-                    onToast={showToast}
-                  />
-                </React.Suspense>
-              ) : activeWorkspace === "slice" ? (
-                <SliceSourceCanvasFrame
-                  snapshot={sourceSessionSnapshot}
-                  metadataOverride={committedSourceMetadata}
-                  legacyImageMeta={slicerImage}
-                  actions={(
-                    <SliceSourceActions
-                      busy={sourceSessionBusy}
-                      error={visibleSourceError}
-                      replaceButtonRef={replaceSourceTriggerRef}
-                      retryButtonRef={retrySourceTriggerRef}
-                      resetButtonRef={resetSourceTriggerRef}
-                      onReplace={() => {
-                        setSourceActionError(null);
-                        openSourcePicker(replaceSourceTriggerRef.current);
-                      }}
-                      onRequestReset={() => setResetSourceDialogOpen(true)}
-                      onRetry={retrySliceSource}
-                    />
-                  )}
-                  footer={<SliceResultsTray controller={sliceResultsController} />}
-                >
-                  <CanvasArea
-                    ref={canvasRef}
-                    canonicalCanvasOwnership={canonicalCanvasOwnership}
-                    onCanonicalPickColor={sliceGridController.setChromaColor}
-                    canonicalRegionTool={canonicalRegionTool}
-                    sliceGridOverlay={irregularToolMode === "manual" ? null : {
-                      sourceDimensions: sliceGridController.sourceDimensions,
-                      effectiveLayout: sliceGridController.effectiveLayout,
-                      onResizeRowBoundary: sliceGridController.setManualRowBoundary,
-                      onResizeColumnBoundary: sliceGridController.setManualColumnBoundary,
-                    }}
-                  />
-                </SliceSourceCanvasFrame>
-              ) : (
-                <CanvasArea
-                  ref={canvasRef}
-                  canonicalCanvasOwnership={canonicalCanvasOwnership}
-                  onCanonicalPickColor={sliceGridController.setChromaColor}
-                />
-              )
-            ) : (
-              <StudioWorkspaceStateView
-                state={workspaceState}
-                registry={commandRegistry}
-                commandContext={commandContext}
-                onExecute={executeCommand}
-                onDismissError={() => setStudioError(null)}
-              />
-            )}
-            </main>
-          </StudioWorkspaceErrorBoundary>
-          {hasWorkspace && activeWorkspace !== "compose" && activeWorkspace !== "animate" && (
-            <TimelinePanel hidden={activeWorkspaceDefinition.capabilities.timeline !== "editable"} />
-          )}
-        </div>
-
-        {canonicalCompositionId && !isCompactLayout ? (
-          <StudioPanel
-            label="Properties"
-            variant="sidebar"
-            hidden={!showComposeProperties}
-            className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
-          >
-            <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-              <CompositionCanvasSettingsInspector
-                store={canonical.store}
-                compositionId={canonicalCompositionId}
-              />
-            </React.Suspense>
-          </StudioPanel>
-        ) : null}
-
-        {showPropertiesPanel && !showComposeProperties && !isCompactLayout ? (
-          <StudioPanel
-            label="Properties"
-            variant="sidebar"
-            className="hidden w-[280px] shrink-0 animate-fade-in rounded-panel border-border/20 xl:flex"
-          >
-            {activeWorkspace === "slice"
-              ? <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                  <SlicePropertiesPanel
-                    controller={sliceGridController}
-                    store={canonical.store}
-                    assets={canonical.assets}
-                    eyedropperActive={isEyedropperActive}
-                    onEyedropperActiveChange={setIsEyedropperActive}
-                    onCleanupDebtChange={canonical.reportAssetCleanupDebt}
-                  />
-                </React.Suspense>
-              : <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                  <RightSidebar />
-                </React.Suspense>}
-          </StudioPanel>
-        ) : null}
-      </div>
-
-      <StudioDialog
-        isOpen={isCompactLayout && compactPanel !== null}
-        onClose={() => setCompactPanel(null)}
-        ariaLabel={compactPanel === "tools" ? "Tools panel" : "Properties panel"}
-        backdropClassName="!items-stretch !justify-start !p-0 !pt-0 bg-black/70"
-        panelClassName="!h-dvh !max-h-dvh !max-w-[360px] !rounded-none !border-y-0 !border-l-0"
+      <LaneShell
+        route={laneRoute}
+        mount={mount}
+        viewport={viewport}
+        onExecute={executeCommand}
+        tools={showToolsPanel ? laneTools : undefined}
+        inspector={showPropertiesPanel || showComposeProperties ? laneInspector : undefined}
       >
-        {compactPanel === "tools" && showToolsPanel ? (
-          <StudioPanel
-            label="Tools"
-            variant="drawer"
-            onClose={() => setCompactPanel(null)}
-            className="h-full border-0"
-          >
-            <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading tools…</div>}>
-              <LeftSidebar key={`compact-tools-${activeWorkspace}`} isSliceWorkspace={activeWorkspace === "slice"} irregularTools={irregularTools} />
-            </React.Suspense>
-          </StudioPanel>
-        ) : compactPanel === "properties" && showPropertiesPanel ? (
-          <StudioPanel
-            label="Properties"
-            variant="drawer"
-            onClose={() => setCompactPanel(null)}
-            className="h-full border-0"
-          >
-            {showComposeProperties && canonicalCompositionId ? (
-              <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                <CompositionCanvasSettingsInspector
-                  store={canonical.store}
-                  compositionId={canonicalCompositionId}
-                />
-              </React.Suspense>
-            ) : (
-              activeWorkspace === "slice"
-                ? <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                    <SlicePropertiesPanel
-                      controller={sliceGridController}
+        {nativeStep ? (
+          <LaneNativeStep route={laneRoute} onExecute={executeCommand} />
+        ) : (
+          <>
+            <StudioWorkspaceErrorBoundary resetKey={`${canonicalProject.id}:${activeWorkspace}`}>
+              <main
+                ref={workspaceContentRef}
+                tabIndex={-1}
+                data-studio-workspace-content={activeWorkspace}
+                aria-label={`${activeWorkspaceDefinition.label} workspace content`}
+                className="flex-1 relative overflow-hidden bg-workspace rounded-panel border border-border/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                {!canonicalSequenceAvailable ? (
+                  <section
+                    aria-hidden={activeWorkspace !== "animate"}
+                    className={`absolute inset-0 flex min-h-0 items-center justify-center bg-workspace p-6 ${activeWorkspace === "animate" ? "visible" : "invisible pointer-events-none"}`}
+                    aria-label="Frame alignment"
+                  >
+                    <div className="max-w-md rounded-xl border border-white/10 bg-panel p-6 text-center">
+                      <h1 className="text-base font-semibold text-textMain">No frames to align</h1>
+                      <p className="mt-2 text-xs leading-relaxed text-textMuted">
+                        Import a video in Slice to create a sequence, then return here to edit each frame.
+                      </p>
+                    </div>
+                  </section>
+                ) : null}
+                {activeWorkspace === "animate" && !canonicalSequenceAvailable ? null : activeWorkspace === "compose" ? (
+                  <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Compose…</div>}>
+                    <ComposeBootstrapWorkspace
+                      key={canonicalProject.id}
                       store={canonical.store}
                       assets={canonical.assets}
-                      eyedropperActive={isEyedropperActive}
-                      onEyedropperActiveChange={setIsEyedropperActive}
+                      importRequestToken={composeImportRequestToken}
+                      disabled={canonical.persistenceState === "loading"}
+                      onBusyChange={setComposeImportBusy}
                       onCleanupDebtChange={canonical.reportAssetCleanupDebt}
+                      onCompositionReady={() => navigate("compose")}
                     />
                   </React.Suspense>
-                : <React.Suspense fallback={<div className="p-3 text-xs text-textMuted">Loading properties…</div>}>
-                    <RightSidebar />
+                ) : activeWorkspace === "animate" ? (
+                  <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Animate…</div>}>
+                    <AnimateFrameWorkspace
+                      store={canonical.store}
+                      assets={canonical.assets}
+                      disabled={canonical.persistenceState === "loading"}
+                    />
                   </React.Suspense>
+                ) : activeWorkspace === "collision" ? (
+                  <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading collision…</div>}>
+                    <CollisionWorkspacePanel />
+                  </React.Suspense>
+                ) : activeWorkspace === "slice" && !slicerImage && sourceSessionSnapshot.status === "ready" ? (
+                  <SliceSourcePreview
+                    snapshot={sourceSessionSnapshot}
+                    getBlob={getSourceBlob}
+                    committing={isSourceCommitting}
+                  />
+                ) : activeWorkspace === "slice" && !slicerImage && workspaceState.kind === "empty" ? (
+                  <SliceSourceDropzone
+                    snapshot={sourceSessionSnapshot}
+                    disabled={isSourceCommitting}
+                    committing={isSourceCommitting}
+                    browseButtonRef={dropzoneBrowseButtonRef}
+                    onBrowse={() => openSourcePicker(dropzoneBrowseButtonRef.current)}
+                    onSelect={(input) => selectSliceInput(input as File | FileList)}
+                    onRetry={retrySliceSource}
+                  />
+                ) : workspaceState.kind === "ready" ? (
+                  activeWorkspace === "export" && canonicalSliceSourceAvailable ? (
+                    <React.Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-textMuted">Loading Export…</div>}>
+                      <GridExportCenter
+                        project={canonicalProject}
+                        revision={canonical.store.getSnapshot().revision}
+                        repository={canonical.assets}
+                        onOpenCompose={openGridRegionInCompose}
+                        onToast={showToast}
+                      />
+                    </React.Suspense>
+                  ) : activeWorkspace === "slice" ? (
+                    <SliceSourceCanvasFrame
+                      snapshot={sourceSessionSnapshot}
+                      metadataOverride={committedSourceMetadata}
+                      legacyImageMeta={slicerImage}
+                      actions={(
+                        <SliceSourceActions
+                          busy={sourceSessionBusy}
+                          error={visibleSourceError}
+                          replaceButtonRef={replaceSourceTriggerRef}
+                          retryButtonRef={retrySourceTriggerRef}
+                          resetButtonRef={resetSourceTriggerRef}
+                          onReplace={() => {
+                            setSourceActionError(null);
+                            openSourcePicker(replaceSourceTriggerRef.current);
+                          }}
+                          onRequestReset={() => setResetSourceDialogOpen(true)}
+                          onRetry={retrySliceSource}
+                        />
+                      )}
+                      footer={<SliceResultsTray controller={sliceResultsController} />}
+                    >
+                      <CanvasArea
+                        ref={canvasRef}
+                        canonicalCanvasOwnership={canonicalCanvasOwnership}
+                        onCanonicalPickColor={sliceGridController.setChromaColor}
+                        canonicalRegionTool={canonicalRegionTool}
+                        sliceGridOverlay={irregularToolMode === "manual" ? null : {
+                          sourceDimensions: sliceGridController.sourceDimensions,
+                          effectiveLayout: sliceGridController.effectiveLayout,
+                          onResizeRowBoundary: sliceGridController.setManualRowBoundary,
+                          onResizeColumnBoundary: sliceGridController.setManualColumnBoundary,
+                        }}
+                      />
+                    </SliceSourceCanvasFrame>
+                  ) : (
+                    <CanvasArea
+                      ref={canvasRef}
+                      canonicalCanvasOwnership={canonicalCanvasOwnership}
+                      onCanonicalPickColor={sliceGridController.setChromaColor}
+                    />
+                  )
+                ) : (
+                  <StudioWorkspaceStateView
+                    state={workspaceState}
+                    registry={commandRegistry}
+                    commandContext={commandContext}
+                    onExecute={executeCommand}
+                    onDismissError={() => setStudioError(null)}
+                  />
+                )}
+              </main>
+            </StudioWorkspaceErrorBoundary>
+            {hasWorkspace && activeWorkspace !== "compose" && activeWorkspace !== "animate" && (
+              <TimelinePanel hidden={activeWorkspaceDefinition.capabilities.timeline !== "editable"} />
             )}
-          </StudioPanel>
-        ) : null}
-      </StudioDialog>
+          </>
+        )}
+      </LaneShell>
 
       <StudioDialog
         isOpen={videoImportFile !== null}

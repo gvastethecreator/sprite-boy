@@ -4,6 +4,7 @@
  */
 
 import { LOCAL_MODEL_IDS, type LocalModelId } from "../models/modelCatalog";
+import { STUDIO_TAB_IDS, resolveStudioRoute, type StudioTabId } from "../studio/laneRegistry";
 
 export const STUDIO_CONTROL_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_CONTROL_MAX_REQUEST_BYTES = 1_048_576 as const;
@@ -12,7 +13,7 @@ export const STUDIO_CONTROL_COMMANDS = Object.freeze([
   "capabilities.get",
   "project.get",
   "selection.get",
-  "workspace.navigate",
+  "lane.navigate",
   "asset.import",
   "video.import",
   "model.status",
@@ -66,9 +67,9 @@ export type StudioControlRequest =
       version: 1;
       requestId: string;
       idempotencyKey: string;
-      command: "workspace.navigate";
+      command: "lane.navigate";
       expectedRevision: number | null;
-      params: { workspaceId: "slice" | "compose" | "collision" | "export" };
+      params: { tab: StudioTabId; step?: string };
     }
   | {
       version: 1;
@@ -194,13 +195,6 @@ const ERROR_CODES = Object.freeze([
   "cancelled",
   "timeout",
   "internal",
-] as const);
-
-const WORKSPACE_IDS = Object.freeze([
-  "slice",
-  "compose",
-  "collision",
-  "export",
 ] as const);
 
 const EXPORT_FORMATS = Object.freeze([
@@ -338,21 +332,21 @@ function parseEmptyParams(params: unknown): EmptyParams {
   return freezeEmptyParams();
 }
 
-function parseWorkspaceNavigateParams(params: unknown): {
-  workspaceId: "slice" | "compose" | "collision" | "export";
-} {
+function parseLaneNavigateParams(params: unknown): { tab: StudioTabId; step?: string } {
   assertSafePlainObject(params, INVALID_REQUEST);
-  exactKeys(params, ["workspaceId"], INVALID_REQUEST);
-  const workspaceId = readDataProp(params, "workspaceId", INVALID_REQUEST);
-  if (
-    typeof workspaceId !== "string" ||
-    !(WORKSPACE_IDS as readonly string[]).includes(workspaceId)
-  ) {
+  const names = ownStringKeys(params, INVALID_REQUEST);
+  const hasStep = names.includes("step");
+  exactKeys(params, hasStep ? ["tab", "step"] : ["tab"], INVALID_REQUEST);
+  const tab = readDataProp(params, "tab", INVALID_REQUEST);
+  const step = hasStep ? readDataProp(params, "step", INVALID_REQUEST) : undefined;
+  if (typeof tab !== "string" || !(STUDIO_TAB_IDS as readonly string[]).includes(tab)) {
     throw new TypeError(INVALID_REQUEST);
   }
-  return Object.freeze({
-    workspaceId: workspaceId as "slice" | "compose" | "collision" | "export",
-  });
+  if (hasStep && typeof step !== "string") throw new TypeError(INVALID_REQUEST);
+  if (resolveStudioRoute(tab, step) === null) throw new TypeError(INVALID_REQUEST);
+  return Object.freeze(
+    hasStep ? { tab: tab as StudioTabId, step: step as string } : { tab: tab as StudioTabId },
+  );
 }
 
 function parseAssetImportParams(params: unknown): { path: string } {
@@ -501,8 +495,8 @@ function parseParams(
     return parseEmptyParams(params);
   }
   switch (command) {
-    case "workspace.navigate":
-      return parseWorkspaceNavigateParams(params);
+    case "lane.navigate":
+      return parseLaneNavigateParams(params);
     case "asset.import":
       return parseAssetImportParams(params);
     case "video.import":

@@ -40,7 +40,7 @@ describe("resolveStudioWorkspaceState", () => {
     for (const state of states) {
       expect(state.kind).toBe("empty");
       if (state.kind !== "empty") continue;
-      expect(state.primaryAction.commandId).toMatch(/^(asset\.import|workspace\.open\.slice)$/);
+      expect(state.primaryAction.commandId).toMatch(/^(asset\.import|lane\.go\.grid\.source)$/);
       expect(Object.isFrozen(state)).toBe(true);
       expect(Object.isFrozen(state.primaryAction)).toBe(true);
     }

@@ -8,12 +8,11 @@ import {
   STUDIO_WORKSPACES,
   getStudioWorkspace,
   isStudioWorkspaceId,
-  parseStudioWorkspaceHref,
   resolveStudioWorkspaceId,
 } from "../../core/studio";
 
 describe("Studio workspace registry", () => {
-  it("partitions every canonical context into five destinations plus Assets support", () => {
+  it("partitions every canonical context into five mounted editors plus Assets support", () => {
     expect(STUDIO_WORKSPACE_IDS).toEqual([
       "slice",
       "compose",
@@ -29,7 +28,7 @@ describe("Studio workspace registry", () => {
     expect(STUDIO_WORKSPACE_IDS).not.toContain("assets");
   });
 
-  it("publishes one immutable, ordered definition for every destination", () => {
+  it("publishes one immutable, ordered definition for every editor", () => {
     expect(Object.keys(STUDIO_WORKSPACE_REGISTRY)).toEqual(STUDIO_WORKSPACE_IDS);
     expect(STUDIO_WORKSPACES.map(({ id }) => id)).toEqual(STUDIO_WORKSPACE_IDS);
     expect(STUDIO_WORKSPACES.map(({ order }) => order)).toEqual([0, 1, 2, 3, 4]);
@@ -43,24 +42,15 @@ describe("Studio workspace registry", () => {
     }
   });
 
-  it("keeps labels, hrefs and navigation command IDs unique and derivable", () => {
+  it("keeps labels unique and gives editors no route of their own", () => {
     expect(new Set(STUDIO_WORKSPACES.map(({ label }) => label)).size).toBe(5);
-    expect(new Set(STUDIO_WORKSPACES.map(({ href }) => href)).size).toBe(5);
-    expect(new Set(STUDIO_WORKSPACES.map(({ commandId }) => commandId)).size).toBe(5);
-
     for (const workspace of STUDIO_WORKSPACES) {
-      expect(workspace.href).toBe(`#/studio/${workspace.id}`);
-      expect(workspace.commandId).toBe(`workspace.open.${workspace.id}`);
-      expect(parseStudioWorkspaceHref(workspace.href)).toBe(workspace.id);
+      expect(workspace).not.toHaveProperty("href");
+      expect(workspace).not.toHaveProperty("commandId");
     }
   });
 
-  it("rejects aliases and keeps support contexts out of primary routing", () => {
-    expect(parseStudioWorkspaceHref("#/studio/assets")).toBeNull();
-    expect(parseStudioWorkspaceHref("#/studio/slice/")).toBeNull();
-    expect(parseStudioWorkspaceHref("#/studio/slice?panel=assets")).toBeNull();
-    expect(parseStudioWorkspaceHref("slice")).toBeNull();
-    expect(parseStudioWorkspaceHref(null)).toBeNull();
+  it("keeps support contexts out of the mounted editors", () => {
     expect(isStudioWorkspaceId("assets")).toBe(false);
     expect(isStudioWorkspaceId("collision")).toBe(true);
   });

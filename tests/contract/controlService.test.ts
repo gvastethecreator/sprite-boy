@@ -110,7 +110,7 @@ describe("StudioControlService command routing", () => {
   it.each([
     ["project.get", {}, "getProject"],
     ["selection.get", {}, "getSelection"],
-    ["workspace.navigate", { workspaceId: "compose" }, "navigate"],
+    ["lane.navigate", { tab: "items", step: "sheet" }, "navigate"],
     ["asset.import", { path: "C:\\sprite.png" }, "importAsset"],
     [
       "video.import",

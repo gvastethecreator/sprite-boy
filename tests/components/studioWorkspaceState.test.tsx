@@ -25,7 +25,7 @@ function createRegistry() {
     importAsset: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
-    openWorkspace: vi.fn(),
+    openRoute: vi.fn(),
     resetCanvas: vi.fn(),
     openCommandPalette: vi.fn(),
     openPreferences: vi.fn(),
@@ -59,10 +59,10 @@ describe("StudioWorkspaceStateView", () => {
 
     expect(screen.getByRole("heading", { name: "Create frames before hitboxes" })).toBeInTheDocument();
     expect(screen.getByText(/attach to sliced frames/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Go to Slice/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Go to Grid/i }));
     fireEvent.click(screen.getByRole("button", { name: /Import source art/i }));
     expect(onExecute.mock.calls.map(([commandId]) => commandId)).toEqual([
-      "workspace.open.slice",
+      "lane.go.grid.source",
       "asset.import",
     ]);
   });

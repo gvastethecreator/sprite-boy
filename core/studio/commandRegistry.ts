@@ -1,8 +1,13 @@
 import {
-  STUDIO_WORKSPACES,
-  type StudioWorkspaceCommandId,
-  type StudioWorkspaceId,
-} from "./workspaceRegistry";
+  STUDIO_LANE_LABELS,
+  STUDIO_LANE_ROUTES,
+  STUDIO_STEP_LABELS,
+  isStudioLaneCommandId,
+  routeCommandId,
+  routeFromCommandId,
+  type StudioLaneCommandId,
+  type StudioLaneRoute,
+} from "./laneRegistry";
 
 export const STUDIO_BASE_COMMAND_IDS = Object.freeze([
   "project.new",
@@ -18,11 +23,11 @@ export const STUDIO_BASE_COMMAND_IDS = Object.freeze([
 ] as const);
 
 export type StudioBaseCommandId = (typeof STUDIO_BASE_COMMAND_IDS)[number];
-export type StudioCommandId = StudioBaseCommandId | StudioWorkspaceCommandId;
+export type StudioCommandId = StudioBaseCommandId | StudioLaneCommandId;
 
 export const STUDIO_COMMAND_IDS: readonly StudioCommandId[] = Object.freeze([
   ...STUDIO_BASE_COMMAND_IDS.slice(0, 6),
-  ...STUDIO_WORKSPACES.map(({ commandId }) => commandId),
+  ...STUDIO_LANE_ROUTES.map(routeCommandId),
   ...STUDIO_BASE_COMMAND_IDS.slice(6),
 ]);
 
@@ -210,23 +215,28 @@ const FIXED_COMMANDS = Object.freeze([
   }),
 ] as const);
 
-const WORKSPACE_COMMANDS = Object.freeze(STUDIO_WORKSPACES.map((workspace, index) =>
-  defineCommand({
-    id: workspace.commandId,
-    label: `Open ${workspace.label}`,
-    description: workspace.description,
-    category: "workspace",
-    keywords: [workspace.id],
-    shortcuts: [primary(`Digit${index + 1}`)],
+const LANE_COMMAND_BY_ID: ReadonlyMap<string, StudioCommand> = new Map(
+  STUDIO_LANE_ROUTES.map((route) => {
+    const id = routeCommandId(route);
+    const lane = STUDIO_LANE_LABELS[route.tab];
+    const label = route.step === null ? "Go to Library" : `Go to ${lane} › ${STUDIO_STEP_LABELS[route.step]}`;
+    return [id, defineCommand({
+      id,
+      label,
+      description: route.step === null
+        ? "Sources, approved items and sheets."
+        : `Open the ${STUDIO_STEP_LABELS[route.step]} step of the ${lane} lane.`,
+      category: "workspace",
+      keywords: route.step === null ? ["library"] : [route.tab, route.step, "lane", "step"],
+    })];
   }),
-));
+);
 
 const FIXED_COMMAND_BY_ID = new Map(FIXED_COMMANDS.map((command) => [command.id, command]));
 
 export const STUDIO_COMMANDS: readonly StudioCommand[] = Object.freeze(
   STUDIO_COMMAND_IDS.map((id) => {
-    const workspace = WORKSPACE_COMMANDS.find((command) => command.id === id);
-    const command = workspace ?? FIXED_COMMAND_BY_ID.get(id as StudioBaseCommandId);
+    const command = LANE_COMMAND_BY_ID.get(id) ?? FIXED_COMMAND_BY_ID.get(id as StudioBaseCommandId);
     if (!command) throw new Error(`Missing Studio command metadata: ${id}.`);
     return command;
   }),
@@ -311,6 +321,7 @@ const disabled = (code: StudioCommandDisabledCode, reason: string): StudioComman
   Object.freeze({ enabled: false, code, reason });
 
 function commandState(id: StudioCommandId, context: StudioCommandContext): StudioCommandState {
+  if (isStudioLaneCommandId(id)) return ENABLED;
   switch (id) {
     case "project.new":
       return context.busy ? disabled("BUSY", "Wait for the current operation to finish.") : ENABLED;
@@ -336,11 +347,6 @@ function commandState(id: StudioCommandId, context: StudioCommandContext): Studi
       return context.canvasAvailable
         ? ENABLED
         : disabled("CANVAS_UNAVAILABLE", "The active workspace has no canvas yet.");
-    case "workspace.open.slice":
-    case "workspace.open.compose":
-    case "workspace.open.animate":
-    case "workspace.open.collision":
-    case "workspace.open.export":
     case "app.openCommandPalette":
     case "app.openPreferences":
     case "app.openHelp":
@@ -358,7 +364,7 @@ export interface StudioCommandHandlers {
   readonly importAsset: StudioCommandHandler;
   readonly undo: StudioCommandHandler;
   readonly redo: StudioCommandHandler;
-  readonly openWorkspace: (workspaceId: StudioWorkspaceId) => void | Promise<void>;
+  readonly openRoute: (route: StudioLaneRoute) => void | Promise<void>;
   readonly resetCanvas: StudioCommandHandler;
   readonly openCommandPalette: StudioCommandHandler;
   readonly openPreferences: StudioCommandHandler;
@@ -372,7 +378,7 @@ const REQUIRED_HANDLER_KEYS = Object.freeze([
   "importAsset",
   "undo",
   "redo",
-  "openWorkspace",
+  "openRoute",
   "resetCanvas",
   "openCommandPalette",
   "openPreferences",
@@ -468,6 +474,7 @@ async function invokeCommand(
   commandId: StudioCommandId,
   handlers: StudioCommandHandlers,
 ): Promise<void> {
+  if (isStudioLaneCommandId(commandId)) return handlers.openRoute(routeFromCommandId(commandId));
   switch (commandId) {
     case "project.new": return handlers.newProject();
     case "project.open": return handlers.openProject();
@@ -475,11 +482,6 @@ async function invokeCommand(
     case "asset.import": return handlers.importAsset();
     case "edit.undo": return handlers.undo();
     case "edit.redo": return handlers.redo();
-    case "workspace.open.slice": return handlers.openWorkspace("slice");
-    case "workspace.open.compose": return handlers.openWorkspace("compose");
-    case "workspace.open.animate": return handlers.openWorkspace("animate");
-    case "workspace.open.collision": return handlers.openWorkspace("collision");
-    case "workspace.open.export": return handlers.openWorkspace("export");
     case "view.resetCanvas": return handlers.resetCanvas();
     case "app.openCommandPalette": return handlers.openCommandPalette();
     case "app.openPreferences": return handlers.openPreferences();

@@ -59,7 +59,7 @@ export interface StudioControlPorts {
   getProject(context: StudioControlPortContext): MaybePromise<StudioControlPortResult>;
   getSelection(context: StudioControlPortContext): MaybePromise<StudioControlPortResult>;
   navigate(
-    params: ParamsFor<"workspace.navigate">,
+    params: ParamsFor<"lane.navigate">,
     context: StudioControlPortContext,
   ): MaybePromise<StudioControlPortResult>;
   importAsset(
@@ -385,7 +385,7 @@ function dispatchPort(
   switch (request.command) {
     case "project.get": return ports.getProject(context);
     case "selection.get": return ports.getSelection(context);
-    case "workspace.navigate": return ports.navigate(request.params, context);
+    case "lane.navigate": return ports.navigate(request.params, context);
     case "asset.import": return ports.importAsset(request.params, context);
     case "video.import": return ports.importVideo(request.params, context);
     case "model.status": return ports.getModelStatus(request.params, context);

@@ -29,7 +29,7 @@ function controlRequest(
   };
 }
 
-describe.sequential("studio control loopback bridge", () => {
+describe("studio control loopback bridge", { concurrent: false }, () => {
   let child: ChildProcessWithoutNullStreams;
   let baseUrl: string;
   let clientId: string;

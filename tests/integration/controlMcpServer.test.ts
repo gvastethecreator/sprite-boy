@@ -15,7 +15,7 @@ function processEnvironment(extra: Record<string, string>): Record<string, strin
   return { ...environment, ...extra };
 }
 
-describe.sequential("SpriteBoy MCP stdio server", () => {
+describe("SpriteBoy MCP stdio server", { concurrent: false }, () => {
   let bridge: ChildProcessWithoutNullStreams;
   let bridgeUrl: string;
   let browserClientId: string;
@@ -166,22 +166,28 @@ describe.sequential("SpriteBoy MCP stdio server", () => {
     const operation = client.callTool({
       name: "spriteboy_navigate",
       arguments: {
-        workspaceId: "compose",
+        tab: "items",
+        step: "sheet",
         expectedRevision: 4,
         idempotencyKey: "mcp-navigate-proof",
       },
     });
-    const driven = await driveBridge(operation, "workspace.navigate", { workspaceId: "compose" }, 5);
+    const driven = await driveBridge(
+      operation,
+      "lane.navigate",
+      { tab: "items", step: "sheet" },
+      5,
+    );
 
     expect(driven.request).toMatchObject({
       version: 1,
       idempotencyKey: "mcp-navigate-proof",
       expectedRevision: 4,
-      params: { workspaceId: "compose" },
+      params: { tab: "items", step: "sheet" },
     });
     expect(driven.operationResult).toMatchObject({
       isError: false,
-      structuredContent: { ok: true, revision: 5, result: { workspaceId: "compose" } },
+      structuredContent: { ok: true, revision: 5, result: { tab: "items", step: "sheet" } },
     });
   });
 
@@ -206,7 +212,7 @@ describe.sequential("SpriteBoy MCP stdio server", () => {
   it("rejects invalid tool input before it reaches the bridge", async () => {
     const result = await client.callTool({
       name: "spriteboy_navigate",
-      arguments: { workspaceId: "animate", extra: true },
+      arguments: { tab: "items", extra: true },
     });
     expect(result.isError).toBe(true);
 

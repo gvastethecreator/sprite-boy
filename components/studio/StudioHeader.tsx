@@ -1,28 +1,32 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Activity,
-  Clapperboard,
+  Boxes,
   ChevronDown,
   CircleHelp,
-  Download,
+  Clapperboard,
   FilePlus2,
   FolderOpen,
+  Grid3x3,
   Layers3,
   LayoutGrid,
+  Library,
   Pencil,
   Redo2,
   Save,
-  Scissors,
   Settings,
-  Target,
   Undo2,
   Upload,
 } from "lucide-react";
 import {
-  STUDIO_WORKSPACES,
-  getStudioWorkspace,
-  type StudioWorkspaceId,
-} from "../../core/studio/workspaceRegistry";
+  STUDIO_LANE_DESCRIPTIONS,
+  STUDIO_LANE_LABELS,
+  STUDIO_TAB_IDS,
+  getDefaultRoute,
+  routeCommandId,
+  routeHref,
+  type StudioTabId,
+} from "../../core/studio/laneRegistry";
 import type {
   StudioCommandContext,
   StudioCommandId,
@@ -31,7 +35,7 @@ import type {
 } from "../../core/studio/commandRegistry";
 
 export interface StudioHeaderProps {
-  readonly activeWorkspace: StudioWorkspaceId;
+  readonly activeTab: StudioTabId;
   readonly registry: StudioCommandRegistry;
   readonly commandContext: StudioCommandContext;
   readonly onExecute: (commandId: StudioCommandId) => void;
@@ -44,13 +48,13 @@ export interface StudioHeaderProps {
   readonly onRenameProject?: (name: string) => string | null;
 }
 
-const WORKSPACE_ICONS = {
-  slice: Scissors,
-  compose: Layers3,
-  animate: Clapperboard,
-  collision: Target,
-  export: Download,
-} as const satisfies Record<StudioWorkspaceId, React.ComponentType<{
+const TAB_ICONS = {
+  items: Boxes,
+  grid: Grid3x3,
+  animation: Clapperboard,
+  tileset: Layers3,
+  library: Library,
+} as const satisfies Record<StudioTabId, React.ComponentType<{
   size?: number;
   strokeWidth?: number;
   className?: string;
@@ -80,7 +84,7 @@ interface CommandButtonProps {
   readonly menuItem?: boolean;
 }
 
-type OpenHeaderMenu = "project" | "workspace" | null;
+type OpenHeaderMenu = "project" | null;
 
 function getEnabledMenuItems(menu: HTMLElement): HTMLElement[] {
   return Array.from(
@@ -139,7 +143,7 @@ function CommandButton({
 }
 
 export const StudioHeader: React.FC<StudioHeaderProps> = ({
-  activeWorkspace,
+  activeTab,
   registry,
   commandContext,
   onExecute,
@@ -153,31 +157,25 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
 }) => {
   const [openMenu, setOpenMenu] = useState<OpenHeaderMenu>(null);
   const projectTriggerRef = useRef<HTMLButtonElement>(null);
-  const workspaceTriggerRef = useRef<HTMLButtonElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
-  const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState(projectName);
   const [renameError, setRenameError] = useState<string | null>(null);
-  const exportCommandId = "workspace.open.export" as const;
-  const exportState = commandState(registry, exportCommandId, commandContext);
-  const exportDisabled = !exportState.enabled;
 
-  const restoreMenuTrigger = (menu: Exclude<OpenHeaderMenu, null>) => {
-    const trigger = menu === "project" ? projectTriggerRef.current : workspaceTriggerRef.current;
-    window.requestAnimationFrame(() => trigger?.focus());
+  const restoreMenuTrigger = () => {
+    window.requestAnimationFrame(() => projectTriggerRef.current?.focus());
   };
 
   const closeMenu = (restoreFocus = false) => {
     const menu = openMenu;
     setOpenMenu(null);
-    if (restoreFocus && menu) restoreMenuTrigger(menu);
+    if (restoreFocus && menu) restoreMenuTrigger();
   };
 
   useEffect(() => {
     if (!openMenu) return;
-    const menu = openMenu === "project" ? projectMenuRef.current : workspaceMenuRef.current;
+    const menu = projectMenuRef.current;
     const frame = window.requestAnimationFrame(() => {
       const firstItem = menu ? getEnabledMenuItems(menu)[0] : undefined;
       firstItem?.focus();
@@ -264,7 +262,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
     closeMenu(true);
   };
 
-  const executeWorkspace = (
+  const executeLane = (
     event: React.MouseEvent<HTMLAnchorElement>,
     commandId: StudioCommandId,
   ) => {
@@ -462,97 +460,33 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         </div>
       </div>
 
-      <div className="absolute left-1/2 -translate-x-1/2 xl:hidden">
-        <button
-          ref={workspaceTriggerRef}
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={openMenu === "workspace"}
-          aria-controls="studio-workspace-menu"
-          onClick={() => setOpenMenu((current) => current === "workspace" ? null : "workspace")}
-          className="inline-flex max-w-[34vw] items-center gap-1.5 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <span className="truncate">{getStudioWorkspace(activeWorkspace).label}</span>
-          <ChevronDown size={12} aria-hidden="true" className={openMenu === "workspace" ? "rotate-180 opacity-70" : "opacity-60"} />
-        </button>
-        {openMenu === "workspace" && (
-          <>
-            <div
-              aria-hidden="true"
-              className="fixed inset-0 z-40 cursor-default"
-              onPointerDown={() => closeMenu(true)}
-            />
-            <div
-              ref={workspaceMenuRef}
-              id="studio-workspace-menu"
-              role="menu"
-              aria-label="Studio workspaces"
-              onKeyDown={handleMenuKeyDown}
-              className="absolute left-1/2 top-full z-50 mt-2 w-56 -translate-x-1/2 rounded-lg border border-border bg-panel p-1 shadow-xl"
-            >
-              {STUDIO_WORKSPACES.map((workspace) => {
-                const Icon = WORKSPACE_ICONS[workspace.id];
-                const state = commandState(registry, workspace.commandId, commandContext);
-                const disabled = !state.enabled;
-                return (
-                  <a
-                    key={workspace.id}
-                    role="menuitem"
-                    tabIndex={-1}
-                    href={workspace.href}
-                    data-workspace-id={workspace.id}
-                    aria-current={activeWorkspace === workspace.id ? "page" : undefined}
-                    aria-disabled={disabled || undefined}
-                    title={disabled ? state.reason : workspace.description}
-                    onClick={(event) => {
-                      executeWorkspace(event, workspace.commandId);
-                      if (!disabled && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
-                        closeMenu(true);
-                      }
-                    }}
-                    className={[
-                      "flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium",
-                      activeWorkspace === workspace.id
-                        ? "bg-accent text-white"
-                        : "text-textMuted hover:bg-white/5 hover:text-textMain",
-                      disabled ? "pointer-events-none opacity-35" : "",
-                    ].join(" ")}
-                  >
-                    <Icon size={14} strokeWidth={1.8} aria-hidden="true" />
-                    <span>{workspace.label}</span>
-                  </a>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-
-      <nav aria-label="Studio workspaces" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 rounded-md border border-white/8 bg-surface/60 p-0.5 xl:flex">
-        {STUDIO_WORKSPACES.map((workspace) => {
-          const Icon = WORKSPACE_ICONS[workspace.id];
-          const commandId = workspace.commandId;
+      <nav aria-label="Studio lanes" className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-md border border-white/8 bg-surface/60 p-0.5">
+        {STUDIO_TAB_IDS.map((tab) => {
+          const Icon = TAB_ICONS[tab];
+          const route = getDefaultRoute(tab);
+          const commandId = routeCommandId(route);
           const state = commandState(registry, commandId, commandContext);
           const disabled = !state.enabled;
           return (
             <a
-              key={workspace.id}
-              href={workspace.href}
-              data-workspace-id={workspace.id}
-              aria-current={activeWorkspace === workspace.id ? "page" : undefined}
+              key={tab}
+              href={routeHref(route)}
+              data-tab-id={tab}
+              aria-current={activeTab === tab ? "page" : undefined}
               aria-disabled={disabled || undefined}
-              title={disabled ? state.reason : workspace.description}
-              onClick={(event) => executeWorkspace(event, commandId)}
+              title={disabled ? state.reason : STUDIO_LANE_DESCRIPTIONS[tab]}
+              onClick={(event) => executeLane(event, commandId)}
               className={[
                 "relative inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[11px] font-medium transition-colors",
-                activeWorkspace === workspace.id
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                activeTab === tab
                   ? "bg-white/12 text-textMain shadow-sm"
                   : "text-textMuted hover:bg-white/5 hover:text-textMain",
                 disabled ? "pointer-events-none opacity-35" : "",
               ].join(" ")}
             >
               <Icon size={13} strokeWidth={1.8} aria-hidden="true" />
-              {workspace.label}
+              {STUDIO_LANE_LABELS[tab]}
             </a>
           );
         })}
@@ -582,21 +516,6 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
             ) : null}
           </button>
         ) : null}
-        <a
-          href={getStudioWorkspace("export").href}
-          data-command-id={exportCommandId}
-          aria-label="Export"
-          aria-disabled={exportDisabled || undefined}
-          title={exportDisabled ? exportState.reason : registry.getCommand(exportCommandId).description}
-          onClick={(event) => executeWorkspace(event, exportCommandId)}
-          className={[
-            "inline-flex items-center gap-2 rounded-md border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-textMain transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-3",
-            exportDisabled ? "pointer-events-none opacity-35" : "",
-          ].join(" ")}
-        >
-          <Download size={14} strokeWidth={1.8} aria-hidden="true" />
-          <span className="hidden sm:inline">Export</span>
-        </a>
         <div className="hidden items-center gap-1 border-l border-white/10 pl-2 sm:flex">
           <CommandButton
             commandId="app.openHelp"

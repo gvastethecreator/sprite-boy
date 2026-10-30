@@ -161,7 +161,7 @@ function runtime(options: RuntimeOptions = {}) {
 }
 
 afterEach(() => {
-  window.history.replaceState(window.history.state, "", "#/studio/slice");
+  window.history.replaceState(window.history.state, "", "#/studio/items/source");
   vi.unstubAllGlobals();
 });
 
@@ -181,20 +181,51 @@ describe("browser Studio control ports", () => {
     expect(jobs).toMatchObject({ ok: true, result: { order: [], jobs: {} } });
   });
 
-  it("updates the project and shell route for workspace.navigate", async () => {
+  it("updates the project and shell route for lane.navigate on a mounted step", async () => {
     const value = runtime();
-    window.history.replaceState(window.history.state, "", "#/studio/slice");
+    window.history.replaceState(window.history.state, "", "#/studio/items/source");
 
-    const response = await value.ports.navigate({ workspaceId: "compose" }, context());
+    const response = await value.ports.navigate({ tab: "items", step: "sheet" }, context());
 
     expect(response).toMatchObject({
       ok: true,
       revision: 1,
-      result: { workspaceId: "compose" },
+      result: { tab: "items", step: "sheet" },
     });
     expect(value.navigate).toHaveBeenCalledWith("compose");
     expect(value.projectStore.getSnapshot().project.workspace.activeWorkspace).toBe("compose");
-    expect(window.location.hash).toBe("#/studio/compose");
+    expect(window.location.hash).toBe("#/studio/items/sheet");
+  });
+
+  it("opens a native step without touching the stored workspace", async () => {
+    const value = runtime();
+    window.history.replaceState(window.history.state, "", "#/studio/grid/source");
+
+    const response = await value.ports.navigate({ tab: "tileset", step: "tiles" }, context());
+
+    expect(response).toMatchObject({ ok: true, revision: 0, result: { tab: "tileset", step: "tiles" } });
+    expect(value.navigate).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("#/studio/tileset/tiles");
+  });
+
+  it("opens the first step when only the lane is named", async () => {
+    const value = runtime();
+
+    const response = await value.ports.navigate({ tab: "animation" }, context());
+
+    expect(response).toMatchObject({ ok: true, result: { tab: "animation", step: "source" } });
+    expect(window.location.hash).toBe("#/studio/animation/source");
+  });
+
+  it("rejects a step that the lane does not have", async () => {
+    const value = runtime();
+    window.history.replaceState(window.history.state, "", "#/studio/items/source");
+
+    const response = await value.ports.navigate({ tab: "items", step: "map" }, context());
+
+    expect(response).toMatchObject({ ok: false, error: { code: "invalid-request" } });
+    expect(value.navigate).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("#/studio/items/source");
   });
 
   it("does not navigate after cancellation", async () => {
@@ -203,13 +234,13 @@ describe("browser Studio control ports", () => {
     controller.abort();
 
     const response = await value.ports.navigate(
-      { workspaceId: "compose" },
+      { tab: "items", step: "sheet" },
       context(controller.signal),
     );
 
     expect(response).toMatchObject({ ok: false, error: { code: "cancelled" } });
     expect(value.navigate).not.toHaveBeenCalled();
-    expect(window.location.hash).toBe("#/studio/slice");
+    expect(window.location.hash).toBe("#/studio/items/source");
   });
 
   it("routes job cancellation and reports a missing active job", async () => {
@@ -305,7 +336,7 @@ describe("browser Studio control ports", () => {
       activeWorkspace: "slice",
       selectedAssetId: expect.any(String),
     });
-    expect(window.location.hash).toBe("#/studio/slice");
+    expect(window.location.hash).toBe("#/studio/grid/source");
   });
 
   it("rejects an image import when the authorized revision changes during transfer", async () => {
@@ -522,7 +553,7 @@ describe("browser Studio control ports", () => {
       "capabilities.get",
       "project.get",
       "selection.get",
-      "workspace.navigate",
+      "lane.navigate",
       "jobs.list",
       "jobs.cancel",
     ]);
@@ -530,7 +561,7 @@ describe("browser Studio control ports", () => {
       "capabilities.get",
       "project.get",
       "selection.get",
-      "workspace.navigate",
+      "lane.navigate",
       "asset.import",
       "video.import",
       "model.status",

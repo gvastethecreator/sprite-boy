@@ -5,6 +5,7 @@ import {
   type StudioCommandContext,
   type StudioCommandHandlers,
 } from "../../core/studio/commandRegistry";
+import type { StudioTabId } from "../../core/studio";
 import { StudioHeader } from "../../components/studio/StudioHeader";
 
 const commandContext: StudioCommandContext = {
@@ -24,7 +25,7 @@ function makeRegistry() {
     importAsset: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
-    openWorkspace: vi.fn(),
+    openRoute: vi.fn(),
     resetCanvas: vi.fn(),
     openCommandPalette: vi.fn(),
     openPreferences: vi.fn(),
@@ -33,12 +34,12 @@ function makeRegistry() {
   return { registry: createStudioCommandRegistry(handlers), handlers };
 }
 
-function renderHeader(activeWorkspace: "slice" | "compose" | "animate" | "collision" | "export" = "slice") {
+function renderHeader(activeTab: StudioTabId = "items") {
   const { registry } = makeRegistry();
   const onExecute = vi.fn();
   render(
     <StudioHeader
-      activeWorkspace={activeWorkspace}
+      activeTab={activeTab}
       registry={registry}
       commandContext={commandContext}
       onExecute={onExecute}
@@ -48,40 +49,51 @@ function renderHeader(activeWorkspace: "slice" | "compose" | "animate" | "collis
 }
 
 describe("StudioHeader", () => {
-  it("renders the registry order, canonical hrefs and active workspace", () => {
-    renderHeader("collision");
+  it("renders the four lanes and the Library with canonical hrefs", () => {
+    renderHeader("animation");
 
-    const navigation = screen.getByRole("navigation", { name: "Studio workspaces" });
+    const navigation = screen.getByRole("navigation", { name: "Studio lanes" });
     const links = within(navigation).getAllByRole("link");
     expect(links.map((link) => link.textContent?.trim())).toEqual([
-      "Slice",
-      "Compose",
-      "Animate",
-      "Collision",
-      "Export",
+      "Items",
+      "Grid",
+      "Animation",
+      "Tileset",
+      "Library",
     ]);
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      "#/studio/slice",
-      "#/studio/compose",
-      "#/studio/animate",
-      "#/studio/collision",
-      "#/studio/export",
+      "#/studio/items/source",
+      "#/studio/grid/source",
+      "#/studio/animation/source",
+      "#/studio/tileset/source",
+      "#/studio/library",
     ]);
-    expect(links[3]).toHaveAttribute("aria-current", "page");
+    expect(links[2]).toHaveAttribute("aria-current", "page");
+    expect(links.filter((link) => link.hasAttribute("aria-current"))).toHaveLength(1);
     expect(screen.getByText("SpriteBoy")).toBeInTheDocument();
     expect(screen.getByText("Studio")).toBeInTheDocument();
   });
 
-  it("routes primary workspace clicks, while modified clicks preserve href navigation", () => {
+  it("routes primary lane clicks, while modified clicks preserve href navigation", () => {
     const { onExecute } = renderHeader();
-    const collision = screen.getByRole("link", { name: "Collision" });
+    const tileset = screen.getByRole("link", { name: "Tileset" });
 
-    fireEvent.click(collision);
-    expect(onExecute).toHaveBeenCalledWith("workspace.open.collision");
+    fireEvent.click(tileset);
+    expect(onExecute).toHaveBeenCalledWith("lane.go.tileset.source");
 
     onExecute.mockClear();
-    fireEvent.click(collision, { button: 0, ctrlKey: true });
+    fireEvent.click(screen.getByRole("link", { name: "Library" }));
+    expect(onExecute).toHaveBeenCalledWith("lane.go.library");
+
+    onExecute.mockClear();
+    fireEvent.click(tileset, { button: 0, ctrlKey: true });
     expect(onExecute).not.toHaveBeenCalled();
+  });
+
+  it("has no Export link and no workspace menu", () => {
+    renderHeader();
+    expect(screen.queryByRole("link", { name: "Export" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "Studio workspaces" })).not.toBeInTheDocument();
   });
 
   it("routes the real project menu and utility commands", () => {
@@ -119,7 +131,7 @@ describe("StudioHeader", () => {
     };
     render(
       <StudioHeader
-        activeWorkspace="slice"
+        activeTab="items"
         registry={registry}
         commandContext={unavailable}
         onExecute={onExecute}
@@ -140,7 +152,7 @@ describe("StudioHeader", () => {
     const onRenameProject = vi.fn(() => null);
     render(
       <StudioHeader
-        activeWorkspace="compose"
+        activeTab="grid"
         registry={registry}
         commandContext={commandContext}
         onExecute={vi.fn()}
@@ -185,22 +197,12 @@ describe("StudioHeader", () => {
     expect(within(reopenedMenu).queryByRole("textbox", { name: "Project name" })).not.toBeInTheDocument();
   });
 
-  it("keeps Export as a dedicated CTA with canonical routing", () => {
-    const { onExecute } = renderHeader();
-    const exportLinks = screen.getAllByRole("link", { name: "Export" });
-    const cta = exportLinks[exportLinks.length - 1];
-
-    expect(cta).toHaveAttribute("href", "#/studio/export");
-    fireEvent.click(cta);
-    expect(onExecute).toHaveBeenCalledWith("workspace.open.export");
-  });
-
   it("exposes Job Center activity without changing command routing", () => {
     const { registry } = makeRegistry();
     const onOpenJobCenter = vi.fn();
     render(
       <StudioHeader
-        activeWorkspace="slice"
+        activeTab="items"
         registry={registry}
         commandContext={commandContext}
         onExecute={vi.fn()}
@@ -220,32 +222,5 @@ describe("StudioHeader", () => {
     fireEvent.click(trigger);
     expect(screen.queryByRole("menu", { name: "Project actions" })).not.toBeInTheDocument();
     expect(onOpenJobCenter).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps every workspace reachable from the compact menu and restores focus", async () => {
-    const { onExecute } = renderHeader("compose");
-    const trigger = screen.getByRole("button", { name: "Compose" });
-
-    fireEvent.click(trigger);
-    const menu = screen.getByRole("menu", { name: "Studio workspaces" });
-    const items = within(menu).getAllByRole("menuitem");
-    expect(items.map((item) => item.textContent?.trim())).toEqual([
-      "Slice",
-      "Compose",
-      "Animate",
-      "Collision",
-      "Export",
-    ]);
-    await waitFor(() => expect(items[0]).toHaveFocus());
-
-    fireEvent.keyDown(menu, { key: "End" });
-    expect(items[4]).toHaveFocus();
-    fireEvent.keyDown(menu, { key: "Escape" });
-    await waitFor(() => expect(trigger).toHaveFocus());
-
-    fireEvent.click(trigger);
-    fireEvent.click(within(screen.getByRole("menu", { name: "Studio workspaces" })).getByRole("menuitem", { name: "Collision" }));
-    expect(onExecute).toHaveBeenLastCalledWith("workspace.open.collision");
-    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

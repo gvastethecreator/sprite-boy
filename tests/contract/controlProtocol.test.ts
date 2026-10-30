@@ -52,7 +52,7 @@ describe("studio control protocol constants", () => {
       "capabilities.get",
       "project.get",
       "selection.get",
-      "workspace.navigate",
+      "lane.navigate",
       "asset.import",
       "video.import",
       "model.status",
@@ -81,16 +81,20 @@ describe("parseStudioControlRequest — valid commands", () => {
     }
   });
 
-  it("parses workspace.navigate", () => {
-    for (const workspaceId of ["slice", "compose", "collision", "export"] as const) {
-      const parsed = parseStudioControlRequest(
-        req("workspace.navigate", { workspaceId }),
-      );
-      expect(parsed).toMatchObject({
-        command: "workspace.navigate",
-        params: { workspaceId },
-      });
+  it("parses lane.navigate with and without a step", () => {
+    for (const tab of ["items", "grid", "animation", "tileset", "library"] as const) {
+      const parsed = parseStudioControlRequest(req("lane.navigate", { tab }));
+      expect(parsed).toMatchObject({ command: "lane.navigate", params: { tab } });
+      expect(parsed.params).not.toHaveProperty("step");
     }
+    const withStep = parseStudioControlRequest(
+      req("lane.navigate", { tab: "animation", step: "collision" }),
+    );
+    expect(withStep).toMatchObject({
+      command: "lane.navigate",
+      params: { tab: "animation", step: "collision" },
+    });
+    expect(Object.isFrozen(withStep.params)).toBe(true);
   });
 
   it("parses asset.import path without reading filesystem", () => {
@@ -361,10 +365,14 @@ describe("parseStudioControlRequest — hostile / invalid input", () => {
     );
   });
 
-  it("rejects bad workspace, model, export enums", () => {
-    expectInvalidRequest(
-      req("workspace.navigate", { workspaceId: "grid" }),
-    );
+  it("rejects bad lane, step, model, export enums", () => {
+    expectInvalidRequest(req("lane.navigate", { tab: "slice" }));
+    expectInvalidRequest(req("lane.navigate", { tab: "compose" }));
+    expectInvalidRequest(req("lane.navigate", { tab: "grid", step: "map" }));
+    expectInvalidRequest(req("lane.navigate", { tab: "library", step: "source" }));
+    expectInvalidRequest(req("lane.navigate", { tab: "items", step: 3 }));
+    expectInvalidRequest(req("lane.navigate", { workspaceId: "slice" }));
+    expectInvalidRequest(req("lane.navigate", {}));
     expectInvalidRequest(req("model.status", { modelId: "other" }));
     expectInvalidRequest(
       req("model.setup", { modelId: "birefnet-lite-512", acceptLicense: "yes" }),
@@ -448,9 +456,8 @@ describe("parseStudioControlRequest — hostile / invalid input", () => {
 
   it("rejects extra keys on params", () => {
     expectInvalidRequest(req("project.get", { extra: 1 }));
-    expectInvalidRequest(
-      req("workspace.navigate", { workspaceId: "slice", x: 1 }),
-    );
+    expectInvalidRequest(req("lane.navigate", { tab: "items", x: 1 }));
+    expectInvalidRequest(req("lane.navigate", { tab: "items", step: "source", x: 1 }));
   });
 
   it("error messages stay generic and do not echo secrets", () => {
@@ -942,7 +949,7 @@ describe("end-to-end typed request shapes", () => {
       parseStudioControlRequest(req("project.get", {})),
       parseStudioControlRequest(req("selection.get", {})),
       parseStudioControlRequest(
-        req("workspace.navigate", { workspaceId: "compose" }),
+        req("lane.navigate", { tab: "items", step: "sheet" }),
       ),
       parseStudioControlRequest(req("asset.import", { path: "a.png" })),
       parseStudioControlRequest(

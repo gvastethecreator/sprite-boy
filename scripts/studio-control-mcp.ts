@@ -212,10 +212,11 @@ async function main(): Promise<void> {
   server.registerTool(
     "spriteboy_navigate",
     {
-      title: "Open a SpriteBoy workspace",
-      description: "Open Slice, Compose, Collision, or Export in the connected Studio tab.",
+      title: "Open a SpriteBoy lane step",
+      description: "Open a lane (items, grid, animation, tileset) and optional step, or the library, in the connected Studio tab.",
       inputSchema: z.object({
-        workspaceId: z.enum(["slice", "compose", "collision", "export"]),
+        tab: z.enum(["items", "grid", "animation", "tileset", "library"]),
+        step: z.string().min(1).max(32).optional(),
         ...commonInput,
       }).strict(),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -223,8 +224,8 @@ async function main(): Promise<void> {
     async (input, extra) => {
       try {
         return toolResult(await callBridge(createControlRequest(
-          "workspace.navigate",
-          { workspaceId: input.workspaceId },
+          "lane.navigate",
+          input.step === undefined ? { tab: input.tab } : { tab: input.tab, step: input.step },
           input,
         ), extra.signal));
       } catch {
