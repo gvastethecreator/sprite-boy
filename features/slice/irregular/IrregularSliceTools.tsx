@@ -1,12 +1,20 @@
 import React from "react";
-import { Box, Copy, Eye, EyeOff, Hand, MousePointer2, Plus, Trash2, Wand2 } from "lucide-react";
+import { Box, Copy, Eye, EyeOff, Hand, MousePointer2, Plus, Shapes, Trash2, Wand2 } from "lucide-react";
+import type { SpriteDetectOptions, StrayFragment } from "sprite-detect";
 import { SliderControl } from "../../../components/toolcraft";
 import type { DeepReadonly } from "../../../core/stores";
 import type { EntityId, StudioProject } from "../../../core/project";
 import { WandSelectionProbe } from "./WandSelectionProbe";
 import type { WandSelectionMode, WandSelectionSnapshot } from "./wandSelection";
 
-export type IrregularToolMode = "wand" | "manual";
+export type IrregularToolMode = "wand" | "manual" | "sprites";
+
+const SPRITE_OPTION_FIELDS = [
+  ["alphaHigh", "Solid alpha", 1, 255],
+  ["alphaLow", "Edge alpha", 1, 255],
+  ["haloRadius", "Halo px", 0, 64],
+  ["minStrongPixels", "Min solid px", 1, 100000],
+] as const;
 
 export interface ManualRegionDraft {
   readonly x: number;
@@ -25,6 +33,10 @@ export interface IrregularSliceToolsProps {
   readonly wandConnectivity: 4 | 8;
   readonly manualDraft: ManualRegionDraft;
   readonly selectedRegionId: EntityId | null;
+  readonly spriteCount: number;
+  readonly spriteOptions: SpriteDetectOptions;
+  /** Null until a detection runs for the current source. */
+  readonly spriteStrays: readonly StrayFragment[] | null;
   readonly busy?: boolean;
   readonly error?: string | null;
   readonly onToolModeChange: (mode: IrregularToolMode) => void;
@@ -40,6 +52,9 @@ export interface IrregularSliceToolsProps {
   readonly onToggleHidden: () => void;
   readonly onConvertToAsset: () => void;
   readonly onSelectRegion: (regionId: EntityId) => void;
+  readonly onSpriteCountChange: (count: number) => void;
+  readonly onSpriteOptionsChange: (patch: Partial<SpriteDetectOptions>) => void;
+  readonly onDetectSprites: () => void;
 }
 
 function numberValue(value: string, fallback: number): number {
@@ -57,6 +72,9 @@ export function IrregularSliceTools({
   wandConnectivity,
   manualDraft,
   selectedRegionId,
+  spriteCount,
+  spriteOptions,
+  spriteStrays,
   busy = false,
   error = null,
   onToolModeChange,
@@ -72,6 +90,9 @@ export function IrregularSliceTools({
   onToggleHidden,
   onConvertToAsset,
   onSelectRegion,
+  onSpriteCountChange,
+  onSpriteOptionsChange,
+  onDetectSprites,
 }: IrregularSliceToolsProps) {
   const regions = project.rootOrder.regionIds
     .map((id) => project.regions[id])
@@ -91,12 +112,15 @@ export function IrregularSliceTools({
       </div>
 
       <div className="space-y-3 p-3">
-        <div role="tablist" aria-label="Irregular region tool" className="grid grid-cols-2 gap-1 rounded-md border border-white/10 bg-black/20 p-0.5">
+        <div role="tablist" aria-label="Irregular region tool" className="grid grid-cols-3 gap-1 rounded-md border border-white/10 bg-black/20 p-0.5">
           <button type="button" role="tab" aria-selected={toolMode === "wand"} onClick={() => onToolModeChange("wand")} className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded text-[10px] font-semibold ${toolMode === "wand" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}>
             <Wand2 size={12} aria-hidden="true" /> Wand
           </button>
           <button type="button" role="tab" aria-selected={toolMode === "manual"} onClick={() => onToolModeChange("manual")} className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded text-[10px] font-semibold ${toolMode === "manual" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}>
             <MousePointer2 size={12} aria-hidden="true" /> Manual
+          </button>
+          <button type="button" role="tab" aria-selected={toolMode === "sprites"} onClick={() => onToolModeChange("sprites")} className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded text-[10px] font-semibold ${toolMode === "sprites" ? "bg-accent text-white" : "text-textMuted hover:bg-white/5"}`}>
+            <Shapes size={12} aria-hidden="true" /> Sprites
           </button>
         </div>
 
@@ -133,6 +157,31 @@ export function IrregularSliceTools({
                 <button type="button" onClick={onCancelSelection} disabled={selection.components.length === 0} className="rounded-md px-2 py-1 font-bold text-textMuted hover:bg-white/10 hover:text-textMain disabled:opacity-40">Clear</button>
               </div>
             </div>
+          </div>
+        ) : toolMode === "sprites" ? (
+          <div className="space-y-3" role="tabpanel" aria-label="Sprite detection controls">
+            <p className="text-[10px] leading-4 text-textMuted">Splits the sheet by alpha into one Region per sprite. Running it again replaces the previous detection.</p>
+            <label className="block text-[9px] font-bold uppercase tracking-wider text-textMuted">
+              Sprites (0 = auto)
+              <input aria-label="Sprite count" type="number" min={0} step={1} value={spriteCount} onChange={(event) => onSpriteCountChange(Math.max(0, Math.round(numberValue(event.target.value, spriteCount))))} className="mt-1 w-full rounded-md border border-white/10 bg-input px-2 py-2 text-xs text-textMain" />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {SPRITE_OPTION_FIELDS.map(([field, label, min, max]) => (
+                <label key={field} className="text-[9px] font-bold uppercase tracking-wider text-textMuted">
+                  {label}
+                  <input aria-label={label} type="number" min={min} max={max} step={1} value={spriteOptions[field]} onChange={(event) => onSpriteOptionsChange({ [field]: numberValue(event.target.value, spriteOptions[field]) })} className="mt-1 w-full rounded-md border border-white/10 bg-input px-2 py-2 text-xs text-textMain" />
+                </label>
+              ))}
+            </div>
+            <button type="button" disabled={!hasSource || busy} onClick={onDetectSprites} className="inline-flex min-h-8 w-full items-center justify-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 text-[10px] font-semibold text-accent hover:bg-accent/15 disabled:opacity-40"><Shapes size={13} aria-hidden="true" /> Detect sprites</button>
+            {spriteStrays && spriteStrays.length > 0 ? (
+              <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-2" aria-label="Excluded strays">
+                <p className="text-[10px] font-bold text-amber-100">{spriteStrays.length} {spriteStrays.length === 1 ? "stray" : "strays"} excluded</p>
+                <ul className="mt-1 max-h-20 space-y-0.5 overflow-auto font-mono text-[9px] text-textMuted">
+                  {spriteStrays.map((stray) => <li key={`${stray.cell.x},${stray.cell.y}`}>{stray.cell.x},{stray.cell.y} · {stray.cell.w}×{stray.cell.h} · {stray.pixelCount} px</li>)}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-3" role="tabpanel" aria-label="Manual region controls">

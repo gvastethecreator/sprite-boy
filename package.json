@@ -52,6 +52,7 @@
     "onnxruntime-web": "1.27.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "sprite-detect": "github:gvastethecreator/sprite-detect#v0.1.0",
     "zod": "4.4.3"
   },
   "devDependencies": {

@@ -57,6 +57,12 @@ import type {
   SourceSessionSnapshot,
 } from "../../features/slice/source/sourceSession";
 import {
+  DEFAULT_SPRITE_DETECT,
+  detectSprites,
+  type SpriteDetectOptions,
+  type StrayFragment,
+} from "sprite-detect";
+import {
   IRREGULAR_REGION_DONOR_DEFAULTS,
 } from "../../core/processing/irregularRegionDetection";
 import {
@@ -254,6 +260,9 @@ const AppLayout: React.FC = () => {
   const [irregularRegionId, setIrregularRegionId] = useState<string | null>(
     () => canonicalProject.workspace.selectedRegionId ?? null,
   );
+  const [spriteCount, setSpriteCount] = useState(0);
+  const [spriteOptions, setSpriteOptions] = useState<SpriteDetectOptions>(DEFAULT_SPRITE_DETECT);
+  const [spriteStrays, setSpriteStrays] = useState<readonly StrayFragment[] | null>(null);
   const [irregularBusy, setIrregularBusy] = useState(false);
   const [irregularError, setIrregularError] = useState<string | null>(null);
   const [canonicalSliceSourceId, setCanonicalSliceSourceId] = useState<string | null>(
@@ -287,6 +296,7 @@ const AppLayout: React.FC = () => {
   }, [canonicalProject.workspace.selectedAssetId]);
   useEffect(() => {
     setWandSelection(createEmptyWandSelection());
+    setSpriteStrays(null);
     setIrregularRegionId(canonicalProject.workspace.selectedRegionId ?? null);
     setIrregularError(null);
   }, [canonicalProject.workspace.selectedAssetId, canonicalProject.id]);
@@ -543,6 +553,58 @@ const AppLayout: React.FC = () => {
       setIrregularBusy(false);
     }
   }, [canonical.assets, canonical.store, irregularRegionId, showToast]);
+  const detectSpriteRegions = useCallback(async (): Promise<void> => {
+    const sourceAssetId = canonicalSliceSourceId;
+    const dimensions = sliceGridController.sourceDimensions;
+    if (!sourceAssetId || !dimensions || !slicerImage) return;
+    setIrregularBusy(true);
+    try {
+      const { width, height } = dimensions;
+      const image = new Image();
+      image.src = slicerImage.src;
+      await image.decode();
+      const context = new OffscreenCanvas(width, height).getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("The source pixels could not be read.");
+      context.drawImage(image, 0, 0, width, height);
+      // ponytail: runs on the main thread like the wand; move to a worker if large sheets stall the UI.
+      const { cells, flags, strays } = detectSprites(context.getImageData(0, 0, width, height), spriteCount, spriteOptions);
+      const timestamp = new Date().toISOString();
+      const project = canonical.store.getSnapshot().project;
+      const previous = project.rootOrder.regionIds.filter((regionId) => {
+        const region = project.regions[regionId];
+        return region?.assetId === sourceAssetId && region.provenance?.source === "sprite-detect";
+      });
+      const commands: ProjectCommand[] = [
+        ...previous.map((regionId): ProjectCommand => ({ type: "region.remove", regionId, policy: "reject" })),
+        ...cells.map((cell, index): ProjectCommand => {
+          const note = flags[index]?.join(", ");
+          return {
+            type: "region.create",
+            region: {
+              id: newIrregularEntityId("region-sprite"),
+              assetId: sourceAssetId,
+              name: `Sprite ${index + 1}`,
+              bounds: { x: cell.x, y: cell.y, width: cell.w, height: cell.h },
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              provenance: { source: "sprite-detect", importedAt: timestamp, ...(note ? { note } : {}) },
+            },
+          };
+        }),
+      ];
+      if (dispatchIrregularCommand({ type: "command.batch", commands }, `sprite-detect:${sourceAssetId}`)) {
+        setSpriteStrays(strays);
+        setIrregularRegionId(null);
+        showToast(`${cells.length} sprite Regions created.`, "success");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The sprites could not be detected.";
+      setIrregularError(message);
+      showToast(message, "error");
+    } finally {
+      setIrregularBusy(false);
+    }
+  }, [canonical.store, canonicalSliceSourceId, dispatchIrregularCommand, showToast, slicerImage, sliceGridController.sourceDimensions, spriteCount, spriteOptions]);
   const handleManualCanvasCommit = useCallback((bounds: ManualRegionDraft): void => {
     setManualRegionDraft(bounds);
     createManualRegion(bounds);
@@ -567,7 +629,8 @@ const AppLayout: React.FC = () => {
   const canonicalRegionTool = useMemo<CanonicalRegionToolInteraction | null>(() => {
     if (activeWorkspace !== "slice" || !sliceGridController.sourceDimensions) return null;
     return {
-      mode: irregularToolMode,
+      // Detected sprites are plain Regions, so the Sprites tab edits them like Manual.
+      mode: irregularToolMode === "sprites" ? "manual" : irregularToolMode,
       sourceWidth: sliceGridController.sourceDimensions.width,
       sourceHeight: sliceGridController.sourceDimensions.height,
       regions: manualOverlayRegions,
@@ -1305,6 +1368,9 @@ const AppLayout: React.FC = () => {
       wandConnectivity={wandConnectivity}
       manualDraft={manualRegionDraft}
       selectedRegionId={irregularRegionId}
+      spriteCount={spriteCount}
+      spriteOptions={spriteOptions}
+      spriteStrays={spriteStrays}
       busy={irregularBusy}
       error={irregularError}
       onToolModeChange={setIrregularToolMode}
@@ -1320,6 +1386,9 @@ const AppLayout: React.FC = () => {
       onToggleHidden={toggleManualRegionHidden}
       onConvertToAsset={() => void convertManualRegionToAsset()}
       onSelectRegion={selectManualRegion}
+      onSpriteCountChange={setSpriteCount}
+      onSpriteOptionsChange={(patch) => setSpriteOptions((current) => ({ ...current, ...patch }))}
+      onDetectSprites={() => void detectSpriteRegions()}
     />
   ) : null;
   const loadingFallback = (label: string) => <div className="p-3 text-xs text-textMuted">Loading {label}…</div>;
@@ -1548,7 +1617,7 @@ const AppLayout: React.FC = () => {
                         canonicalCanvasOwnership={canonicalCanvasOwnership}
                         onCanonicalPickColor={sliceGridController.setChromaColor}
                         canonicalRegionTool={canonicalRegionTool}
-                        sliceGridOverlay={irregularToolMode === "manual" ? null : {
+                        sliceGridOverlay={irregularToolMode !== "wand" ? null : {
                           sourceDimensions: sliceGridController.sourceDimensions,
                           effectiveLayout: sliceGridController.effectiveLayout,
                           onResizeRowBoundary: sliceGridController.setManualRowBoundary,

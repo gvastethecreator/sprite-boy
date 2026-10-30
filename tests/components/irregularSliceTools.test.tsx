@@ -17,6 +17,9 @@ function props() {
     wandConnectivity: 4 as const,
     manualDraft: { x: 0, y: 0, width: 1, height: 1 },
     selectedRegionId: null,
+    spriteCount: 0,
+    spriteOptions: { alphaHigh: 64, alphaLow: 2, haloRadius: 6, minStrongPixels: 12 },
+    spriteStrays: null,
     onToolModeChange: vi.fn(),
     onWandModeChange: vi.fn(),
     onWandAlphaThresholdChange: vi.fn(),
@@ -30,6 +33,9 @@ function props() {
     onToggleHidden: vi.fn(),
     onConvertToAsset: vi.fn(),
     onSelectRegion: vi.fn(),
+    onSpriteCountChange: vi.fn(),
+    onSpriteOptionsChange: vi.fn(),
+    onDetectSprites: vi.fn(),
   };
 }
 
@@ -49,5 +55,21 @@ describe("IrregularSliceTools (S1-04)", () => {
     expect(value.onManualDraftChange).toHaveBeenCalledWith({ width: 12 });
     fireEvent.click(screen.getByRole("button", { name: /Create region/i }));
     expect(value.onCreateManual).toHaveBeenCalledOnce();
+  });
+
+  it("runs sprite detection and lists excluded strays", () => {
+    const value = props();
+    render(
+      <IrregularSliceTools
+        {...value}
+        toolMode="sprites"
+        spriteStrays={[{ cell: { x: 250, y: 225, w: 3, h: 3 }, pixelCount: 9, flags: ["stray_fragment"] }]}
+      />,
+    );
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Halo px" }), { target: { value: "4" } });
+    expect(value.onSpriteOptionsChange).toHaveBeenCalledWith({ haloRadius: 4 });
+    fireEvent.click(screen.getByRole("button", { name: /Detect sprites/i }));
+    expect(value.onDetectSprites).toHaveBeenCalledOnce();
+    expect(screen.getByText("1 stray excluded")).toBeInTheDocument();
   });
 });
