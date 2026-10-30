@@ -50,3 +50,11 @@ test-files/
 # OS
 desktop.ini
 *.lnk
+
+# Vitest 5 artifacts
+.vitest/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
